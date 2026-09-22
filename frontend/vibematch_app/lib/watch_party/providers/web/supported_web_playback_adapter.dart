@@ -12,6 +12,8 @@ import 'ott_playback_probe_result.dart';
 import 'ott_provider_definition.dart';
 import 'ott_web_playback_host.dart';
 
+typedef OttRemountBarrier = Future<void> Function();
+
 enum OttRuntimeMode {
   probing,
   embedded,
@@ -45,10 +47,12 @@ class SupportedWebPlaybackAdapter
     required OttWebPlaybackHost host,
     required CompanionPlaybackAdapter companion,
     AppTelemetry telemetry = const AppTelemetry(),
+    OttRemountBarrier? remountBarrier,
   }) : _provider = provider,
        _host = host,
        _companion = companion,
-       _telemetry = telemetry {
+       _telemetry = telemetry,
+       _remountBarrier = remountBarrier ?? _noOpRemountBarrier {
     _eventSubscription = _host.events.listen(_onHostEvent);
   }
 
@@ -56,6 +60,9 @@ class SupportedWebPlaybackAdapter
   final OttWebPlaybackHost _host;
   final CompanionPlaybackAdapter _companion;
   final AppTelemetry _telemetry;
+  final OttRemountBarrier _remountBarrier;
+
+  static Future<void> _noOpRemountBarrier() async {}
 
   late final StreamSubscription<OttJavascriptEvent> _eventSubscription;
   final ValueNotifier<OttProviderRuntimeState> runtimeState =
@@ -137,7 +144,7 @@ class SupportedWebPlaybackAdapter
     // Give ValueListenableBuilder one frame to remount the WebView before
     // reloading/probing it, otherwise a stale platform-view controller can be
     // mistaken for a real embedded capability.
-    await WidgetsBinding.instance.endOfFrame;
+    await _remountBarrier();
     if (_disposed) return false;
 
     try {
