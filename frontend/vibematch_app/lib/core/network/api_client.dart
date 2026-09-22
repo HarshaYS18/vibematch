@@ -1,15 +1,17 @@
 import 'dart:convert';
 
 import 'package:http/http.dart' as http;
+import 'package:sentry/sentry.dart';
 
 import '../constants/app_constants.dart';
 import 'api_exception.dart';
 import 'vm_api_config.dart';
+import 'trace_context.dart';
 
 class ApiClient {
   ApiClient({String? baseUrl, http.Client? httpClient})
     : _baseUrlOverride = baseUrl,
-      _httpClient = httpClient ?? http.Client();
+      _httpClient = httpClient ?? SentryHttpClient();
 
   final String? _baseUrlOverride;
   final http.Client _httpClient;
@@ -47,7 +49,7 @@ class ApiClient {
     final response = await _httpClient
         .get(
           _buildUri(path, queryParameters: queryParameters),
-          headers: {'Accept': 'application/json', ...headers},
+          headers: TraceContext.withTraceparent({'Accept': 'application/json', ...headers}),
         )
         .timeout(AppConstants.receiveTimeout);
 
@@ -70,7 +72,7 @@ class ApiClient {
     final response = await _httpClient
         .get(
           _buildUri(path, queryParameters: queryParameters),
-          headers: {'Accept': 'application/json', ...headers},
+          headers: TraceContext.withTraceparent({'Accept': 'application/json', ...headers}),
         )
         .timeout(AppConstants.receiveTimeout);
 
@@ -94,7 +96,7 @@ class ApiClient {
     final response = await _httpClient
         .get(
           _buildUri(path, queryParameters: queryParameters),
-          headers: {'Accept': 'application/json', ...headers},
+          headers: TraceContext.withTraceparent({'Accept': 'application/json', ...headers}),
         )
         .timeout(AppConstants.receiveTimeout);
 
@@ -118,11 +120,11 @@ class ApiClient {
     final response = await _httpClient
         .post(
           _buildUri(path, queryParameters: queryParameters),
-          headers: {
+          headers: TraceContext.withTraceparent({
             'Accept': 'application/json',
             'Content-Type': 'application/json',
             ...headers,
-          },
+          }),
           body: body == null ? null : jsonEncode(body),
         )
         .timeout(AppConstants.receiveTimeout);
@@ -147,11 +149,11 @@ class ApiClient {
     final response = await _httpClient
         .patch(
           _buildUri(path, queryParameters: queryParameters),
-          headers: {
+          headers: TraceContext.withTraceparent({
             'Accept': 'application/json',
             'Content-Type': 'application/json',
             ...headers,
-          },
+          }),
           body: body == null ? null : jsonEncode(body),
         )
         .timeout(AppConstants.receiveTimeout);
@@ -176,11 +178,11 @@ class ApiClient {
     final response = await _httpClient
         .delete(
           _buildUri(path, queryParameters: queryParameters),
-          headers: {
+          headers: TraceContext.withTraceparent({
             'Accept': 'application/json',
             'Content-Type': 'application/json',
             ...headers,
-          },
+          }),
           body: body == null ? null : jsonEncode(body),
         )
         .timeout(AppConstants.receiveTimeout);

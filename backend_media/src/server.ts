@@ -8,6 +8,9 @@ import { WorkerManager } from './mediasoup/workerManager.js';
 import { RoomManager } from './mediasoup/roomManager.js';
 import { createSocketServer } from './signaling/socketServer.js';
 import { joinMetrics } from './signaling/metrics.js';
+import { shutdownMediaTelemetry, startMediaTelemetry } from './telemetry.js';
+
+startMediaTelemetry();
 
 const app = express();
 app.use(cors({ origin: config.corsOrigin, credentials: true }));
@@ -150,6 +153,7 @@ async function shutdown(signal: string, exitCode = 0) {
   }
   io.close();
   workerManager.close();
+  await shutdownMediaTelemetry();
   httpServer.close(() => process.exit(exitCode));
   setTimeout(() => process.exit(exitCode || 1), 5000).unref();
 }

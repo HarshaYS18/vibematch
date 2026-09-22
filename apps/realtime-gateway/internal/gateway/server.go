@@ -15,6 +15,11 @@ import (
 	"time"
 
 	"github.com/gorilla/websocket"
+	"go.opentelemetry.io/contrib/instrumentation/net/http/otelhttp"
+	"go.opentelemetry.io/otel"
+	"go.opentelemetry.io/otel/attribute"
+	"go.opentelemetry.io/otel/propagation"
+	"go.opentelemetry.io/otel/trace"
 	"github.com/redis/go-redis/v9"
 )
 
@@ -65,7 +70,18 @@ func (s *Server) Handler() http.Handler {
 		}
 	})
 	mux.HandleFunc("GET /ws", s.serveWS)
-	return mux
+	return otelhttp.NewHandler(
+		mux,
+		"realtime.http",
+		otelhttp.WithFilter(func(r *http.Request) bool {
+			switch r.URL.Path {
+			case "/ws", "/live", "/ready", "/metrics":
+				return false
+			default:
+				return true
+			}
+		}),
+	)
 }
 
 func (s *Server) ready(w http.ResponseWriter, r *http.Request) {
@@ -106,6 +122,21 @@ func newID() string {
 }
 
 func (s *Server) serveWS(w http.ResponseWriter, r *http.Request) {
+	traceContext := otel.GetTextMapPropagator().Extract(
+		r.Context(),
+		propagation.HeaderCarrier(r.Header),
+	)
+	traceContext, connectSpan := otel.Tracer("funkey.realtime").Start(
+		traceContext,
+		"realtime.connect",
+		trace.WithSpanKind(trace.SpanKindServer),
+	)
+	spanEnded := false
+	defer func() {
+		if !spanEnded {
+			connectSpan.End()
+		}
+	}()
 	if s.Hub.IsDraining() {
 		http.Error(w, "draining", http.StatusServiceUnavailable)
 		return
@@ -123,7 +154,7 @@ func (s *Server) serveWS(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "unauthorized", http.StatusUnauthorized)
 		return
 	}
-	ctx, cancel := context.WithTimeout(r.Context(), s.Config.AuthTimeout)
+	ctx, cancel := context.WithTimeout(traceContext, s.Config.AuthTimeout)
 	principal, err := s.verify(ctx, token, "connect", "")
 	cancel()
 	if err != nil {
@@ -135,7 +166,7 @@ func (s *Server) serveWS(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "connection denied", status)
 		return
 	}
-	ctx, cancel = context.WithTimeout(r.Context(), time.Second)
+	ctx, cancel = context.WithTimeout(traceContext, time.Second)
 	err = s.Redis.Ping(ctx).Err()
 	cancel()
 	if err != nil || !s.subscribed.Load() {
@@ -158,6 +189,9 @@ func (s *Server) serveWS(w http.ResponseWriter, r *http.Request) {
 	}
 	s.touchClient(client)
 	s.Hub.Enqueue(client, []byte(`{"type":"connected","version":1}`))
+	connectSpan.SetAttributes(attribute.String("funkey.result", "accepted"))
+	connectSpan.End()
+	spanEnded = true
 	go s.writePump(client)
 	s.readPump(client)
 	s.Hub.Remove(client)
@@ -167,6 +201,7 @@ func (s *Server) serveWS(w http.ResponseWriter, r *http.Request) {
 type clientCommand struct {
 	Type         string `json:"type"`
 	RoomPublicID string `json:"room_public_id"`
+	Traceparent  string `json:"traceparent,omitempty"`
 }
 
 func validRoomID(roomID string) bool {
@@ -221,30 +256,54 @@ func (s *Server) readPump(c *Client) {
 		case "ping":
 			s.Hub.Enqueue(c, []byte(`{"type":"pong"}`))
 		case "subscribe":
-			if !validRoomID(command.RoomPublicID) {
-				s.Hub.Enqueue(c, []byte(`{"type":"error","code":"invalid_room"}`))
+			if !s.subscribeCommand(c, command) {
 				continue
 			}
-			ctx, cancel := context.WithTimeout(context.Background(), s.Config.AuthTimeout)
-			principal, err := s.verify(ctx, c.Token, "subscribe", command.RoomPublicID)
-			cancel()
-			if err != nil || principal.UserID != c.UserID {
-				s.Hub.stats.AuthDenied.Add(1)
-				s.Hub.Enqueue(c, []byte(`{"type":"error","code":"subscribe_denied"}`))
-				continue
-			}
-			if !s.Hub.Subscribe(c, command.RoomPublicID) {
-				s.Hub.Enqueue(c, []byte(`{"type":"error","code":"subscription_limit"}`))
-				continue
-			}
-			ack, _ := json.Marshal(map[string]string{"type": "subscribed", "room_public_id": command.RoomPublicID})
-			s.Hub.Enqueue(c, ack)
 		case "unsubscribe":
 			s.Hub.Unsubscribe(c, command.RoomPublicID)
 		default:
 			s.Hub.Enqueue(c, []byte(`{"type":"error","code":"unsupported_command"}`))
 		}
 	}
+}
+
+func (s *Server) subscribeCommand(c *Client, command clientCommand) bool {
+	if !validRoomID(command.RoomPublicID) {
+		s.Hub.Enqueue(c, []byte(`{"type":"error","code":"invalid_room"}`))
+		return false
+	}
+	parent := context.Background()
+	if command.Traceparent != "" {
+		parent = otel.GetTextMapPropagator().Extract(
+			parent,
+			propagation.MapCarrier{"traceparent": command.Traceparent},
+		)
+	}
+	parent, span := otel.Tracer("funkey.realtime").Start(
+		parent,
+		"realtime.subscribe",
+		trace.WithSpanKind(trace.SpanKindServer),
+		trace.WithAttributes(attribute.String("messaging.system", "websocket")),
+	)
+	defer span.End()
+	ctx, cancel := context.WithTimeout(parent, s.Config.AuthTimeout)
+	principal, err := s.verify(ctx, c.Token, "subscribe", command.RoomPublicID)
+	cancel()
+	if err != nil || principal.UserID != c.UserID {
+		s.Hub.stats.AuthDenied.Add(1)
+		s.Hub.Enqueue(c, []byte(`{"type":"error","code":"subscribe_denied"}`))
+		if err != nil {
+			span.RecordError(err)
+		}
+		return false
+	}
+	if !s.Hub.Subscribe(c, command.RoomPublicID) {
+		s.Hub.Enqueue(c, []byte(`{"type":"error","code":"subscription_limit"}`))
+		return false
+	}
+	ack, _ := json.Marshal(map[string]string{"type": "subscribed", "room_public_id": command.RoomPublicID})
+	s.Hub.Enqueue(c, ack)
+	return true
 }
 
 func (s *Server) writePump(c *Client) {
@@ -377,7 +436,21 @@ func (s *Server) ConsumeEvents(ctx context.Context) {
 				s.Hub.stats.InvalidEvents.Add(1)
 				continue
 			}
+			eventContext := context.Background()
+			if event.Traceparent != "" {
+				eventContext = otel.GetTextMapPropagator().Extract(
+					eventContext,
+					propagation.MapCarrier{"traceparent": event.Traceparent},
+				)
+			}
+			_, span := otel.Tracer("funkey.realtime").Start(
+				eventContext,
+				"realtime.fanout",
+				trace.WithSpanKind(trace.SpanKindConsumer),
+				trace.WithAttributes(attribute.String("messaging.system", "redis")),
+			)
 			s.Hub.Publish(event, []byte(msg.Payload))
+			span.End()
 		}
 		s.subscribed.Store(false)
 		_ = pubsub.Close()

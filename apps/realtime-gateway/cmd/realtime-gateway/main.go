@@ -16,6 +16,18 @@ import (
 
 func main() {
 	logger := slog.New(slog.NewJSONHandler(os.Stdout, nil))
+	shutdownTelemetry, telemetryErr := gateway.SetupTelemetry(context.Background(), "funkey-realtime", logger)
+	if telemetryErr != nil {
+		logger.Error("telemetry setup failed; continuing without exporter", "error", telemetryErr)
+	}
+	defer func() {
+		ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
+		defer cancel()
+		if err := shutdownTelemetry(ctx); err != nil {
+			logger.Warn("telemetry shutdown failed", "error", err)
+		}
+	}()
+
 	cfg, err := gateway.LoadConfig()
 	if err != nil {
 		logger.Error("invalid config", "error", err)

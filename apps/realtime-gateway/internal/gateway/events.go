@@ -14,6 +14,8 @@ type Event struct {
 	EventID      string          `json:"event_id"`
 	EventType    string          `json:"event_type"`
 	EventVersion int             `json:"event_version"`
+	TraceID      string          `json:"trace_id,omitempty"`
+	Traceparent  string          `json:"traceparent,omitempty"`
 	Scope        string          `json:"scope"`
 	RoomPublicID string          `json:"room_public_id,omitempty"`
 	UserID       int64           `json:"user_id,omitempty"`

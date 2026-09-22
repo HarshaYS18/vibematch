@@ -6,6 +6,7 @@ import { extractBearerToken, MediaAuthorizationError, verifyMediaAction } from '
 import type { Ack, MediaAction, MediaConsumer, MediaProducer, MediaWebRtcTransport, PeerState, RoomState } from '../types/mediaTypes.js';
 import type { RoomManager } from '../mediasoup/roomManager.js';
 import { recordJoin } from './metrics.js';
+import { withMediaSpan } from '../telemetry.js';
 import {
   connectTransportSchema,
   consumeSchema,
@@ -19,6 +20,8 @@ import {
   roomMusicStopSchema,
   socketAuthSchema,
 } from './events.js';
+
+const socketTraceparents = new Map<string, string>();
 
 export function createSocketServer(httpServer: HttpServer, roomManager: RoomManager, isDraining: () => boolean = () => false): Server {
   const io = new Server(httpServer, {
@@ -40,6 +43,9 @@ export function createSocketServer(httpServer: HttpServer, roomManager: RoomMana
       next(new Error('Invalid media socket auth token.'));
       return;
     }
+    const rawAuth = socket.handshake.auth as { traceparent?: unknown };
+    const traceparent = typeof rawAuth?.traceparent === 'string' ? rawAuth.traceparent.trim() : '';
+    if (traceparent) socketTraceparents.set(socket.id, traceparent);
     socket.data.auth = { bearerToken, deviceId: parsed.data.deviceId };
     mediaLog('auth.accepted', socket.id, { deviceIdPresent: Boolean(parsed.data.deviceId) });
     next();
@@ -317,6 +323,7 @@ export function createSocketServer(httpServer: HttpServer, roomManager: RoomMana
 
     socket.on('disconnect', async (reason) => {
       await socketOperations.get(socket.id);
+      socketTraceparents.delete(socket.id);
       const leavingRoom = roomManager.getPeerRoom(socket.id);
       if (leavingRoom?.peers.size === 1) {
         await stopRoomMusic(leavingRoom, io, 'room-empty');
@@ -472,7 +479,12 @@ async function safeAck<T>(eventName: string, socketId: string, ack: Ack<T> | und
 
 async function executeAck<T>(eventName: string, socketId: string, ack: Ack<T> | undefined, handler: () => Promise<T>): Promise<void> {
   try {
-    const data = await handler();
+    const data = await withMediaSpan(
+      `media.signal.${eventName}`,
+      handler,
+      socketTraceparents.get(socketId),
+      { 'funkey.media.event': eventName },
+    );
     if (eventName === 'joinRoom') recordJoin(true);
     ack?.(ackPayload(data));
   } catch (error) {

@@ -9,6 +9,8 @@ import (
 	"io"
 	"net/http"
 	"time"
+
+	"go.opentelemetry.io/contrib/instrumentation/net/http/otelhttp"
 )
 
 type Principal struct {
@@ -41,11 +43,11 @@ func NewHTTPAuthorizer(url string, timeout time.Duration) *HTTPAuthorizer {
 		URL: url,
 		Client: &http.Client{
 			Timeout: timeout,
-			Transport: &http.Transport{
+			Transport: otelhttp.NewTransport(&http.Transport{
 				MaxIdleConns:        100,
 				MaxIdleConnsPerHost: 100,
 				IdleConnTimeout:     90 * time.Second,
-			},
+			}),
 		},
 	}
 }

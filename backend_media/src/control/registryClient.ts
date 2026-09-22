@@ -2,6 +2,7 @@ import { randomUUID } from 'node:crypto';
 import http from 'node:http';
 import https from 'node:https';
 import { config } from '../config.js';
+import { injectTraceHeaders } from '../telemetry.js';
 
 export type MediaRuntimeStats = { roomCount: number; peerCount: number; roomIds: string[] };
 
@@ -88,13 +89,13 @@ async function requestRegistry(method: 'POST' | 'DELETE', path: string, payload?
     const request = client.request(url, {
       method,
       agent: false,
-      headers: {
+      headers: injectTraceHeaders({
         Accept: 'application/json',
         Connection: 'close',
         'X-Request-ID': requestId,
         'X-Media-Internal-Token': config.registry.internalToken,
-        ...(body ? { 'Content-Type': 'application/json', 'Content-Length': Buffer.byteLength(body) } : {}),
-      },
+        ...(body ? { 'Content-Type': 'application/json', 'Content-Length': String(Buffer.byteLength(body)) } : {}),
+      }),
     });
     const timeout = setTimeout(() => {
       request.destroy(new RegistryRequestError(

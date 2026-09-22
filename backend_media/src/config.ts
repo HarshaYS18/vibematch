@@ -4,6 +4,9 @@ import { z } from 'zod';
 
 const envSchema = z.object({
   APP_ENV: z.string().default('development'),
+  OTEL_TRACES_ENABLED: z.enum(['true', 'false']).default('false'),
+  OTEL_EXPORTER_OTLP_TRACES_ENDPOINT: z.string().url().default('http://127.0.0.1:4318/v1/traces'),
+  OTEL_EXPORT_TIMEOUT_MS: z.coerce.number().int().min(100).default(3000),
   MEDIA_SERVICE_HOST: z.string().default('0.0.0.0'),
   MEDIA_SERVICE_PORT: z.coerce.number().int().min(1).max(65535).default(4100),
   MEDIA_NODE_ID: z.string().default(''),
@@ -44,6 +47,11 @@ export const config = {
   verifyTimeoutMs: parsed.VERIFY_TIMEOUT_MS,
   drainTimeoutMs: parsed.MEDIA_DRAIN_TIMEOUT_MS,
   registryDiagnostics: parsed.MEDIA_REGISTRY_DIAGNOSTICS === 'true',
+  telemetry: {
+    enabled: parsed.OTEL_TRACES_ENABLED === 'true',
+    tracesEndpoint: parsed.OTEL_EXPORTER_OTLP_TRACES_ENDPOINT,
+    exportTimeoutMs: parsed.OTEL_EXPORT_TIMEOUT_MS,
+  },
   registry: {
     nodeId: parsed.MEDIA_NODE_ID.trim() || os.hostname(),
     publicUrl: parsed.MEDIA_PUBLIC_URL.replace(/\/$/, ''),

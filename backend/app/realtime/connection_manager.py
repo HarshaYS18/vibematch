@@ -13,6 +13,7 @@ from redis.asyncio import Redis
 from starlette.websockets import WebSocketState
 
 from app.core.config import settings
+from app.core.telemetry import current_trace_id, current_traceparent
 
 
 _REDIS_PREFIX = "funkey:room"
@@ -375,6 +376,8 @@ class RealtimeConnectionManager:
             "event_type": "room.realtime",
             "event_version": 1,
             "occurred_at": datetime.now(timezone.utc).isoformat(),
+            "trace_id": current_trace_id(),
+            "traceparent": current_traceparent(),
             "scope": "user" if user_id is not None else "room",
             "payload": payload,
         }
