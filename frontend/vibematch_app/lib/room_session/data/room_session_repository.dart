@@ -35,10 +35,7 @@ class RoomSessionRepository extends StateNotifier<RoomSessionState> {
         },
       );
       return reconcileSnapshot(
-        _room(
-          response,
-          preserveServerOmissions: true,
-        ),
+        _room(response),
         connection: RoomSessionConnection.connected,
         force: true,
       );
@@ -55,7 +52,10 @@ class RoomSessionRepository extends StateNotifier<RoomSessionState> {
         headers: _headers(),
       );
       return reconcileSnapshot(
-        _room(response),
+        _room(
+          response,
+          preserveServerOmissions: true,
+        ),
         connection: RoomSessionConnection.connected,
         force: true,
       );
