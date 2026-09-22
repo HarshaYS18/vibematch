@@ -47,6 +47,8 @@ class WatchPartyRepository extends StateNotifier<WatchPartyState> {
     String? contentUrl,
     String? contentTitle,
     int positionMs = 0,
+    WatchTimelineMode timelineMode = WatchTimelineMode.vod,
+    int targetLiveLatencyMs = defaultWatchTargetLiveLatencyMs,
   }) {
     return _command(
       WatchPartyCommand.load,
@@ -58,6 +60,8 @@ class WatchPartyRepository extends StateNotifier<WatchPartyState> {
         if (contentTitle?.trim().isNotEmpty == true)
           'content_title': contentTitle!.trim(),
         'position_ms': positionMs,
+        'timeline_mode': timelineMode == WatchTimelineMode.live ? 'live' : 'vod',
+        'target_live_latency_ms': targetLiveLatencyMs,
       },
       includeExpectedRevision: false,
     );
@@ -84,6 +88,8 @@ class WatchPartyRepository extends StateNotifier<WatchPartyState> {
     String? contentUrl,
     String? contentTitle,
     int positionMs = 0,
+    WatchTimelineMode? timelineMode,
+    int? targetLiveLatencyMs,
   }) {
     return _command(
       WatchPartyCommand.changeContent,
@@ -95,6 +101,10 @@ class WatchPartyRepository extends StateNotifier<WatchPartyState> {
         if (contentTitle?.trim().isNotEmpty == true)
           'content_title': contentTitle!.trim(),
         'position_ms': positionMs,
+        if (timelineMode != null)
+          'timeline_mode': timelineMode == WatchTimelineMode.live ? 'live' : 'vod',
+        if (targetLiveLatencyMs != null)
+          'target_live_latency_ms': targetLiveLatencyMs,
       },
     );
   }
