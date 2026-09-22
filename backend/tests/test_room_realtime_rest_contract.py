@@ -3,7 +3,7 @@ import unittest
 from fastapi.routing import APIRoute
 
 from app.api.routes.room_realtime_commands import router
-from app.schemas.room_realtime import RoomJoinCommand
+from app.schemas.room_realtime import RoomJoinCommand, RoomWatchPartyCommand
 from app.services.rooms.room_action_service import _safe_room_join_event_payload
 
 
@@ -37,6 +37,18 @@ class RoomRealtimeRestContractTests(unittest.TestCase):
         self.assertIn((f"{prefix}/join", "POST"), routes)
         self.assertIn((f"{prefix}/heartbeat", "POST"), routes)
         self.assertIn((f"{prefix}/leave", "POST"), routes)
+        self.assertIn((f"{prefix}/watch-party/command", "POST"), routes)
+
+    def test_watch_party_command_accepts_revisioned_sync_payload(self):
+        command = RoomWatchPartyCommand(
+            action="SYNC",
+            expected_revision=7,
+            position_ms=57340,
+            playback_state="playing",
+            playback_rate=1.0,
+        )
+        self.assertEqual("SYNC", command.action)
+        self.assertEqual(7, command.expected_revision)
 
 
 if __name__ == "__main__":

@@ -11,7 +11,7 @@ class AppSourceRegistryRoomContractTests(unittest.TestCase):
         reads = {item.path for item in room.child_reads}
         writes = {item.path for item in room.child_writes}
 
-        self.assertEqual(3, registry.version)
+        self.assertEqual(4, registry.version)
         self.assertIn(
             "/rooms/{room_public_id}/realtime/snapshot",
             reads,
@@ -22,6 +22,11 @@ class AppSourceRegistryRoomContractTests(unittest.TestCase):
             "/rooms/{room_public_id}/realtime/leave",
         }:
             self.assertIn(path, writes)
+
+        self.assertIn(
+            "/rooms/{room_public_id}/realtime/watch-party/command",
+            writes,
+        )
 
         for legacy in {
             "/rooms/{room_public_id}/join",

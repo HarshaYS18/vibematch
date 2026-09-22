@@ -46,3 +46,16 @@ class RoomBackgroundThemeCommand(RoomRealtimeBaseCommand):
 class RoomChatSendCommand(RoomRealtimeBaseCommand):
     text: str
     message_type: str = "text"
+
+
+class RoomWatchPartyCommand(RoomRealtimeBaseCommand):
+    action: str = Field(min_length=1, max_length=32)
+    expected_revision: int | None = Field(default=None, ge=0)
+    provider: str | None = Field(default=None, max_length=64)
+    content_id: str | None = Field(default=None, max_length=500)
+    content_url: str | None = Field(default=None, max_length=2000)
+    content_title: str | None = Field(default=None, max_length=500)
+    position_ms: int | None = Field(default=None, ge=0)
+    playback_state: str | None = Field(default=None, max_length=20)
+    playback_rate: float | None = Field(default=None, ge=0.25, le=4.0)
+    target_user_id: int | None = Field(default=None, gt=0)

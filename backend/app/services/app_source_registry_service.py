@@ -14,7 +14,7 @@ def _endpoint(path: str, purpose: str, *, owner: str = "backend", realtime_safe:
 
 def get_app_source_registry() -> AppSourceRegistryResponse:
     return AppSourceRegistryResponse(
-        version=3,
+        version=4,
         master_api=_endpoint(
             MASTER_STATE,
             "Authenticated user/profile/economy summary used as the app-level master read.",
@@ -58,10 +58,11 @@ def get_app_source_registry() -> AppSourceRegistryResponse:
                     _endpoint("/rooms/{room_public_id}/realtime/seat/take", "Canonical seat take/request mutation."),
                     _endpoint("/rooms/{room_public_id}/realtime/seat/leave", "Canonical seat leave mutation."),
                     _endpoint("/rooms/{room_public_id}/realtime/mic", "Canonical microphone state mutation."),
+                    _endpoint("/rooms/{room_public_id}/realtime/watch-party/command", "Canonical Watch Party LOAD/PLAY/PAUSE/SEEK/CHANGE_CONTENT/SYNC/END/TRANSFER_CONTROL mutation returning authoritative room state."),
                     _endpoint("/rooms/{room_public_id}/settings", "Room settings mutation while settings UI migrates onto RoomSessionRepository."),
                 ],
                 realtime_channels=["/ws/room-realtime"],
-                protected_flows=["room entry", "privacy", "kickout", "seats", "gifts", "chat", "online count"],
+                protected_flows=["room entry", "privacy", "kickout", "seats", "gifts", "chat", "online count", "watch party"],
                 duplicate_sources_to_retire=[
                     "LiveRoomPresenceRepository lifecycle reads/writes after legacy UI adapters are retired",
                     "LiveRoomMembershipService process-global cache after all room consumers read RoomSessionRepository",

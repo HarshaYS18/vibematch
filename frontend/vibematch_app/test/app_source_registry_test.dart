@@ -97,6 +97,46 @@ void main() {
     expect(registry.validateRoomSessionContract, returnsNormally);
   });
 
+
+  test('Chunk 7 registry requires canonical Watch Party command at v4', () {
+    final writes = <String>{
+      ...AppSourceRegistry.canonicalRoomLifecycleWrites,
+      AppSourceRegistry.canonicalWatchPartyCommand,
+    };
+    final registry = AppSourceRegistry.fromJson(<String, dynamic>{
+      'version': 4,
+      'master_api': <String, dynamic>{
+        'path': AppSourceRegistry.canonicalMasterRead,
+        'purpose': 'master',
+      },
+      'tabs': <Map<String, dynamic>>[
+        <String, dynamic>{
+          'tab_key': 'rooms',
+          'master_read': AppSourceRegistry.canonicalMasterRead,
+          'child_reads': <Map<String, dynamic>>[
+            <String, dynamic>{
+              'path': AppSourceRegistry.canonicalRoomSnapshot,
+              'purpose': 'snapshot',
+            },
+          ],
+          'child_writes': writes
+              .map(
+                (path) => <String, dynamic>{
+                  'path': path,
+                  'purpose': 'canonical room command',
+                },
+              )
+              .toList(),
+          'realtime_channels': <String>[
+            AppSourceRegistry.canonicalRoomRealtimeChannel,
+          ],
+        },
+      ],
+    });
+
+    expect(registry.validateRoomSessionContract, returnsNormally);
+  });
+
   test('room registry rejects legacy lifecycle endpoints', () {
     final registry = AppSourceRegistry.fromJson(<String, dynamic>{
       'version': 3,

@@ -29,9 +29,10 @@ from app.schemas.room_realtime import (
     RoomSeatLeaveCommand,
     RoomSeatLockCommand,
     RoomSeatTakeCommand,
+    RoomWatchPartyCommand,
 )
 from app.services.permissions import room_permission_service as policy_permissions
-from app.services.rooms import room_action_service, room_permission_service, room_state_service
+from app.services.rooms import room_action_service, room_permission_service, room_state_service, watch_party_service
 from app.services.user_master_state_service import get_user_master_state
 
 
@@ -527,6 +528,23 @@ def _execute_room_command_in_session(
         emissions.append(RoomCommandEmission(target="room", room_id=room.room_public_id, message=_system_event(room, "room_system_message", message, actor=actor)))
         return snapshot
 
+    if event_type.startswith("watch_party/"):
+        action = event_type.split("/", 1)[1].strip().upper()
+        watch_state = watch_party_service.apply_watch_party_command(
+            db,
+            room,
+            actor,
+            action,
+            payload,
+        )
+        return _finish(
+            db,
+            room,
+            emissions,
+            f"watch_party/{action.lower()}",
+            extra={"watch_party": watch_state},
+        )
+
     if event_type == "profile/update":
         room_permission_service.require_join(db, room, actor)
         room_action_service.record_room_event(db, room, "room.profile.refreshed", actor_user_id=actor.id)
@@ -565,7 +583,7 @@ def _execute_room_command_transaction(
             actor = db.query(User).filter(User.id == actor_user_id).first()
             if actor is None or actor.is_banned or not actor.is_active:
                 raise HTTPException(status_code=401, detail="Room session is no longer valid")
-            room = room_or_404(db, room_public_id)
+            room = room_or_404(db, room_public_id, for_update=True)
             snapshot = _execute_room_command_in_session(db, room, actor, event_type, payload, emissions)
             return RoomCommandOutcome(snapshot=snapshot, emissions=emissions)
         except Exception:
@@ -712,4 +730,24 @@ async def background_theme(room_public_id: str, command: RoomBackgroundThemeComm
 async def chat_send(room_public_id: str, command: RoomChatSendCommand, db: Session = Depends(get_db), current_user: User = Depends(get_current_user)):
     room = room_or_404(db, room_public_id)
     data = await execute_room_command(db, room, current_user, "room_chat/send", {"text": command.text, "message_type": command.message_type})
+    return {"room_id": room_public_id, "room": data}
+
+
+@router.post("/watch-party/command")
+async def watch_party_command(
+    room_public_id: str,
+    command: RoomWatchPartyCommand,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    room = room_or_404(db, room_public_id)
+    payload = command.model_dump(exclude_none=True)
+    action = str(payload.pop("action", "")).strip().upper()
+    data = await execute_room_command(
+        db,
+        room,
+        current_user,
+        f"watch_party/{action.lower()}",
+        payload,
+    )
     return {"room_id": room_public_id, "room": data}

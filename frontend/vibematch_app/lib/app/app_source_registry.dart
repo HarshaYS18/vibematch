@@ -78,6 +78,8 @@ class AppSourceRegistry {
   static const String canonicalRoomSnapshot =
       '/rooms/{room_public_id}/realtime/snapshot';
   static const String canonicalRoomRealtimeChannel = '/ws/room-realtime';
+  static const String canonicalWatchPartyCommand =
+      '/rooms/{room_public_id}/realtime/watch-party/command';
   static const Set<String> canonicalRoomLifecycleWrites = <String>{
     '/rooms/{room_public_id}/realtime/join',
     '/rooms/{room_public_id}/realtime/heartbeat',
@@ -144,6 +146,13 @@ class AppSourceRegistry {
       throw StateError(
         'Rooms registry is missing canonical lifecycle writes: '
         '${missingWrites.join(', ')}.',
+      );
+    }
+
+    if (version >= 4 && !writePaths.contains(canonicalWatchPartyCommand)) {
+      throw StateError(
+        'Rooms registry must expose canonical Watch Party command '
+        '$canonicalWatchPartyCommand.',
       );
     }
 

@@ -15,6 +15,7 @@ CANONICAL_ROOTS = (
     APP / "realtime",
     APP / "room_session",
     APP / "room_media",
+    APP / "watch_party",
 )
 
 violations: list[str] = []
@@ -60,6 +61,24 @@ if ROOM_FEATURE_ROOT.exists():
                 f"{rel}: room code must use RoomMediaEngine, not LiveRoomAudioService"
             )
 
+
+
+# Chunk 7: the provider-independent Watch Party core must not bind itself to
+# the legacy room websocket facade. Canonical room snapshots feed the
+# WatchPartyRepository and provider playback stays behind WatchProviderAdapter.
+WATCH_PARTY_ROOT = APP / "watch_party"
+if WATCH_PARTY_ROOT.exists():
+    for path in WATCH_PARTY_ROOT.rglob("*.dart"):
+        text = path.read_text(encoding="utf-8-sig")
+        rel = path.relative_to(ROOT).as_posix()
+        if "LiveRoomMediaSignalingService" in text:
+            violations.append(
+                f"{rel}: Watch Party core must not depend on the legacy room signaling singleton"
+            )
+        if "WebSocketChannel" in text:
+            violations.append(
+                f"{rel}: Watch Party core must use canonical room realtime state, not create/use a raw websocket"
+            )
 
 if violations:
     print("Frontend architecture guard failed:")
