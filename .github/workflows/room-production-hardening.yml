@@ -108,6 +108,8 @@ jobs:
           cache: true
       - name: Resolve Flutter dependencies
         run: flutter pub get
+      - name: Verify Flutter dependency lockfile
+        run: git diff --exit-code -- pubspec.lock
       - name: Run Flutter tests
         run: flutter test
       - name: Analyze Flutter
