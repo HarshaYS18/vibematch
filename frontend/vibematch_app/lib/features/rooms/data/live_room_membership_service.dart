@@ -133,8 +133,9 @@ class LiveRoomMembershipService {
   }
 
   /// Applies membership flags returned by a backend room snapshot or roster
-  /// mutation. Users not present in [roomMemberByUserId] are left untouched;
-  /// this avoids treating an online-participant list as a complete room roster.
+  /// mutation. Set [completeRoster] only when the backend response is a full
+  /// roster; missing confirmed members are then downgraded to guests while
+  /// temporary pending requests are preserved.
   static void applyBackendMembershipSnapshot({
     required String roomId,
     required Map<String, bool> roomMemberByUserId,

@@ -47,6 +47,7 @@ class AuthApiService {
 
     _cachedAccessToken = prefs.getString(_tokenKey);
     _cachedDeviceId = prefs.getString(_deviceIdKey);
+    _cachedUser = null;
 
     final savedUserJson = prefs.getString(_userJsonKey);
     if (savedUserJson != null && savedUserJson.trim().isNotEmpty) {
@@ -76,9 +77,14 @@ class AuthApiService {
     try {
       return await getCurrentUser(accessToken: token, forceRefresh: true);
     } catch (error) {
-      if (cachedUser == null || _isAuthoritativeSessionFailure(error)) {
+      if (_isAuthoritativeSessionFailure(error)) {
+        await _clearLocalSession(
+          reason: 'restored auth session rejected by backend',
+          publishSignedOut: false,
+        );
         rethrow;
       }
+      if (cachedUser == null) rethrow;
 
       AuthUserRealtimeService.instance.publish(cachedUser);
       return cachedUser;
@@ -264,6 +270,16 @@ class AuthApiService {
         'display_name': safeName,
         'bio': bio?.trim() ?? '',
         if (avatarUrl != null) 'avatar_url': avatarUrl.trim(),
+        'cover_photo_urls': _cachedUser?.coverPhotoUrls ?? const <String>[],
+        'date_of_birth': _cachedUser?.dateOfBirth == null
+            ? null
+            : _cachedUser!.dateOfBirth!.toIso8601String().split('T').first,
+        'gender': _cachedUser?.gender,
+        'profession': _cachedUser?.profession,
+        'marital_status': _cachedUser?.maritalStatus,
+        'friend_gender_preference': _cachedUser?.friendGenderPreference,
+        'friend_marital_preference': _cachedUser?.friendMaritalPreference,
+        'interests': _cachedUser?.interests ?? const <String>[],
       }),
     );
 
@@ -278,14 +294,23 @@ class AuthApiService {
 
   Future<void> logout() async {
     await VmPushNotificationService.instance.deleteCurrentTokenOnLogout();
-    await VmSessionCleanupService.clearUserScopedState(reason: 'logout');
+    await _clearLocalSession(reason: 'logout', publishSignedOut: true);
+  }
+
+  Future<void> _clearLocalSession({
+    required String reason,
+    required bool publishSignedOut,
+  }) async {
+    await VmSessionCleanupService.clearUserScopedState(reason: reason);
     _cachedAccessToken = null;
     _cachedUser = null;
 
     final prefs = await SharedPreferences.getInstance();
     await prefs.remove(_tokenKey);
     await prefs.remove(_userJsonKey);
-    AuthUserRealtimeService.instance.publishSignedOut();
+    if (publishSignedOut) {
+      AuthUserRealtimeService.instance.publishSignedOut();
+    }
   }
 
   String? get cachedAccessToken => _cachedAccessToken;
