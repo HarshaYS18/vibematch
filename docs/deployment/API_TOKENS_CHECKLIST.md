@@ -1,6 +1,6 @@
 # API tokens and production secrets checklist
 
-Use this before uploading FunKey / VibeMatch to a VPS.
+Use this before deploying FunKey to a VPS.
 
 ## Golden rule
 

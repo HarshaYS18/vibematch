@@ -1,6 +1,6 @@
-# VibeMatch Media Service
+# FunKey Media Service
 
-Production-style Node/TypeScript mediasoup signaling service for VibeMatch/FunKey realtime audio.
+Canonical Node.js/TypeScript mediasoup signaling and SFU implementation for FunKey rooms and calls. See the [media ownership guide](../docs/modules/media/README.md) and [production architecture](../docs/production_realtime_media_architecture.md).
 
 FastAPI remains the source of truth for:
 
@@ -20,9 +20,9 @@ The media service never trusts client-sent user ids, roles, or permissions. Ever
 ## Local setup
 
 ```powershell
-cd "D:\Vibe Match\vibematch\backend_media"
+cd backend_media
 copy .env.example .env
-npm install
+npm ci
 npm run typecheck
 npm run build
 npm run dev
@@ -31,7 +31,7 @@ npm run dev
 FastAPI should be running before joining rooms:
 
 ```powershell
-cd "D:\Vibe Match\vibematch\backend"
+cd backend
 uvicorn app.main:app --reload
 ```
 
@@ -148,7 +148,7 @@ Payload:
 }
 ```
 
-Only audio is enabled in this foundation. Video should be added after audio is stable.
+Room audio and authorized call video follow FastAPI permission decisions. Test both against the deployed client and network before enabling traffic.
 
 ### `consume`
 
@@ -207,7 +207,7 @@ The media service emits:
 - `POST /media-realtime/verify` must remain the permission gate before every sensitive mediasoup action.
 - Do not let clients pass `user_id`, `public_user_id`, roles, or room permission flags to mediasoup directly.
 - Add rate limiting at Nginx or service level before public beta.
-- Use sticky sessions if horizontally scaling Socket.IO, or add Redis adapter later.
+- Keep room-to-node assignment sticky through the FastAPI media registry. Draining nodes stop receiving new rooms; do not terminate a node while active rooms remain without a documented deadline.
 
 ## Current scope
 
@@ -226,7 +226,7 @@ Completed foundation:
 
 Deferred intentionally:
 
-- video media codecs
+- broader video use outside authorized calls
 - horizontal scaling with Redis adapter
 - recording/transcoding
 - TURN/STUN production tuning

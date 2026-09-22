@@ -6,7 +6,7 @@ Base: `mvp-testable-webrtc-v1`
 
 ## Goal
 
-This branch gives VibeMatch a real FastAPI-backed MVP API surface for the major app modules, without pretending the final production backend is complete.
+This branch gives FunKey a real FastAPI-backed MVP API surface for the major app modules, without pretending the final production backend is complete.
 
 It adds a persistent generic module state table that lets the frontend stop depending only on local mocks while we later split each feature into dedicated normalized tables and strict permission services.
 
@@ -185,7 +185,7 @@ This branch keeps the existing backend work:
 
 ## Important limitation
 
-This is an MVP backend coverage layer. It is not the final production-normalized backend for every VibeMatch module.
+This is an MVP backend coverage layer. It is not the final production-normalized backend for every FunKey module.
 
 Production work still needed later:
 

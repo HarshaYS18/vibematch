@@ -1,16 +1,16 @@
-# Vibe Match Master Source of Truth Architecture
+# FunKey Master Source of Truth Architecture
 
 Branch: `backend-realtime-core-v1`
 
 ## Core rule
 
-Vibe Match must have one master source of truth for the whole app, and only one source of truth for each individual element.
+FunKey must have one master source of truth for the whole app, and only one source of truth for each individual element.
 
 The backend is the master source of truth. Flutter must never be treated as source of truth for permanent app state. Flutter can only hold temporary UI state, optimistic state, animation state, local draft state, or cached snapshots that are replaced by backend truth.
 
 ## Master DB rule
 
-Vibe Match should use one master PostgreSQL database as the backend authority for production data. That does not mean one giant table. It means one canonical backend database owns the truth, and every domain table inside that database has one clear responsibility.
+FunKey should use one master PostgreSQL database as the backend authority for production data. That does not mean one giant table. It means one canonical backend database owns the truth, and every domain table inside that database has one clear responsibility.
 
 Correct production structure:
 
