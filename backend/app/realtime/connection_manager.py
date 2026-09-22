@@ -96,7 +96,13 @@ class RealtimeConnectionManager:
         self._lease_tasks: dict[WebSocket, asyncio.Task[None]] = {}
         self._room_versions: dict[str, int] = {}
         self._instance_id = uuid4().hex
-        self._redis: Redis = Redis.from_url(settings.redis_url, decode_responses=True)
+        self._redis: Redis = Redis.from_url(
+            settings.redis_url,
+            decode_responses=True,
+            socket_connect_timeout=settings.REDIS_CONNECT_TIMEOUT_SECONDS,
+            socket_timeout=settings.REDIS_SOCKET_TIMEOUT_SECONDS,
+            health_check_interval=20,
+        )
         self._listener_task: asyncio.Task[None] | None = None
         self._local_command_claims: dict[str, float] = {}
 

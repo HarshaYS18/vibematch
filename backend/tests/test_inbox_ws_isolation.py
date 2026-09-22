@@ -34,8 +34,16 @@ class InboxWebSocketIsolationTests(IsolatedAsyncioTestCase):
 
         with (
             patch.object(inbox_ws.asyncio, "to_thread", to_thread),
-            patch.object(inbox_ws.inbox_ws_manager, "connect", AsyncMock()) as connect,
-            patch.object(inbox_ws.inbox_ws_manager, "disconnect", Mock()) as disconnect,
+            patch.object(
+                inbox_ws.inbox_ws_manager,
+                "connect",
+                AsyncMock(return_value=True),
+            ) as connect,
+            patch.object(
+                inbox_ws.inbox_ws_manager,
+                "release_connection",
+                AsyncMock(return_value=False),
+            ) as release,
             patch.object(inbox_ws, "_broadcast_presence", AsyncMock()) as presence,
         ):
             await inbox_ws.inbox_websocket(websocket)
@@ -43,13 +51,13 @@ class InboxWebSocketIsolationTests(IsolatedAsyncioTestCase):
         self.assertEqual(to_thread.await_count, 2)
         connect.assert_awaited_once_with(7, websocket, is_staff=False)
         websocket.close.assert_awaited_once_with(code=4403)
-        disconnect.assert_called_once_with(7, websocket)
+        release.assert_awaited_once_with(7, websocket)
         self.assertEqual(
             presence.await_args_list,
             [call(7, True), call(7, False)],
         )
 
-    async def test_disconnect_also_cleans_presence_once(self):
+    async def test_disconnect_preserves_presence_when_another_device_is_live(self):
         websocket = Mock()
         websocket.query_params = {"token": "access-token"}
         websocket.close = AsyncMock()
@@ -64,17 +72,22 @@ class InboxWebSocketIsolationTests(IsolatedAsyncioTestCase):
 
         with (
             patch.object(inbox_ws.asyncio, "to_thread", AsyncMock(return_value=socket_user)),
-            patch.object(inbox_ws.inbox_ws_manager, "connect", AsyncMock()),
-            patch.object(inbox_ws.inbox_ws_manager, "disconnect", Mock()) as disconnect,
+            patch.object(
+                inbox_ws.inbox_ws_manager,
+                "connect",
+                AsyncMock(return_value=False),
+            ),
+            patch.object(
+                inbox_ws.inbox_ws_manager,
+                "release_connection",
+                AsyncMock(return_value=True),
+            ) as release,
             patch.object(inbox_ws, "_broadcast_presence", AsyncMock()) as presence,
         ):
             await inbox_ws.inbox_websocket(websocket)
 
-        disconnect.assert_called_once_with(9, websocket)
-        self.assertEqual(
-            presence.await_args_list,
-            [call(9, True), call(9, False)],
-        )
+        release.assert_awaited_once_with(9, websocket)
+        presence.assert_not_awaited()
 
 
 if __name__ == "__main__":
