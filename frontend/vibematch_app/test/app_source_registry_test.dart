@@ -61,4 +61,76 @@ void main() {
       throwsA(isA<StateError>()),
     );
   });
+
+  test('room registry accepts only canonical Chunk 5 lifecycle paths', () {
+    final registry = AppSourceRegistry.fromJson(<String, dynamic>{
+      'version': 3,
+      'master_api': <String, dynamic>{
+        'path': AppSourceRegistry.canonicalMasterRead,
+        'purpose': 'master',
+      },
+      'tabs': <Map<String, dynamic>>[
+        <String, dynamic>{
+          'tab_key': 'rooms',
+          'master_read': AppSourceRegistry.canonicalMasterRead,
+          'child_reads': <Map<String, dynamic>>[
+            <String, dynamic>{
+              'path': AppSourceRegistry.canonicalRoomSnapshot,
+              'purpose': 'snapshot',
+            },
+          ],
+          'child_writes': AppSourceRegistry.canonicalRoomLifecycleWrites
+              .map(
+                (path) => <String, dynamic>{
+                  'path': path,
+                  'purpose': 'lifecycle',
+                },
+              )
+              .toList(),
+          'realtime_channels': <String>[
+            AppSourceRegistry.canonicalRoomRealtimeChannel,
+          ],
+        },
+      ],
+    });
+
+    expect(registry.validateRoomSessionContract, returnsNormally);
+  });
+
+  test('room registry rejects legacy lifecycle endpoints', () {
+    final registry = AppSourceRegistry.fromJson(<String, dynamic>{
+      'version': 3,
+      'master_api': <String, dynamic>{
+        'path': AppSourceRegistry.canonicalMasterRead,
+        'purpose': 'master',
+      },
+      'tabs': <Map<String, dynamic>>[
+        <String, dynamic>{
+          'tab_key': 'rooms',
+          'master_read': AppSourceRegistry.canonicalMasterRead,
+          'child_reads': <Map<String, dynamic>>[
+            <String, dynamic>{
+              'path': AppSourceRegistry.canonicalRoomSnapshot,
+              'purpose': 'snapshot',
+            },
+          ],
+          'child_writes': <Map<String, dynamic>>[
+            <String, dynamic>{
+              'path': '/rooms/{room_public_id}/join',
+              'purpose': 'legacy join',
+            },
+          ],
+          'realtime_channels': <String>[
+            AppSourceRegistry.canonicalRoomRealtimeChannel,
+          ],
+        },
+      ],
+    });
+
+    expect(
+      registry.validateRoomSessionContract,
+      throwsA(isA<StateError>()),
+    );
+  });
+
 }
