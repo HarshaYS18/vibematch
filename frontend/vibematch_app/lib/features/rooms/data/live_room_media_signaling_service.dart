@@ -1268,7 +1268,7 @@ class LiveRoomMediaSignalingService with WidgetsBindingObserver {
       _runMediaAction(
         _mediaEngine.publishMic(
           seatIndex: confirmedSeatIndex,
-          muted: !decision.micEnabled,
+          muted: decision.micEnabled != true,
         ),
         label: 'apply authoritative microphone state',
       );
