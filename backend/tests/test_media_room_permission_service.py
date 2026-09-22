@@ -65,7 +65,7 @@ class MediaRoomPermissionTests(TestCase):
 
     def test_approved_seat_can_publish_in_apply_only_room(self) -> None:
         self.room.apply_only_mode_enabled = True
-        seat = SimpleNamespace(seat_index=2, admin_muted=False)
+        seat = SimpleNamespace(seat_index=2, admin_muted=False, mic_enabled=True)
 
         with (
             patch.object(media_permissions, "_active_participant", return_value=self.participant),
@@ -77,7 +77,7 @@ class MediaRoomPermissionTests(TestCase):
         self.assertIn("CAN_REQUEST_OR_USE_MIC", decision.permissions)
 
     def test_admin_muted_user_cannot_publish_audio(self) -> None:
-        seat = SimpleNamespace(seat_index=2, admin_muted=True)
+        seat = SimpleNamespace(seat_index=2, admin_muted=True, mic_enabled=True)
 
         with (
             patch.object(media_permissions, "_active_participant", return_value=self.participant),
@@ -87,3 +87,52 @@ class MediaRoomPermissionTests(TestCase):
 
         self.assertFalse(decision.allowed)
         self.assertIn("admin-muted", decision.reason or "")
+
+
+    def test_self_muted_user_cannot_publish_audio(self) -> None:
+        seat = SimpleNamespace(
+            seat_index=2,
+            admin_muted=False,
+            mic_enabled=False,
+        )
+
+        with (
+            patch.object(
+                media_permissions,
+                "_active_participant",
+                return_value=self.participant,
+            ),
+            patch.object(
+                media_permissions,
+                "_occupied_seat",
+                return_value=seat,
+            ),
+        ):
+            decision = self._evaluate("produce_audio")
+
+        self.assertFalse(decision.allowed)
+        self.assertIn("Microphone is muted", decision.reason or "")
+
+    def test_self_muted_user_cannot_resume_audio_producer(self) -> None:
+        seat = SimpleNamespace(
+            seat_index=2,
+            admin_muted=False,
+            mic_enabled=False,
+        )
+
+        with (
+            patch.object(
+                media_permissions,
+                "_active_participant",
+                return_value=self.participant,
+            ),
+            patch.object(
+                media_permissions,
+                "_occupied_seat",
+                return_value=seat,
+            ),
+        ):
+            decision = self._evaluate("resume_producer")
+
+        self.assertFalse(decision.allowed)
+        self.assertIn("Microphone is muted", decision.reason or "")
