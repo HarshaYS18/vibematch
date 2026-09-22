@@ -6,11 +6,11 @@ Runs game definitions, rounds, bets, pool settlement, and risk audit.
 
 ## Responsibilities
 
-The module owns game_definitions, game_rounds, game_bets, game_pools, game_risk_audits. Routes should validate input and delegate business decisions to services.
+The module owns game catalog/round lifecycle and risk state: game_definitions, game_rounds, game_round_players, game_bets, game_risk_audits. Financial game pools, ledgers, wallet mutations, and final settlement are logically Economy-owned even while current code is physically co-located in core-api. Routes should validate input and delegate business decisions to services.
 
 ## What this module owns
 
-game_definitions, game_rounds, game_bets, game_pools, game_risk_audits.
+game_definitions, game_rounds, game_round_players, game_bets, game_risk_audits. It does not own wallet_ledger, game_pool_ledger, or final value settlement.
 
 ## What this module does NOT own
 
@@ -18,7 +18,7 @@ This module does not own SFU transport state, edge routing, or client UI state.
 
 ## Source of truth
 
-PostgreSQL is the durable source of truth for game_definitions, game_rounds, game_bets, game_pools, game_risk_audits, wallet_ledger.
+PostgreSQL is the durable source of truth. Game Platform logically owns game_definitions, game_rounds, game_round_players, game_bets, and game_risk_audits. Economy logically owns value-bearing game pools/ledgers, wallet_ledger, and final financial settlement.
 
 ## Important files
 
@@ -38,7 +38,7 @@ No durable broker consumer is implied by this ownership guide. Add a consumer on
 
 ## Database tables/state owned
 
-Database tables and state: `game_definitions, game_rounds, game_bets, game_pools, game_risk_audits, wallet_ledger`.
+Database tables and state logically owned here: `game_definitions, game_rounds, game_round_players, game_bets, game_risk_audits`. Financial tables are Economy-owned; physical co-location does not grant Games write ownership.
 
 ## Redis keys/state owned
 
@@ -54,7 +54,7 @@ Server RNG, bet limits, settlement permissions, and value ledger are authoritati
 
 ## Failure modes
 
-Round settlement must be idempotent and recover from interrupted execution.
+Round lifecycle must recover from interruption. Financial settlement must be idempotent and delegated to Economy; Game Platform must never repair a failed settlement by directly editing wallet or ledger balances.
 
 ## Retry/idempotency behavior
 
@@ -90,4 +90,4 @@ Before changing this module: identify the owning table and contract, add an addi
 
 ## Known migration status
 
-Existing FastAPI domain; no Go migration started.
+Existing FastAPI domain. Chunk 15 formalizes logical separation from Economy; physical Game Platform extraction is Chunk 28.

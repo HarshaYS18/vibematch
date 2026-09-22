@@ -19,6 +19,13 @@ on:
       - '.github/workflows/production-platform.yml'
       - 'frontend/vibematch_app/**'
       - 'scripts/check_backend_architecture.py'
+      - 'contracts/architecture/**'
+      - 'docs/architecture/**'
+      - 'docs/modules/**'
+      - 'docs/master-source-of-truth-architecture.md'
+      - 'docs/MODULE_INDEX.md'
+      - 'docs/adr/**'
+      - 'docs/runbooks/**'
       - 'PRODUCTION_RUNBOOK.md'
       - '.github/workflows/room-production-hardening.yml'
 

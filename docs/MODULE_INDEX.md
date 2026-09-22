@@ -45,6 +45,10 @@ Each guide records ownership, contracts, state, security, scaling, operations, a
 ## Related guides
 
 - [Architecture decisions](adr/README.md)
+- [Architecture authority registry](architecture/authority-registry.md)
+- [State classification](architecture/state-classification.md)
+- [Service boundaries](architecture/service-boundaries.md)
+- [Authority conformance runbook](runbooks/authority-registry.md)
 - [Capacity model](architecture/capacity-model.md)
 - [Node autoscaling strategy](architecture/node-autoscaling.md)
 - [Failure testing strategy](architecture/failure-testing.md)

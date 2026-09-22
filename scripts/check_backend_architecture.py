@@ -41,6 +41,91 @@ STARTUP_FORBIDDEN = (
     "_ensure_runtime_schema",
 )
 
+AUTHORITY_REGISTRY = ROOT / "contracts" / "architecture" / "authorities.yaml"
+ALLOWED_STATE_CLASSES = {"AUTHORITY", "PROJECTION", "CACHE", "EPHEMERAL"}
+REQUIRED_AUTHORITY_STATE_IDS = {
+    "identity.accounts", "identity.sessions", "profiles.public", "rooms.definition",
+    "rooms.membership", "rooms.permissions", "rooms.seats", "presence.online_lease",
+    "rooms.watch_party", "rooms.activity", "inbox.conversations", "vibes.content",
+    "economy.wallet_ledger", "gifts.settlement", "games.catalog_rounds",
+    "games.financial_settlement", "missions.progress", "missions.reward_claims",
+    "families.membership", "notifications.in_app", "media.metadata", "media.objects",
+    "search.index", "analytics.event_stream", "recommendations.ranking",
+    "client.room_session_cache",
+}
+FINANCIAL_AUTHORITY_STATE_IDS = {
+    "economy.wallet_ledger", "economy.supply_ledger", "gifts.settlement",
+    "games.financial_settlement", "missions.reward_claims",
+}
+FORBIDDEN_DURABLE_AUTHORITY_OWNERS = {
+    "realtime", "search-projection", "analytics", "recommendation", "flutter",
+}
+
+
+def _validate_authority_registry(errors: list[str]) -> None:
+    if not AUTHORITY_REGISTRY.exists():
+        errors.append("machine-readable authority registry is missing")
+        return
+    try:
+        payload = json.loads(AUTHORITY_REGISTRY.read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError) as exc:
+        errors.append(f"authority registry is not valid JSON-compatible YAML: {exc}")
+        return
+    if payload.get("schema_version") != 1:
+        errors.append("authority registry schema_version must be 1")
+    states = payload.get("states")
+    if not isinstance(states, list) or not states:
+        errors.append("authority registry must contain a non-empty states list")
+        return
+
+    by_id: dict[str, dict] = {}
+    for index, item in enumerate(states):
+        if not isinstance(item, dict):
+            errors.append(f"authority registry state #{index} must be an object")
+            continue
+        state_id = str(item.get("id") or "").strip()
+        if not state_id:
+            errors.append(f"authority registry state #{index} is missing id")
+            continue
+        if state_id in by_id:
+            errors.append(f"duplicate authority registry state id: {state_id}")
+            continue
+        by_id[state_id] = item
+        kind = item.get("classification")
+        if kind not in ALLOWED_STATE_CLASSES:
+            errors.append(f"{state_id}: invalid classification {kind!r}")
+        if not str(item.get("logical_owner") or "").strip():
+            errors.append(f"{state_id}: logical_owner is required")
+        if not str(item.get("current_deployable") or "").strip():
+            errors.append(f"{state_id}: current_deployable is required")
+        if not isinstance(item.get("current_storage"), list) or not item["current_storage"]:
+            errors.append(f"{state_id}: current_storage must be non-empty")
+        if not isinstance(item.get("target_storage"), list) or not item["target_storage"]:
+            errors.append(f"{state_id}: target_storage must be non-empty")
+        if kind == "AUTHORITY":
+            if not isinstance(item.get("mutated_by"), list) or not item["mutated_by"]:
+                errors.append(f"{state_id}: authority must declare mutated_by")
+            if item.get("logical_owner") in FORBIDDEN_DURABLE_AUTHORITY_OWNERS:
+                errors.append(f"{state_id}: transport/projection/client owner cannot own durable truth")
+        elif kind in {"PROJECTION", "CACHE"}:
+            if not isinstance(item.get("source_states"), list) or not item["source_states"]:
+                errors.append(f"{state_id}: {kind} must declare source_states")
+        elif kind == "EPHEMERAL":
+            if not isinstance(item.get("rebuild_from"), list) or not item["rebuild_from"]:
+                errors.append(f"{state_id}: EPHEMERAL state must declare rebuild_from")
+
+    missing = REQUIRED_AUTHORITY_STATE_IDS.difference(by_id)
+    if missing:
+        errors.append("authority registry missing required states: " + ", ".join(sorted(missing)))
+    for state_id, item in by_id.items():
+        for source in item.get("source_states") or []:
+            if source not in by_id:
+                errors.append(f"{state_id}: unknown source_state {source}")
+    for state_id in FINANCIAL_AUTHORITY_STATE_IDS:
+        item = by_id.get(state_id)
+        if item and (item.get("classification") != "AUTHORITY" or item.get("logical_owner") != "economy"):
+            errors.append(f"{state_id}: financial truth must be AUTHORITY owned by economy")
+
 
 def _has_tracked_content(path: Path) -> bool:
     return path.exists() and any(item.is_file() for item in path.rglob("*"))
@@ -48,6 +133,7 @@ def _has_tracked_content(path: Path) -> bool:
 
 def main() -> int:
     errors: list[str] = []
+    _validate_authority_registry(errors)
 
     for path in REQUIRED_PATHS:
         if not path.exists():
@@ -134,6 +220,7 @@ def main() -> int:
     print(" - backend_media is the sole executable mediasoup implementation")
     print(" - Alembic is the sole schema mutation path")
     print(" - /api/v1 is owned by the canonical router")
+    print(" - mutable state ownership conforms to contracts/architecture/authorities.yaml")
     return 0
 
 

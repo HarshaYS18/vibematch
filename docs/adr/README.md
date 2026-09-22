@@ -14,3 +14,4 @@ These decisions describe the target and invariants; they do not assert every imp
 - [ADR-010: Realtime gateway ownership](ADR-010-realtime-gateway-ownership.md)
 - [ADR-011: Database connection budget](ADR-011-database-connection-budget.md)
 - [ADR-012: Argo CD GitOps deployment strategy](ADR-012-gitops-deployment.md)
+- [ADR-013: Machine-readable state authority registry](ADR-013-authority-registry.md)

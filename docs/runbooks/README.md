@@ -18,3 +18,4 @@ Choose the incident matching the failing layer. For planned deployment, start wi
 - [Capacity emergency](capacity-emergency.md)
 - [Region failure](region-failure.md)
 - [Security incident](security-incident.md)
+- [Authority registry conformance](authority-registry.md)

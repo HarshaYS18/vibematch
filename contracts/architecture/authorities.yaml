@@ -1,0 +1,1059 @@
+{
+  "schema_version": 1,
+  "updated_for_chunk": 15,
+  "status": "architecture contract; current fields describe repository reality and target fields describe approved migration direction",
+  "classifications": [
+    "AUTHORITY",
+    "PROJECTION",
+    "CACHE",
+    "EPHEMERAL"
+  ],
+  "invariants": {
+    "durable_business_state": "Exactly one logical owner may mutate durable business truth.",
+    "projections": "PROJECTION and CACHE states name source_states and remain rebuildable.",
+    "ephemeral": "EPHEMERAL states are reconstructable after loss.",
+    "no_transport_authority": "Realtime, GraphQL, Kafka, OpenSearch, ClickHouse and Flutter are not durable business authorities.",
+    "financial_authority": "Wallet/ledger/gift/game/mission value movement is Economy-owned.",
+    "extraction": "Logical owner does not imply target microservice is deployed."
+  },
+  "states": [
+    {
+      "id": "identity.accounts",
+      "domain": "identity",
+      "classification": "AUTHORITY",
+      "logical_owner": "identity",
+      "current_deployable": "core-api",
+      "current_storage": [
+        "postgres:users",
+        "postgres:auth_identities",
+        "postgres:login_history"
+      ],
+      "target_storage": [
+        "identity-service postgres"
+      ],
+      "mutated_by": [
+        "identity/auth services"
+      ],
+      "source_states": [],
+      "rebuild_from": [],
+      "change_contract": {
+        "status": "planned",
+        "name": "identity.account.updated.v1"
+      },
+      "migration_status": "physical extraction Chunk 27"
+    },
+    {
+      "id": "identity.sessions",
+      "domain": "identity",
+      "classification": "AUTHORITY",
+      "logical_owner": "identity",
+      "current_deployable": "core-api",
+      "current_storage": [
+        "signed access-token contract",
+        "postgres login/device-ban records; dedicated durable session registry not present yet"
+      ],
+      "target_storage": [
+        "identity-service postgres: sessions + devices"
+      ],
+      "mutated_by": [
+        "identity/auth services"
+      ],
+      "source_states": [],
+      "rebuild_from": [],
+      "change_contract": {
+        "status": "planned",
+        "name": "identity.session.changed.v1"
+      },
+      "migration_status": "explicit storage gap; Chunk 27"
+    },
+    {
+      "id": "identity.access_tokens",
+      "domain": "identity",
+      "classification": "EPHEMERAL",
+      "logical_owner": "identity",
+      "current_deployable": "core-api + clients",
+      "current_storage": [
+        "short-lived signed access tokens"
+      ],
+      "target_storage": [
+        "short-lived access/realtime capabilities"
+      ],
+      "mutated_by": [
+        "identity issuer"
+      ],
+      "source_states": [
+        "identity.sessions"
+      ],
+      "rebuild_from": [
+        "reauthenticate from identity.sessions"
+      ],
+      "change_contract": {
+        "status": "planned",
+        "name": "identity.session.revoked.v1"
+      },
+      "migration_status": "realtime capabilities Chunk 22"
+    },
+    {
+      "id": "profiles.public",
+      "domain": "profiles",
+      "classification": "AUTHORITY",
+      "logical_owner": "profile-social",
+      "current_deployable": "core-api",
+      "current_storage": [
+        "postgres:users",
+        "postgres:user_stealth_states",
+        "postgres:profile_display_audits",
+        "postgres:profile_visits"
+      ],
+      "target_storage": [
+        "profile-social service postgres"
+      ],
+      "mutated_by": [
+        "profile services"
+      ],
+      "source_states": [],
+      "rebuild_from": [],
+      "change_contract": {
+        "status": "planned",
+        "name": "profile.updated.v1"
+      },
+      "migration_status": "physical extraction Chunk 27"
+    },
+    {
+      "id": "social.graph",
+      "domain": "social",
+      "classification": "AUTHORITY",
+      "logical_owner": "profile-social",
+      "current_deployable": "core-api",
+      "current_storage": [
+        "postgres:user_follows",
+        "postgres:user_blocks",
+        "postgres:love_bonds",
+        "postgres:love_bond_requests"
+      ],
+      "target_storage": [
+        "profile-social service postgres"
+      ],
+      "mutated_by": [
+        "social/relationship services"
+      ],
+      "source_states": [],
+      "rebuild_from": [],
+      "change_contract": {
+        "status": "planned",
+        "name": "social.relationship.updated.v1"
+      },
+      "migration_status": "physical extraction Chunk 27"
+    },
+    {
+      "id": "families.membership",
+      "domain": "families",
+      "classification": "AUTHORITY",
+      "logical_owner": "profile-social",
+      "current_deployable": "core-api",
+      "current_storage": [
+        "postgres:family_economy_stats (current family record)",
+        "postgres:family_member_stats"
+      ],
+      "target_storage": [
+        "profile-social service postgres family tables"
+      ],
+      "mutated_by": [
+        "family services/routes"
+      ],
+      "source_states": [],
+      "rebuild_from": [],
+      "change_contract": {
+        "status": "planned",
+        "name": "family.membership.updated.v1"
+      },
+      "migration_status": "historical table naming does not transfer ownership"
+    },
+    {
+      "id": "families.community_chat",
+      "domain": "families",
+      "classification": "AUTHORITY",
+      "logical_owner": "inbox",
+      "current_deployable": "core-api",
+      "current_storage": [
+        "postgres:inbox_conversations(type=family)",
+        "postgres:inbox_participants",
+        "postgres:inbox_messages"
+      ],
+      "target_storage": [
+        "inbox-service postgres"
+      ],
+      "mutated_by": [
+        "inbox service via family adapter"
+      ],
+      "source_states": [],
+      "rebuild_from": [],
+      "change_contract": {
+        "status": "planned",
+        "name": "inbox.message.created.v1"
+      },
+      "migration_status": "family chat is Inbox-owned"
+    },
+    {
+      "id": "rooms.definition",
+      "domain": "rooms",
+      "classification": "AUTHORITY",
+      "logical_owner": "room-control",
+      "current_deployable": "core-api",
+      "current_storage": [
+        "postgres:rooms",
+        "postgres:room_themes",
+        "postgres:room_theme_reviews",
+        "postgres:user_room_theme_inventory"
+      ],
+      "target_storage": [
+        "room-control service postgres"
+      ],
+      "mutated_by": [
+        "room services"
+      ],
+      "source_states": [],
+      "rebuild_from": [],
+      "change_contract": {
+        "status": "planned",
+        "name": "room.updated.v1"
+      },
+      "migration_status": "physical extraction Chunk 26"
+    },
+    {
+      "id": "rooms.membership",
+      "domain": "rooms",
+      "classification": "AUTHORITY",
+      "logical_owner": "room-control",
+      "current_deployable": "core-api",
+      "current_storage": [
+        "postgres:room_participants",
+        "postgres:room_kickouts"
+      ],
+      "target_storage": [
+        "room-control service postgres"
+      ],
+      "mutated_by": [
+        "room action/membership services"
+      ],
+      "source_states": [],
+      "rebuild_from": [],
+      "change_contract": {
+        "status": "live",
+        "name": "room.joined/room.left"
+      },
+      "migration_status": "current"
+    },
+    {
+      "id": "rooms.permissions",
+      "domain": "rooms",
+      "classification": "AUTHORITY",
+      "logical_owner": "room-control",
+      "current_deployable": "core-api",
+      "current_storage": [
+        "postgres:room_participants member/admin flags",
+        "postgres:user_roles/special_permissions for global policy"
+      ],
+      "target_storage": [
+        "room-control postgres + identity authorization contract"
+      ],
+      "mutated_by": [
+        "room permission/admin services"
+      ],
+      "source_states": [],
+      "rebuild_from": [],
+      "change_contract": {
+        "status": "planned",
+        "name": "room.permission.updated.v1"
+      },
+      "migration_status": "current"
+    },
+    {
+      "id": "rooms.seats",
+      "domain": "rooms",
+      "classification": "AUTHORITY",
+      "logical_owner": "room-control",
+      "current_deployable": "core-api",
+      "current_storage": [
+        "postgres:room_seat_states"
+      ],
+      "target_storage": [
+        "room-control service postgres"
+      ],
+      "mutated_by": [
+        "room action service"
+      ],
+      "source_states": [],
+      "rebuild_from": [],
+      "change_contract": {
+        "status": "live",
+        "name": "seat.updated family"
+      },
+      "migration_status": "current"
+    },
+    {
+      "id": "rooms.watch_party",
+      "domain": "rooms",
+      "classification": "AUTHORITY",
+      "logical_owner": "room-control",
+      "current_deployable": "core-api",
+      "current_storage": [
+        "postgres:room_realtime_events where event_type=watch_party.*; latest event is current canonical state"
+      ],
+      "target_storage": [
+        "room-control current-state model + audit/replay log"
+      ],
+      "mutated_by": [
+        "watch_party_service"
+      ],
+      "source_states": [],
+      "rebuild_from": [],
+      "change_contract": {
+        "status": "live",
+        "name": "watch_party.*"
+      },
+      "migration_status": "dedicated current-state optimization remains same owner"
+    },
+    {
+      "id": "rooms.activity",
+      "domain": "rooms",
+      "classification": "AUTHORITY",
+      "logical_owner": "room-control",
+      "current_deployable": "core-api",
+      "current_storage": [
+        "postgres:room_realtime_events where event_type=room_activity.state.*; latest event is current canonical state"
+      ],
+      "target_storage": [
+        "room-control current-state model + audit/replay log"
+      ],
+      "mutated_by": [
+        "room_activity_service"
+      ],
+      "source_states": [],
+      "rebuild_from": [],
+      "change_contract": {
+        "status": "live",
+        "name": "room_activity.state.*"
+      },
+      "migration_status": "current event-log authority can be optimized later"
+    },
+    {
+      "id": "presence.online_lease",
+      "domain": "presence",
+      "classification": "EPHEMERAL",
+      "logical_owner": "realtime",
+      "current_deployable": "core-api compatibility path",
+      "current_storage": [
+        "postgres/user_room_presence + heartbeat compatibility behavior",
+        "process/socket state"
+      ],
+      "target_storage": [
+        "redis/valkey TTL socket/presence leases owned by Go realtime"
+      ],
+      "mutated_by": [
+        "room presence compatibility services"
+      ],
+      "source_states": [
+        "rooms.membership"
+      ],
+      "rebuild_from": [
+        "active authenticated sockets + rooms.membership"
+      ],
+      "change_contract": {
+        "status": "planned",
+        "name": "presence.updated.v2"
+      },
+      "migration_status": "P0 migration Chunk 20/21"
+    },
+    {
+      "id": "realtime.connection_routing",
+      "domain": "realtime",
+      "classification": "EPHEMERAL",
+      "logical_owner": "realtime",
+      "current_deployable": "realtime-gateway",
+      "current_storage": [
+        "gateway memory + redis/valkey coordination where configured"
+      ],
+      "target_storage": [
+        "sharded Go indexes + redis/valkey routing leases"
+      ],
+      "mutated_by": [
+        "Go realtime gateway"
+      ],
+      "source_states": [
+        "identity.sessions"
+      ],
+      "rebuild_from": [
+        "authenticated sockets + subscriptions"
+      ],
+      "change_contract": {
+        "status": "live",
+        "name": "gateway realtime envelope"
+      },
+      "migration_status": "transport only"
+    },
+    {
+      "id": "inbox.conversations",
+      "domain": "inbox",
+      "classification": "AUTHORITY",
+      "logical_owner": "inbox",
+      "current_deployable": "core-api",
+      "current_storage": [
+        "postgres:inbox_conversations",
+        "postgres:inbox_participants",
+        "postgres:inbox_messages",
+        "postgres inbox user-state/preferences"
+      ],
+      "target_storage": [
+        "inbox-service postgres"
+      ],
+      "mutated_by": [
+        "inbox service"
+      ],
+      "source_states": [],
+      "rebuild_from": [],
+      "change_contract": {
+        "status": "planned",
+        "name": "inbox.message.created.v1"
+      },
+      "migration_status": "Chunk 23"
+    },
+    {
+      "id": "inbox.typing",
+      "domain": "inbox",
+      "classification": "EPHEMERAL",
+      "logical_owner": "realtime",
+      "current_deployable": "core-api compatibility websocket",
+      "current_storage": [
+        "socket/redis transient state"
+      ],
+      "target_storage": [
+        "Go realtime + redis/valkey TTL state"
+      ],
+      "mutated_by": [
+        "compatibility inbox websocket"
+      ],
+      "source_states": [
+        "inbox.conversations"
+      ],
+      "rebuild_from": [
+        "active conversation subscriptions"
+      ],
+      "change_contract": {
+        "status": "planned",
+        "name": "inbox.typing.v2"
+      },
+      "migration_status": "Chunk 21/23"
+    },
+    {
+      "id": "vibes.content",
+      "domain": "vibes",
+      "classification": "AUTHORITY",
+      "logical_owner": "vibes",
+      "current_deployable": "core-api",
+      "current_storage": [
+        "postgres:vibe_posts/comments/comment_reactions/reactions/shares/saves/reports"
+      ],
+      "target_storage": [
+        "vibes-service postgres"
+      ],
+      "mutated_by": [
+        "vibes service/routes"
+      ],
+      "source_states": [],
+      "rebuild_from": [],
+      "change_contract": {
+        "status": "planned",
+        "name": "vibe.changed.v1"
+      },
+      "migration_status": "Chunk 24"
+    },
+    {
+      "id": "vibes.feed_projection",
+      "domain": "vibes",
+      "classification": "PROJECTION",
+      "logical_owner": "vibes",
+      "current_deployable": "core-api direct-query feed",
+      "current_storage": [
+        "database query result; no separate durable projection yet"
+      ],
+      "target_storage": [
+        "feed read model + recommendation candidate inputs"
+      ],
+      "mutated_by": [
+        "read model workers after extraction"
+      ],
+      "source_states": [
+        "vibes.content",
+        "social.graph"
+      ],
+      "rebuild_from": [],
+      "change_contract": {
+        "status": "planned",
+        "name": "vibe.feed.invalidated.v1"
+      },
+      "migration_status": "Chunk 24/39"
+    },
+    {
+      "id": "economy.wallet_ledger",
+      "domain": "economy",
+      "classification": "AUTHORITY",
+      "logical_owner": "economy",
+      "current_deployable": "core-api",
+      "current_storage": [
+        "postgres:user_wallets",
+        "postgres:wallet_ledger"
+      ],
+      "target_storage": [
+        "economy-service postgres"
+      ],
+      "mutated_by": [
+        "wallet/economy transaction services"
+      ],
+      "source_states": [],
+      "rebuild_from": [],
+      "change_contract": {
+        "status": "planned",
+        "name": "economy.wallet.changed.v1"
+      },
+      "migration_status": "Tier-0; Chunk 25"
+    },
+    {
+      "id": "economy.supply_ledger",
+      "domain": "economy",
+      "classification": "AUTHORITY",
+      "logical_owner": "economy",
+      "current_deployable": "core-api",
+      "current_storage": [
+        "postgres:coin_supply_pools",
+        "postgres:coin_pool_ledger",
+        "postgres:coin_sale_orders",
+        "postgres:ruby_withdraw_requests"
+      ],
+      "target_storage": [
+        "economy-service postgres"
+      ],
+      "mutated_by": [
+        "economy/coin-sale services"
+      ],
+      "source_states": [],
+      "rebuild_from": [],
+      "change_contract": {
+        "status": "planned",
+        "name": "economy.supply.changed.v1"
+      },
+      "migration_status": "Tier-0; Chunk 25"
+    },
+    {
+      "id": "gifts.catalog",
+      "domain": "gifts",
+      "classification": "AUTHORITY",
+      "logical_owner": "economy",
+      "current_deployable": "core-api",
+      "current_storage": [
+        "postgres:gift_catalog_categories",
+        "postgres:gift_catalog_items"
+      ],
+      "target_storage": [
+        "economy-compatible catalog store"
+      ],
+      "mutated_by": [
+        "gift catalog services"
+      ],
+      "source_states": [],
+      "rebuild_from": [],
+      "change_contract": {
+        "status": "planned",
+        "name": "gift.catalog.updated.v1"
+      },
+      "migration_status": "configuration authority"
+    },
+    {
+      "id": "gifts.settlement",
+      "domain": "gifts",
+      "classification": "AUTHORITY",
+      "logical_owner": "economy",
+      "current_deployable": "core-api",
+      "current_storage": [
+        "postgres:gift_transactions",
+        "postgres:wallet_ledger"
+      ],
+      "target_storage": [
+        "economy-service postgres"
+      ],
+      "mutated_by": [
+        "gift settlement + economy transaction services"
+      ],
+      "source_states": [],
+      "rebuild_from": [],
+      "change_contract": {
+        "status": "planned",
+        "name": "gift.settled.v1"
+      },
+      "migration_status": "financial truth is Economy"
+    },
+    {
+      "id": "games.catalog_rounds",
+      "domain": "games",
+      "classification": "AUTHORITY",
+      "logical_owner": "game-platform",
+      "current_deployable": "core-api + CDN game bridge",
+      "current_storage": [
+        "postgres:game_definitions",
+        "postgres:game_rounds",
+        "postgres:game_round_players",
+        "postgres:game_bets",
+        "postgres:game_risk_audits"
+      ],
+      "target_storage": [
+        "game-platform postgres"
+      ],
+      "mutated_by": [
+        "game services"
+      ],
+      "source_states": [],
+      "rebuild_from": [],
+      "change_contract": {
+        "status": "planned",
+        "name": "game.round.changed.v1"
+      },
+      "migration_status": "Chunk 28"
+    },
+    {
+      "id": "games.financial_settlement",
+      "domain": "games",
+      "classification": "AUTHORITY",
+      "logical_owner": "economy",
+      "current_deployable": "core-api",
+      "current_storage": [
+        "postgres:game_pools",
+        "postgres:game_pool_ledger",
+        "postgres:wallet_ledger"
+      ],
+      "target_storage": [
+        "economy-service postgres invoked by Game Platform"
+      ],
+      "mutated_by": [
+        "economy/game settlement services"
+      ],
+      "source_states": [],
+      "rebuild_from": [],
+      "change_contract": {
+        "status": "planned",
+        "name": "economy.game_settled.v1"
+      },
+      "migration_status": "Economy-owned despite co-location"
+    },
+    {
+      "id": "missions.progress",
+      "domain": "missions",
+      "classification": "PROJECTION",
+      "logical_owner": "profile-social",
+      "current_deployable": "core-api computed read",
+      "current_storage": [
+        "computed from room_realtime_events + gift_transactions"
+      ],
+      "target_storage": [
+        "mission projection/read model only if needed"
+      ],
+      "mutated_by": [
+        "experience_service read logic"
+      ],
+      "source_states": [
+        "rooms.membership",
+        "rooms.seats",
+        "rooms.activity",
+        "gifts.settlement"
+      ],
+      "rebuild_from": [],
+      "change_contract": {
+        "status": "derived",
+        "name": "derived from authoritative room/gift facts"
+      },
+      "migration_status": "no mission-progress authority table today"
+    },
+    {
+      "id": "missions.reward_claims",
+      "domain": "missions",
+      "classification": "AUTHORITY",
+      "logical_owner": "economy",
+      "current_deployable": "core-api",
+      "current_storage": [
+        "postgres:wallet_ledger source_type=SOCIAL_MISSION_REWARD"
+      ],
+      "target_storage": [
+        "economy-service ledger"
+      ],
+      "mutated_by": [
+        "mission reward claim through Economy"
+      ],
+      "source_states": [],
+      "rebuild_from": [],
+      "change_contract": {
+        "status": "planned",
+        "name": "economy.mission_rewarded.v1"
+      },
+      "migration_status": "reward truth is ledger"
+    },
+    {
+      "id": "notifications.in_app",
+      "domain": "notifications",
+      "classification": "AUTHORITY",
+      "logical_owner": "notification",
+      "current_deployable": "core-api",
+      "current_storage": [
+        "postgres:user_notifications"
+      ],
+      "target_storage": [
+        "notification-service postgres"
+      ],
+      "mutated_by": [
+        "notification service"
+      ],
+      "source_states": [],
+      "rebuild_from": [],
+      "change_contract": {
+        "status": "planned",
+        "name": "notification.created.v1"
+      },
+      "migration_status": "Chunk 29"
+    },
+    {
+      "id": "notifications.device_tokens",
+      "domain": "notifications",
+      "classification": "AUTHORITY",
+      "logical_owner": "notification",
+      "current_deployable": "core-api",
+      "current_storage": [
+        "postgres:push_device_tokens"
+      ],
+      "target_storage": [
+        "notification-service postgres"
+      ],
+      "mutated_by": [
+        "push token service"
+      ],
+      "source_states": [],
+      "rebuild_from": [],
+      "change_contract": {
+        "status": "planned",
+        "name": "notification.device_token.changed.v1"
+      },
+      "migration_status": "FCM is transport"
+    },
+    {
+      "id": "store.catalog",
+      "domain": "store",
+      "classification": "AUTHORITY",
+      "logical_owner": "store",
+      "current_deployable": "core-api",
+      "current_storage": [
+        "postgres:store_categories/store_items/store_asset_manifests"
+      ],
+      "target_storage": [
+        "store service postgres"
+      ],
+      "mutated_by": [
+        "store control services"
+      ],
+      "source_states": [],
+      "rebuild_from": [],
+      "change_contract": {
+        "status": "planned",
+        "name": "store.catalog.updated.v1"
+      },
+      "migration_status": "current"
+    },
+    {
+      "id": "store.inventory",
+      "domain": "store",
+      "classification": "AUTHORITY",
+      "logical_owner": "store",
+      "current_deployable": "core-api",
+      "current_storage": [
+        "postgres:user_store_inventory"
+      ],
+      "target_storage": [
+        "store service postgres"
+      ],
+      "mutated_by": [
+        "store service"
+      ],
+      "source_states": [],
+      "rebuild_from": [],
+      "change_contract": {
+        "status": "planned",
+        "name": "store.inventory.updated.v1"
+      },
+      "migration_status": "value transfer still Economy"
+    },
+    {
+      "id": "media.metadata",
+      "domain": "media",
+      "classification": "AUTHORITY",
+      "logical_owner": "media-control",
+      "current_deployable": "core-api",
+      "current_storage": [
+        "postgres:cdn_media_assets",
+        "postgres:media_safety_settings"
+      ],
+      "target_storage": [
+        "media-platform metadata postgres"
+      ],
+      "mutated_by": [
+        "media API/control services"
+      ],
+      "source_states": [],
+      "rebuild_from": [],
+      "change_contract": {
+        "status": "planned",
+        "name": "media.asset.changed.v1"
+      },
+      "migration_status": "Chunk 31"
+    },
+    {
+      "id": "media.objects",
+      "domain": "media",
+      "classification": "AUTHORITY",
+      "logical_owner": "media-control",
+      "current_deployable": "configured object-storage path + legacy/local dev paths",
+      "current_storage": [
+        "object bytes referenced by cdn_media_assets; local/static paths remain migration debt where used"
+      ],
+      "target_storage": [
+        "versioned object storage + CDN"
+      ],
+      "mutated_by": [
+        "media upload/storage service"
+      ],
+      "source_states": [],
+      "rebuild_from": [],
+      "change_contract": {
+        "status": "planned",
+        "name": "media.uploaded.v1"
+      },
+      "migration_status": "Chunk 31"
+    },
+    {
+      "id": "media.transport",
+      "domain": "media",
+      "classification": "EPHEMERAL",
+      "logical_owner": "media",
+      "current_deployable": "backend_media",
+      "current_storage": [
+        "mediasoup worker/router/transport/producer/consumer memory",
+        "media redis node registry/assignment"
+      ],
+      "target_storage": [
+        "regional mediasoup + TURN + redis operational registry"
+      ],
+      "mutated_by": [
+        "backend_media"
+      ],
+      "source_states": [
+        "rooms.membership",
+        "rooms.permissions"
+      ],
+      "rebuild_from": [
+        "client reconnect + authorization + media discovery"
+      ],
+      "change_contract": {
+        "status": "live",
+        "name": "Socket.IO media signaling"
+      },
+      "migration_status": "separate media connection"
+    },
+    {
+      "id": "moderation.enforcement",
+      "domain": "moderation",
+      "classification": "AUTHORITY",
+      "logical_owner": "trust-safety",
+      "current_deployable": "core-api",
+      "current_storage": [
+        "postgres:moderation_events/cases/evidence",
+        "postgres:user_bans/device_bans/user_violation_scores"
+      ],
+      "target_storage": [
+        "trust-safety service postgres"
+      ],
+      "mutated_by": [
+        "moderation/ban services"
+      ],
+      "source_states": [],
+      "rebuild_from": [],
+      "change_contract": {
+        "status": "planned",
+        "name": "moderation.enforcement.changed.v1"
+      },
+      "migration_status": "Chunk 44"
+    },
+    {
+      "id": "search.index",
+      "domain": "search",
+      "classification": "PROJECTION",
+      "logical_owner": "search-projection",
+      "current_deployable": "not deployed; core-api uses direct DB search",
+      "current_storage": [
+        "no OpenSearch index deployed"
+      ],
+      "target_storage": [
+        "OpenSearch indexes"
+      ],
+      "mutated_by": [
+        "projection worker (future)"
+      ],
+      "source_states": [
+        "profiles.public",
+        "rooms.definition",
+        "vibes.content",
+        "families.membership",
+        "games.catalog_rounds"
+      ],
+      "rebuild_from": [],
+      "change_contract": {
+        "status": "planned",
+        "name": "search.document.updated.v1"
+      },
+      "migration_status": "Chunk 38"
+    },
+    {
+      "id": "analytics.event_stream",
+      "domain": "analytics",
+      "classification": "PROJECTION",
+      "logical_owner": "analytics",
+      "current_deployable": "not deployed; NATS remains operational messaging",
+      "current_storage": [
+        "no Kafka analytics stream deployed"
+      ],
+      "target_storage": [
+        "Kafka long-retained analytical stream"
+      ],
+      "mutated_by": [
+        "NATS-to-Kafka bridge (future)"
+      ],
+      "source_states": [
+        "rooms.activity",
+        "vibes.content",
+        "economy.wallet_ledger",
+        "games.catalog_rounds",
+        "media.metadata"
+      ],
+      "rebuild_from": [],
+      "change_contract": {
+        "status": "planned",
+        "name": "analytics bridge events"
+      },
+      "migration_status": "Chunk 37"
+    },
+    {
+      "id": "analytics.warehouse",
+      "domain": "analytics",
+      "classification": "PROJECTION",
+      "logical_owner": "analytics",
+      "current_deployable": "not deployed",
+      "current_storage": [
+        "no ClickHouse/data-lake projection deployed"
+      ],
+      "target_storage": [
+        "ClickHouse + object storage Parquet"
+      ],
+      "mutated_by": [
+        "analytics consumers (future)"
+      ],
+      "source_states": [
+        "analytics.event_stream"
+      ],
+      "rebuild_from": [],
+      "change_contract": {
+        "status": "planned",
+        "name": "analytics materialization"
+      },
+      "migration_status": "Chunk 48"
+    },
+    {
+      "id": "recommendations.ranking",
+      "domain": "recommendations",
+      "classification": "PROJECTION",
+      "logical_owner": "recommendation",
+      "current_deployable": "not deployed",
+      "current_storage": [
+        "chronological/following reads only"
+      ],
+      "target_storage": [
+        "candidate/ranking projection + caches"
+      ],
+      "mutated_by": [
+        "recommendation platform (future)"
+      ],
+      "source_states": [
+        "vibes.content",
+        "social.graph",
+        "rooms.definition",
+        "analytics.event_stream"
+      ],
+      "rebuild_from": [],
+      "change_contract": {
+        "status": "planned",
+        "name": "recommendation.projection.updated.v1"
+      },
+      "migration_status": "Chunk 39"
+    },
+    {
+      "id": "client.master_state_cache",
+      "domain": "client",
+      "classification": "CACHE",
+      "logical_owner": "flutter",
+      "current_deployable": "Flutter",
+      "current_storage": [
+        "memory/cache snapshot from /users/me/master-state"
+      ],
+      "target_storage": [
+        "Riverpod + scoped persistence where allowed"
+      ],
+      "mutated_by": [
+        "Flutter repositories/providers"
+      ],
+      "source_states": [
+        "identity.accounts",
+        "profiles.public",
+        "economy.wallet_ledger"
+      ],
+      "rebuild_from": [],
+      "change_contract": {
+        "status": "snapshot",
+        "name": "REST snapshot"
+      },
+      "migration_status": "backend wins"
+    },
+    {
+      "id": "client.room_session_cache",
+      "domain": "client",
+      "classification": "CACHE",
+      "logical_owner": "flutter",
+      "current_deployable": "Flutter",
+      "current_storage": [
+        "RoomSessionRepository snapshot/delta state"
+      ],
+      "target_storage": [
+        "RoomSessionRepository + Riverpod"
+      ],
+      "mutated_by": [
+        "RoomSessionRepository"
+      ],
+      "source_states": [
+        "rooms.definition",
+        "rooms.membership",
+        "rooms.permissions",
+        "rooms.seats",
+        "rooms.watch_party",
+        "rooms.activity"
+      ],
+      "rebuild_from": [],
+      "change_contract": {
+        "status": "live",
+        "name": "room snapshot + deltas"
+      },
+      "migration_status": "no competing room authority"
+    }
+  ]
+}
