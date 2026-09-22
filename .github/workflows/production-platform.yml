@@ -59,7 +59,7 @@ jobs:
       - run: docker build -f apps/worker/Dockerfile -t funkey-worker:ci .
       - run: docker build -f apps/realtime-gateway/Dockerfile -t funkey-realtime:ci .
       - run: docker build -f backend_media/Dockerfile -t funkey-media:ci backend_media
-      - uses: aquasecurity/trivy-action@0.33.1
+      - uses: aquasecurity/trivy-action@v0.36.0
         with:
           image-ref: funkey-api:ci
           format: table
@@ -75,7 +75,7 @@ jobs:
       - uses: gitleaks/gitleaks-action@v2
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-      - uses: aquasecurity/trivy-action@0.33.1
+      - uses: aquasecurity/trivy-action@v0.36.0
         with:
           scan-type: fs
           scan-ref: .
