@@ -14,6 +14,11 @@ final GlobalKey<NavigatorState> rootNavigatorKey = GlobalKey<NavigatorState>();
 final GlobalKey<ScaffoldMessengerState> rootScaffoldMessengerKey =
     GlobalKey<ScaffoldMessengerState>();
 
+const bool _verboseFlutterErrors = bool.fromEnvironment(
+  'VM_VERBOSE_ERRORS',
+  defaultValue: false,
+);
+
 void main() {
   runZonedGuarded<void>(
     () {
@@ -27,16 +32,21 @@ void main() {
       unawaited(_initializeOptionalServices());
     },
     (error, stackTrace) {
-      debugPrint('Uncaught FunKey zone error: $error');
-      debugPrintStack(stackTrace: stackTrace);
+      debugPrint('[FK:E:App] ${error.runtimeType}: $error');
+      if (_verboseFlutterErrors) {
+        debugPrintStack(stackTrace: stackTrace);
+      }
     },
   );
 }
 
 void _installGlobalErrorHandling() {
   FlutterError.onError = (details) {
-    // presentError already includes the stack trace. Do not print it twice.
-    FlutterError.presentError(details);
+    if (_verboseFlutterErrors) {
+      FlutterError.presentError(details);
+      return;
+    }
+    debugPrint('[FK:E:Flutter] ${details.exceptionAsString()}');
   };
 
   ErrorWidget.builder = (details) {
