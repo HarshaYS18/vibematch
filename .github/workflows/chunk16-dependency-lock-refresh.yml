@@ -30,6 +30,9 @@ jobs:
       - name: Refresh Go module lock
         working-directory: apps/realtime-gateway
         run: go mod tidy
+      - name: Format Go telemetry sources
+        working-directory: apps/realtime-gateway
+        run: gofmt -w ./cmd ./internal
       - uses: subosito/flutter-action@v2
         with:
           channel: stable
@@ -42,7 +45,7 @@ jobs:
         run: |
           git config user.name "funkey-ci"
           git config user.email "funkey-ci@users.noreply.github.com"
-          git add backend_media/package-lock.json apps/realtime-gateway/go.mod apps/realtime-gateway/go.sum frontend/vibematch_app/pubspec.lock
+          git add backend_media/package-lock.json apps/realtime-gateway/go.mod apps/realtime-gateway/go.sum frontend/vibematch_app/pubspec.lock apps/realtime-gateway/cmd apps/realtime-gateway/internal
           if git diff --cached --quiet; then
             echo "Dependency locks already current."
             exit 0
