@@ -6,6 +6,7 @@ import logging
 from datetime import datetime
 
 from fastapi import APIRouter, Depends, HTTPException, WebSocket, WebSocketDisconnect
+from sqlalchemy.exc import OperationalError
 from sqlalchemy.orm import Session
 from starlette.websockets import WebSocketState
 
@@ -25,6 +26,9 @@ from app.services.rooms import room_action_service, room_permission_service
 router = APIRouter(tags=["Room Realtime"])
 logger = logging.getLogger("uvicorn.error")
 _DISCONNECT_GRACE_SECONDS = 5
+_TRANSIENT_ROOM_DB_CODES = {"55P03", "40P01", "40001"}
+_ROOM_COMMAND_RETRY_DELAYS_SECONDS = (0.075, 0.2)
+
 
 
 def _connected(websocket: WebSocket) -> bool:
@@ -36,6 +40,64 @@ def _connected(websocket: WebSocket) -> bool:
 
 def _join_token(payload: dict) -> str:
     return str(payload.get("access_token") or "").strip()
+
+
+def _room_db_sqlstate(exc: OperationalError) -> str:
+    original = getattr(exc, "orig", None)
+    return str(
+        getattr(original, "sqlstate", None)
+        or getattr(original, "pgcode", None)
+        or ""
+    )
+
+
+def _is_transient_room_db_error(exc: OperationalError) -> bool:
+    return _room_db_sqlstate(exc) in _TRANSIENT_ROOM_DB_CODES
+
+
+async def _execute_room_command_with_retry(
+    db: Session,
+    *,
+    room_id: str,
+    user_id: int,
+    command_type: str,
+    payload: dict,
+) -> dict:
+    for attempt in range(len(_ROOM_COMMAND_RETRY_DELAYS_SECONDS) + 1):
+        user = db.query(User).filter(User.id == user_id).first()
+        if user is None or user.is_banned or not user.is_active:
+            raise HTTPException(
+                status_code=401,
+                detail="Room session is no longer valid",
+            )
+        room = room_or_404(db, room_id)
+        try:
+            return await execute_room_command(
+                db,
+                room,
+                user,
+                command_type,
+                payload,
+            )
+        except OperationalError as exc:
+            db.rollback()
+            if (
+                not _is_transient_room_db_error(exc)
+                or attempt >= len(_ROOM_COMMAND_RETRY_DELAYS_SECONDS)
+            ):
+                raise
+            delay = _ROOM_COMMAND_RETRY_DELAYS_SECONDS[attempt]
+            logger.warning(
+                "room_realtime.command_retry room_id=%s user_id=%s command=%s attempt=%s sqlstate=%s delay_ms=%s",
+                room_id,
+                user_id,
+                command_type,
+                attempt + 1,
+                _room_db_sqlstate(exc),
+                int(delay * 1000),
+            )
+            await asyncio.sleep(delay)
+    raise RuntimeError("Room command retry loop exhausted")
 
 
 def _disconnect_is_superseded(
@@ -473,17 +535,6 @@ async def room_realtime_socket(websocket: WebSocket) -> None:
                         active_user_id = None
                         break
 
-                    # Keep the same room -> participant lock order used by
-                    # execute_room_command. Reconciliation may lock/update the
-                    # participant row, so acquire the room row first to avoid
-                    # introducing an inverse-order deadlock during reconnects.
-                    room = room_or_404(db, room_id, for_update=True)
-                    room_action_service.reconcile_authenticated_room_presence(
-                        db,
-                        room,
-                        user,
-                    )
-
                     if command_id:
                         claimed = await room_realtime_connections.claim_command(
                             room_id,
@@ -503,12 +554,12 @@ async def room_realtime_socket(websocket: WebSocket) -> None:
                             )
                             continue
 
-                    snapshot = await execute_room_command(
+                    snapshot = await _execute_room_command_with_retry(
                         db,
-                        room,
-                        user,
-                        command_type,
-                        payload,
+                        room_id=room_id,
+                        user_id=int(user.id),
+                        command_type=command_type,
+                        payload=payload,
                     )
                     await _send_ack(
                         websocket,
