@@ -18,6 +18,7 @@ class _FakeOttHost implements OttWebPlaybackHost {
   int positionMs = 0;
   WatchLiveTimeline? liveTimeline;
   WatchSession? loaded;
+  int loadCount = 0;
   bool disposed = false;
   final StreamController<OttJavascriptEvent> controller =
       StreamController<OttJavascriptEvent>.broadcast();
@@ -30,6 +31,7 @@ class _FakeOttHost implements OttWebPlaybackHost {
 
   @override
   Future<void> load(WatchSession session) async {
+    loadCount += 1;
     loaded = session;
     positionMs = session.positionMs;
   }
@@ -186,6 +188,54 @@ void main() {
     final retried = await adapter.retryEmbeddedProbe();
     expect(retried, isFalse);
     expect(adapter.runtimeState.value.mode, OttRuntimeMode.companion);
+    await adapter.dispose();
+  });
+
+  test('retry waits for remount and reloads canonical session', () async {
+    final host = _FakeOttHost(
+      probeResult: const OttPlaybackProbeResult(
+        pageSupported: true,
+        authenticated: false,
+        playerAvailable: false,
+        playbackAvailable: false,
+        positionReadable: false,
+        programmaticPlay: false,
+        programmaticPause: false,
+        programmaticSeek: false,
+        playbackRateControl: false,
+        fineGrainedPlaybackRateControl: false,
+        liveTimelineAvailable: false,
+        failureReason: 'LOGIN_REQUIRED_OR_PLAYER_UNAVAILABLE',
+        fallbackRequired: false,
+      ),
+    );
+    final companion = CompanionPlaybackAdapter(
+      provider: OttProviderCatalog.netflix,
+      launcher: (_) async => true,
+    );
+    var remountBarrierCalls = 0;
+    final adapter = SupportedWebPlaybackAdapter(
+      provider: OttProviderCatalog.netflix,
+      host: host,
+      companion: companion,
+      remountBarrier: () async {
+        remountBarrierCalls += 1;
+      },
+    );
+
+    await adapter.load(_session());
+    expect(adapter.runtimeState.value.mode, OttRuntimeMode.probing);
+    expect(host.loadCount, 1);
+
+    host.probeResult = _readyProbe;
+    final ready = await adapter.retryEmbeddedProbe(
+      fallbackIfUnavailable: false,
+    );
+
+    expect(ready, isTrue);
+    expect(remountBarrierCalls, 1);
+    expect(host.loadCount, 2);
+    expect(host.loaded?.sessionId, 'ott-session');
     await adapter.dispose();
   });
 
