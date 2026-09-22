@@ -19,6 +19,10 @@ class EventOutbox(Base):
     payload: Mapped[dict] = mapped_column(JSON, nullable=False)
     published_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True, index=True)
     attempt_count: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
+    claimed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    claimed_by: Mapped[str | None] = mapped_column(String(120), nullable=True)
+    next_attempt_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True, index=True)
+    last_error: Mapped[str | None] = mapped_column(String(500), nullable=True)
 
 
 class WorkerProcessedEvent(Base):

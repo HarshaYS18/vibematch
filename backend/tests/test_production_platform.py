@@ -16,10 +16,11 @@ from app.api.routes import auth, media_control, realtime_gateway_auth
 from app.core.config import Settings, settings
 from app.core.rate_limit import check_rate_limit, check_rate_limit_async
 from app.database import Base
-from app.models.event_outbox import WorkerProcessedEvent
+from app.models.event_outbox import EventOutbox, WorkerProcessedEvent
 from app.models.notification import UserNotification
 from app.models.user import User
 from app.services.identity_service import generate_public_user_id
+from app.services import outbox_relay_service
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[2]))
 from apps.worker.events import EventEnvelope
@@ -127,6 +128,90 @@ class GatewayAuthTests(TestCase):
         with patch.object(media_control, "get_redis", return_value=redis):
             drained = media_control.media_node_internal_drain("node-1", request)
         self.assertTrue(drained.draining)
+
+
+class OutboxLeaseTests(TestCase):
+    def setUp(self):
+        self.db_engine = create_engine(
+            "sqlite://",
+            connect_args={"check_same_thread": False},
+            poolclass=StaticPool,
+        )
+        Base.metadata.create_all(self.db_engine, tables=[EventOutbox.__table__])
+        self.factory = sessionmaker(bind=self.db_engine)
+        self.now = datetime(2026, 9, 22, 12, 0, tzinfo=timezone.utc)
+        with self.factory.begin() as db:
+            db.add(EventOutbox(
+                event_id=str(uuid4()),
+                event_type="notification.requested",
+                event_version=1,
+                occurred_at=self.now,
+                payload={"recipient_user_id": 7},
+                attempt_count=0,
+            ))
+
+    def tearDown(self):
+        self.db_engine.dispose()
+
+    def test_claim_is_short_lived_exclusive_and_retryable(self):
+        with patch.object(outbox_relay_service, "SessionLocal", self.factory):
+            first = outbox_relay_service.claim_outbox_batch(
+                "worker-a", now=self.now, lease_seconds=120
+            )
+            self.assertEqual(len(first), 1)
+            self.assertEqual(first[0].attempt_count, 1)
+
+            blocked = outbox_relay_service.claim_outbox_batch(
+                "worker-b", now=self.now, lease_seconds=120
+            )
+            self.assertEqual(blocked, [])
+
+            self.assertTrue(outbox_relay_service.release_outbox_claim(
+                first[0].event_id,
+                "worker-a",
+                error="NatsTimeoutError",
+                delay_seconds=60,
+                now=self.now,
+            ))
+            too_early = outbox_relay_service.claim_outbox_batch(
+                "worker-b",
+                now=self.now.replace(minute=0, second=30),
+                lease_seconds=120,
+            )
+            self.assertEqual(too_early, [])
+
+            retry_at = self.now.replace(minute=1, second=1)
+            retried = outbox_relay_service.claim_outbox_batch(
+                "worker-b", now=retry_at, lease_seconds=120
+            )
+            self.assertEqual(len(retried), 1)
+            self.assertEqual(retried[0].attempt_count, 2)
+            self.assertTrue(outbox_relay_service.mark_outbox_published(
+                retried[0].event_id,
+                "worker-b",
+                now=retry_at,
+            ))
+            self.assertEqual(
+                outbox_relay_service.claim_outbox_batch(
+                    "worker-c",
+                    now=retry_at,
+                    lease_seconds=120,
+                ),
+                [],
+            )
+
+    def test_expired_lease_can_be_reclaimed_after_worker_crash(self):
+        with patch.object(outbox_relay_service, "SessionLocal", self.factory):
+            first = outbox_relay_service.claim_outbox_batch(
+                "worker-a", now=self.now, lease_seconds=120
+            )
+            reclaimed_at = datetime(2026, 9, 22, 12, 2, 1, tzinfo=timezone.utc)
+            reclaimed = outbox_relay_service.claim_outbox_batch(
+                "worker-b", now=reclaimed_at, lease_seconds=120
+            )
+            self.assertEqual(len(reclaimed), 1)
+            self.assertEqual(reclaimed[0].event_id, first[0].event_id)
+            self.assertEqual(reclaimed[0].attempt_count, 2)
 
 
 class WorkerIdempotencyTests(TestCase):

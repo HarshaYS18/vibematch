@@ -6,6 +6,7 @@ import logging
 import os
 import random
 import signal
+import socket
 import sys
 from datetime import datetime, timezone
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
@@ -23,7 +24,7 @@ from pydantic import ValidationError
 from sqlalchemy import text
 
 from app.database import SessionLocal, engine
-from app.models.event_outbox import EventOutbox
+from app.services import outbox_relay_service
 from apps.worker.events import EventEnvelope
 from apps.worker.handlers import HANDLERS
 
@@ -32,7 +33,11 @@ NATS_URL = os.getenv("NATS_URL", "nats://127.0.0.1:4222")
 STREAM = os.getenv("NATS_STREAM", "FUNKEY_EVENTS")
 DLQ_STREAM = os.getenv("NATS_DLQ_STREAM", "FUNKEY_DLQ")
 CONSUMER = os.getenv("NATS_CONSUMER", "funkey-worker")
-MAX_ATTEMPTS = 5
+MAX_ATTEMPTS = int(os.getenv("WORKER_MAX_ATTEMPTS", "5"))
+OUTBOX_BATCH_SIZE = int(os.getenv("OUTBOX_BATCH_SIZE", "25"))
+OUTBOX_LEASE_SECONDS = int(os.getenv("OUTBOX_LEASE_SECONDS", "120"))
+SHUTDOWN_GRACE_SECONDS = float(os.getenv("WORKER_SHUTDOWN_GRACE_SECONDS", "30"))
+WORKER_INSTANCE_ID = os.getenv("WORKER_INSTANCE_ID") or f"{socket.gethostname()}-{os.getpid()}"
 _logger = logging.getLogger("funkey.worker")
 
 
@@ -46,6 +51,7 @@ class WorkerState:
         self.retries = 0
         self.dead_lettered = 0
         self.outbox_published = 0
+        self.outbox_retries = 0
         self._lock = Lock()
 
     def count(self, name: str):
@@ -55,7 +61,8 @@ class WorkerState:
     def metrics(self) -> str:
         with self._lock:
             values = {name: getattr(self, name) for name in (
-                "processed", "duplicates", "retries", "dead_lettered", "outbox_published")}
+                "processed", "duplicates", "retries", "dead_lettered",
+                "outbox_published", "outbox_retries")}
         lines = [f"funkey_worker_{name}_total {value}" for name, value in values.items()]
         lines.append(f"funkey_worker_ready {1 if self.is_ready() else 0}")
         return "\n".join(lines) + "\n"
@@ -95,40 +102,73 @@ class HealthHandler(BaseHTTPRequestHandler):
         return
 
 
-def _row_envelope(row: EventOutbox) -> EventEnvelope:
+def _claim_envelope(claim: outbox_relay_service.ClaimedOutboxEvent) -> EventEnvelope:
     return EventEnvelope(
-        event_id=row.event_id, event_type=row.event_type,
-        event_version=row.event_version, occurred_at=row.occurred_at,
-        request_id=row.request_id, trace_id=row.trace_id,
-        actor_user_id=row.actor_user_id, payload=row.payload,
+        event_id=claim.event_id,
+        event_type=claim.event_type,
+        event_version=claim.event_version,
+        occurred_at=claim.occurred_at,
+        request_id=claim.request_id,
+        trace_id=claim.trace_id,
+        actor_user_id=claim.actor_user_id,
+        payload=claim.payload,
     )
 
 
 async def relay_outbox(js, stop: asyncio.Event):
     while not stop.is_set():
         try:
-            # PostgreSQL SKIP LOCKED prevents duplicate concurrent relays.
-            with SessionLocal.begin() as db:
-                rows = (db.query(EventOutbox)
-                    .filter(EventOutbox.published_at.is_(None))
-                    .order_by(EventOutbox.occurred_at)
-                    .with_for_update(skip_locked=True)
-                    .limit(25).all())
-                for row in rows:
-                    envelope = _row_envelope(row)
+            claims = await asyncio.to_thread(
+                outbox_relay_service.claim_outbox_batch,
+                WORKER_INSTANCE_ID,
+                limit=OUTBOX_BATCH_SIZE,
+                lease_seconds=OUTBOX_LEASE_SECONDS,
+            )
+            for claim in claims:
+                envelope = _claim_envelope(claim)
+                try:
                     await js.publish(
                         envelope.subject,
                         envelope.model_dump_json().encode(),
-                        headers={"Nats-Msg-Id": str(envelope.event_id)}, timeout=3,
+                        headers={"Nats-Msg-Id": str(envelope.event_id)},
+                        timeout=3,
                     )
-                    row.published_at = datetime.now(timezone.utc)
-                    row.attempt_count += 1
-                    state.count("outbox_published")
-            await asyncio.sleep(0.25 if rows else 2)
+                    marked = await asyncio.to_thread(
+                        outbox_relay_service.mark_outbox_published,
+                        claim.event_id,
+                        WORKER_INSTANCE_ID,
+                    )
+                    if marked:
+                        state.count("outbox_published")
+                    else:
+                        _logger.warning(json.dumps({
+                            "event": "outbox.publish_mark_lost",
+                            "event_id": claim.event_id,
+                        }))
+                except asyncio.CancelledError:
+                    raise
+                except Exception as exc:
+                    delay = min(300.0, (2 ** min(claim.attempt_count, 8)) + random.random())
+                    await asyncio.to_thread(
+                        outbox_relay_service.release_outbox_claim,
+                        claim.event_id,
+                        WORKER_INSTANCE_ID,
+                        error=type(exc).__name__,
+                        delay_seconds=delay,
+                    )
+                    state.count("outbox_retries")
+                    _logger.warning(json.dumps({
+                        "event": "outbox.retry",
+                        "event_id": claim.event_id,
+                        "attempt": claim.attempt_count,
+                        "error": type(exc).__name__,
+                        "delay_seconds": round(delay, 2),
+                    }))
+            await asyncio.sleep(0.25 if claims else 2)
         except asyncio.CancelledError:
             raise
         except Exception as exc:
-            _logger.error(json.dumps({"event": "outbox.retry", "error": type(exc).__name__}))
+            _logger.error(json.dumps({"event": "outbox.claim_retry", "error": type(exc).__name__}))
             await asyncio.sleep(3 + random.random() * 2)
 
 
@@ -221,7 +261,7 @@ async def run():
             config=js_api.ConsumerConfig(
                 durable_name=CONSUMER, filter_subject="funkey.events.notification.requested",
                 ack_policy=js_api.AckPolicy.EXPLICIT, ack_wait=90,
-                max_deliver=1000, max_ack_pending=100,
+                max_deliver=MAX_ATTEMPTS, max_ack_pending=100,
             ),
         )
         tasks = [asyncio.create_task(relay_outbox(js, stop)), asyncio.create_task(consume(js, subscription, stop))]
@@ -231,11 +271,22 @@ async def run():
         if stop_waiter not in done:
             raise RuntimeError("worker task exited unexpectedly")
     finally:
+        state.ready = False
         state.draining = True
         stop.set()
-        for task in tasks:
-            task.cancel()
-        await asyncio.gather(*tasks, return_exceptions=True)
+        if tasks:
+            done, pending = await asyncio.wait(tasks, timeout=SHUTDOWN_GRACE_SECONDS)
+            if pending:
+                _logger.warning(json.dumps({
+                    "event": "worker.shutdown_timeout",
+                    "pending_tasks": len(pending),
+                    "grace_seconds": SHUTDOWN_GRACE_SECONDS,
+                }))
+                for task in pending:
+                    task.cancel()
+                await asyncio.gather(*pending, return_exceptions=True)
+            if done:
+                await asyncio.gather(*done, return_exceptions=True)
         if nc is not None:
             await nc.drain()
         await asyncio.to_thread(health.shutdown)
