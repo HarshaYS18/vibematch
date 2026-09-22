@@ -124,13 +124,29 @@ class SupportedWebPlaybackAdapter
     bool fallbackIfUnavailable = true,
   }) async {
     if (_disposed) return false;
+    final session = _session;
+    if (session == null) return false;
+
     runtimeState.value = OttProviderRuntimeState(
       mode: OttRuntimeMode.probing,
       probe: runtimeState.value.probe,
       errorCode: null,
     );
-    final probe = await _host.probe();
-    _applyProbe(probe, fallbackIfUnavailable: fallbackIfUnavailable);
+
+    // Companion mode removes the embedded surface from the widget tree.
+    // Give ValueListenableBuilder one frame to remount the WebView before
+    // reloading/probing it, otherwise a stale platform-view controller can be
+    // mistaken for a real embedded capability.
+    await WidgetsBinding.instance.endOfFrame;
+    if (_disposed) return false;
+
+    try {
+      await _host.load(session);
+      final probe = await _host.probe();
+      _applyProbe(probe, fallbackIfUnavailable: fallbackIfUnavailable);
+    } catch (_) {
+      _useCompanion('EMBEDDED_PLAYBACK_UNSUPPORTED');
+    }
     return runtimeState.value.mode == OttRuntimeMode.embedded;
   }
 
