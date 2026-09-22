@@ -77,6 +77,48 @@ void main() {
     );
   });
 
+  test('complete backend roster clears stale confirmed membership', () {
+    LiveRoomMembershipService.applyBackendMembershipSnapshot(
+      roomId: 'VM100',
+      roomMemberByUserId: const {'6418001001': true},
+    );
+
+    LiveRoomMembershipService.applyBackendMembershipSnapshot(
+      roomId: 'VM100',
+      roomMemberByUserId: const <String, bool>{},
+      completeRoster: true,
+    );
+
+    expect(
+      LiveRoomMembershipService.statusFor(
+        roomId: 'VM100',
+        userId: '6418001001',
+      ),
+      LiveRoomMembershipStatus.guest,
+    );
+  });
+
+  test('complete backend roster preserves pending request UI state', () {
+    LiveRoomMembershipService.markPending(
+      roomId: 'VM100',
+      userId: '6418001001',
+    );
+
+    LiveRoomMembershipService.applyBackendMembershipSnapshot(
+      roomId: 'VM100',
+      roomMemberByUserId: const <String, bool>{},
+      completeRoster: true,
+    );
+
+    expect(
+      LiveRoomMembershipService.isPending(
+        roomId: 'VM100',
+        userId: '6418001001',
+      ),
+      isTrue,
+    );
+  });
+
   test('clearAll removes account-scoped room membership projection', () {
     LiveRoomMembershipService.applyBackendMembershipSnapshot(
       roomId: 'VM100',

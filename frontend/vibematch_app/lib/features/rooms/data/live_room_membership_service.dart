@@ -138,20 +138,23 @@ class LiveRoomMembershipService {
   static void applyBackendMembershipSnapshot({
     required String roomId,
     required Map<String, bool> roomMemberByUserId,
+    bool completeRoster = false,
     String? roomName,
     String? language,
     String? modeTitle,
     int? onlineCount,
   }) {
     final cleanRoomId = roomId.trim();
-    if (cleanRoomId.isEmpty || roomMemberByUserId.isEmpty) return;
+    if (cleanRoomId.isEmpty) return;
 
     final next = Map<String, LiveRoomMembershipSnapshot>.from(snapshots.value);
+    final seenKeys = <String>{};
     for (final entry in roomMemberByUserId.entries) {
       final normalizedUserId = normalizeUserId(entry.key);
       if (normalizedUserId.isEmpty) continue;
 
       final key = keyFor(roomId: cleanRoomId, userId: normalizedUserId);
+      seenKeys.add(key);
       final previous = next[key];
       final backendStatus = entry.value
           ? LiveRoomMembershipStatus.roomMember
@@ -174,6 +177,25 @@ class LiveRoomMembershipService {
         modeTitle: modeTitle ?? previous?.modeTitle,
         onlineCount: onlineCount ?? previous?.onlineCount,
       );
+    }
+
+    if (completeRoster) {
+      for (final entry in next.entries.toList(growable: false)) {
+        final previous = entry.value;
+        if (previous.roomId.trim() != cleanRoomId ||
+            seenKeys.contains(entry.key) ||
+            previous.status == LiveRoomMembershipStatus.pending) {
+          continue;
+        }
+
+        next[entry.key] = previous.copyWith(
+          status: LiveRoomMembershipStatus.guest,
+          roomName: roomName,
+          language: language,
+          modeTitle: modeTitle,
+          onlineCount: onlineCount,
+        );
+      }
     }
 
     snapshots.value = Map<String, LiveRoomMembershipSnapshot>.unmodifiable(next);

@@ -155,6 +155,7 @@ class LiveRoomPresenceRepository {
     LiveRoomMembershipService.applyBackendMembershipSnapshot(
       roomId: resolvedRoomId,
       roomMemberByUserId: snapshot.roomMemberByUserId,
+      completeRoster: true,
       onlineCount: snapshot.onlineCount,
     );
     return snapshot;
@@ -260,6 +261,7 @@ class LiveRoomPresenceRepository {
     LiveRoomMembershipService.applyBackendMembershipSnapshot(
       roomId: snapshot.roomId,
       roomMemberByUserId: snapshot.roomMemberByUserId,
+      completeRoster: true,
       onlineCount: snapshot.onlineCount,
     );
     return snapshot;

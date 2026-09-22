@@ -145,6 +145,8 @@ class LiveRoomMemberRequestService {
 
     final peers = roomData['peers'];
     if (peers is! List) return;
+
+    final backendMembership = <String, bool>{};
     for (final rawPeer in peers.whereType<Map<String, dynamic>>()) {
       final publicUserId = rawPeer['public_user_id']?.toString() ?? '';
       final backendUserId = rawPeer['backend_user_id']?.toString() ?? rawPeer['user_id']?.toString() ?? '';
@@ -163,25 +165,33 @@ class LiveRoomMemberRequestService {
           rawPeer['has_pending_room_member_request'] == true || status == 'pending';
 
       for (final alias in aliases) {
-        if (isRoomMember) {
-          LiveRoomMembershipService.markRoomMember(roomId: roomId, userId: alias);
-        } else if (isPending) {
+        if (isPending) {
           LiveRoomMembershipService.markPending(roomId: roomId, userId: alias);
         } else {
-          LiveRoomMembershipService.markGuest(roomId: roomId, userId: alias);
+          backendMembership[alias] = isRoomMember;
         }
       }
 
-      if (currentUser != null && aliases.contains(currentUser.id)) {
-        if (isRoomMember) {
-          LiveRoomMembershipService.markRoomMember(roomId: roomId, userId: currentUser.id);
-        } else if (isPending) {
-          LiveRoomMembershipService.markPending(roomId: roomId, userId: currentUser.id);
+      if (currentUser != null &&
+          aliases.map(LiveRoomMembershipService.normalizeUserId).contains(
+            LiveRoomMembershipService.normalizeUserId(currentUser.id),
+          )) {
+        if (isPending) {
+          LiveRoomMembershipService.markPending(
+            roomId: roomId,
+            userId: currentUser.id,
+          );
         } else {
-          LiveRoomMembershipService.markGuest(roomId: roomId, userId: currentUser.id);
+          backendMembership[currentUser.id] = isRoomMember;
         }
       }
     }
+
+    LiveRoomMembershipService.applyBackendMembershipSnapshot(
+      roomId: roomId,
+      roomMemberByUserId: backendMembership,
+      completeRoster: true,
+    );
   }
 
   SeatUser? _pendingRequestToSeatUser(Map<String, dynamic> json) {

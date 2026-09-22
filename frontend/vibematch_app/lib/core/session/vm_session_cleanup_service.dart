@@ -2,6 +2,7 @@ import 'dart:async';
 
 import '../../features/rooms/data/active_room_context.dart';
 import '../../features/rooms/data/live_room_media_signaling_service.dart';
+import '../../features/rooms/data/live_room_member_request_service.dart';
 import '../../features/rooms/data/live_room_membership_service.dart';
 import '../../features/rooms/data/live_room_presence_repository.dart';
 import '../../features/rooms/data/room_music_controller.dart';
@@ -19,6 +20,7 @@ class VmSessionCleanupService {
     // These are process-local projections only. Never let room/user state from
     // one authenticated account bleed into the next account.
     ActiveRoomContext.clear();
+    LiveRoomMemberRequestService.instance.stop();
     LiveRoomPresenceRepository.clearCachedPresence();
     LiveRoomMembershipService.clearAll();
 
