@@ -26,6 +26,72 @@ WATCH_PARTY_ACTIONS = {
     "TRANSFER_CONTROL",
 }
 
+OTT_PROVIDERS = frozenset({"netflix", "prime_video", "jiohotstar"})
+DEFAULT_TARGET_LIVE_LATENCY_MS = 10_000
+MIN_TARGET_LIVE_LATENCY_MS = 1_000
+MAX_TARGET_LIVE_LATENCY_MS = 120_000
+
+
+def canonical_provider_id(value: Any) -> str:
+    normalized = str(value or "").strip().lower().replace("-", "_").replace(" ", "_")
+    aliases = {
+        "prime": "prime_video",
+        "primevideo": "prime_video",
+        "amazon_prime": "prime_video",
+        "amazon_prime_video": "prime_video",
+        "hotstar": "jiohotstar",
+        "jio_hotstar": "jiohotstar",
+    }
+    return aliases.get(normalized, normalized)
+
+
+def is_ott_provider(value: Any) -> bool:
+    return canonical_provider_id(value) in OTT_PROVIDERS
+
+
+def _require_private_ott_room(room: Room, provider: Any) -> None:
+    if is_ott_provider(provider) and not bool(room.is_secret):
+        raise HTTPException(
+            status_code=403,
+            detail="OTT Watch Party requires a private, invite-only Secret Vibe room",
+        )
+
+
+def _timeline_fields(
+    payload: dict[str, Any],
+    current: dict[str, Any] | None = None,
+) -> dict[str, Any]:
+    current = current or {}
+    timeline_mode = str(
+        payload.get("timeline_mode")
+        or current.get("timeline_mode")
+        or "vod"
+    ).strip().lower()
+    if timeline_mode not in {"vod", "live"}:
+        raise HTTPException(status_code=400, detail="Invalid Watch Party timeline mode")
+
+    raw_latency = payload.get("target_live_latency_ms")
+    if raw_latency is None:
+        raw_latency = current.get("target_live_latency_ms")
+    if raw_latency is None:
+        raw_latency = DEFAULT_TARGET_LIVE_LATENCY_MS
+    try:
+        target_live_latency_ms = int(raw_latency)
+    except (TypeError, ValueError):
+        raise HTTPException(status_code=400, detail="Invalid target live latency")
+    if not MIN_TARGET_LIVE_LATENCY_MS <= target_live_latency_ms <= MAX_TARGET_LIVE_LATENCY_MS:
+        raise HTTPException(
+            status_code=400,
+            detail=(
+                "Target live latency must be between "
+                f"{MIN_TARGET_LIVE_LATENCY_MS} and {MAX_TARGET_LIVE_LATENCY_MS} ms"
+            ),
+        )
+    return {
+        "timeline_mode": timeline_mode,
+        "target_live_latency_ms": target_live_latency_ms,
+    }
+
 
 def server_now_ms() -> int:
     return int(datetime.now(timezone.utc).timestamp() * 1000)
@@ -56,7 +122,18 @@ def watch_party_snapshot(db: Session, room: Room) -> dict[str, Any]:
     event = _latest_event(db, room)
     if event is None or not isinstance(event.payload, dict):
         return {"active": False}
-    return dict(event.payload)
+    state = dict(event.payload)
+    if is_ott_provider(state.get("provider")) and not bool(room.is_secret):
+        # Private OTT metadata must never become visible after a room is made
+        # public. Preserve only the minimum inactive convergence envelope.
+        return {
+            "active": False,
+            "provider": canonical_provider_id(state.get("provider")),
+            "room_id": room.room_public_id,
+            "revision": int(state.get("revision") or 0),
+            "event_sequence": int(state.get("event_sequence") or 0),
+        }
+    return state
 
 
 def projected_position_ms(state: dict[str, Any], at_server_time_ms: int) -> int:
@@ -134,7 +211,7 @@ def _validate_expected_revision(payload: dict[str, Any], state: dict[str, Any]) 
 
 def _content_fields(payload: dict[str, Any], current: dict[str, Any] | None = None) -> dict[str, Any]:
     current = current or {}
-    provider = str(payload.get("provider") or current.get("provider") or "").strip().lower()
+    provider = canonical_provider_id(payload.get("provider") or current.get("provider"))
     content_id = str(payload.get("content_id") or current.get("content_id") or "").strip()
     content_url = str(payload.get("content_url") or current.get("content_url") or "").strip()
     content_title = str(payload.get("content_title") or current.get("content_title") or "").strip()
@@ -180,6 +257,7 @@ def apply_watch_party_command(
     if command == "LOAD":
         room_permission_service.require_room_admin(db, room, actor)
         content = _content_fields(payload)
+        _require_private_ott_room(room, content["provider"])
         state = {
             "active": True,
             "session_id": f"watch_{room.room_public_id}_{uuid4().hex}",
@@ -191,6 +269,7 @@ def apply_watch_party_command(
             "position_ms": max(0, int(payload.get("position_ms") or 0)),
             "server_anchor_time": now_ms,
             "playback_rate": _normalized_rate(payload.get("playback_rate"), 1.0),
+            **_timeline_fields(payload),
             "revision": 1,
         }
         return _record_state(db, room, actor, "watch_party.loaded", state)
@@ -200,6 +279,7 @@ def apply_watch_party_command(
         return current
 
     _require_active_session(current)
+    _require_private_ott_room(room, current.get("provider"))
     _validate_expected_revision(payload, current)
     _require_controller_or_admin(db, room, actor, current)
 
@@ -221,7 +301,10 @@ def apply_watch_party_command(
         state["position_ms"] = max(0, int(payload["position_ms"]))
         event_type = "watch_party.seeked"
     elif command == "CHANGE_CONTENT":
-        state.update(_content_fields(payload, current))
+        next_content = _content_fields(payload, current)
+        _require_private_ott_room(room, next_content["provider"])
+        state.update(next_content)
+        state.update(_timeline_fields(payload, current))
         state["position_ms"] = max(0, int(payload.get("position_ms") or 0))
         state["playback_state"] = "paused"
         state["playback_rate"] = _normalized_rate(payload.get("playback_rate"), 1.0)
@@ -338,3 +421,44 @@ def ensure_controller_after_departure(
         state,
         target_user_id=int(replacement.user_id),
     )
+
+def end_ott_if_room_not_private(
+    db: Session,
+    room: Room,
+    actor: User | None = None,
+) -> dict[str, Any] | None:
+    """End and redact an active OTT session when room privacy is downgraded."""
+    event = _latest_event(db, room)
+    if event is None or not isinstance(event.payload, dict):
+        return None
+    current = dict(event.payload)
+    if (
+        current.get("active") is not True
+        or not is_ott_provider(current.get("provider"))
+        or bool(room.is_secret)
+    ):
+        return None
+
+    now_ms = server_now_ms()
+    state = {
+        "active": False,
+        "session_id": str(current.get("session_id") or ""),
+        "room_id": room.room_public_id,
+        "provider": canonical_provider_id(current.get("provider")),
+        "content_id": None,
+        "content_url": None,
+        "content_title": None,
+        "host_user_id": int(current.get("host_user_id") or 0),
+        "controller_user_id": int(current.get("controller_user_id") or 0),
+        "playback_state": "paused",
+        "position_ms": projected_position_ms(current, now_ms),
+        "server_anchor_time": now_ms,
+        "playback_rate": float(current.get("playback_rate") or 1.0),
+        "timeline_mode": str(current.get("timeline_mode") or "vod"),
+        "target_live_latency_ms": int(
+            current.get("target_live_latency_ms") or DEFAULT_TARGET_LIVE_LATENCY_MS
+        ),
+        "revision": _next_revision(current),
+    }
+    return _record_state(db, room, actor, "watch_party.ended_privacy_changed", state)
+
