@@ -60,6 +60,16 @@ class LiveRoomMediaSignalingService with WidgetsBindingObserver {
   final ValueNotifier<LiveMediaSeatInvite?> seatInvite =
       ValueNotifier<LiveMediaSeatInvite?>(null);
 
+  final StreamController<Map<String, dynamic>> _canonicalRoomSnapshotController =
+      StreamController<Map<String, dynamic>>.broadcast();
+
+  /// Full backend room snapshots carried by the existing room realtime socket.
+  ///
+  /// Chunk 5 consumers reconcile these into RoomSessionRepository. Media
+  /// signaling remains responsible for transport/audio only.
+  Stream<Map<String, dynamic>> get canonicalRoomSnapshotEvents =>
+      _canonicalRoomSnapshotController.stream;
+
   bool get isConnected => _channel != null;
   bool get isJoined => _joined;
   String? get roomId => _roomId;
@@ -779,6 +789,23 @@ class LiveRoomMediaSignalingService with WidgetsBindingObserver {
       _debug('media received: $type $payload');
 
       if (payload is! Map<String, dynamic>) return;
+
+      final rawCanonicalRoom = payload['room'];
+      if (rawCanonicalRoom is Map) {
+        final canonicalRoom = rawCanonicalRoom.cast<String, dynamic>();
+        final snapshotRoomId =
+            canonicalRoom['room_id']?.toString() ??
+            canonicalRoom['room_public_id']?.toString() ??
+            payload['room_id']?.toString();
+        if (_roomId == null ||
+            snapshotRoomId == null ||
+            snapshotRoomId.trim().isEmpty ||
+            snapshotRoomId.trim() == _roomId) {
+          _canonicalRoomSnapshotController.add(
+            Map<String, dynamic>.unmodifiable(canonicalRoom),
+          );
+        }
+      }
 
       if (type == 'command/ack') {
         return;

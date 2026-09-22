@@ -1,18 +1,22 @@
 import 'dart:async';
 
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../core/ui/vm_motion.dart';
+import '../../../room_session/data/room_session_repository.dart';
+import '../../../room_session/domain/room_session_state.dart';
 import '../../auth/models/current_user.dart';
 import '../data/live_room_media_signaling_service.dart';
 import '../data/live_room_presence_repository.dart';
+import '../data/room_session_legacy_adapter.dart';
 import 'live_room_models.dart';
 import 'live_room_page.dart';
 import 'live_room_restore_state.dart';
 import 'widgets/live_room_minimized_overlay_service.dart';
 import 'widgets/room_theme.dart';
 
-class LiveRoomPresenceShellPage extends StatefulWidget {
+class LiveRoomPresenceShellPage extends ConsumerStatefulWidget {
   const LiveRoomPresenceShellPage({
     super.key,
     required this.roomName,
@@ -37,13 +41,14 @@ class LiveRoomPresenceShellPage extends StatefulWidget {
   final LiveRoomRestoreState? restoreState;
 
   @override
-  State<LiveRoomPresenceShellPage> createState() =>
+  ConsumerState<LiveRoomPresenceShellPage> createState() =>
       _LiveRoomPresenceShellPageState();
 }
 
-class _LiveRoomPresenceShellPageState extends State<LiveRoomPresenceShellPage> {
-  final LiveRoomPresenceRepository _presenceRepository =
-      LiveRoomPresenceRepository();
+class _LiveRoomPresenceShellPageState
+    extends ConsumerState<LiveRoomPresenceShellPage> {
+  late final RoomSessionRepository _roomSessionRepository;
+  late final RoomSessionLegacyRealtimeBridge _roomSessionRealtimeBridge;
   final ValueNotifier<SeatUser?> _enteredUser = ValueNotifier<SeatUser?>(null);
   final ValueNotifier<String?> _livePresenceWarning = ValueNotifier<String?>(
     null,
@@ -67,6 +72,15 @@ class _LiveRoomPresenceShellPageState extends State<LiveRoomPresenceShellPage> {
       roomId: widget.roomId,
       roomName: widget.roomName,
     );
+    _roomSessionRepository = ref.read(
+      roomSessionRepositoryProvider(widget.roomId).notifier,
+    );
+    _roomSessionRealtimeBridge = RoomSessionLegacyRealtimeBridge(
+      roomId: widget.roomId,
+      repository: _roomSessionRepository,
+      mediaSignalingService: LiveRoomMediaSignalingService.instance,
+    )..start();
+
     final currentUser = widget.currentUser;
     if (currentUser != null) {
       LiveRoomMediaSignalingService.instance.setActiveLoggedInUser(currentUser);
@@ -84,14 +98,20 @@ class _LiveRoomPresenceShellPageState extends State<LiveRoomPresenceShellPage> {
     _heartbeatTimer?.cancel();
     _enteredMessageTimer?.cancel();
     if (!LiveRoomMinimizedOverlayService.instance.isShowing) {
-      unawaited(
-        _presenceRepository.leaveRoom(widget.roomId).catchError((_) => 0),
-      );
+      unawaited(_leaveRoomBestEffort());
     }
+    _roomSessionRealtimeBridge.dispose();
     _enteredUser.dispose();
     _livePresenceWarning.dispose();
-    _presenceRepository.close();
     super.dispose();
+  }
+
+  Future<void> _leaveRoomBestEffort() async {
+    try {
+      await _roomSessionRepository.leave();
+    } catch (_) {
+      // Route teardown must not be blocked by a failed leave request.
+    }
   }
 
   void _restorePresenceWithoutFreshJoin() {
@@ -198,9 +218,13 @@ class _LiveRoomPresenceShellPageState extends State<LiveRoomPresenceShellPage> {
     }
 
     try {
-      final snapshot = await _presenceRepository.joinRoom(
-        widget.roomId,
+      final roomState = await _roomSessionRepository.join(
         lockPassword: widget.lockPassword,
+      );
+      final snapshot = RoomSessionLegacyAdapter.toPresenceSnapshot(
+        roomState,
+        currentPublicUserId: widget.currentUser?.publicUserId,
+        publishLegacyCaches: true,
       );
       if (!mounted) return;
 
@@ -311,7 +335,12 @@ class _LiveRoomPresenceShellPageState extends State<LiveRoomPresenceShellPage> {
 
   Future<void> _heartbeat() async {
     try {
-      final snapshot = await _presenceRepository.heartbeat(widget.roomId);
+      final roomState = await _roomSessionRepository.heartbeat();
+      final snapshot = RoomSessionLegacyAdapter.toPresenceSnapshot(
+        roomState,
+        currentPublicUserId: widget.currentUser?.publicUserId,
+        publishLegacyCaches: true,
+      );
       if (!mounted) return;
 
       _seedIdentityFromPresence(snapshot);
@@ -346,6 +375,13 @@ class _LiveRoomPresenceShellPageState extends State<LiveRoomPresenceShellPage> {
 
   @override
   Widget build(BuildContext context) {
+    final canonicalRoom = ref.watch(
+      roomSessionRepositoryProvider(widget.roomId),
+    );
+    final canonicalOnlineCount = canonicalRoom.isJoined
+        ? canonicalRoom.onlineCount
+        : _onlineCount;
+
     if (_shouldBlockRoomWithRetry) {
       return _RoomNetworkRetryState(
         message: _presenceError!,
@@ -365,7 +401,7 @@ class _LiveRoomPresenceShellPageState extends State<LiveRoomPresenceShellPage> {
           roomId: widget.roomId,
           language: widget.language,
           modeTitle: widget.modeTitle,
-          onlineCount: _onlineCount,
+          onlineCount: canonicalOnlineCount,
           initialBackgroundTheme: widget.initialBackgroundTheme,
           restoreState: widget.restoreState,
         ),

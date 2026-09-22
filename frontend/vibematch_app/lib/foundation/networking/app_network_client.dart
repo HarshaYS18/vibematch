@@ -3,34 +3,34 @@ import '../../core/network/api_client.dart';
 abstract interface class AppNetworkClient {
   Future<Map<String, dynamic>> getMap(
     String path, {
-    Map<String, String?> queryParameters,
-    Map<String, String> headers,
+    Map<String, String?> queryParameters = const <String, String?>{},
+    Map<String, String> headers = const <String, String>{},
   });
 
   Future<List<dynamic>> getList(
     String path, {
-    Map<String, String?> queryParameters,
-    Map<String, String> headers,
+    Map<String, String?> queryParameters = const <String, String?>{},
+    Map<String, String> headers = const <String, String>{},
   });
 
   Future<Map<String, dynamic>> postMap(
     String path, {
-    Map<String, String?> queryParameters,
-    Map<String, String> headers,
+    Map<String, String?> queryParameters = const <String, String?>{},
+    Map<String, String> headers = const <String, String>{},
     Object? body,
   });
 
   Future<Map<String, dynamic>> patchMap(
     String path, {
-    Map<String, String?> queryParameters,
-    Map<String, String> headers,
+    Map<String, String?> queryParameters = const <String, String?>{},
+    Map<String, String> headers = const <String, String>{},
     Object? body,
   });
 
   Future<Map<String, dynamic>> deleteMap(
     String path, {
-    Map<String, String?> queryParameters,
-    Map<String, String> headers,
+    Map<String, String?> queryParameters = const <String, String?>{},
+    Map<String, String> headers = const <String, String>{},
     Object? body,
   });
 

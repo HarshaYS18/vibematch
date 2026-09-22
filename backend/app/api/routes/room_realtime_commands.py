@@ -628,6 +628,24 @@ async def join(room_public_id: str, command: RoomJoinCommand, db: Session = Depe
     return {"room_id": room_public_id, "room": data}
 
 
+@router.post("/heartbeat")
+def heartbeat(
+    room_public_id: str,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """Refresh durable presence and return one canonical room snapshot."""
+    room = room_or_404(db, room_public_id, for_update=True)
+    try:
+        room_permission_service.require_room_view(db, room, current_user)
+        data = room_action_service.heartbeat_room(db, room, current_user)
+        db.commit()
+        return {"room_id": room_public_id, "room": data}
+    except Exception:
+        db.rollback()
+        raise
+
+
 @router.post("/leave")
 async def leave(room_public_id: str, command: RoomLeaveCommand, db: Session = Depends(get_db), current_user: User = Depends(get_current_user)):
     room = room_or_404(db, room_public_id)

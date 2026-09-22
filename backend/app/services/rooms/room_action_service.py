@@ -195,13 +195,37 @@ def _seat_application_cooldown_remaining(db: Session, room: Room, user: User) ->
     return max(0, SEAT_APPLICATION_COOLDOWN_SECONDS - elapsed)
 
 
+def _safe_room_join_event_payload(
+    payload: dict[str, Any] | None,
+    *,
+    is_stealth: bool,
+) -> dict[str, Any]:
+    """Strip entry secrets before durable room event/outbox persistence."""
+    safe = {
+        key: value
+        for key, value in (payload or {}).items()
+        if key not in {"lock_password", "password"}
+    }
+    safe["is_stealth"] = is_stealth
+    return safe
+
+
 def join_room(db: Session, room: Room, user: User, payload: dict[str, Any] | None = None) -> dict[str, Any]:
     assert_room_entry_allowed(db, room, user, lock_password=str((payload or {}).get("lock_password") or "") or None)
     closed_room_ids = close_other_active_room_sessions(db, user.id, except_room_public_id=room.room_public_id)
     participant = _ensure_room_participant(db, room, user, payload)
     mark_user_room_presence_active(db, room, user)
     _auto_place_host_admin_if_needed(db, room, user, participant)
-    record_room_event(db, room, "room.joined", actor_user_id=user.id, payload={**(payload or {}), "is_stealth": participant.is_stealth})
+    record_room_event(
+        db,
+        room,
+        "room.joined",
+        actor_user_id=user.id,
+        payload=_safe_room_join_event_payload(
+            payload,
+            is_stealth=participant.is_stealth,
+        ),
+    )
     db.flush()
     snapshot = room_snapshot(db, room)
     if closed_room_ids:

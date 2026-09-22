@@ -6,7 +6,7 @@ class RoomRealtimeBaseCommand(BaseModel):
 
 
 class RoomJoinCommand(RoomRealtimeBaseCommand):
-    pass
+    lock_password: str | None = Field(default=None, max_length=128)
 
 
 class RoomLeaveCommand(RoomRealtimeBaseCommand):
