@@ -4,20 +4,29 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../features/inbox/controllers/inbox_controller.dart';
+import '../../features/inbox/data/inbox_socket_service.dart';
 import '../../features/inbox/models/inbox_models.dart';
+import '../../realtime/app_realtime_hub.dart';
 
 class AppInboxRuntime extends ChangeNotifier {
-  AppInboxRuntime({InboxController? controller})
-      : controller = controller ?? InboxController();
+  AppInboxRuntime({
+    required this.realtimeHub,
+    InboxController? controller,
+  }) : controller = controller ?? InboxController(
+          socketService: InboxSocketService(hub: realtimeHub),
+        );
 
+  final AppRealtimeHub realtimeHub;
   final InboxController controller;
 
   bool _started = false;
   bool _realtimeReady = false;
+  bool _resyncInFlight = false;
   String? _lastMessageKey;
   InboxConversation? _foregroundConversation;
   InboxMessage? _foregroundMessage;
   Timer? _dismissTimer;
+  StreamSubscription<RealtimeResyncRequest>? _resyncSubscription;
   String? _pendingOpenConversationId;
   int _pendingOpenRequestNonce = 0;
   String? _activeConversationId;
@@ -31,14 +40,35 @@ class AppInboxRuntime extends ChangeNotifier {
     if (_started) return;
     _started = true;
     controller.addListener(_handleControllerChanged);
+    _resyncSubscription ??= realtimeHub.resyncRequests.listen(
+      (request) => unawaited(_handleResync(request)),
+    );
+    await realtimeHub.start();
     await controller.loadFromBackend();
     _lastMessageKey = _latestIncomingKey();
     _realtimeReady = true;
     notifyListeners();
   }
 
-  Future<void> ensureRealtimeConnected() {
-    return controller.ensureRealtimeConnected();
+  Future<void> ensureRealtimeConnected() async {
+    await realtimeHub.start();
+    await controller.ensureRealtimeConnected();
+  }
+
+  Future<void> _handleResync(RealtimeResyncRequest request) async {
+    if (!_started || _resyncInFlight) return;
+    if (request.stream != '*' && !request.stream.startsWith('app:')) return;
+
+    _resyncInFlight = true;
+    try {
+      await controller.loadFromBackend();
+      final observed = request.observedSequence;
+      if (observed != null && observed > 0 && request.stream != '*') {
+        realtimeHub.markResynced(request.stream, observed);
+      }
+    } finally {
+      _resyncInFlight = false;
+    }
   }
 
   void setActiveConversation(String? conversationId) {
@@ -120,6 +150,7 @@ class AppInboxRuntime extends ChangeNotifier {
   @override
   void dispose() {
     _dismissTimer?.cancel();
+    unawaited(_resyncSubscription?.cancel());
     controller.removeListener(_handleControllerChanged);
     controller.dispose();
     super.dispose();
@@ -128,5 +159,11 @@ class AppInboxRuntime extends ChangeNotifier {
 
 final appInboxRuntimeProvider =
     ChangeNotifierProvider.autoDispose<AppInboxRuntime>((ref) {
-  return AppInboxRuntime();
+  final hub = ref.read(appRealtimeHubProvider);
+  return AppInboxRuntime(
+    realtimeHub: hub,
+    controller: InboxController(
+      socketService: InboxSocketService(hub: hub),
+    ),
+  );
 });

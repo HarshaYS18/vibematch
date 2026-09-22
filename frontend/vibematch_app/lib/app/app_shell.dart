@@ -22,6 +22,7 @@ import '../session/data/session_repository.dart';
 import 'runtime/app_identity_runtime.dart';
 import 'runtime/app_inbox_runtime.dart';
 import 'runtime/app_presence_runtime.dart';
+import '../realtime/app_realtime_hub.dart';
 import 'runtime/app_shell_navigation_controller.dart';
 import 'runtime/app_wallet_runtime.dart';
 import 'app_routes.dart';
@@ -63,14 +64,7 @@ class _AppShellState extends ConsumerState<AppShell>
 
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (!mounted) return;
-      ref
-          .read(appIdentityRuntimeProvider)
-          .start(initialUser: widget.currentUser);
-      ref.read(appInboxRuntimeProvider).start();
-      ref.read(appPresenceRuntimeProvider).start(
-        onSessionInvalid: _handleAuthoritativeSessionInvalidation,
-      );
-      unawaited(ref.read(appWalletRuntimeProvider).start());
+      unawaited(_startShellRuntimes());
       unawaited(_validateAppSourceRegistry());
       unawaited(_permissionService.requestAppLaunchPermissions());
     });
@@ -114,6 +108,23 @@ class _AppShellState extends ConsumerState<AppShell>
     }
   }
 
+  Future<void> _startShellRuntimes() async {
+    ref
+        .read(appIdentityRuntimeProvider)
+        .start(initialUser: widget.currentUser);
+    ref.read(appPresenceRuntimeProvider).start(
+      onSessionInvalid: _handleAuthoritativeSessionInvalidation,
+    );
+
+    final realtime = ref.read(appRealtimeHubProvider);
+    await realtime.start();
+
+    await Future.wait<void>([
+      ref.read(appInboxRuntimeProvider).start(),
+      ref.read(appWalletRuntimeProvider).start(),
+    ]);
+  }
+
   Future<void> _handleAuthoritativeSessionInvalidation() async {
     if (_sessionLogoutInFlight) return;
     _sessionLogoutInFlight = true;
@@ -137,6 +148,7 @@ class _AppShellState extends ConsumerState<AppShell>
       ref.read(identityRepositoryProvider.notifier).accept(user);
       LiveRoomMediaSignalingService.instance.setActiveLoggedInUser(user);
 
+      await ref.read(appRealtimeHubProvider).start();
       await Future.wait<void>([
         ref.read(appInboxRuntimeProvider).ensureRealtimeConnected(),
         ref.read(appWalletRuntimeProvider).start(),
@@ -198,6 +210,7 @@ class _AppShellState extends ConsumerState<AppShell>
     // the authenticated shell is mounted.
     ref.watch(appIdentityRuntimeProvider);
     ref.watch(appPresenceRuntimeProvider);
+    ref.watch(appRealtimeHubProvider);
     ref.watch(appWalletRuntimeProvider);
 
     final navigation = ref.watch(appShellNavigationProvider);

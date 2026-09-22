@@ -16,6 +16,7 @@ from app.core.config import settings
 
 _INBOX_CHANNEL = "funkey:inbox:events"
 _INBOX_LEASE_PREFIX = "funkey:inbox:leases"
+_CLIENT_SEQUENCE_PREFIX = "funkey:app-realtime:sequence"
 _SOCKET_LEASE_SECONDS = 30
 _SOCKET_LEASE_REFRESH_SECONDS = 10
 _REMOTE_EVENT_TTL_SECONDS = 5 * 60
@@ -41,6 +42,7 @@ class InboxWebSocketManager:
         )
         self._listener_task: asyncio.Task[None] | None = None
         self._seen_remote_events: dict[str, float] = {}
+        self._local_sequence_fallback: dict[str, int] = {}
 
     @staticmethod
     def _lease_key(user_id: int) -> str:
@@ -281,9 +283,13 @@ class InboxWebSocketManager:
     ) -> None:
         """Explicitly close this instance's sessions without affecting other devices."""
         sockets = list(self._connections.get(user_id, set()))
+        session_event = await self._canonical_client_event(
+            user_id,
+            {"event": "session_replaced", "reason": reason},
+        )
         for socket in sockets:
             try:
-                await socket.send_json({"event": "session_replaced", "reason": reason})
+                await socket.send_json(session_event)
             except Exception:
                 pass
             try:
@@ -314,11 +320,72 @@ class InboxWebSocketManager:
             # replica incorrectly announce a remote device as offline.
             return fail_open
 
+    @staticmethod
+    def _is_client_envelope(payload: dict[str, Any]) -> bool:
+        return (
+            bool(payload.get("eventId") or payload.get("event_id"))
+            and bool(payload.get("stream"))
+            and isinstance(payload.get("sequence"), int)
+        )
+
+    async def _next_client_sequence(self, stream: str) -> int:
+        key = f"{_CLIENT_SEQUENCE_PREFIX}:{stream}"
+        try:
+            return int(await self._redis.incr(key))
+        except Exception:
+            next_value = self._local_sequence_fallback.get(stream, 0) + 1
+            self._local_sequence_fallback[stream] = next_value
+            return next_value
+
+    async def _canonical_client_event(
+        self,
+        user_id: int | None,
+        payload: dict[str, Any],
+        *,
+        stream: str | None = None,
+    ) -> dict[str, Any]:
+        if self._is_client_envelope(payload):
+            return payload
+
+        resolved_stream = stream or (
+            f"app:user:{int(user_id)}" if user_id is not None else "app:global"
+        )
+        event_type = str(
+            payload.get("type")
+            or payload.get("event")
+            or "app.event"
+        ).strip() or "app.event"
+        sequence = await self._next_client_sequence(resolved_stream)
+        event_id = uuid4().hex
+        server_time = datetime.utcnow().isoformat(timespec="milliseconds") + "Z"
+        nested_payload = payload.get("payload")
+        if not isinstance(nested_payload, dict):
+            nested_payload = dict(payload)
+
+        # Preserve legacy top-level fields during migration while also exposing
+        # the canonical envelope expected by the new frontend realtime client.
+        return {
+            **payload,
+            "eventId": event_id,
+            "event_id": event_id,
+            "sequence": sequence,
+            "stream": resolved_stream,
+            "type": event_type,
+            "serverTime": server_time,
+            "server_time": server_time,
+            "payload": nested_payload,
+        }
+
     async def _send_to_user_local(self, user_id: int, payload: dict) -> None:
+        outgoing = (
+            payload
+            if self._is_client_envelope(payload)
+            else await self._canonical_client_event(user_id, payload)
+        )
         sockets = list(self._connections.get(user_id, set()))
         for socket in sockets:
             try:
-                await socket.send_json(payload)
+                await socket.send_json(outgoing)
             except Exception:
                 await self.release_connection(user_id, socket)
 
@@ -346,23 +413,34 @@ class InboxWebSocketManager:
             await self._send_to_user_local(user_id, payload)
 
     async def send_to_user(self, user_id: int, payload: dict) -> None:
-        await self._send_to_user_local(user_id, payload)
-        await self._publish("user", payload, user_id=user_id)
+        canonical = await self._canonical_client_event(user_id, payload)
+        await self._send_to_user_local(user_id, canonical)
+        await self._publish("user", canonical, user_id=user_id)
 
     async def broadcast_to_users(self, user_ids: list[int], payload: dict) -> None:
         resolved_user_ids = list(dict.fromkeys(int(item) for item in user_ids))
-        if not resolved_user_ids:
-            return
-        await self._broadcast_to_users_local(resolved_user_ids, payload)
-        await self._publish("users", payload, user_ids=resolved_user_ids)
+        for user_id in resolved_user_ids:
+            canonical = await self._canonical_client_event(user_id, payload)
+            await self._send_to_user_local(user_id, canonical)
+            await self._publish("user", canonical, user_id=user_id)
 
     async def broadcast_all_staff(self, payload: dict) -> None:
-        await self._broadcast_staff_local(payload)
-        await self._publish("staff", payload)
+        canonical = await self._canonical_client_event(
+            None,
+            payload,
+            stream="app:staff",
+        )
+        await self._broadcast_staff_local(canonical)
+        await self._publish("staff", canonical)
 
     async def broadcast_all_users(self, payload: dict) -> None:
-        await self._broadcast_all_local(payload)
-        await self._publish("all", payload)
+        canonical = await self._canonical_client_event(
+            None,
+            payload,
+            stream="app:global",
+        )
+        await self._broadcast_all_local(canonical)
+        await self._publish("all", canonical)
 
     def is_user_online(self, user_id: int | None) -> bool:
         """Return local-instance online state for legacy synchronous callers."""
