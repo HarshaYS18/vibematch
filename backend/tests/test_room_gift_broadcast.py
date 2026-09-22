@@ -2,7 +2,7 @@ import unittest
 from types import SimpleNamespace
 from unittest.mock import AsyncMock, Mock, patch
 
-from fastapi import HTTPException
+from fastapi import BackgroundTasks, HTTPException
 
 from app.api.routes import economy
 
@@ -59,7 +59,9 @@ class RoomGiftBroadcastTests(unittest.IsolatedAsyncioTestCase):
             ),
             patch.object(economy.room_realtime_connections, "broadcast_room", broadcast),
         ):
-            await economy._broadcast_room_gift_event(
+            background_tasks = BackgroundTasks()
+            economy._queue_room_gift_event(
+                background_tasks,
                 Mock(),
                 room=room,
                 sender=sender,
@@ -69,6 +71,7 @@ class RoomGiftBroadcastTests(unittest.IsolatedAsyncioTestCase):
                 quantity=3,
                 result=result,
             )
+            await background_tasks()
 
         find_gift.assert_called_once()
         self.assertIsNotNone(find_gift.call_args.kwargs.get("db"))
@@ -133,7 +136,9 @@ class RoomGiftBroadcastTests(unittest.IsolatedAsyncioTestCase):
             patch.object(economy, "_public_wallet_summary", return_value={}),
             patch.object(economy.room_realtime_connections, "broadcast_room", broadcast),
         ):
-            await economy._broadcast_room_gift_event(
+            background_tasks = BackgroundTasks()
+            economy._queue_room_gift_event(
+                background_tasks,
                 Mock(),
                 room=room,
                 sender=sender,
@@ -144,6 +149,7 @@ class RoomGiftBroadcastTests(unittest.IsolatedAsyncioTestCase):
                 result=result,
                 is_lucky=True,
             )
+            await background_tasks()
 
         payload = broadcast.await_args.args[1]["payload"]
         self.assertTrue(payload["is_lucky"])
