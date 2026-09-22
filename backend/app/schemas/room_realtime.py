@@ -58,4 +58,6 @@ class RoomWatchPartyCommand(RoomRealtimeBaseCommand):
     position_ms: int | None = Field(default=None, ge=0)
     playback_state: str | None = Field(default=None, max_length=20)
     playback_rate: float | None = Field(default=None, ge=0.25, le=4.0)
+    timeline_mode: str | None = Field(default=None, pattern="^(vod|live)$")
+    target_live_latency_ms: int | None = Field(default=None, ge=1000, le=120000)
     target_user_id: int | None = Field(default=None, gt=0)
