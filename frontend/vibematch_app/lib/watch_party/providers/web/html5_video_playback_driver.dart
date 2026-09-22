@@ -39,8 +39,16 @@ class Html5VideoPlaybackDriver {
 
   const seekable = video.seekable;
   const hasSeekable = !!seekable && seekable.length > 0;
-  const sourceAvailable = !!(video.currentSrc || video.src);
-  const playbackAvailable = !video.error && sourceAvailable && video.readyState >= 1;
+  const source = video.currentSrc || video.src || '';
+  const sourceAvailable = !!source;
+  const playbackObserved =
+      video.dataset.funkeyPlaybackObserved === '1' &&
+      video.dataset.funkeyPlaybackSource === source;
+  const playbackAvailable =
+      !video.error &&
+      sourceAvailable &&
+      video.readyState >= 1 &&
+      playbackObserved;
   const positionReadable = Number.isFinite(video.currentTime);
   const programmaticSeek =
       positionReadable && (Number.isFinite(video.duration) || hasSeekable);
@@ -59,7 +67,9 @@ class Html5VideoPlaybackDriver {
     playbackRateControl: 'playbackRate' in video,
     fineGrainedPlaybackRateControl: false,
     liveTimelineAvailable,
-    failureReason: playbackAvailable ? null : 'PROTECTED_CONTENT_NOT_READY',
+    failureReason: playbackAvailable
+        ? null
+        : (sourceAvailable ? 'PLAYBACK_NOT_OBSERVED' : 'PROTECTED_CONTENT_NOT_READY'),
     fallbackRequired: false
   };
 })()
