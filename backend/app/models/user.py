@@ -13,7 +13,7 @@ class User(Base):
 
     # Permanent public ID. This never changes.
     # Founder Owner public_user_id = 6922022.
-    # Normal user IDs use 6418xxxxxx.
+    # Existing normal IDs may use 6418xxxxxx; new IDs use 6418 + 9 digits.
     public_user_id: Mapped[int] = mapped_column(
         BigInteger,
         unique=True,

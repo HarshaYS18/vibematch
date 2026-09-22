@@ -12,13 +12,14 @@ from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
 from sqlalchemy.pool import StaticPool
 
-from app.api.routes import media_control, realtime_gateway_auth
+from app.api.routes import auth, media_control, realtime_gateway_auth
 from app.core.config import Settings, settings
 from app.core.rate_limit import check_rate_limit
 from app.database import Base
 from app.models.event_outbox import WorkerProcessedEvent
 from app.models.notification import UserNotification
 from app.models.user import User
+from app.services.identity_service import generate_public_user_id
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[2]))
 from apps.worker.events import EventEnvelope
@@ -46,6 +47,33 @@ class ProductionConfigTests(TestCase):
             Settings(**{**safe, "redis_url": "redis://localhost:6379/0"}, _env_file=None).validate_production()
         with self.assertRaisesRegex(RuntimeError, "DB_API_CONNECTION_BUDGET"):
             Settings(**safe, DB_POOL_SIZE=10, DB_API_CONNECTION_BUDGET=100, _env_file=None).validate_production()
+
+
+class IdentityAllocationTests(TestCase):
+    def test_non_postgres_public_ids_expand_capacity_and_keep_prefix(self):
+        db_engine = create_engine("sqlite://", connect_args={"check_same_thread": False}, poolclass=StaticPool)
+        Base.metadata.create_all(db_engine, tables=[User.__table__])
+        factory = sessionmaker(bind=db_engine)
+        with factory() as db:
+            public_id = generate_public_user_id(db)
+        self.assertTrue(str(public_id).startswith("6418"))
+        self.assertEqual(len(str(public_id)), 13)
+        db_engine.dispose()
+
+
+class GoogleAccessTokenTests(TestCase):
+    def test_access_token_must_belong_to_an_allowed_google_client(self):
+        tokeninfo = Mock(status_code=200)
+        tokeninfo.json.return_value = {
+            "audience": "other-client.apps.googleusercontent.com",
+            "expires_in": 3600,
+        }
+        with patch.object(auth.settings, "GOOGLE_AUTH_CLIENT_IDS", "funkey-client.apps.googleusercontent.com"), \
+             patch.object(auth.requests, "get", return_value=tokeninfo) as get:
+            with self.assertRaises(HTTPException) as raised:
+                auth._google_profile_from_access_token("google-token")
+        self.assertEqual(raised.exception.status_code, 401)
+        self.assertEqual(get.call_count, 1)
 
 
 class DistributedRateLimitTests(TestCase):

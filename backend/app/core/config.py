@@ -37,6 +37,7 @@ class Settings(BaseSettings):
 
     # Founder Owner
     FOUNDER_OWNER_PUBLIC_ID: int = 6922022
+    FOUNDER_OWNER_EMAIL: str = "founder@vibematch.com"
 
     # Dynamic gift assets. In production set this to your CDN.
     GIFT_CDN_BASE_URL: str = ""

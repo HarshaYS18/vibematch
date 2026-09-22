@@ -1,4 +1,6 @@
-import random
+import secrets
+
+from sqlalchemy import text
 from sqlalchemy.orm import Session
 
 from app.core.config import settings
@@ -14,6 +16,9 @@ RESERVED_CUSTOM_ID_PREFIXES = (
 )
 
 NORMAL_USER_PUBLIC_ID_PREFIX = "6418"
+PUBLIC_USER_ID_BASE = 6_418_000_000_000
+PUBLIC_USER_ID_MAX_SUFFIX = 999_999_999
+PUBLIC_USER_ID_SEQUENCE = "funkey_public_user_id_seq"
 
 
 def is_reserved_custom_id(custom_id: int) -> bool:
@@ -25,26 +30,35 @@ def is_reserved_custom_id(custom_id: int) -> bool:
     return custom_id_str.startswith(RESERVED_CUSTOM_ID_PREFIXES)
 
 
-def generate_public_user_id(db: Session) -> int:
-    """
-    Permanent public user ID generator.
-
-    Founder Owner gets 6922022 separately.
-    Normal users get 10-digit IDs starting with 6418.
-    Example: 6418000001 to 6418999999.
-    4518 series remains reserved for official/staff display custom IDs.
-    """
-
-    while True:
-        # 10 digits total:
-        # prefix 6418 + 6-digit suffix
-        suffix = random.randint(1, 999999)
-        public_id = int(f"{NORMAL_USER_PUBLIC_ID_PREFIX}{suffix:06d}")
-
-        if public_id in RESERVED_PUBLIC_IDS:
-            continue
-
-        existing = db.query(User).filter(User.public_user_id == public_id).first()
-
-        if not existing:
+def _fallback_public_user_id(db: Session) -> int:
+    """Non-PostgreSQL test/dev allocator with bounded collision retries."""
+    for _ in range(100):
+        suffix = secrets.randbelow(PUBLIC_USER_ID_MAX_SUFFIX) + 1
+        public_id = PUBLIC_USER_ID_BASE + suffix
+        exists = db.query(User.id).filter(User.public_user_id == public_id).first()
+        if not exists:
             return public_id
+    raise RuntimeError("Unable to allocate a unique public user ID after 100 attempts.")
+
+
+def generate_public_user_id(db: Session) -> int:
+    """Allocate a permanent public user ID.
+
+    Existing 7/10-digit IDs remain valid forever. New PostgreSQL-backed users
+    receive 13-digit numeric IDs beginning with 6418, backed by a database
+    sequence so concurrent signups cannot race each other. The nine-digit suffix
+    provides 999,999,999 normal-user IDs without relying on random collision
+    retries.
+    """
+    bind = db.get_bind()
+    if bind is not None and bind.dialect.name == "postgresql":
+        suffix = int(
+            db.execute(
+                text(f"SELECT nextval('{PUBLIC_USER_ID_SEQUENCE}')")
+            ).scalar_one()
+        )
+        if suffix < 1 or suffix > PUBLIC_USER_ID_MAX_SUFFIX:
+            raise RuntimeError("FunKey public user ID sequence is exhausted.")
+        return PUBLIC_USER_ID_BASE + suffix
+
+    return _fallback_public_user_id(db)

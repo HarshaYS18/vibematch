@@ -80,7 +80,7 @@ def _get_or_create_identity_user(db: Session, provider: str, provider_user_id: s
             db.commit()
             db.refresh(user)
         return user
-    is_founder_email = email == "founder@vibematch.com"
+    is_founder_email = email == settings.FOUNDER_OWNER_EMAIL.strip().lower()
     public_user_id = settings.FOUNDER_OWNER_PUBLIC_ID if is_founder_email else generate_public_user_id(db)
     user = User(public_user_id=public_user_id, username=username, display_name=display_name or "Vibe User", avatar_url=avatar_url)
     db.add(user)
@@ -94,8 +94,39 @@ def _get_or_create_identity_user(db: Session, provider: str, provider_user_id: s
     return user
 
 
+def _allowed_google_client_ids() -> set[str]:
+    return {item.strip() for item in settings.GOOGLE_AUTH_CLIENT_IDS.split(",") if item.strip()}
+
+
 def _google_profile_from_access_token(access_token: str) -> dict:
-    response = requests.get("https://www.googleapis.com/oauth2/v3/userinfo", headers={"Authorization": f"Bearer {access_token}"}, timeout=10)
+    tokeninfo = requests.get(
+        "https://www.googleapis.com/oauth2/v2/tokeninfo",
+        params={"access_token": access_token},
+        timeout=5,
+    )
+    if tokeninfo.status_code < 200 or tokeninfo.status_code >= 300:
+        raise HTTPException(status_code=401, detail="Invalid Google access token")
+    info = tokeninfo.json()
+    allowed_client_ids = _allowed_google_client_ids()
+    audience = str(
+        info.get("audience")
+        or info.get("aud")
+        or info.get("issued_to")
+        or ""
+    ).strip()
+    if allowed_client_ids and audience not in allowed_client_ids:
+        raise HTTPException(status_code=401, detail="Google access token audience is not allowed for this app.")
+    try:
+        if int(info.get("expires_in", 0)) <= 0:
+            raise HTTPException(status_code=401, detail="Google access token is expired.")
+    except (TypeError, ValueError) as exc:
+        raise HTTPException(status_code=401, detail="Google access token expiry is invalid.") from exc
+
+    response = requests.get(
+        "https://www.googleapis.com/oauth2/v3/userinfo",
+        headers={"Authorization": f"Bearer {access_token}"},
+        timeout=10,
+    )
     if response.status_code < 200 or response.status_code >= 300:
         raise HTTPException(status_code=401, detail="Invalid Google access token")
     return response.json()
@@ -108,7 +139,7 @@ def _google_profile_from_payload(payload: GoogleLoginRequest) -> dict:
             verified = google_id_token.verify_oauth2_token(token, google_requests.Request())
         except ValueError as exc:
             raise HTTPException(status_code=401, detail="Invalid Google token") from exc
-        client_ids = [item.strip() for item in settings.GOOGLE_AUTH_CLIENT_IDS.split(",") if item.strip()]
+        client_ids = _allowed_google_client_ids()
         if client_ids and str(verified.get("aud") or "") not in client_ids:
             raise HTTPException(status_code=401, detail="Google token audience is not allowed for this app.")
         return verified
