@@ -27,6 +27,12 @@ spec:
       serviceAccountName: funkey-worker
       automountServiceAccountToken: false
       terminationGracePeriodSeconds: 90
+      nodeSelector: {funkey.io/workload: application}
+      topologySpreadConstraints:
+        - maxSkew: 1
+          topologyKey: kubernetes.io/hostname
+          whenUnsatisfiable: ScheduleAnyway
+          labelSelector: {matchLabels: {app: funkey-worker}}
       securityContext: {runAsNonRoot: true, seccompProfile: {type: RuntimeDefault}}
       containers:
         - name: worker

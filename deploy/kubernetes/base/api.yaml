@@ -28,6 +28,7 @@ spec:
       serviceAccountName: funkey-api
       automountServiceAccountToken: false
       terminationGracePeriodSeconds: 60
+      nodeSelector: {funkey.io/workload: application}
       securityContext: {runAsNonRoot: true, seccompProfile: {type: RuntimeDefault}}
       topologySpreadConstraints:
         - maxSkew: 1

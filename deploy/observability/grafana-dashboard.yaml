@@ -1,0 +1,25 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: funkey-production-dashboard
+  labels:
+    grafana_dashboard: "1"
+data:
+  funkey-production.json: |
+    {
+      "title": "FunKey Production",
+      "uid": "funkey-production",
+      "schemaVersion": 39,
+      "refresh": "30s",
+      "time": {"from": "now-6h", "to": "now"},
+      "panels": [
+        {"type":"timeseries","title":"API request rate","targets":[{"expr":"sum(rate(funkey_http_requests_total[5m]))"}],"gridPos":{"x":0,"y":0,"w":12,"h":8}},
+        {"type":"timeseries","title":"API 5xx ratio","targets":[{"expr":"sum(rate(funkey_http_requests_total{status=~\\"5..\\"}[5m])) / clamp_min(sum(rate(funkey_http_requests_total[5m])), 0.001)"}],"gridPos":{"x":12,"y":0,"w":12,"h":8}},
+        {"type":"timeseries","title":"API p95 latency","targets":[{"expr":"histogram_quantile(0.95, sum by (le) (rate(funkey_http_request_duration_seconds_bucket[5m])))"}],"gridPos":{"x":0,"y":8,"w":12,"h":8}},
+        {"type":"timeseries","title":"Realtime connections","targets":[{"expr":"sum(funkey_realtime_connections)"}],"gridPos":{"x":12,"y":8,"w":12,"h":8}},
+        {"type":"timeseries","title":"Realtime slow clients","targets":[{"expr":"sum(rate(funkey_realtime_slow_clients_closed_total[5m]))"}],"gridPos":{"x":0,"y":16,"w":12,"h":8}},
+        {"type":"timeseries","title":"Worker retries and DLQ","targets":[{"expr":"sum(rate(funkey_worker_retries_total[5m]))","legendFormat":"retries"},{"expr":"sum(increase(funkey_worker_dead_lettered_total[15m]))","legendFormat":"dead-lettered"}],"gridPos":{"x":12,"y":16,"w":12,"h":8}},
+        {"type":"timeseries","title":"Media peers and rooms","targets":[{"expr":"sum(funkey_media_peers)","legendFormat":"peers"},{"expr":"sum(funkey_media_rooms)","legendFormat":"rooms"}],"gridPos":{"x":0,"y":24,"w":12,"h":8}},
+        {"type":"timeseries","title":"DB checked-out connections","targets":[{"expr":"sum(funkey_db_pool_checked_out)"}],"gridPos":{"x":12,"y":24,"w":12,"h":8}}
+      ]
+    }

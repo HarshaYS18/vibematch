@@ -39,7 +39,7 @@ spec:
         target: {type: Utilization, averageUtilization: 60}
     - type: Pods
       pods:
-        metric: {name: funkey_websocket_connections}
+        metric: {name: funkey_realtime_connections}
         target: {type: AverageValue, averageValue: "2000"}
 ---
 apiVersion: keda.sh/v1alpha1
@@ -52,6 +52,11 @@ spec:
   cooldownPeriod: 300
   minReplicaCount: 1
   maxReplicaCount: 20
+  fallback:
+    failureThreshold: 3
+    replicas: 2
+  advanced:
+    restoreToOriginalReplicaCount: false
   triggers:
     - type: nats-jetstream
       metadata:

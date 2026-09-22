@@ -19,4 +19,7 @@ data:
   REALTIME_REDIS_URL: redis://redis.example.invalid:6379/0
   REALTIME_ORIGINS: https://app.example.invalid
   REALTIME_DRAIN_TIMEOUT: 120s
+  REALTIME_MAX_CONNECTIONS: "10000"
+  REALTIME_MAX_CONNECTIONS_PER_USER: "4"
+  WORKER_SHUTDOWN_GRACE_SECONDS: "60"
   NATS_URL: nats://nats.example.invalid:4222

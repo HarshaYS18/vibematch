@@ -27,10 +27,11 @@ spec:
       serviceAccountName: funkey-realtime
       automountServiceAccountToken: false
       terminationGracePeriodSeconds: 150
+      nodeSelector: {funkey.io/workload: realtime}
       securityContext: {runAsNonRoot: true, seccompProfile: {type: RuntimeDefault}}
       topologySpreadConstraints:
         - maxSkew: 1
-          topologyKey: kubernetes.io/hostname
+          topologyKey: topology.kubernetes.io/hostname
           whenUnsatisfiable: DoNotSchedule
           labelSelector: {matchLabels: {app: funkey-realtime}}
       containers:

@@ -1,0 +1,76 @@
+apiVersion: monitoring.coreos.com/v1
+kind: PrometheusRule
+metadata:
+  name: funkey-production-slos
+  labels:
+    app.kubernetes.io/part-of: funkey
+spec:
+  groups:
+    - name: funkey-api
+      rules:
+        - alert: FunKeyApiErrorBudgetBurn
+          expr: |
+            (
+              sum(rate(funkey_http_requests_total{status=~"5.."}[10m]))
+              /
+              clamp_min(sum(rate(funkey_http_requests_total[10m])), 0.001)
+            ) > 0.01
+          for: 10m
+          labels: {severity: page}
+          annotations:
+            summary: FunKey API 5xx ratio is above 1%
+        - alert: FunKeyApiP95LatencyHigh
+          expr: |
+            histogram_quantile(
+              0.95,
+              sum by (le) (rate(funkey_http_request_duration_seconds_bucket[10m]))
+            ) > 1
+          for: 15m
+          labels: {severity: ticket}
+          annotations:
+            summary: FunKey API p95 latency is above one second
+        - alert: FunKeyDatabasePoolSaturated
+          expr: funkey_db_pool_checked_out / clamp_min(funkey_db_pool_size + funkey_db_pool_overflow, 1) > 0.85
+          for: 10m
+          labels: {severity: page}
+          annotations:
+            summary: FunKey API database pool is above 85% utilization
+    - name: funkey-realtime
+      rules:
+        - alert: FunKeyRealtimeRedisSubscriptionDown
+          expr: funkey_realtime_redis_subscription_up < 1
+          for: 2m
+          labels: {severity: page}
+          annotations:
+            summary: Realtime gateway lost Redis fanout subscription
+        - alert: FunKeyRealtimeSlowClients
+          expr: rate(funkey_realtime_slow_clients_closed_total[5m]) > 1
+          for: 10m
+          labels: {severity: ticket}
+          annotations:
+            summary: Realtime gateway is evicting sustained slow clients
+        - alert: FunKeyRealtimeCapacityDenied
+          expr: rate(funkey_realtime_capacity_denied_total[5m]) > 0
+          for: 5m
+          labels: {severity: page}
+          annotations:
+            summary: Realtime gateway is rejecting connections at configured capacity
+    - name: funkey-worker-media
+      rules:
+        - alert: FunKeyWorkerDeadLetters
+          expr: increase(funkey_worker_dead_lettered_total[15m]) > 0
+          labels: {severity: page}
+          annotations:
+            summary: Worker sent one or more messages to the dead-letter stream
+        - alert: FunKeyMediaRegistryUnhealthy
+          expr: funkey_media_registry_healthy < 1
+          for: 2m
+          labels: {severity: page}
+          annotations:
+            summary: Media node cannot reach authoritative registry
+        - alert: FunKeyMediaNodeDrainingTooLong
+          expr: funkey_media_draining > 0 and funkey_media_peers > 0
+          for: 5m
+          labels: {severity: ticket}
+          annotations:
+            summary: Media node remains draining with active peers
