@@ -1161,7 +1161,7 @@ packages:
     source: hosted
     version: "1.0.7"
   sdp_transform:
-    dependency: transitive
+    dependency: "direct dev"
     description:
       path: third_party/sdp_transform
       relative: true
