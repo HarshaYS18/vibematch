@@ -1,6 +1,8 @@
 # FunKey production runbook
 
-This branch has one canonical backend platform with a separate control plane and media plane.
+This guide records the established FastAPI and canonical media control-plane contract. The evolving Go gateway, worker, NATS, Kubernetes, and GitOps rollout are described in the [deployment guide](docs/architecture/deployment.md), [module index](docs/MODULE_INDEX.md), and [incident runbooks](docs/runbooks/README.md). Use `docs/FUNKEY_PRODUCTION_BACKEND_COMPLETION_REPORT.md` for this branch's verified implementation status before operating a new component.
+
+FunKey has one canonical media implementation and a separate application control plane and media plane.
 
 ## Runtime topology
 
