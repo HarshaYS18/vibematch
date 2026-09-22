@@ -17,6 +17,7 @@ import '../presentation/modules/cricket_room_mode_signal.dart';
 import '../presentation/widgets/cricket_room_backgrounds.dart';
 import '../presentation/widgets/room_theme.dart';
 import 'live_room_audio_service.dart';
+import 'live_room_log.dart';
 import 'live_room_foreground_service.dart';
 import 'live_room_presence_repository.dart';
 import 'seat_authority_gate.dart';
@@ -641,7 +642,7 @@ class LiveRoomMediaSignalingService with WidgetsBindingObserver {
       _subscription = channel.stream.listen(
         _handleMessage,
         onError: (Object error) {
-          _debug('media websocket error: $error');
+          _warn('websocket error: $error');
           _resetConnectionState();
           _scheduleReconnect(reason: 'socket error');
         },
@@ -655,7 +656,7 @@ class LiveRoomMediaSignalingService with WidgetsBindingObserver {
 
       _debug('media websocket connecting: ${VmMediaConfig.wsUrl}');
     } catch (error) {
-      _debug('media websocket connect failed: $error');
+      _warn('websocket connect failed: $error');
       _resetConnectionState();
       _scheduleReconnect(reason: 'connect exception');
     } finally {
@@ -686,7 +687,7 @@ class LiveRoomMediaSignalingService with WidgetsBindingObserver {
         _joinRoomInternal(reason: 'reconnect: $reason').catchError((
           Object error,
         ) {
-          _debug('media reconnect ignored after failure: $error');
+          _warn('reconnect failed: $error');
         }),
       );
     });
@@ -763,7 +764,7 @@ class LiveRoomMediaSignalingService with WidgetsBindingObserver {
 
       _debug('media sent: $type command=$commandId');
     } catch (error) {
-      _debug('media send failed for $type: $error');
+      _warn('send failed for $type: $error');
       _resetConnectionState();
       _scheduleReconnect(reason: 'send failed for $type');
     }
@@ -971,7 +972,7 @@ class LiveRoomMediaSignalingService with WidgetsBindingObserver {
         _enforceAdminMutePayloadIfCurrentUser(payload);
       }
     } catch (error) {
-      _debug('media received unreadable message: $raw');
+      _warn('received unreadable websocket message');
     }
   }
 
@@ -1300,8 +1301,11 @@ class LiveRoomMediaSignalingService with WidgetsBindingObserver {
   }
 
   void _debug(String message) {
-    // ignore: avoid_print
-    print('[VibeMatchMedia] $message');
+    LiveRoomLog.trace('Media', message);
+  }
+
+  void _warn(String message) {
+    LiveRoomLog.warning('Media', message);
   }
 }
 
