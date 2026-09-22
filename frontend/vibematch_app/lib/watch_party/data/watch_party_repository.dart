@@ -103,8 +103,7 @@ class WatchPartyRepository extends StateNotifier<WatchPartyState> {
         'position_ms': positionMs,
         if (timelineMode != null)
           'timeline_mode': timelineMode == WatchTimelineMode.live ? 'live' : 'vod',
-        if (targetLiveLatencyMs != null)
-          'target_live_latency_ms': targetLiveLatencyMs,
+        'target_live_latency_ms': targetLiveLatencyMs,
       },
     );
   }
