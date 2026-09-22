@@ -26,7 +26,7 @@ PostgreSQL remains the durable source of truth for application state.
 
 ## Public API/contracts
 
-Go `GET /ws`, `/live`, `/ready`, `/metrics`; backend `POST /api/v1/realtime/verify`. The gateway remains a foundation/shadow path until client migration and parity checks. Keep existing Flutter-compatible paths and payloads until a versioned migration is ready.
+Go `GET /ws`, `/live`, `/ready`, `/metrics`; backend `POST /api/v1/realtime/verify`. The gateway implements the production transport contract; traffic cutover remains controlled by deployment/client compatibility. Existing FastAPI compatibility paths stay available until the client migration is explicitly completed.
 
 ## Events published
 
@@ -90,4 +90,4 @@ Review security boundaries, schema changes, resource limits, autoscaling signals
 
 ## Known migration status
 
-Go gateway foundation/shadow; Flutter traffic migration not complete.
+Transport implementation complete: bounded queues, connection/device budgets, authorization revalidation, subscription authorization, Redis cross-instance fanout, event dedupe, leases, reconnect/resync controls, metrics and graceful drain are implemented. Client traffic cutover is a deployment decision, not a missing gateway feature.

@@ -1,187 +1,120 @@
 # FunKey production runbook
 
-This guide records the established FastAPI and canonical media control-plane contract. The evolving Go gateway, worker, NATS, Kubernetes, and GitOps rollout are described in the [deployment guide](docs/architecture/deployment.md), [module index](docs/MODULE_INDEX.md), and [incident runbooks](docs/runbooks/README.md). Use `docs/FUNKEY_PRODUCTION_BACKEND_COMPLETION_REPORT.md` for this branch's verified implementation status before operating a new component.
-
-FunKey has one canonical media implementation and a separate application control plane and media plane.
+This is the operational entry point for the production-backend branch. The authoritative implementation audit is [docs/FUNKEY_PRODUCTION_BACKEND_COMPLETION_REPORT.md](docs/FUNKEY_PRODUCTION_BACKEND_COMPLETION_REPORT.md); provider/account prerequisites remain in [docs/EXTERNAL_PREREQUISITES.md](docs/EXTERNAL_PREREQUISITES.md).
 
 ## Runtime topology
 
-Production requires these application processes:
+The production application is split into four independently scalable deployables:
 
-1. **FastAPI control/API plane** — default port `8000`
-   - REST and WebSocket API under `/api/v1`
-   - authentication, authorization, rooms, seats, presence, inbox, economy and games
-   - authoritative room/media permission checks
-   - media-node registry, room-to-node assignment and drain controls
+1. **FastAPI control/API plane** — port `8000`
+   - REST APIs and the compatibility WebSocket paths under `/api/v1`
+   - authentication, authorization, users, profiles, rooms, seats, inbox, economy, games and durable application state
+   - authoritative realtime subscription verification
+   - media-node registry, room assignment and drain controls
+   - PostgreSQL is authoritative; Redis is coordination/cache, never wallet or identity truth
 
-2. **`backend_media` mediasoup media plane** — default signaling port `4100`
-   - Socket.IO signaling
-   - mediasoup workers/routers/transports/producers/consumers
-   - media-node heartbeat and capacity reporting
-   - graceful drain/offline behavior
+2. **Go realtime gateway** — port `8081`
+   - authenticated WebSocket transport
+   - bounded outbound queues and per-pod/per-user connection budgets
+   - subscription authorization and periodic revalidation
+   - Redis cross-instance fanout, event-ID deduplication, reconnect/resync signaling and graceful drain
+   - no direct durable business writes
+
+3. **Python worker** — health/metrics port `8082`
+   - transactional-outbox relay to NATS JetStream
+   - durable pull consumer, idempotent handling, bounded retry and dead-letter behavior
+   - graceful drain and health/readiness/metrics endpoints
+
+4. **`backend_media` mediasoup media plane** — signaling port `4100`
+   - Socket.IO signaling and mediasoup transport
+   - node heartbeat/capacity registration, sticky assignment and graceful drain
    - sensitive media actions re-authorized through FastAPI
 
-Infrastructure:
+There is exactly one executable media implementation: `backend_media/`.
 
-- PostgreSQL
-- Redis
-- TLS reverse proxy / ingress in production
+## Required infrastructure
 
-There is exactly one executable media implementation in this repository: `backend_media/`.
-The former `audio-server/`, `media-server/` and `services/mediasoup-audio-server/` implementations have been removed.
+Production needs PostgreSQL, a highly available Redis/Valkey primary, NATS JetStream, S3-compatible object storage/CDN, TURN, Kubernetes with separate application/realtime/media node-pool capacity, TLS/DNS, secret management/workload identity, and a metrics/logging platform. The repository provides provider-neutral Terraform contracts and Kubernetes/GitOps desired state; real cloud resources require the selected provider, account IDs, credentials, DNS zones and quotas.
 
 ## Database schema ownership
 
-**Alembic is the only schema mutation authority.**
+**Alembic is the only schema mutation authority.** Runtime schema creation/patching is forbidden.
 
-Do not add `Base.metadata.create_all()`, runtime `ALTER TABLE`, runtime `CREATE TABLE`, or another startup schema patcher under `backend/app`.
-
-Before starting a new backend release:
-
-```bash
-cd backend
-alembic upgrade head
-```
-
-The API schema guard can fail startup when the connected database is not at the current Alembic head. That is intentional: apply migrations first rather than mutating the database from application startup.
+The GitOps migration job is an Argo CD `PreSync` hook. It must succeed before compatible workloads are promoted. Do not automatically downgrade a production schema during rollback; use expand/contract migrations and restore procedures.
 
 ## Local development
 
-### 1. PostgreSQL and Redis
+Use `infra/docker-compose.yml` for PostgreSQL, Redis and NATS, then run the application deployables independently. The convenience task runner is `scripts/task.ps1`.
 
-Start PostgreSQL and Redis and configure `backend/.env`.
-
-### 2. FastAPI
-
-PowerShell:
+Typical checks:
 
 ```powershell
-cd backend
-.\.venv\Scripts\Activate.ps1
-alembic upgrade head
-uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload
+pwsh scripts/task.ps1 test
+pwsh scripts/task.ps1 lint
+pwsh scripts/task.ps1 integration-test
+pwsh scripts/task.ps1 load-test-smoke
 ```
 
-Linux/macOS:
-
-```bash
-cd backend
-source .venv/bin/activate
-alembic upgrade head
-uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload
-```
-
-Health check:
-
-```bash
-curl http://127.0.0.1:8000/health
-```
-
-### 3. Media worker
-
-```bash
-cd backend_media
-npm ci
-npm run typecheck
-npm run build
-npm run dev
-```
-
-Health and readiness:
-
-```bash
-curl http://127.0.0.1:4100/health
-curl http://127.0.0.1:4100/ready
-```
-
-A media worker is ready only when mediasoup is ready and its FastAPI registry heartbeat is healthy.
-
-## Media discovery and load distribution
-
-Clients do not choose a media server manually.
-
-The authenticated control-plane endpoint:
-
-```text
-GET /api/v1/rooms/{room_public_id}/media
-```
-
-verifies room access and returns the signaling URL of the assigned healthy media node.
-
-FastAPI stores node heartbeats and sticky room assignments in Redis. New rooms are assigned to a non-draining node using reported room/peer capacity and load. Existing room assignments remain sticky while the assigned node stays healthy.
-
-Administrative drain controls live under:
-
-```text
-GET   /api/v1/admin/media/nodes
-PATCH /api/v1/admin/media/nodes/{node_id}/drain
-```
-
-Set a node to draining before terminating it. Draining nodes stop receiving new room assignments while existing room assignments can finish naturally.
-
-Actual process/pod creation is owned by the deployment orchestrator. The application control plane supplies the node health/capacity/drain contract; Kubernetes, ECS, Nomad or another orchestrator should scale `backend_media` replicas.
+The canonical media worker remains under `backend_media/`; removed legacy media servers must not be restored.
 
 ## Production boot order
 
-1. PostgreSQL
-2. Redis
-3. `alembic upgrade head`
-4. FastAPI
-5. one or more `backend_media` workers
-6. ingress/reverse proxy and client deployment
+1. Managed PostgreSQL, Redis/Valkey, NATS JetStream, object storage/CDN and TURN are healthy.
+2. Kubernetes nodes, ingress/load balancers, DNS/TLS, secret injection and observability are healthy.
+3. Run the Alembic migration hook to the expected head.
+4. Start/roll FastAPI and confirm `/live`, `/ready` and `/metrics`.
+5. Start/roll workers and confirm JetStream connectivity, readiness and no unexpected dead-letter growth.
+6. Start/roll realtime gateway replicas and confirm Redis subscription health, authentication verification and WebSocket upgrade/reconnect.
+7. Start/roll media nodes, verify registry heartbeat, media discovery and TURN-only connectivity.
+8. Promote client traffic only after smoke, rollback and dashboard checks pass.
 
-Do not run a media worker against a FastAPI instance with mismatched schema or API version.
+## GitOps release path
 
-## Production process rules
+Images are built, scanned, signed and published by `.github/workflows/publish-backend-images.yml`. Production desired state is digest-pinned. Use `.github/workflows/prepare-gitops-promotion.yml` with immutable `name@sha256:<digest>` references; it creates a reviewable environment promotion PR.
 
-- Do not use Uvicorn `--reload` in production.
-- Run FastAPI and media workers under a supervisor/orchestrator.
-- Use HTTPS/WSS at the public edge.
-- Keep PostgreSQL and Redis private.
-- Set mediasoup announced IP/addressing for the actual public/NAT topology.
-- Open only the signaling port and configured mediasoup RTC UDP/TCP range required by the deployment.
-- Use the same `MEDIA_INTERNAL_TOKEN` on the FastAPI control plane and media workers.
-- Drain a media node before planned shutdown.
+Staging Argo CD is configured for automated prune/self-heal. Production requires an explicit reviewed sync. The migration job runs before workload sync.
 
-Example systemd operations:
+## Scaling and drain rules
 
-```bash
-sudo systemctl restart funkey-api
-sudo systemctl status funkey-api --no-pager
-sudo journalctl -u funkey-api -n 200 --no-pager
+- API: HPA on CPU and inflight requests; DB pool sizes are bounded by the Terraform/Kubernetes connection budget.
+- Realtime: HPA on CPU and `funkey_realtime_connections`; each gateway enforces local and per-user connection ceilings.
+- Worker: KEDA scales from JetStream consumer lag with a safe fallback replica count.
+- Media: HPA contracts use CPU, peer and room metrics, but real SFU capacity must be measured with actual WebRTC/TURN traffic.
+- PDBs and topology spread protect API, realtime and media availability.
+- Realtime and media scale-in must drain first. Media nodes stop receiving new room assignments before termination.
 
-sudo systemctl restart funkey-media
-sudo systemctl status funkey-media --no-pager
-sudo journalctl -u funkey-media -n 200 --no-pager
-```
+## Observability and incident response
 
-## Required pre-deploy checks
+API, gateway, worker and media expose Prometheus metrics and structured operational logs. Repository alert rules and the Grafana dashboard are under `deploy/observability/`. The environment must provide the Prometheus Operator/metrics adapter, Grafana discovery, log collection and paging routes.
 
-```bash
-python scripts/check_backend_architecture.py
+Use [docs/runbooks/README.md](docs/runbooks/README.md) for database, Redis, queue, realtime, media, TURN, deployment, migration, latency, capacity, region and security incidents.
 
-cd backend
-python -m unittest discover -s tests -p "test_*.py" -v
+## Load, soak and failure validation
 
-cd ../backend_media
-npm ci
-npm run typecheck
-npm run build
+`tests/load/` contains HTTP, WebSocket, media-discovery and reconnect-storm k6 scenarios. `tests/chaos/` contains staging-only pod termination/drain exercises. Large-scale capacity claims require a real staging environment with distributed load generators and real WebRTC clients; the repository deliberately does not claim an unmeasured concurrency number.
 
-cd ../frontend/vibematch_app
-flutter pub get
-flutter test
-flutter build web --release
-```
+## Required pre-deploy gates
 
-CI runs the same architecture/backend/media/frontend checks for this consolidation branch.
+The branch CI must pass:
+
+- architecture guard and backend tests/migration replay
+- media typecheck/build/lint/tests
+- Flutter tests/analyze/release web build
+- Go format/vet/unit/race tests
+- Terraform format/init/validate
+- local/staging/production/media/observability Kustomize renders
+- immutable production-image policy
+- load/chaos harness parse checks
+- container builds, secret scan, filesystem scan and SBOM generation
+
+After repository CI, staging must still verify real provider bindings, backup/restore, TURN, load/soak, failure drills, alert delivery and rollback before production traffic.
 
 ## Architecture invariants
 
-- `backend/app/api/router.py` owns the `/api/v1` root.
-- FastAPI owns authentication, authorization, room membership, seats and business state.
-- `backend_media` owns media transport state, not application authorization or seat truth.
-- Every sensitive media action is verified against FastAPI.
-- Redis coordinates realtime distribution, media-node liveness and room assignment.
-- Alembic owns every database schema change.
-- A second executable media server implementation is a CI failure.
+- FastAPI/PostgreSQL remain authoritative for identity, authorization, room membership, seats, messages, wallet/economy and other durable state.
+- Redis/Valkey provides ephemeral fanout, leases, presence/routing coordination and caching.
+- NATS JetStream carries durable asynchronous work from the PostgreSQL transactional outbox.
+- The Go gateway transports authorized realtime events; it does not become a second business-state authority.
+- `backend_media` owns media transport, not application authorization.
+- Alembic owns schema evolution.
+- Production images are immutable digest pins.

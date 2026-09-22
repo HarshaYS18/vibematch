@@ -22,7 +22,7 @@ PostgreSQL remains the durable source of truth for application state.
 
 ## Important files
 
-`backend/app/realtime/events.py`, `backend/app/realtime/event_bus.py`, `contracts/events (target)`.
+`backend/app/realtime/events.py`, `backend/app/realtime/event_bus.py`, `backend/app/services/event_outbox_service.py`, `backend/app/services/outbox_relay_service.py`, `apps/worker/events.py`, and `contracts/events/`.
 
 ## Public API/contracts
 
@@ -34,7 +34,7 @@ NATS JetStream is the selected broker. Contracts must carry event_id, event_type
 
 ## Events consumed
 
-No durable broker consumer is implied by this ownership guide. Add a consumer only with a versioned contract, idempotency, retry limits, and an integration test.
+Implemented durable contracts use the worker's JetStream pull consumer with explicit ack, bounded retry, idempotent handlers and dead-letter publication. Realtime Redis Pub/Sub remains intentionally ephemeral and separate.
 
 ## Database tables/state owned
 
@@ -90,4 +90,4 @@ Review security boundaries, schema changes, resource limits, autoscaling signals
 
 ## Known migration status
 
-Existing Redis realtime bus; NATS JetStream foundation is being introduced.
+Redis realtime fanout and the PostgreSQL transactional-outbox → NATS JetStream durable-worker path are implemented as separate transports. Production NATS provisioning/credentials and additional domain-event migrations remain environment/domain-by-domain work rather than a platform gap.

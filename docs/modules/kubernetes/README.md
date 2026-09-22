@@ -22,7 +22,7 @@ PostgreSQL remains the durable source of truth for application state.
 
 ## Important files
 
-`deploy/helm (target)`, `deploy/kubernetes (target)`, `backend_media/src/control/heartbeatLoop.ts`.
+`deploy/kubernetes/base/`, `deploy/kubernetes/overlays/`, `deploy/kubernetes/media/`, `deploy/kubernetes/jobs/`, `deploy/gitops/`, and `backend_media/src/control/heartbeatLoop.ts`.
 
 ## Public API/contracts
 
@@ -90,4 +90,4 @@ Review security boundaries, schema changes, resource limits, autoscaling signals
 
 ## Known migration status
 
-Deployment foundation; replica and node capacities require load validation.
+Workload orchestration implemented: API/realtime/worker/media deployments, probes, resource budgets, PDBs, topology spread, node-pool placement, HPA/KEDA, migration PreSync hook, ingress and GitOps overlays are present. Replica targets and media/gateway capacity still require validation against the selected production environment.

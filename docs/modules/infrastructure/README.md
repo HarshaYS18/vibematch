@@ -22,7 +22,7 @@ PostgreSQL remains the durable source of truth for application state.
 
 ## Important files
 
-`infra/docker-compose.yml`, `infra/turn/docker-compose.yml`, `infra/terraform (target)`.
+`infra/docker-compose.yml`, `infra/turn/docker-compose.yml`, and `infra/terraform/`.
 
 ## Public API/contracts
 
@@ -90,4 +90,4 @@ Review security boundaries, schema changes, resource limits, autoscaling signals
 
 ## Known migration status
 
-Local Compose active; production provider resources need owner choice and credentials.
+Repository-side infrastructure contract complete. Terraform validates zones, node pools, service bindings and PostgreSQL connection budgets, while Kubernetes defines workload placement/ingress/autoscaling. Actual cloud resources remain external because no provider/account/region/credential set is selected in the repository.

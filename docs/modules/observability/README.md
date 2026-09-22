@@ -22,11 +22,11 @@ PostgreSQL remains the durable source of truth for application state.
 
 ## Important files
 
-`backend/app/main.py`, `backend/app/api/routes/health.py`, `backend_media/src/server.ts`, `deploy (target)`.
+`backend/app/core/operational.py`, `backend/app/main.py`, `apps/realtime-gateway/internal/gateway/hub.go`, `apps/worker/main.py`, `backend_media/src/server.ts`, and `deploy/observability/`.
 
 ## Public API/contracts
 
-/health and media /health /ready currently; /live /ready /metrics as rollout contracts. Keep existing Flutter-compatible paths and payloads until a versioned migration is ready.
+`/live`, `/ready`, and `/metrics` are operational contracts for API/gateway/worker; media exposes `/health`, `/ready`, and `/metrics`. Prometheus alert rules and a Grafana dashboard are deployable from `deploy/observability/`.
 
 ## Events published
 
@@ -90,4 +90,4 @@ Review security boundaries, schema changes, resource limits, autoscaling signals
 
 ## Known migration status
 
-Existing health endpoints; unified OTel/Prometheus rollout is incremental.
+Repository observability package implemented: structured API/gateway/worker/media operational logs, Prometheus metrics, SLO-style alert rules, dashboard configuration and incident runbooks are present. The actual Prometheus/Grafana/log collector/paging stack and any OpenTelemetry collector/exporter are external environment integrations.

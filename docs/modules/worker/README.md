@@ -22,11 +22,11 @@ PostgreSQL remains the durable source of truth for application state.
 
 ## Important files
 
-`backend/app/services/push_notification_service.py`, `backend/app/services/notification_service.py`, `contracts/events (target)`.
+`apps/worker/main.py`, `apps/worker/events.py`, `apps/worker/handlers.py`, `backend/app/services/event_outbox_service.py`, `backend/app/services/outbox_relay_service.py`, and `contracts/events/`.
 
 ## Public API/contracts
 
-No public HTTP business API; broker envelope and handler contract are planned. Keep existing Flutter-compatible paths and payloads until a versioned migration is ready.
+No public HTTP business API. The worker consumes the versioned JetStream envelope and exposes only operational `/live`, `/ready`, and `/metrics` endpoints.
 
 ## Events published
 
@@ -34,7 +34,7 @@ This component may publish or consume versioned domain events as contracts are i
 
 ## Events consumed
 
-No durable broker consumer is implied by this ownership guide. Add a consumer only with a versioned contract, idempotency, retry limits, and an integration test.
+The deployable owns a durable JetStream pull consumer for implemented event contracts. It acknowledges only after successful idempotent handling, uses bounded redelivery, and publishes terminal failures to the dead-letter stream before acknowledging the source.
 
 ## Database tables/state owned
 
@@ -90,4 +90,4 @@ Review security boundaries, schema changes, resource limits, autoscaling signals
 
 ## Known migration status
 
-Foundation target; assess actual worker deployable before enabling consumers.
+Deployable implemented. PostgreSQL transactional-outbox claims, JetStream publication, durable notification consumption, idempotency, bounded retry/dead-letter handling, health/metrics and graceful shutdown are present. Production broker endpoints/credentials and measured scaling thresholds remain environment inputs.
