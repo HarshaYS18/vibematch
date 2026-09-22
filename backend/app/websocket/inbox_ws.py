@@ -18,6 +18,7 @@ _INBOX_CHANNEL = "funkey:inbox:events"
 _INBOX_LEASE_PREFIX = "funkey:inbox:leases"
 _SOCKET_LEASE_SECONDS = 30
 _SOCKET_LEASE_REFRESH_SECONDS = 10
+_REMOTE_EVENT_TTL_SECONDS = 5 * 60
 
 
 class InboxWebSocketManager:
@@ -39,6 +40,7 @@ class InboxWebSocketManager:
             health_check_interval=20,
         )
         self._listener_task: asyncio.Task[None] | None = None
+        self._seen_remote_events: dict[str, float] = {}
 
     @staticmethod
     def _lease_key(user_id: int) -> str:
@@ -73,6 +75,8 @@ class InboxWebSocketManager:
                         continue
                     if envelope.get("origin") == self._instance_id:
                         continue
+                    if not self._accept_remote_event(envelope):
+                        continue
                     await self._handle_envelope(envelope)
             except asyncio.CancelledError:
                 raise
@@ -83,6 +87,44 @@ class InboxWebSocketManager:
                     await pubsub.aclose()
                 except Exception:
                     pass
+
+    def _accept_remote_event(self, envelope: dict[str, Any]) -> bool:
+        event_id = str(envelope.get("event_id") or "").strip()
+        if not event_id:
+            return True
+        now = time.monotonic()
+        for key, expires_at in list(self._seen_remote_events.items()):
+            if expires_at <= now:
+                self._seen_remote_events.pop(key, None)
+        if event_id in self._seen_remote_events:
+            return False
+        self._seen_remote_events[event_id] = now + _REMOTE_EVENT_TTL_SECONDS
+        return True
+
+    async def shutdown(self) -> None:
+        listener = self._listener_task
+        self._listener_task = None
+        if listener is not None and not listener.done():
+            listener.cancel()
+        sockets = [
+            (user_id, socket)
+            for user_id, user_sockets in list(self._connections.items())
+            for socket in list(user_sockets)
+        ]
+        for user_id, socket in sockets:
+            await self.release_connection(user_id, socket)
+        tasks = [task for task in self._lease_tasks.values() if not task.done()]
+        for task in tasks:
+            task.cancel()
+        if listener is not None:
+            await asyncio.gather(listener, return_exceptions=True)
+        if tasks:
+            await asyncio.gather(*tasks, return_exceptions=True)
+        close = getattr(self._redis, "aclose", None)
+        if callable(close):
+            result = close()
+            if asyncio.iscoroutine(result):
+                await result
 
     async def _handle_envelope(self, envelope: dict[str, Any]) -> None:
         payload = envelope.get("payload")
@@ -128,6 +170,7 @@ class InboxWebSocketManager:
     ) -> None:
         await self._ensure_listener()
         envelope: dict[str, Any] = {
+            "event_id": uuid4().hex,
             "origin": self._instance_id,
             "scope": scope,
             "payload": payload,

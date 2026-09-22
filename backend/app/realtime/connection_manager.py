@@ -20,6 +20,7 @@ _GLOBAL_ROOM_ID = "__global__"
 _SOCKET_LEASE_SECONDS = 30
 _SOCKET_LEASE_REFRESH_SECONDS = 10
 _COMMAND_CLAIM_SECONDS = 5 * 60
+_REMOTE_EVENT_TTL_SECONDS = 5 * 60
 _GATEWAY_CHANNEL = "funkey:realtime:events"
 
 
@@ -105,6 +106,7 @@ class RealtimeConnectionManager:
         )
         self._listener_task: asyncio.Task[None] | None = None
         self._local_command_claims: dict[str, float] = {}
+        self._seen_remote_events: dict[str, float] = {}
 
     async def _ensure_listener(self) -> None:
         if self._listener_task is not None and not self._listener_task.done():
@@ -129,6 +131,8 @@ class RealtimeConnectionManager:
                     payload = envelope.get("payload")
                     if not isinstance(payload, dict):
                         continue
+                    if not self._accept_remote_event(envelope, payload):
+                        continue
                     if envelope.get("scope") == "global":
                         await self._deliver_global_local(payload)
                         continue
@@ -150,6 +154,52 @@ class RealtimeConnectionManager:
                     await pubsub.aclose()
                 except Exception:
                     pass
+
+    def _accept_remote_event(
+        self,
+        envelope: dict[str, Any],
+        payload: dict[str, Any],
+    ) -> bool:
+        event_id = str(payload.get("event_id") or "").strip()
+        if not event_id:
+            return True
+        now = time.monotonic()
+        for key, expires_at in list(self._seen_remote_events.items()):
+            if expires_at <= now:
+                self._seen_remote_events.pop(key, None)
+        key = ":".join(
+            [
+                event_id,
+                str(envelope.get("scope") or "room"),
+                str(envelope.get("room_id") or ""),
+                str(envelope.get("target_user_id") or ""),
+            ]
+        )
+        if key in self._seen_remote_events:
+            return False
+        self._seen_remote_events[key] = now + _REMOTE_EVENT_TTL_SECONDS
+        return True
+
+    async def shutdown(self) -> None:
+        listener = self._listener_task
+        self._listener_task = None
+        if listener is not None and not listener.done():
+            listener.cancel()
+        sockets = list(self._client_rooms)
+        for websocket in sockets:
+            await self.release_connection(websocket)
+        tasks = [task for task in self._lease_tasks.values() if not task.done()]
+        for task in tasks:
+            task.cancel()
+        if listener is not None:
+            await asyncio.gather(listener, return_exceptions=True)
+        if tasks:
+            await asyncio.gather(*tasks, return_exceptions=True)
+        close = getattr(self._redis, "aclose", None)
+        if callable(close):
+            result = close()
+            if asyncio.iscoroutine(result):
+                await result
 
     async def connect_room(
         self,

@@ -351,14 +351,14 @@ async def room_realtime_socket(websocket: WebSocket) -> None:
             room_id = str(payload.get("room_id") or active_room_id or "").strip()
 
             if active_room_id is None:
-                if command_type != "room/join" or not room_id:
+                if command_type not in {"room/join", "room/resume"} or not room_id:
                     await _send_error(
                         websocket,
                         room_id=room_id,
                         command_id=command_id,
                         command_type=command_type,
                         status_code=401,
-                        message="room/join must be the first authenticated command",
+                        message="room/join or room/resume must be the first authenticated command",
                     )
                     continue
 
@@ -430,6 +430,20 @@ async def room_realtime_socket(websocket: WebSocket) -> None:
                     websocket,
                     authenticated_user_id,
                 )
+
+                if command_type == "room/resume":
+                    await room_realtime_connections.send_json(
+                        websocket,
+                        {
+                            "type": "room/resumed",
+                            "payload": {
+                                "room_id": room_id,
+                                "last_state_version": payload.get("last_state_version"),
+                                "state_version": int(snapshot.get("state_version") or 0),
+                                "room": snapshot,
+                            },
+                        },
+                    )
 
                 # Existing room clients receive room/joined from the authoritative join
                 # transaction. The joining socket was not registered yet, so send exactly

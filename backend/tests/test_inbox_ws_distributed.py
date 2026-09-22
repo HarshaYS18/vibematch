@@ -133,6 +133,27 @@ class InboxWebSocketDistributedTests(IsolatedAsyncioTestCase):
         await subscriber.release_connection(11, websocket)
         await asyncio.sleep(0)
 
+    async def test_duplicate_remote_event_id_is_suppressed(self):
+        redis = FakeRedis()
+        manager = self.manager(redis)
+        websocket = websocket_mock()
+        await manager.connect(11, websocket)
+        websocket.send_json.reset_mock()
+
+        envelope = {
+            "event_id": "evt-1",
+            "scope": "user",
+            "user_id": 11,
+            "payload": {"event": "inbox_message_created"},
+        }
+        self.assertTrue(manager._accept_remote_event(envelope))
+        await manager._handle_envelope(envelope)
+        self.assertFalse(manager._accept_remote_event(envelope))
+        websocket.send_json.assert_awaited_once()
+
+        await manager.release_connection(11, websocket)
+        await asyncio.sleep(0)
+
     async def test_remote_staff_event_only_reaches_staff_sockets(self):
         redis = FakeRedis()
         manager = self.manager(redis)

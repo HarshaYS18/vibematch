@@ -14,7 +14,9 @@ from app.core.rate_limit import rate_limit_middleware
 from app.core.redis_client import get_async_redis, get_redis
 from app.core.schema_guard import assert_database_schema_current
 from app.database import engine
+from app.realtime.connection_manager import room_realtime_connections
 from app.services.push_notification_service import assert_firebase_configuration
+from app.websocket.inbox_ws import inbox_ws_manager
 
 
 BACKEND_DIR = Path(__file__).resolve().parents[1]
@@ -38,6 +40,8 @@ async def lifespan(_app: FastAPI):
     _app.state.draining = False
     yield
     _app.state.draining = True
+    await room_realtime_connections.shutdown()
+    await inbox_ws_manager.shutdown()
     await get_async_redis().aclose()
     get_redis().close()
     engine.dispose()
