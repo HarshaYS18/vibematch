@@ -208,8 +208,23 @@ class InAppWebViewOttPlaybackHost implements OttWebPlaybackHost {
       live: !Number.isFinite(video.duration) || video.duration === Infinity
     });
 
+    const markPlaybackObserved = () => {
+      const source = video.currentSrc || video.src || '';
+      if (!source) return;
+      video.dataset.funkeyPlaybackObserved = '1';
+      video.dataset.funkeyPlaybackSource = source;
+    };
+
+    if (!video.paused && video.readyState >= 3) {
+      markPlaybackObserved();
+    }
+
     video.addEventListener('loadedmetadata', () => send('PLAYER_READY', state()));
     video.addEventListener('play', () => send('PLAYER_STATE', state()));
+    video.addEventListener('playing', () => {
+      markPlaybackObserved();
+      send('PLAYER_STATE', state());
+    });
     video.addEventListener('pause', () => send('PLAYER_STATE', state()));
     video.addEventListener('waiting', () => send('BUFFERING', state()));
     video.addEventListener('error', () => send('PLAYBACK_ERROR', {
