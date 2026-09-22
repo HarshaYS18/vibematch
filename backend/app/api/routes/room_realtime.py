@@ -146,7 +146,9 @@ def _room_heartbeat_for_user(room_id: str, user_id: int) -> dict:
             room_action_service.heartbeat_room(db, room, user)
             db.commit()
             db.refresh(room)
-            snapshot = client_room_snapshot(db, room, include_chat=False)
+            # Websocket snapshots remain complete replacement snapshots.
+            # REST heartbeats use an explicit partial-snapshot contract.
+            snapshot = client_room_snapshot(db, room, include_chat=True)
             db.commit()
             return snapshot
         except Exception:
