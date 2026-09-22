@@ -21,6 +21,8 @@ _logger = logging.getLogger("funkey.api")
 _lock = threading.Lock()
 _requests: dict[tuple[str, str, int], int] = defaultdict(int)
 _latency: dict[tuple[str, str, str], int] = defaultdict(int)
+_latency_count: dict[tuple[str, str], int] = defaultdict(int)
+_latency_sum: dict[tuple[str, str], float] = defaultdict(float)
 _inflight = 0
 _buckets = (0.01, 0.05, 0.1, 0.25, 0.5, 1.0, 2.5, 5.0, 10.0)
 
@@ -61,6 +63,8 @@ async def operational_middleware(request: Request, call_next):
         with _lock:
             _inflight -= 1
             _requests[(method, path, status)] += 1
+            _latency_count[(method, path)] += 1
+            _latency_sum[(method, path)] += elapsed
             for bucket in _buckets:
                 if elapsed <= bucket:
                     _latency[(method, path, str(bucket))] += 1
@@ -76,6 +80,8 @@ def render_metrics(pool=None) -> str:
     with _lock:
         requests = dict(_requests)
         latency = dict(_latency)
+        latency_count = dict(_latency_count)
+        latency_sum = dict(_latency_sum)
         inflight = _inflight
     lines = [
         "# TYPE funkey_http_inflight_requests gauge",
@@ -87,6 +93,9 @@ def render_metrics(pool=None) -> str:
     lines.append("# TYPE funkey_http_request_duration_seconds histogram")
     for (method, path, bucket), count in sorted(latency.items()):
         lines.append(f'funkey_http_request_duration_seconds_bucket{{method={json.dumps(method)},route={json.dumps(path)},le="{bucket}"}} {count}')
+    for (method, path), count in sorted(latency_count.items()):
+        lines.append(f'funkey_http_request_duration_seconds_count{{method={json.dumps(method)},route={json.dumps(path)}}} {count}')
+        lines.append(f'funkey_http_request_duration_seconds_sum{{method={json.dumps(method)},route={json.dumps(path)}}} {latency_sum[(method, path)]:.9f}')
     if pool is not None and hasattr(pool, "checkedout"):
         lines.extend([
             "# TYPE funkey_db_pool_checked_out gauge",
