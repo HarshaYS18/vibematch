@@ -19,6 +19,5 @@ class JioHotstarProviderAdapter extends SupportedWebPlaybackAdapter {
          companion:
              companion ??
              CompanionPlaybackAdapter(provider: OttProviderCatalog.jioHotstar),
-         telemetry: telemetry,
        );
 }
