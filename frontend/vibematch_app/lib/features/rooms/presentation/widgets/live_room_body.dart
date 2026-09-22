@@ -41,6 +41,7 @@ class LiveRoomBody extends StatelessWidget {
     this.showMicButton,
     required this.inboxUnreadCount,
     required this.imagesEnabled,
+    this.watchPartyModule,
     required this.onBack,
     required this.onJoinTap,
     required this.onShare,
@@ -99,6 +100,7 @@ class LiveRoomBody extends StatelessWidget {
   final bool? showMicButton;
   final int inboxUnreadCount;
   final bool imagesEnabled;
+  final Widget? watchPartyModule;
   final VoidCallback onBack;
   final VoidCallback onJoinTap;
   final VoidCallback onShare;
@@ -234,6 +236,13 @@ class LiveRoomBody extends StatelessWidget {
                       onApply: onApplySeat,
                     ),
                   ),
+                  if (watchPartyModule != null) ...[
+                    const SizedBox(height: 6),
+                    Padding(
+                      padding: const EdgeInsets.symmetric(horizontal: 12),
+                      child: watchPartyModule!,
+                    ),
+                  ],
                   const SizedBox(height: 3),
                   Expanded(
                     child: GestureDetector(

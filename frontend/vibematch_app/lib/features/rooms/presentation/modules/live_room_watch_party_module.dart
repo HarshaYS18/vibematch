@@ -16,7 +16,7 @@ class LiveRoomWatchPartyModule extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    if (!active && !canManage) return const SizedBox.shrink();
+    if (!active) return const SizedBox.shrink();
 
     return Material(
       color: Colors.transparent,
@@ -30,22 +30,30 @@ class LiveRoomWatchPartyModule extends StatelessWidget {
         ),
         child: Row(
           children: [
-            const Icon(Icons.smart_display_rounded, color: Colors.white, size: 18),
+            const Icon(
+              Icons.smart_display_rounded,
+              color: Colors.white,
+              size: 18,
+            ),
             const SizedBox(width: 8),
-            Expanded(
+            const Expanded(
               child: Text(
-                active ? 'Watch Party is active' : 'Start Watch Party',
-                style: const TextStyle(
+                'Watch Party is active',
+                style: TextStyle(
                   color: Colors.white,
                   fontSize: 12,
                   fontWeight: FontWeight.w900,
                 ),
               ),
             ),
+            TextButton(
+              onPressed: onOpenSettings,
+              child: const Text('Open'),
+            ),
             if (canManage)
               TextButton(
-                onPressed: active ? onEndWatchParty : onOpenSettings,
-                child: Text(active ? 'End' : 'Open'),
+                onPressed: onEndWatchParty,
+                child: const Text('End'),
               ),
           ],
         ),

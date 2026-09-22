@@ -1,5 +1,10 @@
-import 'package:flutter/material.dart';
+import 'dart:async';
 
+import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+
+import '../../../../../session/data/session_repository.dart';
+import '../../../../../watch_party/data/watch_party_repository.dart';
 import '../../widgets/live_room_body.dart';
 import '../../widgets/live_room_minimized_bubble.dart';
 import '../../widgets/live_room_shell.dart';
@@ -11,25 +16,62 @@ import '../gifts/live_room_gifts_module.dart';
 import '../header/live_room_header_module.dart';
 import '../lifecycle/live_room_lifecycle_module.dart';
 import '../live_room_controller_bundle.dart';
+import '../live_room_watch_party_module.dart';
 import '../overlays/live_room_overlays_module.dart';
 import '../profile/live_room_profile_module.dart';
 import '../seats/live_room_seats_module.dart';
 import '../settings/live_room_settings_module.dart';
+import '../watch_party/live_room_watch_party_entry_module.dart';
 
-class LiveRoomLayoutModule extends StatelessWidget {
+class LiveRoomLayoutModule extends ConsumerWidget {
   const LiveRoomLayoutModule({super.key, required this.bundle});
 
   final LiveRoomControllerBundle bundle;
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
+    final watchPartyState = ref.watch(
+      watchPartyRepositoryProvider(bundle.roomId),
+    );
+    final signedInUserId = ref.watch(
+      sessionRepositoryProvider.select((state) => state.signedInUserId),
+    );
+    final session = watchPartyState.session;
+    final canControlWatchParty =
+        bundle.viewerCanManageRoom ||
+        (session != null &&
+            signedInUserId != null &&
+            session.controllerUserId == signedInUserId);
+
+    final watchPartyModule = watchPartyState.active
+        ? LiveRoomWatchPartyModule(
+            active: true,
+            canManage: canControlWatchParty,
+            onOpenSettings: () =>
+                LiveRoomWatchPartyEntryModule.openFromRoom(bundle: bundle),
+            onEndWatchParty: () => unawaited(_endWatchParty(ref)),
+          )
+        : null;
+
     return ValueListenableBuilder<int>(
       valueListenable: bundle.roomRevision,
-      builder: (context, value, child) => _buildRoomRoute(context),
+      builder: (context, value, child) =>
+          _buildRoomRoute(context, watchPartyModule),
     );
   }
 
-  Widget _buildRoomRoute(BuildContext context) {
+  Future<void> _endWatchParty(WidgetRef ref) async {
+    try {
+      await ref.read(watchPartyRepositoryProvider(bundle.roomId).notifier).end();
+    } catch (_) {
+      // The functional Watch Party sheet exposes command errors and retry UI.
+    }
+  }
+
+  Widget _buildRoomRoute(
+    BuildContext context,
+    Widget? watchPartyModule,
+  ) {
     if (bundle.minimized) {
       return PopScope<void>(
         canPop: bundle.allowRoomPop,
@@ -100,6 +142,7 @@ class LiveRoomLayoutModule extends StatelessWidget {
           showMicButton: bundle.currentUserIsSeated,
           inboxUnreadCount: bundle.inboxUnreadCount,
           imagesEnabled: bundle.roomImagesEnabled,
+          watchPartyModule: watchPartyModule,
           onBack: () => LiveRoomLifecycleModule.openLeaveSheet(bundle),
           onJoinTap: () => LiveRoomSeatsModule.handleJoinRoom(bundle),
           onShare: () => LiveRoomChatModule.openRoomShareSheet(bundle),
