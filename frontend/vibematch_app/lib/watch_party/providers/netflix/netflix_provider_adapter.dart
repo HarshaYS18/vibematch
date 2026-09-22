@@ -19,6 +19,5 @@ class NetflixProviderAdapter extends SupportedWebPlaybackAdapter {
          companion:
              companion ??
              CompanionPlaybackAdapter(provider: OttProviderCatalog.netflix),
-         telemetry: telemetry,
        );
 }
