@@ -185,10 +185,10 @@ class RealtimeConnectionManager:
         self._listener_task = None
         if listener is not None and not listener.done():
             listener.cancel()
+        tasks = [task for task in self._lease_tasks.values() if not task.done()]
         sockets = list(self._client_rooms)
         for websocket in sockets:
             await self.release_connection(websocket)
-        tasks = [task for task in self._lease_tasks.values() if not task.done()]
         for task in tasks:
             task.cancel()
         if listener is not None:

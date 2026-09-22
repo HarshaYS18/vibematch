@@ -106,6 +106,7 @@ class InboxWebSocketManager:
         self._listener_task = None
         if listener is not None and not listener.done():
             listener.cancel()
+        tasks = [task for task in self._lease_tasks.values() if not task.done()]
         sockets = [
             (user_id, socket)
             for user_id, user_sockets in list(self._connections.items())
@@ -113,7 +114,6 @@ class InboxWebSocketManager:
         ]
         for user_id, socket in sockets:
             await self.release_connection(user_id, socket)
-        tasks = [task for task in self._lease_tasks.values() if not task.done()]
         for task in tasks:
             task.cancel()
         if listener is not None:
