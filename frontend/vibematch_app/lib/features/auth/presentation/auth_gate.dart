@@ -1,12 +1,12 @@
 import 'dart:async';
 
 import 'package:flutter/material.dart';
-import 'package:google_sign_in/google_sign_in.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 import '../../../app/app_shell.dart';
 import '../data/auth_api_service.dart';
 import '../data/google_sign_in_config.dart';
+import '../data/google_sign_in_session_service.dart';
 import '../models/current_user.dart';
 import 'profile_setup_page.dart';
 
@@ -21,11 +21,8 @@ class _AuthGateState extends State<AuthGate> {
   static const String _profileSetupDonePrefix = 'vm_profile_setup_done_';
 
   final AuthApiService _authApiService = AuthApiService();
-  late final GoogleSignIn _googleSignIn = GoogleSignIn(
-    clientId: GoogleSignInConfig.clientId,
-    serverClientId: GoogleSignInConfig.serverClientId,
-    scopes: const ['email', 'profile'],
-  );
+  final GoogleSignInSessionService _googleSignIn =
+      GoogleSignInSessionService.instance;
 
   bool _isCheckingAuth = true;
   bool _isLoading = false;
@@ -117,7 +114,7 @@ class _AuthGateState extends State<AuthGate> {
 
     try {
       await _authApiService.logout();
-      await _googleSignIn.signOut();
+      await _googleSignIn.signOutIfUsed();
       final result = await _authApiService.devLogin(
         email: email,
         username: username,
@@ -153,7 +150,7 @@ class _AuthGateState extends State<AuthGate> {
 
     try {
       await _authApiService.logout();
-      await _googleSignIn.signOut();
+      await _googleSignIn.signOutIfUsed();
       final account = await _googleSignIn.signIn();
       if (account == null) {
         if (mounted) setState(() => _error = 'Google login cancelled.');
@@ -178,8 +175,6 @@ class _AuthGateState extends State<AuthGate> {
           _needsProfileSetup = needsSetup;
         });
       }
-    } on GoogleSignInAccount catch (error) {
-      if (mounted) setState(() => _error = 'Google login failed: $error');
     } catch (error) {
       final message = error.toString();
       final lower = message.toLowerCase();
@@ -194,7 +189,7 @@ class _AuthGateState extends State<AuthGate> {
 
   Future<void> _logout() async {
     await _authApiService.logout();
-    await _googleSignIn.signOut();
+    await _googleSignIn.clearGoogleSessionIfUsed();
     if (!mounted) return;
     setState(() {
       _currentUser = null;
