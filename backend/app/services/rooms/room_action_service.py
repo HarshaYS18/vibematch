@@ -608,6 +608,7 @@ def set_room_privacy(db: Session, room: Room, actor: User, mode: str, lock_passw
     room.is_secret = clean_mode == RoomMode.SECRET_VIBE.value
     room.is_locked = clean_mode == RoomMode.LOCKED.value
     room.is_members_only = clean_mode == RoomMode.MEMBERS_ONLY.value
+    watch_party_service.end_ott_if_room_not_private(db, room, actor)
     if lock_password_hash is not None:
         room.lock_password_hash = lock_password_hash
         room.lock_updated_at = datetime.utcnow()
