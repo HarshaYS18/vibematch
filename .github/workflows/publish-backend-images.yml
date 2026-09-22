@@ -3,17 +3,17 @@ name: Publish Backend Images
 on:
   workflow_dispatch:
   push:
-    branches: [codex/funkey-production-backend-v1]
-    paths:
-      - 'backend/**'
-      - 'apps/**'
-      - 'backend_media/**'
-      - '.github/workflows/publish-backend-images.yml'
+    tags:
+      - 'funkey-backend-v*'
 
 permissions:
   contents: read
   packages: write
   id-token: write
+
+concurrency:
+  group: publish-backend-images-${{ github.ref }}
+  cancel-in-progress: false
 
 jobs:
   publish:
