@@ -19,6 +19,7 @@ dependencies:
   uuid: ^4.5.3
   video_player: ^2.10.1
   youtube_player_iframe: ^6.0.2
+  flutter_inappwebview: ^6.1.5
   flutter_svg: ^2.0.10
   web_socket_channel: ^3.0.3
   file_picker: ^10.3.3
