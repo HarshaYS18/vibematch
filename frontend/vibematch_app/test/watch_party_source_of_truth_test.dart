@@ -99,4 +99,18 @@ void main() {
     expect(combined, isNot(contains('providerPassword')));
     expect(combined, isNot(contains('eval(')));
   });
+
+  test('OTT embedded readiness requires observed real playback', () {
+    final driver = File(
+      'lib/watch_party/providers/web/html5_video_playback_driver.dart',
+    ).readAsStringSync();
+    final host = File(
+      'lib/watch_party/providers/web/ott_web_playback_host.dart',
+    ).readAsStringSync();
+
+    expect(driver, contains('funkeyPlaybackObserved'));
+    expect(driver, contains('PLAYBACK_NOT_OBSERVED'));
+    expect(host, contains("addEventListener('playing'"));
+    expect(host, contains('markPlaybackObserved'));
+  });
 }
