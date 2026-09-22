@@ -9,10 +9,11 @@ from sqlalchemy import text
 
 from app.api.router import api_router
 from app.core.config import settings
-from app.core.operational import operational_middleware, render_metrics
+from app.core.operational import install_query_counter, operational_middleware, render_metrics
 from app.core.rate_limit import rate_limit_middleware
 from app.core.redis_client import get_async_redis, get_redis
 from app.core.schema_guard import assert_database_schema_current
+from app.core.telemetry import configure_telemetry, shutdown_telemetry
 from app.database import engine
 from app.realtime.connection_manager import room_realtime_connections
 from app.services.push_notification_service import assert_firebase_configuration
@@ -45,6 +46,7 @@ async def lifespan(_app: FastAPI):
     await get_async_redis().aclose()
     get_redis().close()
     engine.dispose()
+    shutdown_telemetry()
 
 
 app = FastAPI(
@@ -110,3 +112,6 @@ def metrics():
 
 
 app.include_router(api_router)
+
+install_query_counter(engine)
+configure_telemetry("funkey-api", app=app, engine=engine)

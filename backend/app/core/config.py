@@ -9,6 +9,17 @@ class Settings(BaseSettings):
     ENFORCE_SCHEMA_CURRENT: bool = True
     CORS_ALLOWED_ORIGINS: str = "*"
 
+    # OpenTelemetry tracing is opt-in locally and enabled by deployment config.
+    # Export failure is never a readiness or business-transaction dependency.
+    OTEL_TRACES_ENABLED: bool = False
+    OTEL_EXPORTER_OTLP_TRACES_ENDPOINT: str = "http://127.0.0.1:4318/v1/traces"
+    OTEL_TRACE_SAMPLE_RATIO: float = 0.10
+    OTEL_EXPORT_TIMEOUT_SECONDS: float = 3.0
+    OTEL_BSP_MAX_QUEUE_SIZE: int = 2048
+    OTEL_BSP_MAX_EXPORT_BATCH_SIZE: int = 512
+    OTEL_BSP_SCHEDULE_DELAY_MS: int = 5000
+    DB_QUERY_COUNT_RESPONSE_HEADER: bool = False
+
     # Database / Redis from .env
     database_url: str = "postgresql://postgres:postgres@localhost:5432/vibematch"
     redis_url: str = "redis://localhost:6379/0"
@@ -125,6 +136,11 @@ class Settings(BaseSettings):
             unsafe.append("DB_POOL_SIZE/DB_MAX_OVERFLOW/API_MAX_REPLICAS")
         if self.API_MAX_REPLICAS * (self.DB_POOL_SIZE + self.DB_MAX_OVERFLOW) > self.DB_API_CONNECTION_BUDGET:
             unsafe.append("DB_API_CONNECTION_BUDGET")
+        if self.OTEL_TRACES_ENABLED:
+            if not self.OTEL_EXPORTER_OTLP_TRACES_ENDPOINT.startswith(("http://", "https://")):
+                unsafe.append("OTEL_EXPORTER_OTLP_TRACES_ENDPOINT")
+            if not 0.0 <= self.OTEL_TRACE_SAMPLE_RATIO <= 1.0:
+                unsafe.append("OTEL_TRACE_SAMPLE_RATIO")
         if unsafe:
             raise RuntimeError("Unsafe production configuration: " + ", ".join(unsafe))
 

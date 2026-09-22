@@ -22,7 +22,9 @@ from nats.js import api as js_api
 from nats.js.errors import NotFoundError
 from pydantic import ValidationError
 from sqlalchemy import text
+from opentelemetry.trace import SpanKind
 
+from app.core.telemetry import configure_telemetry, current_traceparent, shutdown_telemetry, traced
 from app.database import SessionLocal, engine
 from app.services import outbox_relay_service
 from apps.worker.events import EventEnvelope
@@ -110,6 +112,7 @@ def _claim_envelope(claim: outbox_relay_service.ClaimedOutboxEvent) -> EventEnve
         occurred_at=claim.occurred_at,
         request_id=claim.request_id,
         trace_id=claim.trace_id,
+        traceparent=claim.traceparent,
         actor_user_id=claim.actor_user_id,
         payload=claim.payload,
     )
@@ -127,12 +130,28 @@ async def relay_outbox(js, stop: asyncio.Event):
             for claim in claims:
                 envelope = _claim_envelope(claim)
                 try:
-                    await js.publish(
-                        envelope.subject,
-                        envelope.model_dump_json().encode(),
-                        headers={"Nats-Msg-Id": str(envelope.event_id)},
-                        timeout=3,
-                    )
+                    with traced(
+                        "worker.outbox.publish",
+                        traceparent=envelope.traceparent,
+                        kind=SpanKind.PRODUCER,
+                        attributes={
+                            "messaging.system": "nats",
+                            "messaging.destination.name": envelope.subject,
+                            "funkey.event_type": envelope.event_type,
+                        },
+                    ):
+                        headers = {"Nats-Msg-Id": str(envelope.event_id)}
+                        propagated = current_traceparent()
+                        if propagated:
+                            headers["traceparent"] = propagated
+                        if envelope.request_id:
+                            headers["x-request-id"] = envelope.request_id
+                        await js.publish(
+                            envelope.subject,
+                            envelope.model_dump_json().encode(),
+                            headers=headers,
+                            timeout=3,
+                        )
                     marked = await asyncio.to_thread(
                         outbox_relay_service.mark_outbox_published,
                         claim.event_id,
@@ -191,8 +210,21 @@ async def process_message(js, msg):
         if handler is None:
             await msg.ack()
             return
-        result = await asyncio.to_thread(handler, envelope)
-        await msg.ack()
+        incoming_traceparent = None
+        if msg.headers:
+            incoming_traceparent = msg.headers.get("traceparent")
+        with traced(
+            "worker.message.consume",
+            traceparent=incoming_traceparent or envelope.traceparent,
+            kind=SpanKind.CONSUMER,
+            attributes={
+                "messaging.system": "nats",
+                "messaging.destination.name": msg.subject,
+                "funkey.event_type": envelope.event_type,
+            },
+        ):
+            result = await asyncio.to_thread(handler, envelope)
+            await msg.ack()
         state.count("duplicates" if result == "duplicate" else "processed")
     except (ValidationError, ValueError) as exc:
         await _dead_letter(js, msg, event_id=event_id, reason=type(exc).__name__)
@@ -231,6 +263,7 @@ async def consume(js, subscription, stop: asyncio.Event):
 
 async def run():
     logging.basicConfig(level=logging.INFO, format="%(message)s")
+    configure_telemetry("funkey-worker", engine=engine)
     stop = asyncio.Event()
     loop = asyncio.get_running_loop()
     for sig in (signal.SIGINT, signal.SIGTERM):
@@ -292,6 +325,7 @@ async def run():
         await asyncio.to_thread(health.shutdown)
         health.server_close()
         engine.dispose()
+        shutdown_telemetry()
 
 
 if __name__ == "__main__":

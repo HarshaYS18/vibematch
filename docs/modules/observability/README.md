@@ -91,3 +91,10 @@ Review security boundaries, schema changes, resource limits, autoscaling signals
 ## Known migration status
 
 Repository observability package implemented: structured API/gateway/worker/media operational logs, Prometheus metrics, SLO-style alert rules, dashboard configuration and incident runbooks are present. The actual Prometheus/Grafana/log collector/paging stack and any OpenTelemetry collector/exporter are external environment integrations.
+
+## Chunk 16 tracing contract
+
+Chunk 16 adds opt-in OpenTelemetry tracing to the Python API/worker, W3C `traceparent`
+continuation through the durable outbox/NATS boundary, and request-scoped SQL query
+counting for N+1 regression tests. Prometheus remains the metric source and telemetry
+export failure remains fail-open. See `docs/architecture/observability-platform.md`.
