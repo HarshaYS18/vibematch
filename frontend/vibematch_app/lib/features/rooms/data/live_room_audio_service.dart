@@ -10,6 +10,7 @@ import 'package:socket_io_client/socket_io_client.dart' as io;
 
 import '../../../core/network/vm_api_config.dart';
 import 'audio_publish_intent_gate.dart';
+import 'live_room_log.dart';
 import '../../auth/data/auth_api_service.dart';
 import '../presentation/live_room_models.dart';
 
@@ -990,7 +991,7 @@ class LiveRoomAudioService {
     if (rebuildPipeline) _rebuildSendPipelineOnRetry = true;
     if (_produceRetryTimer?.isActive ?? false) return;
     if (_produceRetryCount >= 3) {
-      _debug('audio produce retry limit reached');
+      _warn('audio produce retry limit reached');
       return;
     }
     _produceRetryCount += 1;
@@ -1172,7 +1173,7 @@ class LiveRoomAudioService {
         try {
           await Helper.setSpeakerphoneOn(true);
         } catch (error) {
-          _debug('set speakerphone failed: $error');
+          _warn('set speakerphone failed: $error');
         }
       }
 
@@ -1279,7 +1280,7 @@ class LiveRoomAudioService {
       'producerId': producerId,
     });
     if (ack['ok'] != true) {
-      _debug('server producer close failed producer=$producerId ack=$ack');
+      _warn('server producer close failed producer=$producerId');
     }
   }
 
@@ -1642,12 +1643,15 @@ class LiveRoomAudioService {
 
   void _setError(String message) {
     lastError.value = message;
-    _debug(message);
+    _warn(message);
   }
 
   void _debug(String message) {
-    // ignore: avoid_print
-    print('[VibeMatchAudio] $message');
+    LiveRoomLog.trace('Audio', message);
+  }
+
+  void _warn(String message) {
+    LiveRoomLog.warning('Audio', message);
   }
 }
 
