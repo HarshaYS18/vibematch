@@ -21,8 +21,9 @@ makeLine(type, obj, location) {
   } else {
     try {
       str = '${location[obj['name']]}';
-    } catch (e) {
-      print('e = ' + e.toString());
+    } catch (_) {
+      // Preserve upstream fallback behavior without writing parser/writer
+      // internals to the application console.
     }
   }
   var formatStr = type + '=' + str.toString();
