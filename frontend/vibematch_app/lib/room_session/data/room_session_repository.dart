@@ -35,7 +35,10 @@ class RoomSessionRepository extends StateNotifier<RoomSessionState> {
         },
       );
       return reconcileSnapshot(
-        _room(response),
+        _room(
+          response,
+          preserveServerOmissions: true,
+        ),
         connection: RoomSessionConnection.connected,
         force: true,
       );
@@ -209,11 +212,33 @@ class RoomSessionRepository extends StateNotifier<RoomSessionState> {
     return <String, String>{'Authorization': 'Bearer $token'};
   }
 
-  Map<String, dynamic> _room(Map<String, dynamic> response) {
+  Map<String, dynamic> _room(
+    Map<String, dynamic> response, {
+    bool preserveServerOmissions = false,
+  }) {
     final raw = response['room'];
-    if (raw is Map<String, dynamic>) return raw;
-    if (raw is Map) return raw.cast<String, dynamic>();
-    throw StateError('Room command response is missing canonical room state.');
+    final room = raw is Map<String, dynamic>
+        ? Map<String, dynamic>.from(raw)
+        : raw is Map
+        ? raw.cast<String, dynamic>()
+        : null;
+    if (room == null) {
+      throw StateError('Room command response is missing canonical room state.');
+    }
+
+    if (!preserveServerOmissions) return room;
+
+    final rawOmissions = response['omitted_sections'];
+    if (rawOmissions is! List) return room;
+
+    for (final item in rawOmissions) {
+      final key = item?.toString().trim();
+      if (key == null || key.isEmpty || room.containsKey(key)) continue;
+      if (state.room.containsKey(key)) {
+        room[key] = state.room[key];
+      }
+    }
+    return room;
   }
 
   void _fail(Object error, {bool preserveConnection = false}) {
