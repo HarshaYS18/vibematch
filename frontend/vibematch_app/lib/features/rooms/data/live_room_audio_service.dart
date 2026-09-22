@@ -9,6 +9,7 @@ import 'package:mediasfu_mediasoup_client/mediasfu_mediasoup_client.dart';
 import 'package:socket_io_client/socket_io_client.dart' as io;
 
 import '../../../core/network/vm_api_config.dart';
+import 'audio_publish_intent_gate.dart';
 import '../../auth/data/auth_api_service.dart';
 import '../presentation/live_room_models.dart';
 
@@ -51,6 +52,8 @@ class LiveRoomAudioService {
   bool _joinInFlight = false;
   bool _consumePendingRunning = false;
   Future<void>? _recvTransportFuture;
+  final AudioPublishIntentGate _publishIntentGate = AudioPublishIntentGate();
+  int? _activeProduceGeneration;
 
   final Set<String> _pendingProducerIds = <String>{};
   final Set<String> _consumingProducerIds = <String>{};
@@ -109,6 +112,8 @@ class LiveRoomAudioService {
       _desiredSelfMuted = !micEnabled;
       _selfMuted = !micEnabled;
       if (_selfMuted) {
+        _invalidatePublishingIntent();
+        _silenceLocalMicImmediately();
         _cancelProduceRetry();
         _removeActiveSpeaker(_peerId);
       } else {
@@ -135,6 +140,8 @@ class LiveRoomAudioService {
     _seated = false;
     _selfMuted = true;
     _desiredSelfMuted = true;
+    _invalidatePublishingIntent();
+    _silenceLocalMicImmediately();
     _cancelProduceRetry();
     unawaited(_stopPublishingAndCapture());
   }
@@ -142,12 +149,25 @@ class LiveRoomAudioService {
   void setSelfMuted(bool muted) {
     _desiredSelfMuted = muted;
     _selfMuted = muted;
-    if (muted) _removeActiveSpeaker(_peerId);
-    if (!muted) _produceRetryCount = 0;
-    if (muted) _cancelProduceRetry();
+    if (muted) {
+      _invalidatePublishingIntent();
+      _silenceLocalMicImmediately();
+      _removeActiveSpeaker(_peerId);
+      _cancelProduceRetry();
+    } else {
+      _produceRetryCount = 0;
+    }
     _applyLocalMuteSnapshot(muted);
+
+    // Muting is a local safety boundary and must not depend on signaling
+    // connectivity. Silence/teardown immediately even while reconnecting.
+    if (muted) {
+      unawaited(_syncLocalMicCapture());
+      return;
+    }
+
     if (!_canSendRoomEvent()) {
-      if (!muted) _scheduleRecovery('unmute while disconnected');
+      _scheduleRecovery('unmute while disconnected');
       return;
     }
     unawaited(_syncLocalMicCapture());
@@ -584,6 +604,7 @@ class LiveRoomAudioService {
 
   Future<void> _startLocalMicCapture() async {
     if (_localAudioStream != null) return;
+    final captureGeneration = _publishIntentGate.capture();
     try {
       final stream = await navigator.mediaDevices.getUserMedia(
         <String, dynamic>{
@@ -595,6 +616,25 @@ class LiveRoomAudioService {
           'video': false,
         },
       );
+
+      if (!_publishIntentGate.isCurrent(
+        captureGeneration,
+        seated: _seated,
+        muted: _selfMuted,
+      )) {
+        for (final track in stream.getTracks()) {
+          try {
+            track.enabled = false;
+            track.stop();
+          } catch (_) {}
+        }
+        try {
+          await stream.dispose();
+        } catch (_) {}
+        _debug('discarded mic capture completed after mute/seat change');
+        return;
+      }
+
       for (final track in stream.getAudioTracks()) {
         track.enabled = true;
       }
@@ -652,6 +692,18 @@ class LiveRoomAudioService {
       final transport = device.createSendTransportFromMap(
         params,
         producerCallback: (Producer producer) {
+          final generation = _activeProduceGeneration;
+          if (generation == null || !_isPublishIntentCurrent(generation)) {
+            try {
+              producer.close();
+            } catch (_) {}
+            unawaited(_closeServerProducerById(producer.id));
+            _debug(
+              'discarded producer callback after mute/seat change id=${producer.id}',
+            );
+            return;
+          }
+
           _cancelProduceRetry();
           _produceRetryCount = 0;
           _rebuildSendPipelineOnRetry = false;
@@ -685,6 +737,17 @@ class LiveRoomAudioService {
               data['errback']('produce failed: missing producer id');
               return;
             }
+
+            final generation = _activeProduceGeneration;
+            if (generation == null || !_isPublishIntentCurrent(generation)) {
+              data['errback']('produce cancelled because microphone is muted');
+              unawaited(_closeServerProducerById(producerId));
+              _debug(
+                'discarded server producer completed after mute/seat change id=$producerId',
+              );
+              return;
+            }
+
             _serverAudioProducerId = producerId;
             _cancelProduceRetry();
             _produceRetryCount = 0;
@@ -825,6 +888,7 @@ class LiveRoomAudioService {
         _serverAudioProducerId != null)
       return;
     if (!_seated || _selfMuted || _localAudioStream == null) return;
+    final publishGeneration = _publishIntentGate.capture();
     _producerCreating = true;
     try {
       await _ensureSendTransport();
@@ -832,8 +896,7 @@ class LiveRoomAudioService {
       final transport = _sendTransport;
       final stream = _localAudioStream;
       if (transport == null || stream == null) return;
-      if (!_seated ||
-          _selfMuted ||
+      if (!_isPublishIntentCurrent(publishGeneration) ||
           _audioProducer != null ||
           _serverAudioProducerId != null)
         return;
@@ -841,6 +904,7 @@ class LiveRoomAudioService {
       if (audioTracks.isEmpty)
         throw Exception('No local audio track available');
       final audioTrack = audioTracks.first;
+      _activeProduceGeneration = publishGeneration;
       try {
         final maybeProducer = await transport.produce(
           source: 'mic',
@@ -849,6 +913,24 @@ class LiveRoomAudioService {
           appData: <String, dynamic>{'mediaTag': 'mic-audio'},
         );
         if (maybeProducer != null) {
+          if (!_isPublishIntentCurrent(publishGeneration)) {
+            try {
+              maybeProducer.close();
+            } catch (_) {}
+            unawaited(_closeServerProducerById(maybeProducer.id));
+            if (identical(_audioProducer, maybeProducer)) {
+              _audioProducer = null;
+            }
+            if (_serverAudioProducerId == maybeProducer.id) {
+              _serverAudioProducerId = null;
+            }
+            audioPublishing.value = false;
+            _debug(
+              'discarded local producer completed after mute/seat change id=${maybeProducer.id}',
+            );
+            return;
+          }
+
           _cancelProduceRetry();
           _produceRetryCount = 0;
           _rebuildSendPipelineOnRetry = false;
@@ -894,6 +976,9 @@ class LiveRoomAudioService {
         _setError('Audio produce failed: $error');
       }
     } finally {
+      if (_activeProduceGeneration == publishGeneration) {
+        _activeProduceGeneration = null;
+      }
       _producerCreating = false;
     }
   }
@@ -1151,9 +1236,52 @@ class LiveRoomAudioService {
   }
 
   Future<void> _stopPublishingAndCapture() async {
+    _invalidatePublishingIntent();
     _cancelProduceRetry();
-    await _stopAudioProducer();
+    _silenceLocalMicImmediately();
+
+    // Closing the local producer starts synchronously before its network ack.
+    // Dispose the local capture immediately instead of waiting on signaling.
+    final producerStop = _stopAudioProducer();
     await _stopLocalMicCapture();
+    await producerStop;
+  }
+
+  void _invalidatePublishingIntent() {
+    _publishIntentGate.invalidate();
+    _activeProduceGeneration = null;
+  }
+
+  bool _isPublishIntentCurrent(int generation) {
+    return _publishIntentGate.isCurrent(
+          generation,
+          seated: _seated,
+          muted: _selfMuted,
+        ) &&
+        _localAudioStream != null;
+  }
+
+  void _silenceLocalMicImmediately() {
+    final stream = _localAudioStream;
+    if (stream == null) return;
+    for (final track in stream.getAudioTracks()) {
+      try {
+        track.enabled = false;
+      } catch (_) {}
+    }
+    localMicCapturing.value = false;
+  }
+
+  Future<void> _closeServerProducerById(String producerId) async {
+    if (producerId.isEmpty || !_canSendRoomEvent()) return;
+    final ack = await _emitWithAckFuture('closeProducer', <String, Object?>{
+      'roomId': _roomId,
+      'peerId': _peerId,
+      'producerId': producerId,
+    });
+    if (ack['ok'] != true) {
+      _debug('server producer close failed producer=$producerId ack=$ack');
+    }
   }
 
   Future<void> _stopAudioProducer() async {
@@ -1165,18 +1293,8 @@ class LiveRoomAudioService {
     try {
       producer.close();
     } catch (_) {}
-    if (serverProducerId != null &&
-        serverProducerId.isNotEmpty &&
-        _canSendRoomEvent()) {
-      final ack = await _emitWithAckFuture('closeProducer', <String, Object?>{
-        'roomId': _roomId,
-        'peerId': _peerId,
-        'producerId': serverProducerId,
-      });
-      if (ack['ok'] != true)
-        _debug(
-          'server producer close failed producer=$serverProducerId ack=$ack',
-        );
+    if (serverProducerId != null && serverProducerId.isNotEmpty) {
+      await _closeServerProducerById(serverProducerId);
     }
     audioPublishing.value = false;
     _removeActiveSpeaker(_peerId);
@@ -1189,6 +1307,7 @@ class LiveRoomAudioService {
     _localAudioStream = null;
     for (final track in stream.getTracks()) {
       try {
+        track.enabled = false;
         track.stop();
       } catch (_) {}
     }
