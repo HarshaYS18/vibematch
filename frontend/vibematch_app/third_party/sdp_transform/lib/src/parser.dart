@@ -113,7 +113,8 @@ Map<String, dynamic> parse(String sdp) {
         tmp['value'] = content;
         location['invalid'].add(tmp);
       } else {
-        print("ERROR unknown grammer type " + type);
+        // Preserve upstream behavior (ignore unknown SDP line types) without
+        // emitting parser noise into the application console.
       }
     }
   });
