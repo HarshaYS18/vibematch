@@ -4,7 +4,7 @@ import 'package:flutter/material.dart';
 
 import '../../controllers/live_room_sheet_controller.dart';
 import '../live_room_controller_bundle.dart';
-import 'live_room_youtube_watch_party_sheet.dart';
+import 'live_room_watch_party_router_sheet.dart';
 
 class LiveRoomWatchPartyEntryModule {
   const LiveRoomWatchPartyEntryModule._();
@@ -31,9 +31,10 @@ class LiveRoomWatchPartyEntryModule {
     LiveRoomSheetController.showTransparentSheet<void>(
       context: bundle.context,
       isScrollControlled: true,
-      builder: (context) => LiveRoomYoutubeWatchPartySheet(
+      builder: (context) => LiveRoomWatchPartyRouterSheet(
         roomId: bundle.roomId,
         canManageRoom: bundle.viewerCanManageRoom,
+        privacyMode: bundle.privacyMode,
       ),
     );
   }
