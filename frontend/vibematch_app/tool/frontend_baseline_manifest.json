@@ -1,0 +1,90 @@
+{
+  "version": 1,
+  "ui_contract": "existing_funkey_ui_no_redesign",
+  "capture": {
+    "logical_width": 390,
+    "logical_height": 844,
+    "device_pixel_ratio": 3,
+    "text_scale_factor": 0.92,
+    "locale": "en",
+    "mode": "profile"
+  },
+  "screens": [
+    {
+      "id": "login",
+      "golden": "test/goldens/baseline/login.png",
+      "captured": false
+    },
+    {
+      "id": "onboarding",
+      "golden": "test/goldens/baseline/onboarding.png",
+      "captured": false
+    },
+    {
+      "id": "home",
+      "golden": "test/goldens/baseline/home.png",
+      "captured": false
+    },
+    {
+      "id": "room",
+      "golden": "test/goldens/baseline/room.png",
+      "captured": false
+    },
+    {
+      "id": "room_sheets",
+      "golden": "test/goldens/baseline/room_sheets.png",
+      "captured": false
+    },
+    {
+      "id": "profile",
+      "golden": "test/goldens/baseline/profile.png",
+      "captured": false
+    },
+    {
+      "id": "vibes",
+      "golden": "test/goldens/baseline/vibes.png",
+      "captured": false
+    },
+    {
+      "id": "inbox",
+      "golden": "test/goldens/baseline/inbox.png",
+      "captured": false
+    },
+    {
+      "id": "wallet",
+      "golden": "test/goldens/baseline/wallet.png",
+      "captured": false
+    },
+    {
+      "id": "store",
+      "golden": "test/goldens/baseline/store.png",
+      "captured": false
+    },
+    {
+      "id": "games",
+      "golden": "test/goldens/baseline/games.png",
+      "captured": false
+    },
+    {
+      "id": "control_center",
+      "golden": "test/goldens/baseline/control_center.png",
+      "captured": false
+    }
+  ],
+  "runtime_metrics": {
+    "cold_start_first_useful_frame_ms": null,
+    "authenticated_shell_ready_ms": null,
+    "tab_switch_p95_ms": null,
+    "home_scroll_bad_frame_percent": null,
+    "room_entry_authoritative_snapshot_ms": null,
+    "room_reconnect_convergence_ms": null,
+    "five_minute_room_rss_mb": null,
+    "shell_restore_major_request_count": null,
+    "authenticated_app_websocket_count": null
+  },
+  "performance_budgets": {
+    "frame_60hz_ms": 16.67,
+    "frame_120hz_ms": 8.33,
+    "duplicate_network_requests_per_operation": 0
+  }
+}
