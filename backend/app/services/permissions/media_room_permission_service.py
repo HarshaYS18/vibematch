@@ -99,6 +99,7 @@ def evaluate_media_room_permission(
         "has_occupied_seat": seat_state is not None,
         "seat_index": getattr(seat_state, "seat_index", None),
         "admin_muted": bool(getattr(seat_state, "admin_muted", False)),
+        "mic_enabled": bool(getattr(seat_state, "mic_enabled", False)),
         "device_id_present": bool((device_id or "").strip()),
     }
 
@@ -169,6 +170,13 @@ def evaluate_media_room_permission(
             return MediaRoomPermissionDecision(
                 allowed=False,
                 reason="An occupied room seat is required before publishing audio.",
+                permissions=[],
+                context=context,
+            )
+        if not bool(getattr(seat_state, "mic_enabled", False)):
+            return MediaRoomPermissionDecision(
+                allowed=False,
+                reason="Microphone is muted in authoritative room state.",
                 permissions=[],
                 context=context,
             )
