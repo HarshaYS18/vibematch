@@ -8,7 +8,7 @@ class JioHotstarProviderAdapter extends SupportedWebPlaybackAdapter {
   JioHotstarProviderAdapter({
     OttWebPlaybackHost? host,
     CompanionPlaybackAdapter? companion,
-    AppTelemetry telemetry = const AppTelemetry(),
+    super.telemetry = const AppTelemetry(),
   }) : super(
          provider: OttProviderCatalog.jioHotstar,
          host:
