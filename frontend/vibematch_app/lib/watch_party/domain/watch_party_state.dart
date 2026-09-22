@@ -5,6 +5,13 @@ enum WatchPlaybackState {
   playing,
 }
 
+enum WatchTimelineMode {
+  vod,
+  live,
+}
+
+const int defaultWatchTargetLiveLatencyMs = 10000;
+
 class WatchSession {
   const WatchSession({
     required this.active,
@@ -22,6 +29,8 @@ class WatchSession {
     required this.playbackRate,
     required this.revision,
     required this.eventSequence,
+    this.timelineMode = WatchTimelineMode.vod,
+    this.targetLiveLatencyMs = defaultWatchTargetLiveLatencyMs,
   });
 
   final bool active;
@@ -42,6 +51,10 @@ class WatchSession {
   final double playbackRate;
   final int revision;
   final int eventSequence;
+  final WatchTimelineMode timelineMode;
+  final int targetLiveLatencyMs;
+
+  bool get isLive => timelineMode == WatchTimelineMode.live;
 
   int targetPositionMsAt(int serverTimeMs) {
     if (!active || playbackState != WatchPlaybackState.playing) {
@@ -72,6 +85,11 @@ class WatchSession {
       playbackRate: _double(json['playback_rate'], fallback: 1),
       revision: _int(json['revision']),
       eventSequence: _int(json['event_sequence']),
+      timelineMode: _timelineMode(json['timeline_mode']),
+      targetLiveLatencyMs: _positiveInt(
+        json['target_live_latency_ms'],
+        fallback: defaultWatchTargetLiveLatencyMs,
+      ),
     );
   }
 }
@@ -155,3 +173,15 @@ bool _bool(dynamic value, {required bool fallback}) {
   if (normalized == 'false' || normalized == '0') return false;
   return fallback;
 }
+
+WatchTimelineMode _timelineMode(dynamic value) {
+  return value?.toString().trim().toLowerCase() == 'live'
+      ? WatchTimelineMode.live
+      : WatchTimelineMode.vod;
+}
+
+int _positiveInt(dynamic value, {required int fallback}) {
+  final parsed = _int(value);
+  return parsed > 0 ? parsed : fallback;
+}
+
