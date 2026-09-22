@@ -26,7 +26,7 @@ class AppSourceRegistryRepository {
       },
     );
     final registry = AppSourceRegistry.fromJson(json);
-    registry.validateMainShellContract();
+    registry.validateCanonicalContracts();
     return registry;
   }
 
