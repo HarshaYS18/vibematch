@@ -3,6 +3,7 @@ import 'dart:async';
 import 'package:firebase_core/firebase_core.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import 'app/app_route_factory.dart';
 import 'app/app_routes.dart';
@@ -27,7 +28,7 @@ void main() {
 
       // Render FunKey immediately. Optional services such as Firebase/push must
       // never be able to block the first frame or leave the app on a white page.
-      runApp(const VibeMatchApp());
+      runApp(const ProviderScope(child: VibeMatchApp()));
 
       unawaited(_initializeOptionalServices());
     },

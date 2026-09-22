@@ -1,0 +1,23 @@
+name: Frontend architecture guard
+
+on:
+  pull_request:
+    paths:
+      - 'frontend/vibematch_app/**'
+      - 'scripts/check_frontend_architecture.py'
+      - '.github/workflows/frontend-architecture.yml'
+  push:
+    branches:
+      - main
+      - 'chatgpt/**'
+    paths:
+      - 'frontend/vibematch_app/**'
+      - 'scripts/check_frontend_architecture.py'
+
+jobs:
+  architecture:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Enforce canonical frontend boundaries
+        run: python scripts/check_frontend_architecture.py
