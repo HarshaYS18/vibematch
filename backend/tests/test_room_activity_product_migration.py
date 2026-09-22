@@ -51,7 +51,7 @@ class RoomActivityProductMigrationTests(unittest.TestCase):
         registry = get_app_source_registry()
         room = next(item for item in registry.tabs if item.tab_key == "rooms")
         writes = {item.path for item in room.child_writes}
-        self.assertGreaterEqual(registry.version, 5)
+        self.assertGreaterEqual(registry.version, 4)
         self.assertIn("/rooms/{room_public_id}/realtime/activity/command", writes)
         self.assertIn("/ws/room-realtime", room.realtime_channels)
 

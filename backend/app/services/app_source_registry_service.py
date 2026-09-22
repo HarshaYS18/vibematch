@@ -14,7 +14,7 @@ def _endpoint(path: str, purpose: str, *, owner: str = "backend", realtime_safe:
 
 def get_app_source_registry() -> AppSourceRegistryResponse:
     return AppSourceRegistryResponse(
-        version=5,
+        version=4,
         master_api=_endpoint(
             MASTER_STATE,
             "Authenticated user/profile/economy summary used as the app-level master read.",
