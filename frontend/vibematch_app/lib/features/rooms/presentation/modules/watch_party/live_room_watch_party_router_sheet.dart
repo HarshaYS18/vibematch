@@ -50,6 +50,7 @@ class _LiveRoomWatchPartyRouterSheetState
         : OttProviderCatalog.byId(providerId);
     if (ottProvider != null) {
       return LiveRoomOttWatchPartySheet(
+        key: ValueKey('ott-watch-${ottProvider.id}'),
         roomId: widget.roomId,
         canManageRoom: widget.canManageRoom,
         privacyMode: widget.privacyMode,
