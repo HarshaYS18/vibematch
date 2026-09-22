@@ -1,41 +1,93 @@
 # Gifts
 
-## Purpose and responsibilities
+## Purpose
 
-Owns the gift catalog and gift send transaction path into the economy. The module owns gift_catalog_items, gift_catalog_categories, gift_transactions. Routes should validate input and delegate business decisions to services.
+Owns the gift catalog and gift send transaction path into the economy.
 
-## Ownership and source of truth
+## Responsibilities
 
-PostgreSQL is the durable source of truth for gift_catalog_items, gift_catalog_categories, gift_transactions, wallet_ledger. This module does not own SFU transport state, edge routing, or client UI state. Flutter caches are replaced by backend snapshots.
+The module owns gift_catalog_items, gift_catalog_categories, gift_transactions. Routes should validate input and delegate business decisions to services.
 
-## Important files and public contracts
+## What this module owns
 
-`backend/app/services/gift_catalog_service.py`, `backend/app/api/routes/gift_catalog.py`, `backend/app/services/economy_service.py`. Public surface: gift catalog and send routes under /api/v1. Preserve deployed request and response shapes while migrating implementation.
+gift_catalog_items, gift_catalog_categories, gift_transactions.
 
-## Events published and consumed
+## What this module does NOT own
+
+This module does not own SFU transport state, edge routing, or client UI state.
+
+## Source of truth
+
+PostgreSQL is the durable source of truth for gift_catalog_items, gift_catalog_categories, gift_transactions, wallet_ledger.
+
+## Important files
+
+`backend/app/services/gift_catalog_service.py`, `backend/app/api/routes/gift_catalog.py`, `backend/app/services/economy_service.py`.
+
+## Public API/contracts
+
+gift catalog and send routes under /api/v1. Preserve deployed request and response shapes while migrating implementation.
+
+## Events published
 
 Current code may emit domain WebSocket updates after committed writes. A versioned broker event for this domain must be added only with a contract and transactional publication path; do not claim every proposed event is live. Consumers must handle duplicates and refetch a snapshot after a gap.
 
-## Database and Redis state
+## Events consumed
 
-Database tables and state: `gift_catalog_items, gift_catalog_categories, gift_transactions, wallet_ledger`. Redis: Animations/fanout may be transient; a sent gift is durable.
+No durable broker consumer is implied by this ownership guide. Add a consumer only with a versioned contract, idempotency, retry limits, and an integration test.
 
-## Dependencies and security
+## Database tables/state owned
 
-Depends on FastAPI authentication, SQLAlchemy transaction/session handling, and the relevant domain services. Gift send requires room eligibility, wallet debit, recipient accounting, and audit in one committed operation. Never log tokens, OTPs, or payment secrets.
+Database tables and state: `gift_catalog_items, gift_catalog_categories, gift_transactions, wallet_ledger`.
 
-## Failure modes and retry behavior
+## Redis keys/state owned
 
-Duplicate client retries must not debit twice; reconcile by transaction identifier. Reads and writes should use bounded timeouts. Retries are safe only for read operations or writes backed by an idempotency key and known commit outcome.
+Animations/fanout may be transient; a sent gift is durable.
 
-## Scaling and observability
+## Dependencies
 
-Scale stateless API replicas only within the PostgreSQL connection budget. Track route request rate, p95 latency, error rate, transaction latency, DB pool use, and domain-specific rejection counts. Trace commands through commit and fanout with a request ID; avoid user PII in metric labels.
+Depends on FastAPI authentication, SQLAlchemy transaction/session handling, and the relevant domain services.
 
-## Local development and testing
+## Security considerations
 
-Start dependencies with `.\\scripts\\dev-up.ps1`, then run affected backend tests with `python -m unittest discover -s backend/tests -p test_*.py` from the repository root with the backend import path configured, or use the test command in the root README. Add a regression test for authorization, transaction outcome, and duplicate/reconnect behavior when relevant.
+Gift send requires room eligibility, wallet debit, recipient accounting, and audit in one committed operation. Never log tokens, OTPs, or payment secrets.
 
-## Deployment notes and change checklist
+## Failure modes
 
-Apply Alembic first; roll out compatible API behavior; check readiness and error metrics. Before changing this module: identify the owning table and contract, add an additive migration if needed, preserve Flutter compatibility, verify permission checks, and document rollback. Known migration status: **Existing FastAPI domain; no Go migration started.**
+Duplicate client retries must not debit twice; reconcile by transaction identifier.
+
+## Retry/idempotency behavior
+
+Reads and writes should use bounded timeouts. Retries are safe only for read operations or writes backed by an idempotency key and known commit outcome.
+
+## Scaling behavior
+
+Scale stateless API replicas only within the PostgreSQL connection budget.
+
+## Autoscaling metrics
+
+Track route request rate, p95 latency, error rate, transaction latency, DB pool use, and domain-specific rejection counts. Trace commands through commit and fanout with a request ID; avoid user PII in metric labels.
+
+## Observability
+
+Trace commands through commit and fanout with a request ID; avoid user PII in metric labels.
+
+## Local development
+
+Start dependencies with `.\\scripts\\dev-up.ps1`, then run affected backend tests with `python -m unittest discover -s backend/tests -p test_*.py` from the repository root with the backend import path configured, or use the test command in the root README.
+
+## Testing
+
+Add a regression test for authorization, transaction outcome, and duplicate/reconnect behavior when relevant.
+
+## Deployment notes
+
+Apply Alembic first; roll out compatible API behavior; check readiness and error metrics.
+
+## Change checklist
+
+Before changing this module: identify the owning table and contract, add an additive migration if needed, preserve Flutter compatibility, verify permission checks, and document rollback.
+
+## Known migration status
+
+Existing FastAPI domain; no Go migration started.

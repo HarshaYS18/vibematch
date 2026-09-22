@@ -1,45 +1,93 @@
 # Media
 
-## Purpose and responsibilities
+## Purpose
 
-Runs the canonical Socket.IO and mediasoup SFU for audio/video transport. Routers, transports, producers, consumers, and RTP lifecycle only.
+Runs the canonical Socket.IO and mediasoup SFU for audio/video transport.
 
-## Ownership and source of truth
+## Responsibilities
 
-FastAPI remains authoritative for identity, room membership, seats, calls, and permissions. This module does not take over an adjacent domain merely because it transports or caches its data. Refer to the source-of-truth architecture before changing ownership.
+Routers, transports, producers, consumers, and RTP lifecycle only.
 
-## Important files and public contracts
+## What this module owns
 
-`backend_media/src/server.ts`, `backend_media/src/mediasoup/roomManager.ts`, `backend_media/src/control/heartbeatLoop.ts`. Contract surface: Socket.IO signaling, /health, /ready; backend media discovery and verify endpoints. Keep existing Flutter-compatible paths and payloads until a versioned migration is ready.
+Routers, transports, producers, consumers, and RTP lifecycle only.
 
-## Events published and consumed
+## What this module does NOT own
+
+This module does not take over an adjacent domain merely because it transports or caches its data.
+
+## Source of truth
+
+FastAPI remains authoritative for identity, room membership, seats, calls, and permissions.
+
+## Important files
+
+`backend_media/src/server.ts`, `backend_media/src/mediasoup/roomManager.ts`, `backend_media/src/control/heartbeatLoop.ts`.
+
+## Public API/contracts
+
+Socket.IO signaling, /health, /ready; backend media discovery and verify endpoints. Keep existing Flutter-compatible paths and payloads until a versioned migration is ready.
+
+## Events published
 
 This component may publish or consume versioned domain events as contracts are implemented. Existing room WebSocket/Redis events are distinct from durable JetStream publication; do not assume all proposed events are live.
 
-## Database and Redis state
+## Events consumed
 
-Database: No application-state tables; call and room authority remains in FastAPI. Redis/Valkey: Node heartbeat, drain flag, capacity reservation, sticky room assignment in dedicated media Redis.
+No durable broker consumer is implied by this ownership guide. Add a consumer only with a versioned contract, idempotency, retry limits, and an integration test.
 
-## Dependencies and security
+## Database tables/state owned
 
-Dependencies include the configured runtime, PostgreSQL, Redis/Valkey, and relevant internal contracts where applicable. Every sensitive action reauthorizes through FastAPI; clients cannot select node or supply trusted roles. Do not log tokens, credentials, private content, or payment secrets.
+Database: No application-state tables; call and room authority remains in FastAPI.
 
-## Failure modes and retry/idempotency
+## Redis keys/state owned
 
-Registry heartbeat loss makes media unready; re-resolve after node loss and follow drain runbook. Use bounded timeouts and explicit retry budgets. Only replay writes when a stable idempotency key or reconciliation proves the commit outcome.
+Node heartbeat, drain flag, capacity reservation, sticky room assignment in dedicated media Redis.
 
-## Scaling and autoscaling metrics
+## Dependencies
 
-Scale this workload independently when deployed. Measure its primary work unit, CPU, memory, saturation, errors, p95 latency, queue/backpressure where relevant, and dependency pressure. Respect the database connection budget and drain before scale-in.
+Dependencies include the configured runtime, PostgreSQL, Redis/Valkey, and relevant internal contracts where applicable.
+
+## Security considerations
+
+Every sensitive action reauthorizes through FastAPI; clients cannot select node or supply trusted roles. Do not log tokens, credentials, private content, or payment secrets.
+
+## Failure modes
+
+Registry heartbeat loss makes media unready; re-resolve after node loss and follow drain runbook.
+
+## Retry/idempotency behavior
+
+Use bounded timeouts and explicit retry budgets. Only replay writes when a stable idempotency key or reconciliation proves the commit outcome.
+
+## Scaling behavior
+
+Scale this workload independently when deployed.
+
+## Autoscaling metrics
+
+Measure its primary work unit, CPU, memory, saturation, errors, p95 latency, queue/backpressure where relevant, and dependency pressure. Respect the database connection budget and drain before scale-in.
 
 ## Observability
 
 Propagate request and trace IDs through internal calls. Emit structured logs and low-cardinality metrics for readiness, throughput, failures, and drain progress. Pair alerts with the matching runbook.
 
-## Local development and testing
+## Local development
 
-See the root README and local development guide for PostgreSQL, Redis, FastAPI, media, and optional broker setup. Run the component's unit/contract checks and an integration test against real dependencies before changing a distributed contract.
+See the root README and local development guide for PostgreSQL, Redis, FastAPI, media, and optional broker setup.
 
-## Deployment notes and change checklist
+## Testing
 
-Deploy compatible contracts first, then producers/consumers or routing. Verify health, rollback path, and operational dashboards. Review security boundaries, schema changes, resource limits, autoscaling signals, and scale-in drain behavior. Known migration status: **Canonical TypeScript media plane active; scaling requires network-specific validation.**
+Run the component's unit/contract checks and an integration test against real dependencies before changing a distributed contract.
+
+## Deployment notes
+
+Deploy compatible contracts first, then producers/consumers or routing. Verify health, rollback path, and operational dashboards.
+
+## Change checklist
+
+Review security boundaries, schema changes, resource limits, autoscaling signals, and scale-in drain behavior.
+
+## Known migration status
+
+Canonical TypeScript media plane active; scaling requires network-specific validation.

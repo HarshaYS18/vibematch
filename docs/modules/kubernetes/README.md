@@ -1,45 +1,93 @@
 # Kubernetes
 
-## Purpose and responsibilities
+## Purpose
 
-Orchestrates independent API, gateway, worker, and media replicas with health and drain hooks. Deployments, Services, probes, HPA/KEDA integration, disruption budgets.
+Orchestrates independent API, gateway, worker, and media replicas with health and drain hooks.
 
-## Ownership and source of truth
+## Responsibilities
 
-PostgreSQL remains the durable source of truth for application state. This module does not take over an adjacent domain merely because it transports or caches its data. Refer to the source-of-truth architecture before changing ownership.
+Deployments, Services, probes, HPA/KEDA integration, disruption budgets.
 
-## Important files and public contracts
+## What this module owns
 
-`deploy/helm (target)`, `deploy/kubernetes (target)`, `backend_media/src/control/heartbeatLoop.ts`. Contract surface: Kubernetes resource API and metrics adapters. Keep existing Flutter-compatible paths and payloads until a versioned migration is ready.
+Deployments, Services, probes, HPA/KEDA integration, disruption budgets.
 
-## Events published and consumed
+## What this module does NOT own
+
+This module does not take over an adjacent domain merely because it transports or caches its data.
+
+## Source of truth
+
+PostgreSQL remains the durable source of truth for application state.
+
+## Important files
+
+`deploy/helm (target)`, `deploy/kubernetes (target)`, `backend_media/src/control/heartbeatLoop.ts`.
+
+## Public API/contracts
+
+Kubernetes resource API and metrics adapters. Keep existing Flutter-compatible paths and payloads until a versioned migration is ready.
+
+## Events published
 
 This component may publish or consume versioned domain events as contracts are implemented. Existing room WebSocket/Redis events are distinct from durable JetStream publication; do not assume all proposed events are live.
 
-## Database and Redis state
+## Events consumed
 
-Database: No domain tables. Redis/Valkey: Media node drain state must be set before scale-in.
+No durable broker consumer is implied by this ownership guide. Add a consumer only with a versioned contract, idempotency, retry limits, and an integration test.
 
-## Dependencies and security
+## Database tables/state owned
 
-Dependencies include the configured runtime, PostgreSQL, Redis/Valkey, and relevant internal contracts where applicable. Pod identity, network policy, secrets, and least-privilege service accounts. Do not log tokens, credentials, private content, or payment secrets.
+Database: No domain tables.
 
-## Failure modes and retry/idempotency
+## Redis keys/state owned
 
-A pod may terminate only after bounded drain; media rooms must stop being assigned first. Use bounded timeouts and explicit retry budgets. Only replay writes when a stable idempotency key or reconciliation proves the commit outcome.
+Media node drain state must be set before scale-in.
 
-## Scaling and autoscaling metrics
+## Dependencies
 
-Scale this workload independently when deployed. Measure its primary work unit, CPU, memory, saturation, errors, p95 latency, queue/backpressure where relevant, and dependency pressure. Respect the database connection budget and drain before scale-in.
+Dependencies include the configured runtime, PostgreSQL, Redis/Valkey, and relevant internal contracts where applicable.
+
+## Security considerations
+
+Pod identity, network policy, secrets, and least-privilege service accounts. Do not log tokens, credentials, private content, or payment secrets.
+
+## Failure modes
+
+A pod may terminate only after bounded drain; media rooms must stop being assigned first.
+
+## Retry/idempotency behavior
+
+Use bounded timeouts and explicit retry budgets. Only replay writes when a stable idempotency key or reconciliation proves the commit outcome.
+
+## Scaling behavior
+
+Scale this workload independently when deployed.
+
+## Autoscaling metrics
+
+Measure its primary work unit, CPU, memory, saturation, errors, p95 latency, queue/backpressure where relevant, and dependency pressure. Respect the database connection budget and drain before scale-in.
 
 ## Observability
 
 Propagate request and trace IDs through internal calls. Emit structured logs and low-cardinality metrics for readiness, throughput, failures, and drain progress. Pair alerts with the matching runbook.
 
-## Local development and testing
+## Local development
 
-See the root README and local development guide for PostgreSQL, Redis, FastAPI, media, and optional broker setup. Run the component's unit/contract checks and an integration test against real dependencies before changing a distributed contract.
+See the root README and local development guide for PostgreSQL, Redis, FastAPI, media, and optional broker setup.
 
-## Deployment notes and change checklist
+## Testing
 
-Deploy compatible contracts first, then producers/consumers or routing. Verify health, rollback path, and operational dashboards. Review security boundaries, schema changes, resource limits, autoscaling signals, and scale-in drain behavior. Known migration status: **Deployment foundation; replica and node capacities require load validation.**
+Run the component's unit/contract checks and an integration test against real dependencies before changing a distributed contract.
+
+## Deployment notes
+
+Deploy compatible contracts first, then producers/consumers or routing. Verify health, rollback path, and operational dashboards.
+
+## Change checklist
+
+Review security boundaries, schema changes, resource limits, autoscaling signals, and scale-in drain behavior.
+
+## Known migration status
+
+Deployment foundation; replica and node capacities require load validation.
