@@ -30,30 +30,30 @@ func newClient(id string, userID int64, token string, conn *websocket.Conn, queu
 }
 
 type Stats struct {
-	Connections   atomic.Int64
-	Accepted      atomic.Uint64
-	AuthDenied    atomic.Uint64
-	SlowClosed    atomic.Uint64
-	Events        atomic.Uint64
+	Connections     atomic.Int64
+	Accepted        atomic.Uint64
+	AuthDenied      atomic.Uint64
+	SlowClosed      atomic.Uint64
+	Events          atomic.Uint64
 	InvalidEvents   atomic.Uint64
 	DuplicateEvents atomic.Uint64
 	CapacityDenied  atomic.Uint64
 }
 
 type Hub struct {
-	mu       sync.RWMutex
-	clients  map[*Client]struct{}
-	byUser   map[int64]map[*Client]struct{}
-	byRoom   map[string]map[*Client]struct{}
-	draining  bool
+	mu         sync.RWMutex
+	clients    map[*Client]struct{}
+	byUser     map[int64]map[*Client]struct{}
+	byRoom     map[string]map[*Client]struct{}
+	draining   bool
 	seenEvents map[string]time.Time
-	stats     Stats
+	stats      Stats
 }
 
 func NewHub() *Hub {
 	return &Hub{
-		clients: make(map[*Client]struct{}),
-		byUser:  make(map[int64]map[*Client]struct{}),
+		clients:    make(map[*Client]struct{}),
+		byUser:     make(map[int64]map[*Client]struct{}),
 		byRoom:     make(map[string]map[*Client]struct{}),
 		seenEvents: make(map[string]time.Time),
 	}

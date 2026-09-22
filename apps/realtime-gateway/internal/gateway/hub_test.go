@@ -80,7 +80,6 @@ func TestEventRejectsInvalidRoutingMetadata(t *testing.T) {
 	}
 }
 
-
 func TestHubDeduplicatesEventsAndCapsUserDevices(t *testing.T) {
 	hub := NewHub()
 	first := newClient("first", 7, "token", nil, 4)
