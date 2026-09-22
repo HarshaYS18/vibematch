@@ -252,6 +252,13 @@ async def execute_room_command(
     """Apply one authenticated room command, commit it, then broadcast truth."""
     room = db.query(Room).filter(Room.id == room.id).with_for_update().one()
 
+    if event_type not in {"room/join", "room/leave"}:
+        room_action_service.reconcile_authenticated_room_presence(
+            db,
+            room,
+            actor,
+        )
+
     if event_type == "room/join":
         room_action_service.join_room(db, room, actor, payload)
         return await _finish(db, room, "room/joined")
