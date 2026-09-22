@@ -8,12 +8,14 @@ class _FakeWatchAdapter implements WatchProviderAdapter {
   _FakeWatchAdapter({
     required this.providerId,
     this.positionMs = 0,
+    this.fineGrainedPlaybackRateControl = true,
   });
 
   @override
   final String providerId;
 
   int positionMs;
+  final bool fineGrainedPlaybackRateControl;
   double playbackRate = 1;
   bool playing = false;
   bool disposed = false;
@@ -21,14 +23,14 @@ class _FakeWatchAdapter implements WatchProviderAdapter {
   String? loadedSessionId;
 
   @override
-  WatchProviderCapabilities get capabilities =>
-      const WatchProviderCapabilities(
+  WatchProviderCapabilities get capabilities => WatchProviderCapabilities(
         embeddedPlayback: true,
         programmaticPlay: true,
         programmaticPause: true,
         programmaticSeek: true,
         programmaticPosition: true,
         playbackRateControl: true,
+        fineGrainedPlaybackRateControl: fineGrainedPlaybackRateControl,
         externalLaunch: false,
       );
 
@@ -160,6 +162,30 @@ void main() {
 
     expect(adapter.seekCount, seekCountAfterLoad);
     expect(adapter.playbackRate, greaterThan(1));
+    await coordinator.dispose();
+  });
+
+  test('discrete-rate provider seeks for medium playing drift', () async {
+    var clientNow = 5000;
+    final adapter = _FakeWatchAdapter(
+      providerId: 'fake',
+      fineGrainedPlaybackRateControl: false,
+    );
+    final coordinator = WatchPartyCoordinator(
+      adapter: adapter,
+      clock: WatchPartyClock(clientNowMs: () => clientNow),
+    );
+    final state = _state(_session());
+
+    await coordinator.reconcile(state);
+    final seekCountAfterLoad = adapter.seekCount;
+
+    adapter.positionMs = 14300;
+    await coordinator.reconcile(state);
+
+    expect(adapter.seekCount, seekCountAfterLoad + 1);
+    expect(adapter.positionMs, 15000);
+    expect(adapter.playbackRate, 1);
     await coordinator.dispose();
   });
 }
