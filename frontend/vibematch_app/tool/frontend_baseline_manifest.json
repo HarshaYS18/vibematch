@@ -1,5 +1,5 @@
 {
-  "version": 1,
+  "version": 2,
   "ui_contract": "existing_funkey_ui_no_redesign",
   "capture": {
     "logical_width": 390,
@@ -86,5 +86,12 @@
     "frame_60hz_ms": 16.67,
     "frame_120hz_ms": 8.33,
     "duplicate_network_requests_per_operation": 0
-  }
+  },
+  "reference": {
+    "commit": "b8189636eacda323cabcf2b07a2bedf94853737d",
+    "phase": "post_chunk_5_pre_chunk_6",
+    "historical_pre_chunk_0_visual_evidence_available": false,
+    "runtime_evidence_required_before_visual_migration": true
+  },
+  "evidence_status": "capture_required"
 }
