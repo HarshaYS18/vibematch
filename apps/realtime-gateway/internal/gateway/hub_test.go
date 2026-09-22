@@ -39,7 +39,9 @@ func TestHubRoutesOnlyAuthorizedSubscriptionsAndUsers(t *testing.T) {
 		t.Fatal("other user received room event")
 	default:
 	}
-	hub.Publish(testEvent("user", 2, ""), []byte("user-event"))
+	userEvent := testEvent("user", 2, "")
+	userEvent.EventID = "event-2"
+	hub.Publish(userEvent, []byte("user-event"))
 	select {
 	case got := <-bob.send:
 		if string(got) != "user-event" {
@@ -56,8 +58,11 @@ func TestHubClosesSlowClientAndRejectsNewConnectionsOnDrain(t *testing.T) {
 	if !hub.Add(client, 10, 4) || !hub.Subscribe(client, "room-a") {
 		t.Fatal("setup failed")
 	}
-	hub.Publish(testEvent("room", 0, "room-a"), []byte("first"))
-	hub.Publish(testEvent("room", 0, "room-a"), []byte("second"))
+	firstEvent := testEvent("room", 0, "room-a")
+	secondEvent := testEvent("room", 0, "room-a")
+	secondEvent.EventID = "event-2"
+	hub.Publish(firstEvent, []byte("first"))
+	hub.Publish(secondEvent, []byte("second"))
 	if hub.stats.SlowClosed.Load() != 1 || hub.stats.Connections.Load() != 0 {
 		t.Fatal("slow client was not evicted")
 	}
