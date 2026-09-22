@@ -1,7 +1,7 @@
 import inspect
 from unittest import TestCase
 
-from app.api.routes import inbox_message_tools, love_bonds
+from app.api.routes import economy, inbox, inbox_message_tools, love_bonds, lucky_packets
 from app.api.routes.wallet import convert_ruby_to_coins, recharge_wallet
 
 
@@ -14,6 +14,22 @@ class AsyncRouteIsolationTests(TestCase):
             love_bonds.accept_love_bond_request,
             love_bonds.reject_love_bond_request,
             inbox_message_tools.edit_message_text,
+            economy.send_gift,
+            economy._send_lucky_gift_authoritative,
+            inbox.send_message,
+            inbox.update_message,
+            inbox.delete_message,
+            inbox.update_secret_drift,
+            inbox.close_secret_drift_session,
+            inbox.create_report,
+            inbox.reject_report,
+            inbox.accept_report,
+            inbox.monitor_action,
+            lucky_packets.create_lucky_packet,
+            lucky_packets.get_active_lucky_packet,
+            lucky_packets.get_lucky_packet,
+            lucky_packets.claim_lucky_packet,
+            lucky_packets.finalize_lucky_packet,
         ]
         for route in routes:
             with self.subTest(route=route.__name__):
@@ -25,6 +41,9 @@ class AsyncRouteIsolationTests(TestCase):
     def test_socket_broadcast_helpers_remain_async(self):
         self.assertTrue(inspect.iscoroutinefunction(inbox_message_tools.inbox_ws_manager.broadcast_to_users))
         self.assertTrue(inspect.iscoroutinefunction(love_bonds.inbox_ws_manager.broadcast_to_users))
+        self.assertTrue(inspect.iscoroutinefunction(inbox.inbox_ws_manager.broadcast_to_users))
+        self.assertTrue(inspect.iscoroutinefunction(economy.room_realtime_connections.broadcast_room))
+        self.assertTrue(inspect.iscoroutinefunction(lucky_packets.room_realtime_connections.broadcast_room))
 
 
 if __name__ == "__main__":

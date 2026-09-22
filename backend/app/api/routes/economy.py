@@ -1,7 +1,7 @@
 import json
 from datetime import datetime
 
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException
 from fastapi.encoders import jsonable_encoder
 from sqlalchemy.orm import Session
 
@@ -208,7 +208,8 @@ def _room_user_id(user: User) -> str:
     return f"user_{user.public_user_id}"
 
 
-async def _broadcast_user_level_updates(
+def _queue_user_level_updates(
+    background_tasks: BackgroundTasks,
     db: Session,
     sender_user_id: int,
     receiver_user_id: int,
@@ -216,7 +217,8 @@ async def _broadcast_user_level_updates(
     sender = db.query(User).filter(User.id == sender_user_id).first()
     receiver = db.query(User).filter(User.id == receiver_user_id).first()
     if sender is not None:
-        await inbox_ws_manager.send_to_user(
+        background_tasks.add_task(
+            inbox_ws_manager.send_to_user,
             sender_user_id,
             {
                 "event": "all_levels_updated",
@@ -227,7 +229,8 @@ async def _broadcast_user_level_updates(
             },
         )
     if receiver is not None:
-        await inbox_ws_manager.send_to_user(
+        background_tasks.add_task(
+            inbox_ws_manager.send_to_user,
             receiver_user_id,
             {
                 "event": "all_levels_updated",
@@ -239,7 +242,8 @@ async def _broadcast_user_level_updates(
         )
 
 
-async def _broadcast_room_level_and_rankings(
+def _queue_room_level_and_rankings(
+    background_tasks: BackgroundTasks,
     db: Session,
     room_id: int | None,
     sender_user_id: int,
@@ -260,7 +264,8 @@ async def _broadcast_room_level_and_rankings(
         period="daily",
         limit=100,
     )
-    await inbox_ws_manager.broadcast_to_users(
+    background_tasks.add_task(
+        inbox_ws_manager.broadcast_to_users,
         user_ids,
         {
             "event": "room_level_and_contribution_updated",
@@ -271,7 +276,8 @@ async def _broadcast_room_level_and_rankings(
     )
 
 
-async def _broadcast_room_gift_event(
+def _queue_room_gift_event(
+    background_tasks: BackgroundTasks,
     db: Session,
     *,
     room: Room | None,
@@ -311,7 +317,8 @@ async def _broadcast_room_gift_event(
         suffix = "try again" if multiplier <= 0 else f"{multiplier}x"
         message = f"sent to {receiver_name} {gift_name} x{quantity} · {suffix}"
 
-    await room_realtime_connections.broadcast_room(
+    background_tasks.add_task(
+        room_realtime_connections.broadcast_room,
         room.room_public_id,
         {
             "type": "room/system_event",
@@ -375,7 +382,8 @@ async def _broadcast_room_gift_event(
     )
 
 
-async def _broadcast_after_gift(
+def _queue_after_gift(
+    background_tasks: BackgroundTasks,
     db: Session,
     *,
     room_id: int | None,
@@ -383,15 +391,20 @@ async def _broadcast_after_gift(
     receiver_user_id: int,
     exp_updates: dict,
 ) -> None:
-    await _broadcast_user_level_updates(db, sender_user_id, receiver_user_id)
-    await _broadcast_room_level_and_rankings(
+    _queue_user_level_updates(
+        background_tasks,
+        db,
+        sender_user_id,
+        receiver_user_id,
+    )
+    _queue_room_level_and_rankings(
+        background_tasks,
         db,
         room_id,
         sender_user_id,
         receiver_user_id,
         exp_updates,
     )
-
 
 @router.get("/me", response_model=EconomyDashboardResponse)
 def get_my_economy_dashboard(
@@ -434,8 +447,9 @@ def preview_gift_economy(payload: GiftEconomyPreviewRequest):
 
 
 @router.post("/gifts/send", response_model=GiftSendResponse)
-async def send_gift(
+def send_gift(
     payload: GiftSendPublicRequest,
+    background_tasks: BackgroundTasks,
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db),
 ):
@@ -444,7 +458,7 @@ async def send_gift(
     _require_room_gift_presence(db, room, current_user.id, receiver.id)
     catalog_gift = _catalog_gift_or_error(db, payload.gift_id, payload.quantity)
     if str(catalog_gift.get("gift_type") or "").lower() == "lucky":
-        return await _send_lucky_gift_authoritative(payload, current_user, db)
+        return _send_lucky_gift_authoritative(payload, current_user, db, background_tasks)
     coin_value = int(catalog_gift["coin_value"])
     room_id = room.id if room is not None else None
 
@@ -464,14 +478,16 @@ async def send_gift(
         if isinstance(result.get("experience_updates"), dict)
         else {}
     )
-    await _broadcast_after_gift(
+    _queue_after_gift(
+        background_tasks,
         db,
         room_id=room_id,
         sender_user_id=current_user.id,
         receiver_user_id=receiver.id,
         exp_updates=exp_updates,
     )
-    await _broadcast_room_gift_event(
+    _queue_room_gift_event(
+        background_tasks,
         db,
         room=room,
         sender=current_user,
@@ -485,10 +501,11 @@ async def send_gift(
     return GiftSendResponse(**result)
 
 
-async def _send_lucky_gift_authoritative(
+def _send_lucky_gift_authoritative(
     payload: GiftSendPublicRequest,
-    current_user: User = Depends(get_current_user),
-    db: Session = Depends(get_db),
+    current_user: User,
+    db: Session,
+    background_tasks: BackgroundTasks,
 ):
     receiver = _receiver_from_public_id(db, payload.receiver_public_user_id)
     room = _room_from_public_id(db, payload.room_public_id)
@@ -618,14 +635,16 @@ async def _send_lucky_gift_authoritative(
         if isinstance(result.get("experience_updates"), dict)
         else {}
     )
-    await _broadcast_after_gift(
+    _queue_after_gift(
+        background_tasks,
         db,
         room_id=room_id,
         sender_user_id=current_user.id,
         receiver_user_id=receiver.id,
         exp_updates=exp_updates,
     )
-    await _broadcast_room_gift_event(
+    _queue_room_gift_event(
+        background_tasks,
         db,
         room=room,
         sender=current_user,

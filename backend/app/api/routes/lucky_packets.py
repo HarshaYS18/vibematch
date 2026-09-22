@@ -1,4 +1,5 @@
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException
+from fastapi.responses import JSONResponse
 from sqlalchemy.orm import Session
 
 from app.api.routes.users import get_current_user
@@ -29,7 +30,8 @@ def _room_from_public_id(db: Session, room_public_id: str) -> Room:
     return room
 
 
-async def _broadcast_packet(
+def _queue_packet_broadcast(
+    background_tasks: BackgroundTasks,
     db: Session,
     packet,
     *,
@@ -39,20 +41,22 @@ async def _broadcast_packet(
     room = db.query(Room).filter(Room.id == packet.room_id).first()
     if room is None:
         return
-    await room_realtime_connections.broadcast_room(
+    event_payload = lucky_packet_service.room_event_payload(
+        db,
+        packet,
+        event_type=event_type,
+        target_claim=target_claim,
+    )
+    background_tasks.add_task(
+        room_realtime_connections.broadcast_room,
         room.room_public_id,
-        lucky_packet_service.room_event_payload(
-            db,
-            packet,
-            event_type=event_type,
-            target_claim=target_claim,
-        ),
+        event_payload,
     )
 
-
 @router.post("", response_model=LuckyPacketResponse)
-async def create_lucky_packet(
+def create_lucky_packet(
     payload: LuckyPacketCreateRequest,
+    background_tasks: BackgroundTasks,
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db),
 ):
@@ -66,12 +70,18 @@ async def create_lucky_packet(
         message=payload.message,
     )
     if finalized_previous is not None:
-        await _broadcast_packet(
+        _queue_packet_broadcast(
+            background_tasks,
             db,
             finalized_previous,
             event_type="lucky_packet_results",
         )
-    await _broadcast_packet(db, packet, event_type="lucky_packet_created")
+    _queue_packet_broadcast(
+        background_tasks,
+        db,
+        packet,
+        event_type="lucky_packet_created",
+    )
     return LuckyPacketResponse(
         **lucky_packet_service.snapshot(
             db,
@@ -84,7 +94,7 @@ async def create_lucky_packet(
 
 
 @router.get("/active", response_model=LuckyPacketResponse | None)
-async def get_active_lucky_packet(
+def get_active_lucky_packet(
     room_public_id: str,
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db),
@@ -104,7 +114,7 @@ async def get_active_lucky_packet(
 
 
 @router.get("/{packet_public_id}", response_model=LuckyPacketResponse)
-async def get_lucky_packet(
+def get_lucky_packet(
     packet_public_id: str,
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db),
@@ -124,8 +134,9 @@ async def get_lucky_packet(
 
 
 @router.post("/{packet_public_id}/claim", response_model=LuckyPacketClaimResponse)
-async def claim_lucky_packet(
+def claim_lucky_packet(
     packet_public_id: str,
+    background_tasks: BackgroundTasks,
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db),
 ):
@@ -137,18 +148,35 @@ async def claim_lucky_packet(
 
     if claim is None:
         if finalized:
-            await _broadcast_packet(db, packet, event_type="lucky_packet_results")
+            _queue_packet_broadcast(
+                background_tasks,
+                db,
+                packet,
+                event_type="lucky_packet_results",
+            )
+        if background_tasks.tasks:
+            return JSONResponse(
+                status_code=410,
+                content={"detail": "Lucky Packet is closed"},
+                background=background_tasks,
+            )
         raise HTTPException(status_code=410, detail="Lucky Packet is closed")
 
     if created:
-        await _broadcast_packet(
+        _queue_packet_broadcast(
+            background_tasks,
             db,
             packet,
             event_type="lucky_packet_claimed",
             target_claim=claim,
         )
     if finalized:
-        await _broadcast_packet(db, packet, event_type="lucky_packet_results")
+        _queue_packet_broadcast(
+            background_tasks,
+            db,
+            packet,
+            event_type="lucky_packet_results",
+        )
 
     return LuckyPacketClaimResponse(
         **lucky_packet_service.snapshot(
@@ -161,8 +189,9 @@ async def claim_lucky_packet(
 
 
 @router.post("/{packet_public_id}/finalize", response_model=LuckyPacketResponse)
-async def finalize_lucky_packet(
+def finalize_lucky_packet(
     packet_public_id: str,
+    background_tasks: BackgroundTasks,
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db),
 ):
@@ -172,7 +201,12 @@ async def finalize_lucky_packet(
         user=current_user,
     )
     if changed:
-        await _broadcast_packet(db, packet, event_type="lucky_packet_results")
+        _queue_packet_broadcast(
+            background_tasks,
+            db,
+            packet,
+            event_type="lucky_packet_results",
+        )
     return LuckyPacketResponse(
         **lucky_packet_service.snapshot(
             db,
