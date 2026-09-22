@@ -18,7 +18,7 @@ func TestHubRoutesOnlyAuthorizedSubscriptionsAndUsers(t *testing.T) {
 	hub := NewHub()
 	alice := newClient("alice", 1, "token", nil, 2)
 	bob := newClient("bob", 2, "token", nil, 2)
-	if !hub.Add(alice, 10) || !hub.Add(bob, 10) {
+	if !hub.Add(alice, 10, 4) || !hub.Add(bob, 10, 4) {
 		t.Fatal("failed to add clients")
 	}
 	defer hub.CloseAll()
@@ -53,7 +53,7 @@ func TestHubRoutesOnlyAuthorizedSubscriptionsAndUsers(t *testing.T) {
 func TestHubClosesSlowClientAndRejectsNewConnectionsOnDrain(t *testing.T) {
 	hub := NewHub()
 	client := newClient("slow", 1, "token", nil, 1)
-	if !hub.Add(client, 10) || !hub.Subscribe(client, "room-a") {
+	if !hub.Add(client, 10, 4) || !hub.Subscribe(client, "room-a") {
 		t.Fatal("setup failed")
 	}
 	hub.Publish(testEvent("room", 0, "room-a"), []byte("first"))
@@ -62,7 +62,7 @@ func TestHubClosesSlowClientAndRejectsNewConnectionsOnDrain(t *testing.T) {
 		t.Fatal("slow client was not evicted")
 	}
 	hub.Drain(time.Now().Add(time.Second))
-	if hub.Add(newClient("new", 2, "token", nil, 1), 10) {
+	if hub.Add(newClient("new", 2, "token", nil, 1), 10, 4) {
 		t.Fatal("draining gateway accepted connection")
 	}
 }
@@ -78,4 +78,43 @@ func TestEventRejectsInvalidRoutingMetadata(t *testing.T) {
 			t.Fatalf("accepted invalid event: %+v", event)
 		}
 	}
+}
+
+
+func TestHubDeduplicatesEventsAndCapsUserDevices(t *testing.T) {
+	hub := NewHub()
+	first := newClient("first", 7, "token", nil, 4)
+	second := newClient("second", 7, "token", nil, 4)
+	if !hub.Add(first, 10, 1) {
+		t.Fatal("first connection rejected")
+	}
+	if hub.Add(second, 10, 1) {
+		t.Fatal("per-user connection cap was not enforced")
+	}
+	if hub.stats.CapacityDenied.Load() != 1 {
+		t.Fatal("capacity denial metric not incremented")
+	}
+	if !hub.Subscribe(first, "room-a") {
+		t.Fatal("subscription failed")
+	}
+	event := testEvent("room", 0, "room-a")
+	hub.Publish(event, []byte("first"))
+	hub.Publish(event, []byte("duplicate"))
+	if hub.stats.DuplicateEvents.Load() != 1 {
+		t.Fatal("duplicate event was not counted")
+	}
+	select {
+	case got := <-first.send:
+		if string(got) != "first" {
+			t.Fatalf("wrong payload: %q", got)
+		}
+	default:
+		t.Fatal("first event was not delivered")
+	}
+	select {
+	case got := <-first.send:
+		t.Fatalf("duplicate event was delivered: %q", got)
+	default:
+	}
+	hub.CloseAll()
 }

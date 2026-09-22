@@ -35,7 +35,9 @@ type Stats struct {
 	AuthDenied    atomic.Uint64
 	SlowClosed    atomic.Uint64
 	Events        atomic.Uint64
-	InvalidEvents atomic.Uint64
+	InvalidEvents   atomic.Uint64
+	DuplicateEvents atomic.Uint64
+	CapacityDenied  atomic.Uint64
 }
 
 type Hub struct {
@@ -43,22 +45,29 @@ type Hub struct {
 	clients  map[*Client]struct{}
 	byUser   map[int64]map[*Client]struct{}
 	byRoom   map[string]map[*Client]struct{}
-	draining bool
-	stats    Stats
+	draining  bool
+	seenEvents map[string]time.Time
+	stats     Stats
 }
 
 func NewHub() *Hub {
 	return &Hub{
 		clients: make(map[*Client]struct{}),
 		byUser:  make(map[int64]map[*Client]struct{}),
-		byRoom:  make(map[string]map[*Client]struct{}),
+		byRoom:     make(map[string]map[*Client]struct{}),
+		seenEvents: make(map[string]time.Time),
 	}
 }
 
-func (h *Hub) Add(c *Client, maxConnections int64) bool {
+func (h *Hub) Add(c *Client, maxConnections int64, maxConnectionsPerUser int) bool {
 	h.mu.Lock()
 	defer h.mu.Unlock()
 	if h.draining || int64(len(h.clients)) >= maxConnections {
+		h.stats.CapacityDenied.Add(1)
+		return false
+	}
+	if maxConnectionsPerUser > 0 && len(h.byUser[c.UserID]) >= maxConnectionsPerUser {
+		h.stats.CapacityDenied.Add(1)
 		return false
 	}
 	h.clients[c] = struct{}{}
@@ -132,8 +141,20 @@ func (h *Hub) Publish(event Event, raw []byte) {
 		h.stats.InvalidEvents.Add(1)
 		return
 	}
+	now := time.Now()
+	h.mu.Lock()
+	for eventID, expiresAt := range h.seenEvents {
+		if !expiresAt.After(now) {
+			delete(h.seenEvents, eventID)
+		}
+	}
+	if _, duplicate := h.seenEvents[event.EventID]; duplicate {
+		h.stats.DuplicateEvents.Add(1)
+		h.mu.Unlock()
+		return
+	}
+	h.seenEvents[event.EventID] = now.Add(5 * time.Minute)
 	h.stats.Events.Add(1)
-	h.mu.RLock()
 	var recipients map[*Client]struct{}
 	if event.Scope == "room" {
 		recipients = h.byRoom[event.RoomPublicID]
@@ -144,7 +165,7 @@ func (h *Hub) Publish(event Event, raw []byte) {
 	for c := range recipients {
 		clients = append(clients, c)
 	}
-	h.mu.RUnlock()
+	h.mu.Unlock()
 	for _, c := range clients {
 		if !h.Enqueue(c, raw) {
 			h.stats.SlowClosed.Add(1)
@@ -225,5 +246,7 @@ func (h *Hub) Metrics() string {
 		"funkey_realtime_auth_denied_total " + strconv.FormatUint(h.stats.AuthDenied.Load(), 10) + "\n" +
 		"funkey_realtime_slow_clients_closed_total " + strconv.FormatUint(h.stats.SlowClosed.Load(), 10) + "\n" +
 		"funkey_realtime_events_received_total " + strconv.FormatUint(h.stats.Events.Load(), 10) + "\n" +
-		"funkey_realtime_events_invalid_total " + strconv.FormatUint(h.stats.InvalidEvents.Load(), 10) + "\n"
+		"funkey_realtime_events_invalid_total " + strconv.FormatUint(h.stats.InvalidEvents.Load(), 10) + "\n" +
+		"funkey_realtime_events_duplicate_total " + strconv.FormatUint(h.stats.DuplicateEvents.Load(), 10) + "\n" +
+		"funkey_realtime_capacity_denied_total " + strconv.FormatUint(h.stats.CapacityDenied.Load(), 10) + "\n"
 }

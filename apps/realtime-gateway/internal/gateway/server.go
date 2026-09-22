@@ -151,7 +151,7 @@ func (s *Server) serveWS(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	client := newClient(newID(), principal.UserID, token, conn, s.Config.OutboundQueue)
-	if !s.Hub.Add(client, s.Config.MaxConnections) {
+	if !s.Hub.Add(client, s.Config.MaxConnections, s.Config.MaxConnectionsPerUser) {
 		_ = conn.WriteControl(websocket.CloseMessage, websocket.FormatCloseMessage(websocket.CloseTryAgainLater, "capacity"), time.Now().Add(time.Second))
 		_ = conn.Close()
 		return

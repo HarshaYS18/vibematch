@@ -23,7 +23,8 @@ type Config struct {
 	LeaseTTL        time.Duration
 	MaxMessageBytes int64
 	OutboundQueue   int
-	MaxConnections  int64
+	MaxConnections        int64
+	MaxConnectionsPerUser int
 }
 
 func env(key, fallback string) string {
@@ -49,7 +50,8 @@ func LoadConfig() (Config, error) {
 		LeaseTTL:        60 * time.Second,
 		MaxMessageBytes: 16 * 1024,
 		OutboundQueue:   64,
-		MaxConnections:  10000,
+		MaxConnections:        10000,
+		MaxConnectionsPerUser: 4,
 	}
 	if cfg.AuthVerifyURL == "" {
 		return cfg, errors.New("REALTIME_AUTH_VERIFY_URL is required")
@@ -67,6 +69,13 @@ func LoadConfig() (Config, error) {
 			return cfg, errors.New("REALTIME_MAX_CONNECTIONS must be positive")
 		}
 		cfg.MaxConnections = value
+	}
+	if raw := os.Getenv("REALTIME_MAX_CONNECTIONS_PER_USER"); raw != "" {
+		value, err := strconv.Atoi(raw)
+		if err != nil || value <= 0 {
+			return cfg, errors.New("REALTIME_MAX_CONNECTIONS_PER_USER must be positive")
+		}
+		cfg.MaxConnectionsPerUser = value
 	}
 	for _, origin := range strings.Split(os.Getenv("REALTIME_ORIGINS"), ",") {
 		origin = strings.TrimSpace(origin)
