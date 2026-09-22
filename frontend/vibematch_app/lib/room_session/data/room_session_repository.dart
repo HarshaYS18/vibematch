@@ -170,15 +170,15 @@ class RoomSessionRepository extends StateNotifier<RoomSessionState> {
       '/rooms/$_roomId/realtime/activity/command',
       <String, dynamic>{
         'action': action.trim().toUpperCase(),
-        if (expectedRevision != null) 'expected_revision': expectedRevision,
+        'expected_revision': ?expectedRevision,
         if (kind?.trim().isNotEmpty == true) 'kind': kind!.trim(),
         if (activityId?.trim().isNotEmpty == true) 'activity_id': activityId!.trim(),
         if (title?.trim().isNotEmpty == true) 'title': title!.trim(),
         if (phase?.trim().isNotEmpty == true) 'phase': phase!.trim(),
         if (gameId?.trim().isNotEmpty == true) 'game_id': gameId!.trim(),
-        if (targetUserId != null) 'target_user_id': targetUserId,
-        if (metadata != null) 'metadata': metadata,
-        if (postGame != null) 'post_game': postGame,
+        'target_user_id': ?targetUserId,
+        'metadata': ?metadata,
+        'post_game': ?postGame,
       },
     );
   }
