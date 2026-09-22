@@ -127,7 +127,22 @@ class InboxWebSocketDistributedTests(IsolatedAsyncioTestCase):
         self.assertEqual(envelope["user_id"], 11)
 
         await subscriber._handle_envelope(envelope)
-        websocket.send_json.assert_awaited_once_with(payload)
+
+        websocket.send_json.assert_awaited_once()
+        delivered = websocket.send_json.await_args.args[0]
+        self.assertEqual(delivered["event"], payload["event"])
+        self.assertEqual(
+            delivered["conversation_id"],
+            payload["conversation_id"],
+        )
+        self.assertEqual(delivered["type"], payload["event"])
+        self.assertEqual(delivered["stream"], "app:user:11")
+        self.assertEqual(delivered["sequence"], 1)
+        self.assertTrue(delivered["eventId"])
+        self.assertTrue(delivered["serverTime"])
+        self.assertEqual(delivered["payload"], payload)
+
+        # Remote delivery must never fan back into Redis.
         self.assertEqual(len(redis.published), 1)
 
         await subscriber.release_connection(11, websocket)
