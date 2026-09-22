@@ -9,7 +9,7 @@ import '../core/ui/vm_motion.dart';
 import '../core/ui/vm_toast.dart';
 import '../features/auth/models/current_user.dart';
 import '../features/home/presentation/home_page_modular.dart';
-import '../game_platform/data/game_bundle_cache.dart';
+import '../game_platform/data/game_manifest_repository.dart';
 import '../features/inbox/presentation/inbox_page.dart';
 import '../features/inbox/presentation/widgets/inbox_foreground_notification_banner.dart';
 import '../features/profile/presentation/me_page.dart';

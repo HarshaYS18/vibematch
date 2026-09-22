@@ -59,12 +59,14 @@ class VibesNavigationController {
   static void openCreateVibe({
     required BuildContext context,
     required VibesController controller,
+    required VibeMediaPlaybackGate playbackGate,
   }) {
     Navigator.of(context).push(
       VmMotion.pageRoute<void>(
         settings: const RouteSettings(name: 'create-vibe'),
         page: CreateVibePageModular(
           canUseMentionAllToday: controller.canUseMentionAllToday,
+          playbackGate: playbackGate,
           onPublish: (newVibe) async {
             try {
               await controller.publishVibe(newVibe);

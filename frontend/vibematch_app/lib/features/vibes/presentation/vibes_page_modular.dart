@@ -142,7 +142,7 @@ class _VibesPageState extends State<VibesPage> {
         ),
       ),
       floatingActionButton: FloatingActionButton(
-        onPressed: () => VibesNavigationController.openCreateVibe(context: context, controller: _controller),
+        onPressed: () => VibesNavigationController.openCreateVibe(context: context, controller: _controller, playbackGate: widget.playbackGate),
         backgroundColor: const Color(0xFF111015),
         foregroundColor: Colors.white,
         shape: const CircleBorder(),

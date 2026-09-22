@@ -14,10 +14,11 @@ import '../widgets/create_vibe_media_picker.dart';
 import '../widgets/vibe_media_playback_gate.dart';
 
 class CreateVibePageModular extends StatefulWidget {
-  const CreateVibePageModular({super.key, required this.canUseMentionAllToday, required this.onPublish});
+  const CreateVibePageModular({super.key, required this.canUseMentionAllToday, required this.onPublish, required this.playbackGate});
 
   final bool canUseMentionAllToday;
   final Future<void> Function(VibeItem) onPublish;
+  final VibeMediaPlaybackGate playbackGate;
 
   @override
   State<CreateVibePageModular> createState() => _CreateVibePageModularState();
@@ -56,13 +57,13 @@ class _CreateVibePageModularState extends State<CreateVibePageModular> {
   @override
   void initState() {
     super.initState();
-    VibeMediaPlaybackGate.acquirePauseLock(_composerPauseLockKey);
+    widget.playbackGate.acquirePauseLock(_composerPauseLockKey);
     _captionController.addListener(_onCaptionChanged);
   }
 
   @override
   void dispose() {
-    VibeMediaPlaybackGate.releasePauseLock(_composerPauseLockKey);
+    widget.playbackGate.releasePauseLock(_composerPauseLockKey);
     _captionController.removeListener(_onCaptionChanged);
     _captionController.dispose();
     super.dispose();

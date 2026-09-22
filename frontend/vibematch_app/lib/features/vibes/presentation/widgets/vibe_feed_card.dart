@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import '../../../auth/data/auth_api_service.dart';
 import '../../models/vibe_models.dart';
 import 'vibe_avatar.dart';
+import 'vibe_media_playback_gate.dart';
 import 'vibe_media_player.dart';
 
 class VibeCardModular extends StatefulWidget {
