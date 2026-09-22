@@ -1,0 +1,24 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://funkey.example/contracts/events/realtime-gateway-v1.schema.json",
+  "title": "FunKey realtime gateway event v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["event_id", "event_type", "event_version", "scope", "payload"],
+  "properties": {
+    "event_id": {"type": "string", "minLength": 1},
+    "event_type": {"type": "string", "minLength": 1},
+    "event_version": {"const": 1},
+    "scope": {"enum": ["room", "user"]},
+    "room_public_id": {"type": "string", "minLength": 1, "maxLength": 32},
+    "user_id": {"type": "integer", "minimum": 1},
+    "occurred_at": {"type": "string", "format": "date-time"},
+    "request_id": {"type": "string"},
+    "trace_id": {"type": "string"},
+    "payload": {}
+  },
+  "oneOf": [
+    {"properties": {"scope": {"const": "room"}}, "required": ["room_public_id"]},
+    {"properties": {"scope": {"const": "user"}}, "required": ["user_id"]}
+  ]
+}
