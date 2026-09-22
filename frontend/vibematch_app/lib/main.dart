@@ -35,10 +35,8 @@ void main() {
 
 void _installGlobalErrorHandling() {
   FlutterError.onError = (details) {
+    // presentError already includes the stack trace. Do not print it twice.
     FlutterError.presentError(details);
-    if (details.stack != null) {
-      debugPrintStack(stackTrace: details.stack);
-    }
   };
 
   ErrorWidget.builder = (details) {
@@ -99,10 +97,7 @@ Future<void> _initializeOptionalServices() async {
   // options are generated and committed; never access currentPlatform on web
   // because firebase_options.dart intentionally throws there today.
   if (kIsWeb) {
-    debugPrint(
-      'FunKey bootstrap: Firebase/push skipped on web because web Firebase '
-      'options are not configured.',
-    );
+    // Expected until web Firebase options are configured; stay quiet.
     return;
   }
 
