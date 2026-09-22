@@ -1,6 +1,6 @@
 from datetime import datetime, timedelta
 
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException
 from sqlalchemy.orm import Session
 
 from app.api.routes.users import get_current_user
@@ -16,10 +16,11 @@ EDIT_WINDOW = timedelta(minutes=15)
 
 
 @router.patch("/conversations/{conversation_id}/messages/{message_id}/edit", response_model=InboxMessageResponse)
-async def edit_message_text(
+def edit_message_text(
     conversation_id: str,
     message_id: str,
     request: InboxMessageActionRequest,
+    background_tasks: BackgroundTasks,
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
@@ -60,19 +61,23 @@ async def edit_message_text(
     db.commit()
     db.refresh(message)
 
-    await inbox_ws_manager.broadcast_to_users(
-        inbox_service.participant_user_ids(conversation),
+    participant_ids = inbox_service.participant_user_ids(conversation)
+    message_payload = inbox_service.message_to_dict(message, current_user)
+    background_tasks.add_task(
+        inbox_ws_manager.broadcast_to_users,
+        participant_ids,
         {
             "event": "inbox_message_updated",
             "conversation_id": conversation.public_id,
-            "message": inbox_service.message_to_dict(message, current_user),
+            "message": message_payload,
         },
     )
-    await inbox_ws_manager.broadcast_to_users(
-        inbox_service.participant_user_ids(conversation),
+    background_tasks.add_task(
+        inbox_ws_manager.broadcast_to_users,
+        participant_ids,
         {"event": "inbox_conversation_updated", "conversation_id": conversation.public_id},
     )
-    return InboxMessageResponse(**inbox_service.message_to_dict(message, current_user))
+    return InboxMessageResponse(**message_payload)
 
 
 @router.post("/conversations/{conversation_id}/messages/{message_id}/delete-for-me", response_model=InboxDeleteForMeResponse)

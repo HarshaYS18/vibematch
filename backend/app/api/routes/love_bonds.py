@@ -1,4 +1,4 @@
-﻿from fastapi import APIRouter, Depends, HTTPException
+﻿from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException
 from sqlalchemy.orm import Session
 
 from app.api.routes.users import get_current_user
@@ -32,8 +32,9 @@ def get_my_love_bond_inventory(
 
 
 @router.post("/requests", response_model=LoveBondRequestResponse)
-async def send_love_bond_request(
+def send_love_bond_request(
     request: LoveBondSendRequest,
+    background_tasks: BackgroundTasks,
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
@@ -59,7 +60,8 @@ async def send_love_bond_request(
         raise HTTPException(status_code=400, detail=str(error)) from error
 
     if bond_request.inbox_message is not None:
-        await inbox_ws_manager.broadcast_to_users(
+        background_tasks.add_task(
+            inbox_ws_manager.broadcast_to_users,
             [current_user.id, receiver.id],
             {
                 "event": "inbox_conversation_updated",
@@ -91,8 +93,9 @@ def list_pending_love_bond_requests(
 
 
 @router.post("/requests/{request_id}/accept", response_model=LoveBondResponse)
-async def accept_love_bond_request(
+def accept_love_bond_request(
     request_id: str,
+    background_tasks: BackgroundTasks,
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
@@ -103,7 +106,8 @@ async def accept_love_bond_request(
     except ValueError as error:
         raise HTTPException(status_code=400, detail=str(error)) from error
 
-    await inbox_ws_manager.broadcast_to_users(
+    background_tasks.add_task(
+        inbox_ws_manager.broadcast_to_users,
         [bond.user_a_id, bond.user_b_id],
         {"event": "love_bond_updated", "bond_id": bond.public_id},
     )
@@ -111,8 +115,9 @@ async def accept_love_bond_request(
 
 
 @router.post("/requests/{request_id}/reject", response_model=LoveBondRequestResponse)
-async def reject_love_bond_request(
+def reject_love_bond_request(
     request_id: str,
+    background_tasks: BackgroundTasks,
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
@@ -123,7 +128,8 @@ async def reject_love_bond_request(
     except ValueError as error:
         raise HTTPException(status_code=400, detail=str(error)) from error
 
-    await inbox_ws_manager.broadcast_to_users(
+    background_tasks.add_task(
+        inbox_ws_manager.broadcast_to_users,
         [bond_request.sender_user_id, bond_request.receiver_user_id],
         {"event": "love_bond_request_updated", "request_id": bond_request.public_id},
     )

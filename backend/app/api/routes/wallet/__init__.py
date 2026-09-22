@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from datetime import datetime
 
-from fastapi import APIRouter, Depends, Query
+from fastapi import APIRouter, BackgroundTasks, Depends, Query
 from pydantic import BaseModel, Field
 from sqlalchemy.orm import Session
 
@@ -248,7 +248,7 @@ def get_my_wallet_ledger(
 
 
 @router.post("/recharge", response_model=WalletResponse)
-async def recharge_wallet(payload: RechargeRequest, current_user: User = Depends(get_current_user), db: Session = Depends(get_db)):
+def recharge_wallet(payload: RechargeRequest, background_tasks: BackgroundTasks, current_user: User = Depends(get_current_user), db: Session = Depends(get_db)):
     coins = payload.amount_inr * COINS_PER_RUPEE
     wallet = economy_service.get_or_create_wallet(db, current_user.id)
     before = wallet.coin_balance
@@ -271,16 +271,16 @@ async def recharge_wallet(payload: RechargeRequest, current_user: User = Depends
     db.flush()
     response = _wallet_response(db, current_user)
     db.commit()
-    await _broadcast_wallet_update(current_user.id, response)
+    background_tasks.add_task(_broadcast_wallet_update, current_user.id, response)
     return response
 
 
 @router.post("/rubies/convert", response_model=WalletResponse)
-async def convert_ruby_to_coins(payload: RubyConvertRequest, current_user: User = Depends(get_current_user), db: Session = Depends(get_db)):
+def convert_ruby_to_coins(payload: RubyConvertRequest, background_tasks: BackgroundTasks, current_user: User = Depends(get_current_user), db: Session = Depends(get_db)):
     economy_service.convert_rubies_to_coins(db, current_user, payload.ruby_amount)
     response = _wallet_response(db, current_user)
     db.commit()
-    await _broadcast_wallet_update(current_user.id, response)
+    background_tasks.add_task(_broadcast_wallet_update, current_user.id, response)
     return response
 
 
