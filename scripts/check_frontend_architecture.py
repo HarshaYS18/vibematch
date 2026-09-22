@@ -80,6 +80,18 @@ if WATCH_PARTY_ROOT.exists():
                 f"{rel}: Watch Party core must use canonical room realtime state, not create/use a raw websocket"
             )
 
+        if "package:flutter_inappwebview/flutter_inappwebview.dart" in text and "/watch_party/providers/web/" not in f"/{rel}":
+            violations.append(
+                f"{rel}: raw OTT WebView access belongs behind watch_party/providers/web"
+            )
+
+        if "InAppWebViewController" in text and not rel.endswith(
+            "watch_party/providers/web/ott_web_playback_host.dart"
+        ):
+            violations.append(
+                f"{rel}: InAppWebViewController must stay inside OttWebPlaybackHost"
+            )
+
 if violations:
     print("Frontend architecture guard failed:")
     for violation in violations:
