@@ -65,6 +65,7 @@ func main() {
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 	go service.ConsumeEvents(ctx)
+	go service.ConsumeNATSEvents(ctx)
 	go service.Heartbeat(ctx)
 	httpServer := &http.Server{
 		Addr:              cfg.ListenAddr,
