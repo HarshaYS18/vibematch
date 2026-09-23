@@ -1,4 +1,5 @@
 import json
+import re
 from pathlib import Path
 from unittest import TestCase
 
@@ -83,9 +84,11 @@ class RedisPlatformContractTests(TestCase):
             realtime,
         )
         self.assertIn(str(contract["rate_limit_window_key"] * 1000), rate_limit)
-        self.assertIn(
-            f'LeaseTTL:              {contract["realtime_gateway_lease"]} * time.Second',
+        self.assertRegex(
             gateway,
+            re.compile(
+                rf'LeaseTTL:\\s+{contract["realtime_gateway_lease"]} \\* time\\.Second'
+            ),
         )
 
     def test_local_topology_has_role_specific_memory_policies(self):
