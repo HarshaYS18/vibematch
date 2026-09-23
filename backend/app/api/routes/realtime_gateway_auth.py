@@ -61,6 +61,7 @@ class RealtimeCommandResponse(BaseModel):
     conversation_id: str | None = None
     state_version: int | None = None
     event_sequence: int | None = None
+    result: str | None = None
 
 
 @router.post("/verify", response_model=RealtimeVerifyResponse)
@@ -119,6 +120,7 @@ async def execute_realtime_command(
         conversation_id=payload.conversation_id,
         activity=payload.activity,
         payload=payload.payload,
+        command_id=payload.command_id,
     )
     return RealtimeCommandResponse(
         command_id=payload.command_id,
