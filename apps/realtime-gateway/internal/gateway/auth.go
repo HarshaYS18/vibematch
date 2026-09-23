@@ -14,7 +14,8 @@ import (
 )
 
 type Principal struct {
-	UserID int64
+	UserID  int64
+	IsStaff bool
 }
 
 type Authorizer interface {
@@ -34,6 +35,7 @@ type verifyRequest struct {
 type verifyResponse struct {
 	Allowed bool  `json:"allowed"`
 	UserID  int64 `json:"user_id"`
+	IsStaff bool  `json:"is_staff"`
 }
 
 var ErrUnauthorized = errors.New("authorization denied")
@@ -81,5 +83,5 @@ func (a *HTTPAuthorizer) Verify(ctx context.Context, token, action, roomID strin
 	if !result.Allowed || result.UserID <= 0 {
 		return Principal{}, ErrUnauthorized
 	}
-	return Principal{UserID: result.UserID}, nil
+	return Principal{UserID: result.UserID, IsStaff: result.IsStaff}, nil
 }
