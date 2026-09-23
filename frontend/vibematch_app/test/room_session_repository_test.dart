@@ -131,7 +131,7 @@ void main() {
     );
   });
 
-  test('heartbeat and leave each reconcile one authoritative snapshot', () async {
+  test('heartbeat is liveness-only and does not replace canonical state', () async {
     final network = _FakeNetworkClient(_room(10, <int>[1, 2]));
     final repository = RoomSessionRepository(
       roomId: 'VM123',
@@ -141,9 +141,12 @@ void main() {
 
     await repository.join();
     network.snapshot = _room(11, <int>[1, 2, 3]);
+
     final heartbeat = await repository.heartbeat();
-    expect(heartbeat.stateVersion, 11);
-    expect(heartbeat.presence.containsKey(3), isTrue);
+
+    expect(heartbeat.stateVersion, 10);
+    expect(heartbeat.presence.containsKey(3), isFalse);
+    expect(heartbeat.connection, RoomSessionConnection.connected);
 
     network.snapshot = _room(12, <int>[2, 3]);
     final left = await repository.leave();
@@ -159,8 +162,9 @@ void main() {
     );
   });
 
-  test('heartbeat preserves sections explicitly omitted by the server', () async {
+  test('room-state-v2 delta merges only supplied canonical sections', () async {
     final initial = _room(30, <int>[1, 2])
+      ..['event_sequence'] = 40
       ..['recent_messages'] = <Map<String, dynamic>>[
         <String, dynamic>{'id': 'm1', 'text': 'keep me'},
       ];
@@ -172,17 +176,50 @@ void main() {
     );
 
     await repository.join();
-    expect(repository.state.chat.single['id'], 'm1');
+    final nextParticipants = _room(31, <int>[1, 2, 3])['participants'];
+    final next = repository.reconcileDelta(<String, dynamic>{
+      'room_id': 'VM123',
+      'room_version': 31,
+      'event_sequence': 41,
+      'participants': nextParticipants,
+      'online_count': 3,
+    });
 
-    network.snapshot = _room(31, <int>[1, 2, 3]);
-    network.omittedSections = const <String>['recent_messages'];
+    expect(next.stateVersion, 31);
+    expect(next.eventSequence, 41);
+    expect(next.presence.containsKey(3), isTrue);
+    expect(next.chat.single['id'], 'm1');
+  });
 
-    final heartbeat = await repository.heartbeat();
+  test('gateway envelope delegates room-state-v2 delta to repository', () async {
+    final network = _FakeNetworkClient(_room(35, <int>[1]));
+    final repository = RoomSessionRepository(
+      roomId: 'VM123',
+      networkClient: network,
+      accessTokenProvider: () => 'token',
+    );
+    await repository.join();
 
-    expect(heartbeat.stateVersion, 31);
-    expect(heartbeat.presence.containsKey(3), isTrue);
-    expect(heartbeat.chat.single['id'], 'm1');
-    expect(heartbeat.room['recent_messages'], isNotNull);
+    final state = repository.reconcileRealtimeEvent(<String, dynamic>{
+      'event_id': 'evt-1',
+      'stream': 'room:VM123:epoch-a',
+      'sequence': 7,
+      'payload': <String, dynamic>{
+        'type': 'seat/taken',
+        'payload': <String, dynamic>{
+          'protocol': 'room-state-v2',
+          'delta': <String, dynamic>{
+            'room_id': 'VM123',
+            'room_version': 36,
+            'event_sequence': 52,
+            'online_count': 1,
+          },
+        },
+      },
+    });
+
+    expect(state.stateVersion, 36);
+    expect(state.eventSequence, 52);
   });
 
   test('two client projections converge across join leave reconnect', () async {
