@@ -42,6 +42,12 @@ STARTUP_FORBIDDEN = (
 )
 
 AUTHORITY_REGISTRY = ROOT / "contracts" / "architecture" / "authorities.yaml"
+REDIS_TOPOLOGY = ROOT / "contracts" / "redis" / "topology.json"
+REQUIRED_REDIS_ROLES = {
+    "app_cache_rate_limit",
+    "realtime_presence",
+    "media_registry",
+}
 ALLOWED_STATE_CLASSES = {"AUTHORITY", "PROJECTION", "CACHE", "EPHEMERAL"}
 REQUIRED_AUTHORITY_STATE_IDS = {
     "identity.accounts", "identity.sessions", "profiles.public", "rooms.definition",
@@ -127,6 +133,53 @@ def _validate_authority_registry(errors: list[str]) -> None:
             errors.append(f"{state_id}: financial truth must be AUTHORITY owned by economy")
 
 
+
+def _validate_redis_topology(errors: list[str]) -> None:
+    if not REDIS_TOPOLOGY.exists():
+        errors.append("machine-readable Redis topology contract is missing")
+        return
+    try:
+        payload = json.loads(REDIS_TOPOLOGY.read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError) as exc:
+        errors.append(f"Redis topology contract is invalid JSON: {exc}")
+        return
+    if payload.get("authority") != "EPHEMERAL_OR_CACHE_ONLY":
+        errors.append("Redis topology must never declare durable business authority")
+    roles = payload.get("roles")
+    if not isinstance(roles, dict):
+        errors.append("Redis topology roles must be an object")
+        return
+    missing = REQUIRED_REDIS_ROLES.difference(roles)
+    if missing:
+        errors.append("Redis topology missing roles: " + ", ".join(sorted(missing)))
+    endpoint_envs = []
+    for role_name in REQUIRED_REDIS_ROLES.intersection(roles):
+        role = roles[role_name]
+        endpoint_env = str(role.get("endpoint_env") or "").strip()
+        if not endpoint_env:
+            errors.append(f"{role_name}: endpoint_env is required")
+        endpoint_envs.append(endpoint_env)
+        if not role.get("ha_required"):
+            errors.append(f"{role_name}: HA is required")
+        if not role.get("maxmemory_required"):
+            errors.append(f"{role_name}: maxmemory ceiling is required")
+        if role.get("redis_cluster_supported_by_current_client") is not False:
+            errors.append(f"{role_name}: current clients must not claim Redis Cluster support")
+    if len(endpoint_envs) != len(set(endpoint_envs)):
+        errors.append("Redis roles must use distinct endpoint environment variables")
+
+    forbidden_generic = {
+        ROOT / "backend" / "app" / "realtime" / "connection_manager.py": "settings.redis_url",
+        ROOT / "backend" / "app" / "websocket" / "inbox_ws.py": "settings.redis_url",
+        ROOT / "backend" / "app" / "api" / "routes" / "media_control.py": "get_redis",
+        ROOT / "backend" / "app" / "api" / "routes" / "media_realtime_auth.py": "get_redis",
+    }
+    for path, token in forbidden_generic.items():
+        if path.exists() and token in path.read_text(encoding="utf-8"):
+            errors.append(
+                f"{path.relative_to(ROOT)} must use its explicit Redis role instead of {token}"
+            )
+
 def _has_tracked_content(path: Path) -> bool:
     return path.exists() and any(item.is_file() for item in path.rglob("*"))
 
@@ -134,6 +187,7 @@ def _has_tracked_content(path: Path) -> bool:
 def main() -> int:
     errors: list[str] = []
     _validate_authority_registry(errors)
+    _validate_redis_topology(errors)
 
     for path in REQUIRED_PATHS:
         if not path.exists():
@@ -221,6 +275,7 @@ def main() -> int:
     print(" - Alembic is the sole schema mutation path")
     print(" - /api/v1 is owned by the canonical router")
     print(" - mutable state ownership conforms to contracts/architecture/authorities.yaml")
+    print(" - Redis roles conform to contracts/redis/topology.json")
     return 0
 
 
