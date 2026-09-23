@@ -6,7 +6,7 @@ from sqlalchemy.orm import Session
 
 from app.api.routes.users import get_current_user
 from app.core.config import settings
-from app.core.redis_client import get_redis
+from app.core.redis_client import get_media_registry_redis, get_realtime_redis
 from app.database import get_db
 from app.models.user import User
 from app.realtime.connection_manager import has_active_room_user_lease
@@ -32,7 +32,7 @@ def _verify_media_node_identity(http_request: Request, payload: MediaRealtimeVer
     if room_public_id:
         try:
             assigned = media_node_registry_service.room_is_assigned_to_node(
-                get_redis(),
+                get_media_registry_redis(),
                 room_public_id,
                 node_id,
             )
@@ -59,7 +59,7 @@ def verify_media_realtime_access(
     has_active_room_connection = bool(
         room_public_id
         and has_active_room_user_lease(
-            get_redis(),
+            get_realtime_redis(),
             room_public_id,
             current_user.id,
         )
