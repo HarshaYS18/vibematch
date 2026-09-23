@@ -51,19 +51,7 @@ def _conversation_context(
     public_id = str(conversation.public_id)
 
     if mark_read:
-        participant = next(
-            (
-                item
-                for item in conversation.participants
-                if item.user_id == user.id
-            ),
-            None,
-        )
-        if participant is not None:
-            participant.unread_count = 0
-            if conversation.messages:
-                participant.last_read_message_id = conversation.messages[-1].id
-            db.commit()
+        inbox_service.mark_messages_read_for_user(db, conversation, user)
 
     return InboxRealtimeCommandResult(
         conversation_id=public_id,
@@ -127,8 +115,8 @@ async def execute_inbox_realtime_command(
             },
         )
     elif command_type == "inbox.mark_read":
-        await inbox_ws_manager.send_to_user(
-            user.id,
+        await inbox_ws_manager.broadcast_to_users(
+            [user.id, *result.recipient_ids],
             {
                 "event": "inbox_messages_read",
                 "conversation_id": result.conversation_id,
