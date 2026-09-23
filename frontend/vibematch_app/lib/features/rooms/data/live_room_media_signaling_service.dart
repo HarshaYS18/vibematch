@@ -9,7 +9,6 @@ import '../../../core/ui/vm_motion.dart';
 import '../../../foundation/realtime/realtime_event_envelope.dart';
 import '../../../realtime/app_realtime_hub.dart';
 import '../../../main.dart';
-import '../../auth/data/auth_api_service.dart';
 import '../../auth/models/current_user.dart';
 import '../presentation/live_room_models.dart';
 import '../presentation/modules/cricket_room_mode_signal.dart';
@@ -648,11 +647,17 @@ class LiveRoomMediaSignalingService with WidgetsBindingObserver {
       return;
     }
 
-    // Authoritative room presence is established by RoomSessionRepository
-    // before this compatibility facade is entered. Subscription is idempotent.
+    // Authoritative room presence was already established by
+    // RoomSessionRepository before this facade is entered. The Go socket only
+    // subscribes to room events; it must not perform a duplicate room/join.
     _appRealtimeHub.subscribeRoom(safeRoomId);
-    _send('room/join', _joinPayload(effectiveUser, safeRoomId));
+    _peerId ??= '${safeRoomId}_${effectiveUser.id}'.replaceAll(
+      RegExp(r'[^a-zA-Z0-9_\-]'),
+      '_',
+    );
     _joined = true;
+    roomBlock.value = null;
+    _joinAudioAfterMediaJoin();
   }
 
   Future<void> _connect() async {
@@ -684,32 +689,6 @@ class LiveRoomMediaSignalingService with WidgetsBindingObserver {
         _warn('shared application realtime reconnect failed: $error');
       }),
     );
-  }
-
-  Map<String, Object?> _joinPayload(SeatUser user, String safeRoomId) {
-    final stablePeerId = '${safeRoomId}_${user.id}'.replaceAll(
-      RegExp(r'[^a-zA-Z0-9_\-]'),
-      '_',
-    );
-
-    _peerId = stablePeerId;
-
-    return <String, Object?>{
-      'room_id': safeRoomId,
-      'access_token': const AuthApiService().cachedAccessToken,
-      'peer_id': stablePeerId,
-      'user_id': user.id,
-      'display_name': user.name,
-      'avatar_url': user.avatarUrl,
-      'vip_level': user.vipLevel,
-      'svip_level': user.svipLevel,
-      'sending_level': user.sendingLevel,
-      'receiving_level': user.receivingLevel,
-      'is_host': user.isHost,
-      'is_room_admin': user.isRoomAdmin || user.isHost,
-      'role_label': _roomRoleLabelFor(user),
-      'seat_index': null,
-    };
   }
 
   Map<String, Object?> _profileUpdatePayload(SeatUser user) {
