@@ -179,6 +179,7 @@ class RoomSessionState {
     required this.watchParty,
     required this.onlineCount,
     required this.stateVersion,
+    required this.eventSequence,
     required this.errorMessage,
   });
 
@@ -203,6 +204,7 @@ class RoomSessionState {
       watchParty: const <String, dynamic>{},
       onlineCount: 0,
       stateVersion: 0,
+      eventSequence: 0,
       errorMessage: null,
     );
   }
@@ -238,6 +240,7 @@ class RoomSessionState {
 
   final int onlineCount;
   final int stateVersion;
+  final int eventSequence;
   final String? errorMessage;
 
   bool get isJoined =>
@@ -348,7 +351,11 @@ class RoomSessionState {
           _nullableInt(snapshot['public_online_count']) ??
           _nullableInt(snapshot['online_count']) ??
           presence.length,
-      stateVersion: _nullableInt(snapshot['state_version']) ?? 0,
+      stateVersion:
+          _nullableInt(snapshot['state_version']) ??
+          _nullableInt(snapshot['room_version']) ??
+          0,
+      eventSequence: _nullableInt(snapshot['event_sequence']) ?? 0,
       errorMessage: null,
     );
   }
@@ -372,6 +379,7 @@ class RoomSessionState {
     Map<String, dynamic>? watchParty,
     int? onlineCount,
     int? stateVersion,
+    int? eventSequence,
     String? errorMessage,
     bool clearError = false,
   }) {
@@ -395,6 +403,7 @@ class RoomSessionState {
       watchParty: watchParty ?? this.watchParty,
       onlineCount: onlineCount ?? this.onlineCount,
       stateVersion: stateVersion ?? this.stateVersion,
+      eventSequence: eventSequence ?? this.eventSequence,
       errorMessage: clearError ? null : errorMessage ?? this.errorMessage,
     );
   }
