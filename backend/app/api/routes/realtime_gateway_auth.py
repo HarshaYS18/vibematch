@@ -16,7 +16,7 @@ from app.database import get_db
 from app.models.role import RoleName
 from app.models.room import Room
 from app.models.user import User
-from app.services import inbox_realtime_command_service, role_service
+from app.services import realtime_command_service, role_service
 from app.services.ban_service import is_device_banned
 from app.services.permissions.media_room_permission_service import evaluate_media_room_permission
 
@@ -45,21 +45,22 @@ class RealtimeVerifyResponse(BaseModel):
 
 
 class RealtimeCommandRequest(BaseModel):
-    type: Literal[
-        "inbox.chat_activity",
-        "inbox.typing_start",
-        "inbox.typing_stop",
-        "inbox.mark_read",
-    ]
-    conversation_id: str = Field(min_length=1, max_length=128)
+    type: str = Field(min_length=1, max_length=80)
+    room_public_id: str | None = Field(default=None, min_length=1, max_length=32)
+    conversation_id: str | None = Field(default=None, min_length=1, max_length=128)
     activity: str | None = Field(default=None, max_length=32)
     command_id: str | None = Field(default=None, max_length=128)
+    payload: dict = Field(default_factory=dict)
 
 
 class RealtimeCommandResponse(BaseModel):
     accepted: bool = True
     command_id: str | None = None
-    conversation_id: str
+    scope: str
+    room_public_id: str | None = None
+    conversation_id: str | None = None
+    state_version: int | None = None
+    event_sequence: int | None = None
 
 
 @router.post("/verify", response_model=RealtimeVerifyResponse)
@@ -109,15 +110,17 @@ async def execute_realtime_command(
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db),
 ):
-    """Execute one allowlisted client realtime command in the authoritative API."""
-    result = await inbox_realtime_command_service.execute_inbox_realtime_command(
+    """Execute one allowlisted application command in the authoritative API."""
+    result = await realtime_command_service.execute_application_realtime_command(
         db,
         current_user,
         command_type=payload.type,
+        room_public_id=payload.room_public_id,
         conversation_id=payload.conversation_id,
         activity=payload.activity,
+        payload=payload.payload,
     )
     return RealtimeCommandResponse(
         command_id=payload.command_id,
-        conversation_id=result.conversation_id,
+        **result,
     )
