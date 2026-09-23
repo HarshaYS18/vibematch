@@ -85,7 +85,10 @@ func newRealtimeTestServer(t *testing.T) (*Server, *redis.Client, context.Cancel
 func dialRealtime(t *testing.T, wsURL string) *websocket.Conn {
 	t.Helper()
 	dialer := websocket.Dialer{Subprotocols: []string{"funkey.v2"}}
-	header := http.Header{"Authorization": []string{"Bearer valid"}}
+	header := http.Header{
+		"Authorization":         []string{"Bearer valid"},
+		"X-Realtime-Capability": []string{"valid"},
+	}
 	conn, response, err := dialer.Dial(wsURL, header)
 	if err != nil {
 		t.Fatalf("dial failed: %v (response %+v)", err, response)
@@ -107,7 +110,7 @@ func TestWebSocketAuthorizesSubscriptionsAndFansOutAllScopes(t *testing.T) {
 	defer cancel()
 	conn := dialRealtime(t, wsURL)
 
-	if err := conn.WriteJSON(map[string]any{"type": "subscribe", "room_public_id": "room-a"}); err != nil {
+	if err := conn.WriteJSON(map[string]any{"type": "subscribe", "room_public_id": "room-a", "capability": "valid"}); err != nil {
 		t.Fatal(err)
 	}
 	var ack map[string]any
@@ -134,7 +137,7 @@ func TestWebSocketAuthorizesSubscriptionsAndFansOutAllScopes(t *testing.T) {
 		}
 	}
 
-	if err := conn.WriteJSON(map[string]string{"type": "subscribe", "room_public_id": "room-b"}); err != nil {
+	if err := conn.WriteJSON(map[string]string{"type": "subscribe", "room_public_id": "room-b", "capability": "valid"}); err != nil {
 		t.Fatal(err)
 	}
 	var denial map[string]any
@@ -173,7 +176,7 @@ func TestRoomSubscriptionReplaysContiguousChunk20StreamAndWritesLease(t *testing
 	}
 
 	if err := conn.WriteJSON(map[string]any{
-		"type": "subscribe", "room_public_id": "room-a",
+		"type": "subscribe", "room_public_id": "room-a", "capability": "valid",
 		"stream": stream, "last_sequence": 0,
 	}); err != nil {
 		t.Fatal(err)
@@ -271,7 +274,10 @@ func TestWebSocketRejectsUnauthorizedTokenBeforeUpgrade(t *testing.T) {
 	defer httpServer.Close()
 	wsURL := "ws" + strings.TrimPrefix(httpServer.URL, "http") + "/ws"
 	dialer := websocket.Dialer{}
-	_, response, err := dialer.Dial(wsURL, http.Header{"Authorization": []string{"Bearer invalid"}})
+	_, response, err := dialer.Dial(wsURL, http.Header{
+		"Authorization":         []string{"Bearer invalid"},
+		"X-Realtime-Capability": []string{"invalid"},
+	})
 	if err == nil || response == nil || response.StatusCode != http.StatusUnauthorized {
 		t.Fatalf("expected unauthorized upgrade, got response %+v, error %v", response, err)
 	}
