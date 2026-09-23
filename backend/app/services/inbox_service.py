@@ -455,6 +455,74 @@ def message_statuses_for_user(
     return statuses
 
 
+def ensure_family_conversation(
+    db: Session,
+    *,
+    family_id: int,
+    title: str,
+    member_user_ids: list[int],
+) -> InboxConversation:
+    """Synchronize one family chat through the Inbox write authority."""
+
+    public_id = f"family_chat_{int(family_id)}"
+    safe_title = (title or f"Family {family_id}").strip()[:120] or f"Family {family_id}"
+    desired_members = {int(user_id) for user_id in member_user_ids if int(user_id) > 0}
+
+    conversation = (
+        db.query(InboxConversation)
+        .filter(InboxConversation.public_id == public_id)
+        .first()
+    )
+    if conversation is None:
+        conversation = InboxConversation(
+            public_id=public_id,
+            title=safe_title,
+            avatar_text=_avatar_text(safe_title),
+            conversation_type=InboxConversationType.FAMILY.value,
+            is_official=False,
+            metadata_json={"family_id": int(family_id), "colors": DEFAULT_COLORS},
+        )
+        db.add(conversation)
+        db.flush()
+
+    changed = False
+    existing = {item.user_id: item for item in conversation.participants}
+    for user_id in desired_members:
+        participant = existing.get(user_id)
+        if participant is None:
+            db.add(
+                InboxParticipant(
+                    conversation_id=conversation.id,
+                    user_id=user_id,
+                )
+            )
+            changed = True
+        elif participant.is_deleted_for_user:
+            participant.is_deleted_for_user = False
+            db.add(participant)
+            changed = True
+
+    for user_id, participant in existing.items():
+        if user_id not in desired_members and not participant.is_deleted_for_user:
+            participant.is_deleted_for_user = True
+            db.add(participant)
+            changed = True
+
+    if conversation.title != safe_title:
+        conversation.title = safe_title
+        conversation.avatar_text = _avatar_text(safe_title)
+        changed = True
+    if conversation.conversation_type != InboxConversationType.FAMILY.value:
+        conversation.conversation_type = InboxConversationType.FAMILY.value
+        changed = True
+    if changed:
+        conversation.updated_at = datetime.utcnow()
+    db.add(conversation)
+    db.commit()
+    db.refresh(conversation)
+    return conversation
+
+
 def create_direct_conversation(db: Session, current_user: User, target_user: User) -> InboxConversation:
     _merge_duplicate_direct_conversations_for_user(db, current_user)
 
