@@ -20,6 +20,12 @@ class RoomSessionRepository extends StateNotifier<RoomSessionState> {
   final AppNetworkClient _networkClient;
   final String? Function() _accessTokenProvider;
 
+  /// Read-only snapshot for compatibility adapters during the Chunk 21 cutover.
+  ///
+  /// RoomSessionRepository remains the single mutable room-session authority;
+  /// callers can inspect the current state but cannot assign StateNotifier.state.
+  RoomSessionState get currentState => state;
+
   Future<RoomSessionState> join({String? lockPassword}) async {
     state = state.copyWith(
       connection: RoomSessionConnection.joining,
