@@ -11,7 +11,6 @@ from sqlalchemy.orm import Session
 from app.api.routes import room_realtime_commands
 from app.models.user import User
 from app.realtime.connection_manager import room_realtime_connections
-from app.services import inbox_realtime_command_service
 from app.services.rooms import room_permission_service
 
 
@@ -78,15 +77,7 @@ ROOM_EPHEMERAL_COMMANDS = frozenset({
     "room_music/producer_started_external",
 })
 
-INBOX_REALTIME_COMMANDS = frozenset(
-    inbox_realtime_command_service.ALLOWED_INBOX_REALTIME_COMMANDS
-)
-
-APPLICATION_REALTIME_COMMANDS = (
-    ROOM_REALTIME_COMMANDS
-    | ROOM_EPHEMERAL_COMMANDS
-    | INBOX_REALTIME_COMMANDS
-)
+APPLICATION_REALTIME_COMMANDS = ROOM_REALTIME_COMMANDS | ROOM_EPHEMERAL_COMMANDS
 
 
 def _room_db_sqlstate(exc: OperationalError) -> str:
@@ -149,21 +140,6 @@ async def execute_application_realtime_command(
     command = str(command_type or "").strip()
     if command not in APPLICATION_REALTIME_COMMANDS:
         raise HTTPException(status_code=422, detail="Unsupported realtime command")
-
-    if command in INBOX_REALTIME_COMMANDS:
-        if not conversation_id or not conversation_id.strip():
-            raise HTTPException(status_code=422, detail="conversation_id is required")
-        result = await inbox_realtime_command_service.execute_inbox_realtime_command(
-            db,
-            user,
-            command_type=command,
-            conversation_id=conversation_id,
-            activity=activity,
-        )
-        return {
-            "scope": "inbox",
-            "conversation_id": result.conversation_id,
-        }
 
     room_id = str(room_public_id or "").strip()
     if not room_id:
