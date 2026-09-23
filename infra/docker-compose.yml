@@ -139,6 +139,10 @@ services:
       MEDIA_REGISTRY_REDIS_URL: redis://media-redis:6379/0
       JWT_SECRET_KEY: local-development-only-secret-change-before-production
       MEDIA_INTERNAL_TOKEN: local-development-only-media-token-change-me
+      INBOX_SERVICE_URL: http://inbox:8083/api/v1
+      INBOX_REALTIME_TRANSPORT: nats
+      INBOX_NATS_SUBJECT: funkey.events.inbox.realtime
+      NATS_URL: nats://nats:4222
       CORS_ALLOWED_ORIGINS: http://localhost:3000,http://localhost:8080
       ENABLE_DEV_LOGIN: "true"
     depends_on:
@@ -154,6 +158,22 @@ services:
       pgbouncer: {condition: service_healthy}
       cache-redis: {condition: service_healthy}
 
+  inbox:
+    profiles: ["app"]
+    build: {context: .., dockerfile: apps/inbox-service/Dockerfile}
+    environment:
+      <<: *api_environment
+      DB_APPLICATION_NAME: funkey-inbox
+      INBOX_DATABASE_URL: postgresql://funkey:funkey_dev_only@pgbouncer:6432/funkey
+      INBOX_REALTIME_TRANSPORT: nats
+      NATS_URL: nats://nats:4222
+    ports: ["127.0.0.1:8083:8083"]
+    depends_on:
+      migrate: {condition: service_completed_successfully}
+      pgbouncer: {condition: service_healthy}
+      nats: {condition: service_healthy}
+      realtime-redis: {condition: service_healthy}
+
   realtime:
     profiles: ["app"]
     build: {context: .., dockerfile: apps/realtime-gateway/Dockerfile}
@@ -161,6 +181,8 @@ services:
       REALTIME_LISTEN_ADDR: :8081
       REALTIME_AUTH_VERIFY_URL: http://api:8000/api/v1/realtime/verify
       REALTIME_REDIS_URL: redis://realtime-redis:6379/0
+      REALTIME_NATS_URL: nats://nats:4222
+      REALTIME_NATS_INBOX_SUBJECT: funkey.events.inbox.realtime
       REALTIME_ORIGINS: http://localhost:3000,http://localhost:8080
       REALTIME_NODE_ID: realtime-local-1
       REALTIME_DRAIN_TIMEOUT: 30s
@@ -168,6 +190,7 @@ services:
     depends_on:
       api: {condition: service_started}
       realtime-redis: {condition: service_healthy}
+      nats: {condition: service_healthy}
 
   worker:
     profiles: ["app"]
