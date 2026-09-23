@@ -2,92 +2,95 @@
 
 ## Purpose
 
-Owns durable conversations, messages, participant state, calls, and inbox preferences.
+The Inbox Service is the exclusive durable authority for chat conversations, participants, messages, read receipts, unread counters, per-user mute/pin/archive state, chat preferences, Inbox reports/locks/backups, and Inbox call sessions.
 
-## Responsibilities
+## Deployable
 
-The module owns inbox_conversations, inbox_participants, inbox_messages, call_sessions, call_participants. Routes should validate input and delegate business decisions to services.
+Production deployable: `apps/inbox-service/` (`funkey-inbox`).
 
-## What this module owns
+The core API does not mount Inbox chat implementation routes. It retains a compatibility proxy for rollback/local development, while production ingress routes Inbox paths directly to `funkey-inbox`.
 
-inbox_conversations, inbox_participants, inbox_messages, call_sessions, call_participants.
-
-## What this module does NOT own
-
-This module does not own SFU transport state, edge routing, or client UI state.
+Stories remain on the social/core boundary until the later Vibes/Profile ownership chunks.
 
 ## Source of truth
 
-PostgreSQL is the durable source of truth for inbox_conversations, inbox_participants, inbox_messages, call_sessions, call_participants.
+PostgreSQL is durable authority. The production Inbox login is a member of `funkey_inbox_runtime`; the owned tables are held by the NOLOGIN `funkey_inbox_owner` role. See `deploy/postgres/inbox-ownership.sql`.
+
+Redis is only ephemeral presence/transport state. NATS carries transient realtime delivery to the Go application gateway; loss of a realtime event is recovered by refetching bounded REST state.
+
+## Read contract
+
+- conversation lists use keyset cursors;
+- conversation payloads contain at most the bounded active message window;
+- older messages use a message cursor;
+- ordinary GETs do not bootstrap, repair, mark-read, reopen Secret Drift, or otherwise mutate state;
+- read receipts use explicit mutation commands/endpoints.
+
+The default active message window is 50 and public page sizes are capped at 100.
+
+## Realtime
+
+The write path is:
+
+`Inbox commit -> NATS subject funkey.events.inbox.realtime -> Go realtime gateway -> connected clients`.
+
+Socket commands such as typing/activity/read travel:
+
+`Flutter -> one Go application socket -> Inbox realtime command endpoint`.
+
+Go owns transport only. It never owns Inbox persistence.
+
+## Internal service boundary
+
+Other domains must not import Inbox ORM models to write them. They use the authenticated internal Inbox API through `backend/app/services/inbox_service_client.py`. The shared `INBOX_INTERNAL_TOKEN` is supplied by the secret manager to core and Inbox workloads; it is never stored in Git.
+
+Current adapters cover family chat, Vibe mention messages, media-expiry placeholders, media-safety team messages, and relationship-card messages.
+
+## Database ownership
+
+Owned tables:
+
+- inbox_conversations
+- inbox_participants
+- inbox_messages
+- inbox_read_receipts
+- inbox_reports
+- inbox_lock_settings / inbox_lock_otps
+- inbox_user_preferences
+- inbox_conversation_user_settings
+- inbox_message_user_states
+- inbox_backup_settings / inbox_backup_jobs
+- call_sessions / call_participants
+
+The Inbox runtime receives read-only access to identity context needed to authenticate and render users. It does not own users or roles.
+
+## Failure behavior
+
+If realtime delivery is missed, clients recover via REST cursors. If the Inbox service is unavailable, core adapters return a bounded failure or keep the already-committed owning-domain state and rely on later reconciliation; they must never fall back to direct Inbox table writes.
+
+## Deployment
+
+1. Apply Alembic through revision `20260923_0310` or later.
+2. Run `deploy/postgres/inbox-ownership.sql` with an administrative/migration role.
+3. Provision a production Inbox login externally and grant it `funkey_inbox_runtime`.
+4. Put `INBOX_DATABASE_URL` only in `funkey-inbox-secrets`.
+5. Put the same strong `INBOX_INTERNAL_TOKEN` in core API and Inbox secrets.
+6. Configure NATS and Go realtime Inbox subject/command routes.
+7. Deploy Inbox before moving ingress traffic.
+8. Verify `/live`, `/ready`, cursor reads, send/read flows, NATS fanout, and rollback proxy.
 
 ## Important files
 
-`backend/app/services/inbox_service.py`, `backend/app/services/inbox_call_service.py`, `backend/app/api/routes/inbox.py`.
-
-## Public API/contracts
-
-/api/v1/inbox and calls routes; inbox WebSocket route. Preserve deployed request and response shapes while migrating implementation.
-
-## Events published
-
-Current code may emit domain WebSocket updates after committed writes. A versioned broker event for this domain must be added only with a contract and transactional publication path; do not claim every proposed event is live. Consumers must handle duplicates and refetch a snapshot after a gap.
-
-## Events consumed
-
-No durable broker consumer is implied by this ownership guide. Add a consumer only with a versioned contract, idempotency, retry limits, and an integration test.
-
-## Database tables/state owned
-
-Database tables and state: `inbox_conversations, inbox_participants, inbox_messages, call_sessions, call_participants`.
-
-## Redis keys/state owned
-
-Transient typing/fanout only; messages stay in PostgreSQL.
-
-## Dependencies
-
-Depends on FastAPI authentication, SQLAlchemy transaction/session handling, and the relevant domain services.
-
-## Security considerations
-
-Recipient eligibility, blocks, call participation, and attachment authorization are server decisions. Never log tokens, OTPs, or payment secrets.
-
-## Failure modes
-
-On missed delivery, clients reload conversation history and unread state.
-
-## Retry/idempotency behavior
-
-Reads and writes should use bounded timeouts. Retries are safe only for read operations or writes backed by an idempotency key and known commit outcome.
-
-## Scaling behavior
-
-Scale stateless API replicas only within the PostgreSQL connection budget.
-
-## Autoscaling metrics
-
-Track route request rate, p95 latency, error rate, transaction latency, DB pool use, and domain-specific rejection counts. Trace commands through commit and fanout with a request ID; avoid user PII in metric labels.
-
-## Observability
-
-Trace commands through commit and fanout with a request ID; avoid user PII in metric labels.
-
-## Local development
-
-Start dependencies with `.\\scripts\\dev-up.ps1`, then run affected backend tests with `python -m unittest discover -s backend/tests -p test_*.py` from the repository root with the backend import path configured, or use the test command in the root README.
-
-## Testing
-
-Add a regression test for authorization, transaction outcome, and duplicate/reconnect behavior when relevant.
-
-## Deployment notes
-
-Apply Alembic first; roll out compatible API behavior; check readiness and error metrics.
+- `apps/inbox-service/main.py`
+- `apps/inbox-service/database.py`
+- `apps/inbox-service/internal.py`
+- `apps/inbox-service/realtime.py`
+- `backend/app/services/inbox_service.py`
+- `backend/app/api/routes/inbox.py`
+- `backend/app/api/routes/inbox_proxy.py`
+- `deploy/postgres/inbox-ownership.sql`
+- `docs/architecture/inbox-service.md`
 
 ## Change checklist
 
-Before changing this module: identify the owning table and contract, add an additive migration if needed, preserve Flutter compatibility, verify permission checks, and document rollback.
-
-## Known migration status
-
-Existing FastAPI domain; worker delivery is a future boundary.
+Preserve one durable writer, bounded reads, explicit mutation endpoints, backward-compatible public response fields, NATS -> Go delivery, and service-local DB credentials. Any new cross-domain Inbox write requires a service contract rather than a shared ORM import.
