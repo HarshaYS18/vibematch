@@ -8,6 +8,7 @@ from app.models.special_permission import SpecialPermissionName
 from app.models.user import User
 from app.models.user_ban import BanSource, BanType, UserBan
 from app.services.role_service import get_primary_role
+from app.services.realtime_revocation_service import publish_session_revoked
 from app.services.special_permission_service import has_active_special_permission
 
 
@@ -125,6 +126,7 @@ def create_user_ban(
     db.add(user)
     db.commit()
     db.refresh(ban)
+    publish_session_revoked(user.id, reason="user_banned")
 
     return ban
 
@@ -163,6 +165,12 @@ def create_device_ban(
     db.add(device_ban)
     db.commit()
     db.refresh(device_ban)
+    if user_id is not None:
+        publish_session_revoked(
+            user_id,
+            reason="device_banned",
+            device_id=device_id,
+        )
 
     return device_ban
 
