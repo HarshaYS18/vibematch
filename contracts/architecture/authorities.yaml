@@ -228,6 +228,7 @@
       "current_deployable": "core-api",
       "current_storage": [
         "postgres:room_participants",
+        "postgres:room_member_requests",
         "postgres:room_kickouts"
       ],
       "target_storage": [
@@ -275,7 +276,8 @@
       "logical_owner": "room-control",
       "current_deployable": "core-api",
       "current_storage": [
-        "postgres:room_seat_states"
+        "postgres:room_seat_states",
+        "postgres:room_seat_applications"
       ],
       "target_storage": [
         "room-control service postgres"
@@ -342,16 +344,17 @@
       "domain": "presence",
       "classification": "EPHEMERAL",
       "logical_owner": "realtime",
-      "current_deployable": "core-api compatibility path",
+      "current_deployable": "core-api realtime compatibility + Go gateway",
       "current_storage": [
-        "postgres/user_room_presence + heartbeat compatibility behavior",
-        "process/socket state"
+        "redis/valkey TTL socket/presence leases",
+        "postgres:user_room_presence lifecycle/checkpoint compatibility"
       ],
       "target_storage": [
         "redis/valkey TTL socket/presence leases owned by Go realtime"
       ],
       "mutated_by": [
-        "room presence compatibility services"
+        "realtime connection managers",
+        "room presence lifecycle services"
       ],
       "source_states": [
         "rooms.membership"
@@ -363,7 +366,7 @@
         "status": "planned",
         "name": "presence.updated.v2"
       },
-      "migration_status": "P0 migration Chunk 20/21"
+      "migration_status": "Chunk 20 Redis lease live; Chunk 21 application socket convergence pending"
     },
     {
       "id": "realtime.connection_routing",
