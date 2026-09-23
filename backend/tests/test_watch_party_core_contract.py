@@ -104,7 +104,7 @@ class WatchPartyCoreContractTests(unittest.TestCase):
             "/rooms/{room_public_id}/realtime/watch-party/command",
             writes,
         )
-        self.assertIn("/ws/room-realtime", room.realtime_channels)
+        self.assertIn("/ws", room.realtime_channels)
 
 
 if __name__ == "__main__":
