@@ -22,6 +22,9 @@ type Config struct {
 	RedisPoolTimeout       time.Duration
 	RedisReadTimeout       time.Duration
 	RedisWriteTimeout      time.Duration
+	NATSURL                string
+	NATSInboxSubject       string
+	NATSEnabled            bool
 	NodeID                 string
 	Origins                map[string]struct{}
 	DrainTimeout           time.Duration
@@ -97,6 +100,12 @@ func LoadConfig() (Config, error) {
 		MaxConnections:         10000,
 		MaxConnectionsPerUser:  4,
 	}
+	cfg.NATSURL = strings.TrimSpace(os.Getenv("REALTIME_NATS_URL"))
+	cfg.NATSEnabled = cfg.NATSURL != ""
+	cfg.NATSInboxSubject = env(
+		"REALTIME_NATS_INBOX_SUBJECT",
+		"funkey.events.inbox.realtime",
+	)
 	if cfg.AuthVerifyURL == "" {
 		return cfg, errors.New("REALTIME_AUTH_VERIFY_URL is required")
 	}
@@ -160,6 +169,12 @@ func LoadConfig() (Config, error) {
 		}
 		if strings.TrimSpace(os.Getenv("REALTIME_REDIS_URL")) == "" {
 			return cfg, errors.New("REALTIME_REDIS_URL is required in production")
+		}
+		if !cfg.NATSEnabled {
+			return cfg, errors.New("REALTIME_NATS_URL is required in production")
+		}
+		if strings.TrimSpace(cfg.NATSInboxSubject) == "" {
+			return cfg, errors.New("REALTIME_NATS_INBOX_SUBJECT is required in production")
 		}
 	}
 	return cfg, nil
