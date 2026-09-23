@@ -9,7 +9,6 @@ from app.api.routes.users import get_current_user
 from app.database import get_db
 from app.models.cdn_media import CdnMediaLinkedEntityType
 from app.models.follow import UserFollow
-from app.models.inbox import InboxMessageType
 from app.models.user import User
 from app.models.vibe import VibeComment, VibeCommentReaction, VibePost, VibeReaction, VibeReport, VibeSave, VibeShare
 from app.schemas.vibes import (
@@ -32,7 +31,7 @@ from app.schemas.vibes import (
     VibeShareCreateRequest,
     VibeShareResponse,
 )
-from app.services import cdn_media_service, inbox_service, notification_service
+from app.services import cdn_media_service, inbox_service_client, notification_service
 
 router = APIRouter(prefix="/vibes", tags=["Vibes"])
 admin_router = APIRouter(prefix="/admin/moderation/vibes", tags=["Admin Vibes"])
@@ -173,10 +172,17 @@ def _followers_for_mention_all(db: Session, current_user: User) -> list[User]:
 
 
 def _send_direct_mention_inbox_snapshot(db: Session, post: VibePost, sender: User, recipient: User, caption_preview: str) -> None:
-    conversation = inbox_service.create_direct_conversation(db, sender, recipient)
+    del db
     text = f"Mentioned you in a Vibe\n\n{caption_preview}\n\nVibe ID: {post.id}"
-    message_type = InboxMessageType.IMAGE.value if post.media_type == "photo" and post.media_url else InboxMessageType.TEXT.value
-    inbox_service.send_message(db=db, conversation=conversation, sender=sender, text=text, message_type=message_type, attachment_url=post.media_url)
+    message_type = "image" if post.media_type == "photo" and post.media_url else "text"
+    inbox_service_client.send_direct_message(
+        sender_user_id=sender.id,
+        target_user_id=recipient.id,
+        text=text,
+        message_type=message_type,
+        attachment_url=post.media_url,
+        metadata={"vibe_post_id": post.id, "source": "vibe_mention"},
+    )
 
 
 def _send_vibe_notifications(db: Session, post: VibePost, current_user: User, mentions: list[str], uses_mention_all: bool) -> None:
