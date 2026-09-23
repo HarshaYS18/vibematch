@@ -49,6 +49,47 @@ class ProductionConfigTests(TestCase):
         with self.assertRaisesRegex(RuntimeError, "DB_API_CONNECTION_BUDGET"):
             Settings(**safe, DB_POOL_SIZE=10, DB_API_CONNECTION_BUDGET=100, _env_file=None).validate_production()
 
+    def test_transaction_pooling_requires_direct_migration_url_and_bounded_topology(self):
+        safe = dict(
+            APP_ENV="production", JWT_SECRET_KEY="j" * 40,
+            MEDIA_INTERNAL_TOKEN="m" * 40, INBOX_BACKUP_ENCRYPTION_KEY="b" * 40,
+            GOOGLE_AUTH_CLIENT_IDS="client.apps.googleusercontent.com",
+            CORS_ALLOWED_ORIGINS="https://funkey.example",
+            MEDIA_STORAGE_DRIVER="s3", MEDIA_S3_BUCKET="bucket",
+            MEDIA_CDN_BASE_URL="https://cdn.funkey.example", RATE_LIMIT_ENABLED=True,
+            database_url="postgresql://funkey:strong-secret@pgbouncer.internal:6432/funkey",
+            MIGRATION_DATABASE_URL="postgresql://funkey_migrate:strong-secret@postgres.internal:5432/funkey",
+            DB_POOLER_MODE="transaction",
+            redis_url="rediss://cache.internal:6379/0",
+        )
+        settings_obj = Settings(**safe, _env_file=None)
+        settings_obj.validate_production()
+        self.assertEqual(
+            "postgresql://funkey_migrate:strong-secret@postgres.internal:5432/funkey",
+            settings_obj.migration_database_url,
+        )
+        self.assertEqual(180, settings_obj.expected_pooler_client_connections)
+
+        with self.assertRaisesRegex(RuntimeError, "MIGRATION_DATABASE_URL"):
+            Settings(
+                **{**safe, "MIGRATION_DATABASE_URL": safe["database_url"]},
+                _env_file=None,
+            ).validate_production()
+        with self.assertRaisesRegex(RuntimeError, "DB_POOLER_MAX_CLIENT_CONNECTIONS"):
+            Settings(
+                **safe,
+                DB_POOLER_MAX_CLIENT_CONNECTIONS=100,
+                _env_file=None,
+            ).validate_production()
+        with self.assertRaisesRegex(RuntimeError, "DB_SERVER_CONNECTION_LIMIT"):
+            Settings(
+                **safe,
+                DB_POOLER_MAX_SERVER_CONNECTIONS=140,
+                DB_DIRECT_CONNECTION_RESERVE=40,
+                DB_SERVER_CONNECTION_LIMIT=160,
+                _env_file=None,
+            ).validate_production()
+
 
 class IdentityAllocationTests(TestCase):
     def test_non_postgres_public_ids_expand_capacity_and_keep_prefix(self):
