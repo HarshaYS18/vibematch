@@ -10,6 +10,9 @@ images:
   - name: funkey-api
     newName: ghcr.io/harshays18/vibematch/funkey-api
     digest: sha256:0000000000000000000000000000000000000000000000000000000000000000
+  - name: funkey-inbox
+    newName: ghcr.io/harshays18/vibematch/funkey-inbox
+    digest: sha256:0000000000000000000000000000000000000000000000000000000000000000
   - name: funkey-worker
     newName: ghcr.io/harshays18/vibematch/funkey-worker
     digest: sha256:0000000000000000000000000000000000000000000000000000000000000000
