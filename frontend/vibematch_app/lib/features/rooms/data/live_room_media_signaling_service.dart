@@ -505,9 +505,8 @@ class LiveRoomMediaSignalingService with WidgetsBindingObserver {
   Future<void> leaveRoom() async {
     _shouldStayConnected = false;
     _seatAuthorityGate.cancelPendingSeat();
-    if (_appRealtimeHub.isConnected && _joined) {
-      _send('room/leave', <String, Object?>{});
-    }
+    // RoomSessionRepository owns the durable room/leave mutation. This facade
+    // only tears down the shared room subscription and media plane.
     final leavingRoomId = _roomId;
     if (leavingRoomId != null && leavingRoomId.trim().isNotEmpty) {
       _appRealtimeHub.unsubscribeRoom(leavingRoomId);
