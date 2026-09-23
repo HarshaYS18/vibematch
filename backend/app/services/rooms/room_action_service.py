@@ -344,6 +344,13 @@ def heartbeat_room(db: Session, room: Room, user: User) -> dict[str, Any]:
 
 def leave_room(db: Session, room: Room, user: User, release_seat: bool = False) -> dict[str, Any]:
     deactivate_user_in_room(db, room, user.id, release_seats=release_seat)
+    _resolve_seat_applications(
+        db,
+        room,
+        user.id,
+        status="cancelled",
+        decided_by_user_id=user.id,
+    )
     record_room_event(db, room, "room.left", actor_user_id=user.id, payload={"release_seat": release_seat})
     watch_party_service.ensure_controller_after_departure(db, room, user.id)
     room_activity_service.ensure_controller_after_departure(db, room, user.id)
@@ -359,7 +366,17 @@ def request_room_membership(db: Session, room: Room, user: User) -> dict[str, An
         return room_snapshot(db, room)
     if _has_pending_room_member_request(db, room, user.id):
         return room_snapshot(db, room)
-    record_room_event(db, room, "room.member_request.pending", actor_user_id=user.id, target_user_id=room.owner_user_id, payload={"status": "pending"})
+    event = record_room_event(db, room, "room.member_request.pending", actor_user_id=user.id, target_user_id=room.owner_user_id, payload={"status": "pending"})
+    db.flush()
+    db.add(
+        RoomMemberRequest(
+            room_id=room.id,
+            requester_user_id=user.id,
+            status="pending",
+            source_event_id=event.id,
+            requested_at=datetime.utcnow(),
+        )
+    )
     db.flush()
     return room_snapshot(db, room)
 
@@ -370,6 +387,13 @@ def approve_room_membership(db: Session, room: Room, actor: User, target: User) 
     participant = _ensure_room_participant(db, room, target)
     participant.is_member = True
     participant.member_added_at = datetime.utcnow()
+    _resolve_room_member_requests(
+        db,
+        room,
+        target.id,
+        status="approved",
+        decided_by_user_id=actor.id,
+    )
     record_room_event(db, room, "room.member_request.approved", actor_user_id=actor.id, target_user_id=target.id, payload={"status": "room_member"})
     db.flush()
     return room_snapshot(db, room)
@@ -381,6 +405,13 @@ def reject_room_membership(db: Session, room: Room, actor: User, target: User) -
     participant = _ensure_room_participant(db, room, target)
     if not participant.is_member:
         participant.member_added_at = None
+    _resolve_room_member_requests(
+        db,
+        room,
+        target.id,
+        status="rejected",
+        decided_by_user_id=actor.id,
+    )
     record_room_event(db, room, "room.member_request.rejected", actor_user_id=actor.id, target_user_id=target.id, payload={"status": "rejected"})
     db.flush()
     return room_snapshot(db, room)
@@ -395,6 +426,13 @@ def remove_room_member(db: Session, room: Room, actor: User, target: User) -> di
     if participant:
         participant.is_member = False
         participant.member_added_at = None
+    _resolve_room_member_requests(
+        db,
+        room,
+        target.id,
+        status="removed",
+        decided_by_user_id=actor.id,
+    )
     record_room_event(db, room, "room.member.removed", actor_user_id=actor.id, target_user_id=target.id, payload={"status": "removed"})
     db.flush()
     return room_snapshot(db, room)
@@ -435,6 +473,21 @@ def take_seat(
             seat.occupied_at = now
             seat.left_at = None
             seat.updated_by_user_id = actor_user_id or user.id
+    _resolve_seat_applications(
+        db,
+        room,
+        user.id,
+        status="accepted",
+        decided_by_user_id=actor_user_id or user.id,
+        seat_index=seat_index,
+    )
+    _resolve_seat_applications(
+        db,
+        room,
+        user.id,
+        status="superseded",
+        decided_by_user_id=actor_user_id or user.id,
+    )
     record_room_event(db, room, "seat.taken", actor_user_id=actor_user_id or user.id, target_user_id=user.id, payload={"seat_index": seat_index})
     db.flush()
     return room_snapshot(db, room)
@@ -499,8 +552,21 @@ def request_seat_application(db: Session, room: Room, user: User, seat_index: in
         return room_snapshot(db, room)
     now = datetime.utcnow()
     expires_at = now + timedelta(seconds=SEAT_APPLICATION_EXPIRY_SECONDS)
-    event_id = f"seat_application_{room.room_public_id}_{user.id}_{seat_index}_{int(now.timestamp() * 1000)}"
-    record_room_event(db, room, "seat.application.requested", actor_user_id=user.id, target_user_id=room.owner_user_id, payload={"id": event_id, "seat_index": seat_index, "created_at": now.isoformat(), "expires_at": expires_at.isoformat()})
+    application_id = f"seat_application_{room.room_public_id}_{user.id}_{seat_index}_{int(now.timestamp() * 1000)}"
+    event = record_room_event(db, room, "seat.application.requested", actor_user_id=user.id, target_user_id=room.owner_user_id, payload={"id": application_id, "seat_index": seat_index, "created_at": now.isoformat(), "expires_at": expires_at.isoformat()})
+    db.flush()
+    db.add(
+        RoomSeatApplication(
+            application_id=application_id,
+            room_id=room.id,
+            applicant_user_id=user.id,
+            seat_index=seat_index,
+            status="pending",
+            source_event_id=event.id,
+            requested_at=now,
+            expires_at=expires_at,
+        )
+    )
     db.flush()
     return room_snapshot(db, room)
 
@@ -508,6 +574,14 @@ def request_seat_application(db: Session, room: Room, user: User, seat_index: in
 def reject_seat_application(db: Session, room: Room, actor: User, target: User, seat_index: int) -> dict[str, Any]:
     if not _is_room_manager(db, room, actor):
         return room_snapshot(db, room)
+    _resolve_seat_applications(
+        db,
+        room,
+        target.id,
+        status="rejected",
+        decided_by_user_id=actor.id,
+        seat_index=seat_index,
+    )
     record_room_event(db, room, "seat.application.rejected", actor_user_id=actor.id, target_user_id=target.id, payload={"seat_index": seat_index})
     db.flush()
     return room_snapshot(db, room)
@@ -538,6 +612,20 @@ def kick_user(db: Session, room: Room, actor: User, target: User, reason: str = 
         room_public_id=room.room_public_id,
         target=target,
         actor_user_id=actor.id,
+    )
+    _resolve_room_member_requests(
+        db,
+        room,
+        target.id,
+        status="rejected",
+        decided_by_user_id=actor.id,
+    )
+    _resolve_seat_applications(
+        db,
+        room,
+        target.id,
+        status="cancelled",
+        decided_by_user_id=actor.id,
     )
     record_room_event(db, room, "room.user.kicked", actor_user_id=actor.id, target_user_id=target.id, payload={"reason": reason, "duration": duration})
     watch_party_service.ensure_controller_after_departure(db, room, target.id)
