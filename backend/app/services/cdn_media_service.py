@@ -12,9 +12,8 @@ from app.models.cdn_media import (
     CdnMediaUploadStatus,
     MediaSafetySetting,
 )
-from app.models.inbox import InboxMessage
 from app.models.user import User
-from app.services import media_storage_service
+from app.services import inbox_service_client, media_storage_service
 from app.services.audit_log_service import create_admin_log
 
 
@@ -201,20 +200,23 @@ def mark_media_deleted(db: Session, *, asset: CdnMediaAsset, actor_user_id: int 
     return asset
 
 
-def _expire_inbox_message_references(db: Session, asset: CdnMediaAsset, now: datetime) -> int:
-    messages = db.query(InboxMessage).filter(InboxMessage.attachment_url == asset.public_url).all()
-    updated = 0
-    for message in messages:
-        metadata = dict(message.metadata_json or {})
-        metadata["media_expired"] = True
-        metadata["expired_media_url"] = asset.public_url
-        metadata["expired_media_id"] = asset.public_id
-        metadata["media_expired_at"] = now.isoformat()
-        metadata["local_first_allowed"] = True
-        message.metadata_json = metadata
-        db.add(message)
-        updated += 1
-    return updated
+def _expire_inbox_message_references(
+    db: Session,
+    asset: CdnMediaAsset,
+    now: datetime,
+) -> int:
+    del db
+    try:
+        return inbox_service_client.mark_media_expired(
+            attachment_url=asset.public_url,
+            media_id=asset.public_id,
+            expired_at=now.isoformat(),
+            local_first_allowed=True,
+        )
+    except inbox_service_client.InboxServiceUnavailable:
+        # Media cleanup remains retryable and must not reacquire write access
+        # to Inbox tables merely because the Inbox service is unavailable.
+        return 0
 
 
 def expire_due_inbox_media(db: Session, *, limit: int = 100, actor_user_id: int | None = None) -> dict:
