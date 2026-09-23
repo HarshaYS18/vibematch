@@ -16,6 +16,7 @@ type Config struct {
 	CapabilityAudience     string
 	CapabilityTokenVersion int
 	CommandURL             string
+	InboxCommandURL        string
 	CommandTimeout         time.Duration
 	RedisURL               string
 	RedisPoolSize          int
@@ -115,6 +116,7 @@ func LoadConfig() (Config, error) {
 	if cfg.CommandURL == "" {
 		cfg.CommandURL = strings.TrimSuffix(cfg.AuthVerifyURL, "/verify") + "/command"
 	}
+	cfg.InboxCommandURL = strings.TrimSpace(os.Getenv("REALTIME_INBOX_COMMAND_URL"))
 
 	var err error
 	if cfg.CapabilityTokenVersion, err = positiveIntEnv(
@@ -169,6 +171,9 @@ func LoadConfig() (Config, error) {
 		}
 		if strings.TrimSpace(os.Getenv("REALTIME_REDIS_URL")) == "" {
 			return cfg, errors.New("REALTIME_REDIS_URL is required in production")
+		}
+		if cfg.InboxCommandURL == "" {
+			return cfg, errors.New("REALTIME_INBOX_COMMAND_URL is required in production")
 		}
 		if !cfg.NATSEnabled {
 			return cfg, errors.New("REALTIME_NATS_URL is required in production")
