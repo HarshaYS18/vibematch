@@ -13,7 +13,7 @@ Edge TLS and load balancer          TURN / SFU network path
   +--> FastAPI core control plane        +--> backend_media (mediasoup)
   |      |                                      ^
   |      +--> PostgreSQL (durable truth)        | internal authorization
-  |      +--> Redis/Valkey (ephemeral state) ---+
+  |      +--> Redis/Valkey roles (cache / realtime / media registry) ---+
   |      +--> object storage / CDN
   |
   +--> Go realtime gateway (incremental migration target)
@@ -47,7 +47,7 @@ The supported Windows workflow uses PowerShell and Docker Desktop; Kubernetes is
 .\scripts\dev-status.ps1
 ```
 
-The startup script starts local PostgreSQL and Redis, applies Alembic migrations, and launches FastAPI plus `backend_media`. See [local development](docs/local-development.md) for ports, overrides, client setup, and safe shutdown. Where a new event broker or worker is enabled, follow its module guide and local Compose configuration.
+The startup script starts local PostgreSQL plus isolated cache, realtime, and media-registry Redis roles, applies Alembic migrations, and launches FastAPI plus `backend_media`. See [local development](docs/local-development.md) for ports, overrides, client setup, and safe shutdown. Where a new event broker or worker is enabled, follow its module guide and local Compose configuration.
 
 ## Validation and schema changes
 
@@ -75,7 +75,7 @@ Room commands and snapshots are registered by `backend/app/api/router.py`; `back
 
 ## Operations and deployment
 
-Deploy API, realtime, workers, and media as separately scalable workloads as their implementations become ready. Production needs private PostgreSQL and Redis, object storage and CDN, TURN, TLS ingress, secret management, monitoring, backups, and a tested migration job. A Kubernetes manifest or Terraform configuration alone does not prove capacity. Use [capacity planning](docs/architecture/capacity-model.md), [deployment sequence](docs/architecture/deployment.md), and the [runbooks](docs/runbooks/README.md). External account and credential requirements are listed in [external prerequisites](docs/EXTERNAL_PREREQUISITES.md).
+Deploy API, realtime, workers, and media as separately scalable workloads as their implementations become ready. Production needs private PostgreSQL/PgBouncer and three isolated HA Redis/Valkey roles, object storage and CDN, TURN, TLS ingress, secret management, monitoring, backups, and a tested migration job. A Kubernetes manifest or Terraform configuration alone does not prove capacity. Use [capacity planning](docs/architecture/capacity-model.md), [deployment sequence](docs/architecture/deployment.md), and the [runbooks](docs/runbooks/README.md). External account and credential requirements are listed in [external prerequisites](docs/EXTERNAL_PREREQUISITES.md).
 
 ## Contributing
 
