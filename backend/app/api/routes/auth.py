@@ -18,6 +18,7 @@ from app.services.audit_log_service import AuditAction, create_login_security_lo
 from app.services.ban_service import is_device_banned
 from app.services.identity_service import generate_public_user_id
 from app.services.login_history_service import create_login_history
+from app.services.realtime_revocation_service import publish_session_revoked
 from app.services.role_badge_service import get_primary_role_badge, get_role_badges
 from app.services.role_service import assign_role, get_primary_role, get_user_roles
 
@@ -34,12 +35,20 @@ def _auth_response_for_user(db: Session, user: User, device_id: str | None = Non
 
 
 def _record_login_success(db: Session, user: User, email: str, provider: str, provider_user_id: str, device_id: str | None, client_ip: str | None) -> None:
+    previous_device_id = (user.last_device_id or "").strip()
+    next_device_id = (device_id or "").strip()
     user.last_device_id = device_id
     user.last_login_at = datetime.utcnow()
     user.last_seen_at = datetime.utcnow()
     db.add(user)
     db.commit()
     db.refresh(user)
+    if previous_device_id and previous_device_id != next_device_id:
+        publish_session_revoked(
+            user.id,
+            reason="session_replaced",
+            device_id=previous_device_id,
+        )
     user_roles = get_user_roles(user)
     roles = [role.value for role in user_roles]
     create_login_security_log(db=db, action=AuditAction.LOGIN_SUCCESS, email=email, device_id=device_id, target_user_id=user.id, reason="User logged in successfully.", ip_address=client_ip, extra_metadata={"provider": provider, "provider_user_id": provider_user_id, "public_user_id": user.public_user_id, "roles": roles})
