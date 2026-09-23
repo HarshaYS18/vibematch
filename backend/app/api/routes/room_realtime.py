@@ -509,17 +509,14 @@ async def room_realtime_socket(websocket: WebSocket) -> None:
                     continue
 
                 if command_type == "room/heartbeat":
-                    snapshot = await asyncio.to_thread(_room_heartbeat_for_user, room_id, active_user_id)
-                    await room_realtime_connections.send_json(
-                        websocket,
-                        {"type": "room.snapshot", "payload": {"room_id": room_id, "room": snapshot}},
-                    )
+                    # touch_connection() already refreshed the Redis lease above.
+                    # Heartbeats must never rebuild or write a PostgreSQL snapshot.
                     await _send_ack(
                         websocket,
                         room_id=room_id,
                         command_id=command_id,
                         command_type=command_type,
-                        state_version=int(snapshot.get("state_version") or 0),
+                        state_version=int(payload.get("last_state_version") or 0),
                     )
                     continue
 
