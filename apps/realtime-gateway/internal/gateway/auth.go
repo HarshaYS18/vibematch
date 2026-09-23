@@ -14,8 +14,12 @@ import (
 )
 
 type Principal struct {
-	UserID  int64
-	IsStaff bool
+	UserID            int64
+	IsStaff           bool
+	SessionID         string
+	DeviceID          string
+	Permissions       []string
+	MembershipVersion int64
 }
 
 type Authorizer interface {
