@@ -34,7 +34,15 @@ jobs:
         with:
           go-version-file: apps/realtime-gateway/go.mod
           cache-dependency-path: apps/realtime-gateway/go.sum
-      - run: test -z "$(gofmt -l .)"
+      - name: Check Go formatting
+        shell: bash
+        run: |
+          unformatted="$(gofmt -l .)"
+          if [ -n "$unformatted" ]; then
+            echo "gofmt required for:"
+            echo "$unformatted"
+            exit 1
+          fi
       - run: go vet ./...
       - run: go test ./...
       - run: go test -race ./...
