@@ -45,7 +45,13 @@ func main() {
 	options.ClientName = "funkey-realtime-" + cfg.NodeID
 	client := redis.NewClient(options)
 	defer client.Close()
-	service := gateway.NewServer(cfg, gateway.NewHTTPAuthorizer(cfg.AuthVerifyURL, cfg.AuthTimeout), client, logger)
+	service := gateway.NewServer(
+		cfg,
+		gateway.NewHTTPAuthorizer(cfg.AuthVerifyURL, cfg.AuthTimeout),
+		gateway.NewHTTPCommandExecutor(cfg.CommandURL, cfg.CommandTimeout),
+		client,
+		logger,
+	)
 	if err := service.Validate(); err != nil {
 		logger.Error("invalid gateway", "error", err)
 		os.Exit(1)
