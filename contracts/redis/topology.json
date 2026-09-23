@@ -54,6 +54,8 @@
     "realtime_gateway_lease": 60,
     "realtime_command_dedupe": 300,
     "media_node_heartbeat": 30,
-    "media_room_assignment": 86400
+    "media_room_assignment": 86400,
+    "room_replay_window": 300,
+    "room_transport_stream": 86400
   }
 }
