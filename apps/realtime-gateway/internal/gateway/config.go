@@ -10,8 +10,12 @@ import (
 
 type Config struct {
 	ListenAddr            string
-	AuthVerifyURL         string
-	CommandURL            string
+	AuthVerifyURL          string
+	CapabilityKeyURL       string
+	CapabilityIssuer       string
+	CapabilityAudience     string
+	CapabilityTokenVersion int
+	CommandURL             string
 	CommandTimeout        time.Duration
 	RedisURL              string
 	RedisPoolSize         int
@@ -67,8 +71,12 @@ func positiveIntEnv(key string, fallback int) (int, error) {
 func LoadConfig() (Config, error) {
 	cfg := Config{
 		ListenAddr:            env("REALTIME_LISTEN_ADDR", ":8081"),
-		AuthVerifyURL:         strings.TrimSpace(os.Getenv("REALTIME_AUTH_VERIFY_URL")),
-		CommandURL:            strings.TrimSpace(os.Getenv("REALTIME_COMMAND_URL")),
+		AuthVerifyURL:          strings.TrimSpace(os.Getenv("REALTIME_AUTH_VERIFY_URL")),
+		CapabilityKeyURL:       strings.TrimSpace(os.Getenv("REALTIME_CAPABILITY_KEY_URL")),
+		CapabilityIssuer:       env("REALTIME_CAPABILITY_ISSUER", "funkey-api"),
+		CapabilityAudience:     env("REALTIME_CAPABILITY_AUDIENCE", "funkey-realtime"),
+		CapabilityTokenVersion: 1,
+		CommandURL:             strings.TrimSpace(os.Getenv("REALTIME_COMMAND_URL")),
 		CommandTimeout:        3 * time.Second,
 		RedisURL:              env("REALTIME_REDIS_URL", "redis://127.0.0.1:6379/0"),
 		RedisPoolSize:         100,
@@ -92,11 +100,20 @@ func LoadConfig() (Config, error) {
 	if cfg.AuthVerifyURL == "" {
 		return cfg, errors.New("REALTIME_AUTH_VERIFY_URL is required")
 	}
+	if cfg.CapabilityKeyURL == "" {
+		cfg.CapabilityKeyURL = strings.TrimSuffix(cfg.AuthVerifyURL, "/verify") + "/capability-key"
+	}
 	if cfg.CommandURL == "" {
 		cfg.CommandURL = strings.TrimSuffix(cfg.AuthVerifyURL, "/verify") + "/command"
 	}
 
 	var err error
+	if cfg.CapabilityTokenVersion, err = positiveIntEnv(
+		"REALTIME_CAPABILITY_TOKEN_VERSION",
+		cfg.CapabilityTokenVersion,
+	); err != nil {
+		return cfg, err
+	}
 	if cfg.CommandTimeout, err = positiveDurationEnv(
 		"REALTIME_COMMAND_TIMEOUT",
 		cfg.CommandTimeout,
