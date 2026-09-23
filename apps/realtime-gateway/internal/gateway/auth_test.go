@@ -18,12 +18,12 @@ func TestHTTPAuthorizerDelegatesToControlPlane(t *testing.T) {
 			t.Error("wrong authorization endpoint")
 		}
 		w.Header().Set("Content-Type", "application/json")
-		_, _ = w.Write([]byte(`{"allowed":true,"user_id":123}`))
+		_, _ = w.Write([]byte(`{"allowed":true,"user_id":123,"is_staff":true}`))
 	}))
 	defer server.Close()
 	auth := NewHTTPAuthorizer(server.URL+"/api/v1/realtime/verify", time.Second)
 	principal, err := auth.Verify(context.Background(), "valid-token", "subscribe", "ROOM1")
-	if err != nil || principal.UserID != 123 {
+	if err != nil || principal.UserID != 123 || !principal.IsStaff {
 		t.Fatalf("unexpected result: %+v, %v", principal, err)
 	}
 }
