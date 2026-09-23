@@ -14,23 +14,34 @@ enum RealtimeConnectionStatus {
 }
 
 typedef RealtimeTokenProvider = String? Function();
+typedef RealtimeCapabilityTokenProvider = Future<String?> Function();
 typedef RealtimeSocketUriBuilder = Uri Function(String token);
-typedef RealtimeProtocolsBuilder = Iterable<String> Function(String token);
+typedef RealtimeProtocolsBuilder = Iterable<String> Function(
+  String token,
+  String capabilityToken,
+);
 
 class RealtimeClient {
   RealtimeClient({
     required RealtimeTokenProvider tokenProvider,
+    required RealtimeCapabilityTokenProvider capabilityTokenProvider,
     required RealtimeSocketUriBuilder socketUriBuilder,
     RealtimeProtocolsBuilder? protocolsBuilder,
     AppLogger logger = const AppLogger(),
   })  : _tokenProvider = tokenProvider,
+        _capabilityTokenProvider = capabilityTokenProvider,
         _socketUriBuilder = socketUriBuilder,
         _protocolsBuilder =
             protocolsBuilder ??
-            ((token) => <String>['funkey.v2', 'bearer.$token']),
+            ((token, capabilityToken) => <String>[
+                  'funkey.v2',
+                  'bearer.$token',
+                  'capability.$capabilityToken',
+                ]),
         _logger = logger;
 
   final RealtimeTokenProvider _tokenProvider;
+  final RealtimeCapabilityTokenProvider _capabilityTokenProvider;
   final RealtimeSocketUriBuilder _socketUriBuilder;
   final RealtimeProtocolsBuilder _protocolsBuilder;
   final AppLogger _logger;
@@ -75,9 +86,13 @@ class RealtimeClient {
     );
 
     try {
+      final capabilityToken = (await _capabilityTokenProvider())?.trim();
+      if (capabilityToken == null || capabilityToken.isEmpty) {
+        throw StateError('Realtime connect capability is unavailable.');
+      }
       final channel = WebSocketChannel.connect(
         _socketUriBuilder(token),
-        protocols: _protocolsBuilder(token),
+        protocols: _protocolsBuilder(token, capabilityToken),
       );
       _channel = channel;
       _subscription = channel.stream.listen(
