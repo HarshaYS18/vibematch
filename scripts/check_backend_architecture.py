@@ -187,7 +187,7 @@ def _validate_redis_topology(errors: list[str]) -> None:
 
 def _function_source(text: str, name: str) -> str:
     match = re.search(
-        rf"^def {re.escape(name)}\\(.*?(?=^def |^async def |\\Z)",
+        rf"^def {re.escape(name)}\(.*?(?=^def |^async def |\Z)",
         text,
         flags=re.MULTILINE | re.DOTALL,
     )
