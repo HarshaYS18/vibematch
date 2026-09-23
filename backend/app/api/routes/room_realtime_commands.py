@@ -112,8 +112,63 @@ def _display_name(user: User | None, fallback: str = "Vibe User") -> str:
     return user.display_name or user.username or str(user.public_user_id)
 
 
+def _room_delta(event_type: str, snapshot: dict[str, Any]) -> dict[str, Any]:
+    """Return the bounded v2 section delta for one authoritative room mutation."""
+    base = {
+        "room_id": snapshot.get("room_id"),
+        "room_version": int(snapshot.get("state_version") or 0),
+        "event_sequence": int(snapshot.get("event_sequence") or 0),
+    }
+    if event_type.startswith(("seat/", "seat_", "admin_mute/", "mic/")):
+        keys = (
+            "seats", "locked_seat_indexes", "active_seated_count",
+            "participants", "peers", "peer_count",
+        )
+    elif event_type.startswith(("room_member/", "room/member", "room_admin/")):
+        keys = (
+            "membership_roster", "participants", "peers", "peer_count",
+            "pending_room_member_requests", "pending_room_member_request_count",
+        )
+    elif event_type.startswith("room_settings/"):
+        keys = (
+            "is_secret", "is_locked", "is_members_only", "allow_screenshots",
+            "room_images_enabled", "guest_messages_enabled",
+            "apply_only_mode_enabled", "background_theme_id",
+            "seat_layout_id", "seat_count", "announcement_text",
+        )
+    elif event_type.startswith("watch_party/"):
+        keys = ("watch_party",)
+    elif event_type.startswith("room_activity/"):
+        keys = ("activity",)
+    elif event_type in {"room.chat.message_created", "room/chat_cleared"}:
+        keys = ("recent_messages",)
+    elif event_type in {"room/joined", "room/peer_left", "room/kicked"}:
+        keys = (
+            "participants", "peers", "peer_count", "public_online_count",
+            "online_count", "active_seated_count", "seats",
+        )
+    else:
+        keys = (
+            "participants", "peers", "peer_count", "seats",
+            "membership_roster", "activity", "watch_party",
+        )
+    return {
+        **base,
+        **{key: snapshot[key] for key in keys if key in snapshot},
+    }
+
+
 def _event(event_type: str, room: Room, snapshot: dict[str, Any], extra: dict[str, Any] | None = None) -> dict[str, Any]:
-    payload: dict[str, Any] = {"room_id": room.room_public_id, "room": snapshot}
+    payload: dict[str, Any] = {
+        "room_id": room.room_public_id,
+        # Legacy compatibility: FastAPI room socket consumers still receive
+        # the replacement snapshot until the Chunk 21 Go gateway cutover.
+        "room": snapshot,
+        "delta": _room_delta(event_type, snapshot),
+        "protocol": "room-state-v2",
+        "room_version": int(snapshot.get("state_version") or 0),
+        "event_sequence": int(snapshot.get("event_sequence") or 0),
+    }
     if extra:
         payload.update(extra)
     return {"type": event_type, "payload": payload}
