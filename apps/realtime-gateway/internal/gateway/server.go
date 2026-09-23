@@ -174,21 +174,28 @@ func (s *Server) serveWS(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	upgrader := websocket.Upgrader{
-		Subprotocols: []string{"funkey.v1"},
+		Subprotocols: []string{"funkey.v2", "funkey.v1"},
 		CheckOrigin:  func(_ *http.Request) bool { return true }, // checked above
 	}
 	conn, err := upgrader.Upgrade(w, r, nil)
 	if err != nil {
 		return
 	}
-	client := newClient(newID(), principal.UserID, token, conn, s.Config.OutboundQueue)
+	client := newClient(
+		newID(),
+		principal.UserID,
+		principal.IsStaff,
+		token,
+		conn,
+		s.Config.OutboundQueue,
+	)
 	if !s.Hub.Add(client, s.Config.MaxConnections, s.Config.MaxConnectionsPerUser) {
 		_ = conn.WriteControl(websocket.CloseMessage, websocket.FormatCloseMessage(websocket.CloseTryAgainLater, "capacity"), time.Now().Add(time.Second))
 		_ = conn.Close()
 		return
 	}
 	s.touchClient(client)
-	s.Hub.Enqueue(client, []byte(`{"type":"connected","version":1}`))
+	s.Hub.EnqueueCritical(client, []byte(`{"type":"connected","version":2}`))
 	connectSpan.SetAttributes(attribute.String("funkey.result", "accepted"))
 	connectSpan.End()
 	spanEnded = true
@@ -200,7 +207,9 @@ func (s *Server) serveWS(w http.ResponseWriter, r *http.Request) {
 
 type clientCommand struct {
 	Type         string `json:"type"`
-	RoomPublicID string `json:"room_public_id"`
+	RoomPublicID string `json:"room_public_id,omitempty"`
+	Stream       string `json:"stream,omitempty"`
+	LastSequence int64  `json:"last_sequence,omitempty"`
 	Traceparent  string `json:"traceparent,omitempty"`
 }
 
@@ -249,7 +258,7 @@ func (s *Server) readPump(c *Client) {
 		}
 		var command clientCommand
 		if err := json.Unmarshal(payload, &command); err != nil {
-			s.Hub.Enqueue(c, []byte(`{"type":"error","code":"invalid_message"}`))
+			s.Hub.EnqueueCritical(c, []byte(`{"type":"error","code":"invalid_message"}`))
 			continue
 		}
 		switch command.Type {
@@ -261,15 +270,16 @@ func (s *Server) readPump(c *Client) {
 			}
 		case "unsubscribe":
 			s.Hub.Unsubscribe(c, command.RoomPublicID)
+			s.deleteRoomLease(c, command.RoomPublicID)
 		default:
-			s.Hub.Enqueue(c, []byte(`{"type":"error","code":"unsupported_command"}`))
+			s.Hub.EnqueueCritical(c, []byte(`{"type":"error","code":"unsupported_command"}`))
 		}
 	}
 }
 
 func (s *Server) subscribeCommand(c *Client, command clientCommand) bool {
 	if !validRoomID(command.RoomPublicID) {
-		s.Hub.Enqueue(c, []byte(`{"type":"error","code":"invalid_room"}`))
+		s.Hub.EnqueueCritical(c, []byte(`{"type":"error","code":"invalid_room"}`))
 		return false
 	}
 	parent := context.Background()
@@ -291,18 +301,44 @@ func (s *Server) subscribeCommand(c *Client, command clientCommand) bool {
 	cancel()
 	if err != nil || principal.UserID != c.UserID {
 		s.Hub.stats.AuthDenied.Add(1)
-		s.Hub.Enqueue(c, []byte(`{"type":"error","code":"subscribe_denied"}`))
+		s.Hub.EnqueueCritical(c, []byte(`{"type":"error","code":"subscribe_denied"}`))
 		if err != nil {
 			span.RecordError(err)
 		}
 		return false
 	}
 	if !s.Hub.Subscribe(c, command.RoomPublicID) {
-		s.Hub.Enqueue(c, []byte(`{"type":"error","code":"subscription_limit"}`))
+		s.Hub.EnqueueCritical(c, []byte(`{"type":"error","code":"subscription_limit"}`))
 		return false
 	}
-	ack, _ := json.Marshal(map[string]string{"type": "subscribed", "room_public_id": command.RoomPublicID})
-	s.Hub.Enqueue(c, ack)
+	s.touchRoomLease(c, command.RoomPublicID)
+
+	replayed := false
+	resyncRequired := false
+	currentSequence := int64(0)
+	if command.Stream != "" {
+		replayCtx, replayCancel := context.WithTimeout(parent, 2*time.Second)
+		replayed, currentSequence = s.replayRoom(
+			replayCtx,
+			c,
+			command.RoomPublicID,
+			command.Stream,
+			command.LastSequence,
+		)
+		replayCancel()
+		resyncRequired = !replayed
+	}
+	ack, _ := json.Marshal(map[string]any{
+		"type":             "subscribed",
+		"room_public_id":   command.RoomPublicID,
+		"replayed":         replayed,
+		"resync_required":  resyncRequired,
+		"stream":           command.Stream,
+		"current_sequence": currentSequence,
+	})
+	if !s.Hub.EnqueueCritical(c, ack) {
+		return false
+	}
 	return true
 }
 
@@ -316,10 +352,16 @@ func (s *Server) writePump(c *Client) {
 		select {
 		case <-c.done:
 			return
-		case payload := <-c.send:
-			_ = c.Conn.SetWriteDeadline(time.Now().Add(s.Config.WriteTimeout))
-			if err := c.Conn.WriteMessage(websocket.TextMessage, payload); err != nil {
-				return
+		case <-c.queue.notify:
+			for {
+				payload, ok := c.queue.pop()
+				if !ok {
+					break
+				}
+				_ = c.Conn.SetWriteDeadline(time.Now().Add(s.Config.WriteTimeout))
+				if err := c.Conn.WriteMessage(websocket.TextMessage, payload); err != nil {
+					return
+				}
 			}
 		case <-ticker.C:
 			if err := c.Conn.WriteControl(websocket.PingMessage, nil, time.Now().Add(s.Config.WriteTimeout)); err != nil {
@@ -329,7 +371,7 @@ func (s *Server) writePump(c *Client) {
 			ctx, cancel := context.WithTimeout(context.Background(), s.Config.AuthTimeout)
 			principal, err := s.verify(ctx, c.Token, "connect", "")
 			cancel()
-			if err != nil || principal.UserID != c.UserID {
+			if err != nil || principal.UserID != c.UserID || principal.IsStaff != c.IsStaff {
 				s.Hub.stats.AuthDenied.Add(1)
 				_ = c.Conn.WriteControl(websocket.CloseMessage, websocket.FormatCloseMessage(websocket.ClosePolicyViolation, "reauthorization failed"), time.Now().Add(time.Second))
 				return
@@ -340,12 +382,123 @@ func (s *Server) writePump(c *Client) {
 				cancel()
 				if err != nil || principal.UserID != c.UserID {
 					s.Hub.Unsubscribe(c, roomID)
+					s.deleteRoomLease(c, roomID)
 					notice, _ := json.Marshal(map[string]string{"type": "subscription_revoked", "room_public_id": roomID})
-					s.Hub.Enqueue(c, notice)
+					s.Hub.EnqueueCritical(c, notice)
 				}
 			}
 		}
 	}
+}
+
+func roomLeaseKey(roomID string, userID int64) string {
+	return "funkey:realtime:room:leases:" + roomID + ":" + strconv.FormatInt(userID, 10)
+}
+
+func roomStreamEpochKey(roomID string) string {
+	return "funkey:realtime:room:stream-epoch:" + roomID
+}
+
+func roomStreamSequenceKey(roomID string) string {
+	return "funkey:realtime:room:stream-sequence:" + roomID
+}
+
+func roomReplayKey(roomID, epoch string) string {
+	return "funkey:realtime:room:replay:" + roomID + ":" + epoch
+}
+
+func (s *Server) touchRoomLease(c *Client, roomID string) {
+	if !validRoomID(roomID) {
+		return
+	}
+	ctx, cancel := context.WithTimeout(context.Background(), time.Second)
+	defer cancel()
+	now := time.Now()
+	expiresAt := float64(now.Add(s.Config.LeaseTTL).UnixMilli()) / 1000.0
+	key := roomLeaseKey(roomID, c.UserID)
+	pipe := s.Redis.Pipeline()
+	pipe.ZAdd(ctx, key, redis.Z{Score: expiresAt, Member: c.ID})
+	pipe.ZRemRangeByScore(ctx, key, "-inf", strconv.FormatFloat(float64(now.UnixMilli())/1000.0, 'f', 3, 64))
+	pipe.Expire(ctx, key, s.Config.LeaseTTL*3)
+	_, _ = pipe.Exec(ctx)
+}
+
+func (s *Server) deleteRoomLease(c *Client, roomID string) {
+	if !validRoomID(roomID) {
+		return
+	}
+	ctx, cancel := context.WithTimeout(context.Background(), time.Second)
+	defer cancel()
+	_ = s.Redis.ZRem(ctx, roomLeaseKey(roomID, c.UserID), c.ID).Err()
+}
+
+func (s *Server) replayRoom(
+	ctx context.Context,
+	c *Client,
+	roomID string,
+	stream string,
+	afterSequence int64,
+) (bool, int64) {
+	prefix := "room:" + roomID + ":"
+	if afterSequence < 0 || !strings.HasPrefix(stream, prefix) {
+		return false, 0
+	}
+	epoch := strings.TrimPrefix(stream, prefix)
+	if epoch == "" || strings.HasPrefix(epoch, "degraded:") {
+		return false, 0
+	}
+
+	values, err := s.Redis.MGet(
+		ctx,
+		roomStreamEpochKey(roomID),
+		roomStreamSequenceKey(roomID),
+	).Result()
+	if err != nil || len(values) != 2 {
+		return false, 0
+	}
+	currentEpoch := fmt.Sprint(values[0])
+	currentSequence, err := strconv.ParseInt(fmt.Sprint(values[1]), 10, 64)
+	if err != nil || currentEpoch != epoch {
+		return false, 0
+	}
+	if afterSequence == currentSequence {
+		return true, currentSequence
+	}
+	if afterSequence > currentSequence {
+		return false, currentSequence
+	}
+
+	rawEvents, err := s.Redis.ZRangeByScore(
+		ctx,
+		roomReplayKey(roomID, epoch),
+		&redis.ZRangeBy{
+			Min: "(" + strconv.FormatInt(afterSequence, 10),
+			Max: "+inf",
+		},
+	).Result()
+	if err != nil || len(rawEvents) == 0 {
+		return false, currentSequence
+	}
+
+	expected := afterSequence + 1
+	for _, raw := range rawEvents {
+		var envelope struct {
+			Sequence int64 `json:"sequence"`
+		}
+		if err := json.Unmarshal([]byte(raw), &envelope); err != nil || envelope.Sequence != expected {
+			return false, currentSequence
+		}
+		expected++
+	}
+	if expected-1 != currentSequence {
+		return false, currentSequence
+	}
+	for _, raw := range rawEvents {
+		if !s.Hub.Enqueue(c, []byte(raw)) {
+			return false, currentSequence
+		}
+	}
+	return true, currentSequence
 }
 
 func (s *Server) touchClient(c *Client) {
@@ -388,9 +541,18 @@ func (s *Server) heartbeatOnce(ctx context.Context) {
 	})
 	pipe := s.Redis.Pipeline()
 	pipe.Set(ctx, "funkey:realtime:gateway:node:"+s.Config.NodeID, body, s.Config.LeaseTTL)
+	now := time.Now()
+	roomLeaseScore := float64(now.Add(s.Config.LeaseTTL).UnixMilli()) / 1000.0
+	roomLeaseExpiry := strconv.FormatFloat(float64(now.UnixMilli())/1000.0, 'f', 3, 64)
 	for _, c := range clients {
 		key := "funkey:realtime:gateway:user:" + strconv.FormatInt(c.UserID, 10) + ":" + c.ID
 		pipe.Set(ctx, key, s.Config.NodeID, s.Config.LeaseTTL)
+		for _, roomID := range s.Hub.Rooms(c) {
+			leaseKey := roomLeaseKey(roomID, c.UserID)
+			pipe.ZAdd(ctx, leaseKey, redis.Z{Score: roomLeaseScore, Member: c.ID})
+			pipe.ZRemRangeByScore(ctx, leaseKey, "-inf", roomLeaseExpiry)
+			pipe.Expire(ctx, leaseKey, s.Config.LeaseTTL*3)
+		}
 	}
 	if _, err := pipe.Exec(ctx); err != nil {
 		s.Logger.Warn("redis heartbeat failed", "error", err)
@@ -414,7 +576,7 @@ func (s *Server) ConsumeEvents(ctx context.Context) {
 		s.subscribed.Store(true)
 		if interrupted {
 			for _, client := range s.Hub.Clients() {
-				if !s.Hub.Enqueue(client, []byte(`{"type":"resync_required"}`)) {
+				if !s.Hub.EnqueueCritical(client, []byte(`{"type":"resync_required"}`)) {
 					s.Hub.Remove(client)
 				}
 			}
