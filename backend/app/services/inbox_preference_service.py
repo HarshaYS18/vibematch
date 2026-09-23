@@ -21,7 +21,20 @@ def get_preferences_read_only(db: Session, user: User) -> InboxUserPreference:
         .filter(InboxUserPreference.user_id == user.id)
         .first()
     )
-    return preference or InboxUserPreference(user_id=user.id)
+    return preference or InboxUserPreference(
+        user_id=user.id,
+        strangers_can_message=True,
+        strangers_can_mention_in_vibes=True,
+        read_receipts_enabled=True,
+        online_visibility="everyone",
+        last_seen_visibility="everyone",
+        typing_activity_visibility="everyone",
+        story_visibility="friends",
+        device_unlock_enabled=False,
+        default_chat_theme="pearl",
+        default_wallpaper_key="premium_pearl",
+        default_wallpaper_url=None,
+    )
 
 
 def get_or_create_preferences(db: Session, user: User) -> InboxUserPreference:
