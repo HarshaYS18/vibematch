@@ -1,0 +1,40 @@
+syntax = "proto3";
+
+package funkey.economy.v1;
+
+import "common/v1/context.proto";
+
+option go_package = "github.com/HarshaYS18/vibematch/gen/go/funkey/economy/v1;economyv1";
+
+service EconomyService {
+  rpc GetWallet(GetWalletRequest) returns (Wallet);
+  rpc TransferValue(TransferValueRequest) returns (TransferValueResponse);
+}
+
+message GetWalletRequest {
+  funkey.common.v1.RequestContext context = 1;
+  int64 user_id = 2;
+}
+
+message Wallet {
+  int64 user_id = 1;
+  int64 coin_balance = 2;
+  int64 ruby_balance = 3;
+  uint64 version = 4;
+}
+
+message TransferValueRequest {
+  funkey.common.v1.RequestContext context = 1;
+  int64 from_user_id = 2;
+  int64 to_user_id = 3;
+  int64 amount = 4;
+  string reason = 5;
+  string source_type = 6;
+  string source_id = 7;
+}
+
+message TransferValueResponse {
+  string ledger_transaction_id = 1;
+  Wallet sender_wallet = 2;
+  Wallet recipient_wallet = 3;
+}
