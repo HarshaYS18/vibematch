@@ -40,6 +40,14 @@ func TestRedisPoolAndLeaseConfiguration(t *testing.T) {
 	if cfg.LeaseTTL.String() != "45s" {
 		t.Fatalf("unexpected Redis lease TTL: %v", cfg.LeaseTTL)
 	}
+	if cfg.CapabilityKeyURL != "http://api:8000/api/v1/realtime/capability-key" {
+		t.Fatalf("unexpected capability key URL: %s", cfg.CapabilityKeyURL)
+	}
+	if cfg.CapabilityIssuer != "funkey-api" ||
+		cfg.CapabilityAudience != "funkey-realtime" ||
+		cfg.CapabilityTokenVersion != 1 {
+		t.Fatalf("unexpected capability contract config: %+v", cfg)
+	}
 
 	t.Setenv("REALTIME_REDIS_POOL_SIZE", "0")
 	if _, err := LoadConfig(); err == nil {
