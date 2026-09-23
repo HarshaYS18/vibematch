@@ -24,7 +24,7 @@ from app.schemas.cdn_media import (
     MediaSafetySettingResponse,
     MediaSafetySettingUpdateRequest,
 )
-from app.services import cdn_media_service, inbox_service
+from app.services import cdn_media_service, inbox_service_client
 from app.services.audit_log_service import create_admin_log
 
 
@@ -56,7 +56,10 @@ def _send_media_team_message(db: Session, *, asset: CdnMediaAsset, text: str) ->
     owner = _asset_owner(db, asset)
     if owner is None:
         return
-    inbox_service.send_team_system_message(db, owner, text)
+    inbox_service_client.send_team_message(
+        target_user_id=owner.id,
+        text=text,
+    )
 
 
 @router.get("/dashboard", response_model=CdnMediaDashboardResponse)
