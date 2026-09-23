@@ -5,6 +5,7 @@ resources:
   - namespace.yaml
   - config.yaml
   - api.yaml
+  - inbox.yaml
   - realtime.yaml
   - worker.yaml
   - autoscaling.yaml
