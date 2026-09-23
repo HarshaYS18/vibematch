@@ -11,7 +11,6 @@ from app.api.routes import (
     inbox_calls,
     inbox_message_tools,
     inbox_preferences,
-    inbox_stories,
 )
 from app.core.config import settings
 from app.database import get_db
@@ -33,7 +32,6 @@ app.dependency_overrides[get_db] = get_inbox_db
 api = APIRouter(prefix="/api/v1")
 api.include_router(inbox.router)
 api.include_router(inbox_preferences.router, prefix="/inbox", tags=["Inbox"])
-api.include_router(inbox_stories.router, prefix="/inbox", tags=["Inbox"])
 api.include_router(inbox_message_tools.router, prefix="/inbox", tags=["Inbox"])
 api.include_router(inbox_calls.router, prefix="/inbox", tags=["Inbox Calls"])
 for router in (inbox_backup_google.router, inbox_ai.router, calls.router):
