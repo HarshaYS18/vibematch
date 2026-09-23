@@ -45,6 +45,7 @@ from app.schemas.rooms.room import (
 )
 from app.schemas.rooms.room_background import RoomBackgroundConfigResponse
 from app.schemas.rooms.room_kickout import RoomKickoutCreateRequest, RoomKickoutResponse
+from app.services.permissions import room_permission_service
 from app.services.rooms import room_action_service, room_state_service
 from app.services.rooms.room_background_service import list_room_backgrounds
 from app.services.rooms.room_contribution_service import room_contribution_rankings
