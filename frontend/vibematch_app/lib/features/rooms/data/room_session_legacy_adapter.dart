@@ -143,8 +143,8 @@ class RoomSessionLegacyRealtimeBridge {
       return;
     }
 
-    final previousVersion = repository.state.stateVersion;
-    final previousEventSequence = repository.state.eventSequence;
+    final previousVersion = repository.currentState.stateVersion;
+    final previousEventSequence = repository.currentState.eventSequence;
     final next = repository.reconcileRealtimeEvent(event.raw);
     if (next.stateVersion == previousVersion &&
         next.eventSequence == previousEventSequence) {
