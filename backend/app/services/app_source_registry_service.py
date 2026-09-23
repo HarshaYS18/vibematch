@@ -25,7 +25,7 @@ def get_app_source_registry() -> AppSourceRegistryResponse:
             "child_writes": "Mutations go through feature child APIs and must return or trigger canonical backend state.",
             "configs": "Display/config data comes from backend config/catalog/rule endpoints before any local fallback.",
             "control_center": "Owner/SuperAdmin Control Center APIs manage rules, catalog, roles, permissions, and stealth.",
-            "live_room": "RoomSessionRepository owns canonical room lifecycle/state; /ws/room-realtime delivers authoritative snapshots and commands while media transport remains separate.",
+            "live_room": "RoomSessionRepository owns canonical room lifecycle/state; the Go /ws application socket delivers authorized realtime deltas and commands while media transport remains separate.",
         },
         tabs=[
             TabSourceRegistryItem(
@@ -63,7 +63,7 @@ def get_app_source_registry() -> AppSourceRegistryResponse:
                     _endpoint("/rooms/{room_public_id}/realtime/activity/command", "Canonical karaoke, party and social-game room activity mutation and invite flow."),
                     _endpoint("/rooms/{room_public_id}/settings", "Room settings mutation while settings UI migrates onto RoomSessionRepository."),
                 ],
-                realtime_channels=["/ws/room-realtime"],
+                realtime_channels=["/ws"],
                 protected_flows=["room entry", "privacy", "kickout", "seats", "gifts", "chat", "online count", "watch party", "room activities"],
                 duplicate_sources_to_retire=[
                     "LiveRoomPresenceRepository lifecycle reads/writes after legacy UI adapters are retired",
@@ -104,7 +104,7 @@ def get_app_source_registry() -> AppSourceRegistryResponse:
                     _endpoint("/inbox/messages", "Message send/update flows."),
                     _endpoint("/inbox/backup/*", "Backup actions."),
                 ],
-                realtime_channels=["/ws/inbox"],
+                realtime_channels=["/ws"],
                 duplicate_sources_to_retire=["local conversation/demo notification fallbacks"],
                 migration_status="active_backend_sources",
             ),
