@@ -48,6 +48,10 @@ REQUIRED_REDIS_ROLES = {
     "realtime_presence",
     "media_registry",
 }
+ROOM_STATE_ENGINE_MIGRATION = (
+    ROOT / "backend" / "alembic" / "versions" /
+    "20260923_0200_room_state_engine_v2.py"
+)
 ALLOWED_STATE_CLASSES = {"AUTHORITY", "PROJECTION", "CACHE", "EPHEMERAL"}
 REQUIRED_AUTHORITY_STATE_IDS = {
     "identity.accounts", "identity.sessions", "profiles.public", "rooms.definition",
@@ -180,6 +184,113 @@ def _validate_redis_topology(errors: list[str]) -> None:
                 f"{path.relative_to(ROOT)} must use its explicit Redis role instead of {token}"
             )
 
+
+def _function_source(text: str, name: str) -> str:
+    match = re.search(
+        rf"^def {re.escape(name)}\\(.*?(?=^def |^async def |\\Z)",
+        text,
+        flags=re.MULTILINE | re.DOTALL,
+    )
+    return match.group(0) if match else ""
+
+
+def _validate_room_state_engine(errors: list[str]) -> None:
+    if not ROOM_STATE_ENGINE_MIGRATION.exists():
+        errors.append("Chunk 20 Room State Engine v2 migration is missing")
+
+    room_model = ROOT / "backend" / "app" / "models" / "room.py"
+    realtime_model = ROOT / "backend" / "app" / "models" / "room_realtime_state.py"
+    state_service = ROOT / "backend" / "app" / "services" / "rooms" / "room_state_service.py"
+    command_routes = ROOT / "backend" / "app" / "api" / "routes" / "room_realtime_commands.py"
+    socket_routes = ROOT / "backend" / "app" / "api" / "routes" / "room_realtime.py"
+    legacy_routes = ROOT / "backend" / "app" / "api" / "routes" / "rooms" / "rooms.py"
+    presence_controller = (
+        ROOT / "frontend" / "vibematch_app" / "lib" / "features" / "rooms" /
+        "presentation" / "controllers" / "live_room_presence_controller.dart"
+    )
+    room_repository = (
+        ROOT / "frontend" / "vibematch_app" / "lib" /
+        "room_session" / "data" / "room_session_repository.dart"
+    )
+
+    if room_model.exists():
+        text = room_model.read_text(encoding="utf-8")
+        for token in ("realtime_version", "realtime_event_sequence"):
+            if token not in text:
+                errors.append(f"rooms model must persist {token}")
+
+    if realtime_model.exists():
+        text = realtime_model.read_text(encoding="utf-8")
+        for token in (
+            "event_id", "room_version", "class RoomMemberRequest",
+            "class RoomSeatApplication",
+        ):
+            if token not in text:
+                errors.append(f"room realtime model missing Chunk 20 contract: {token}")
+
+    if state_service.exists():
+        text = state_service.read_text(encoding="utf-8")
+        snapshot = _function_source(text, "room_snapshot")
+        for token in (
+            "ensure_room_seats(",
+            "cleanup_orphaned_seat_occupants(",
+            "cleanup_stale_participants(",
+            "db.flush()",
+        ):
+            if token in snapshot:
+                errors.append(f"room_snapshot must be read-only; found {token}")
+        for name, required, forbidden in (
+            ("pending_room_member_requests", "RoomMemberRequest", "RoomRealtimeEvent"),
+            ("pending_seat_applications", "RoomSeatApplication", "RoomRealtimeEvent"),
+        ):
+            source = _function_source(text, name)
+            if required not in source or forbidden in source:
+                errors.append(
+                    f"{name} must query dedicated current state, not room event history"
+                )
+
+    if command_routes.exists():
+        heartbeat = _function_source(
+            command_routes.read_text(encoding="utf-8"), "heartbeat"
+        )
+        if "room_snapshot(" in heartbeat or "heartbeat_room(" in heartbeat:
+            errors.append("realtime REST heartbeat must not construct a room snapshot")
+
+    if legacy_routes.exists():
+        heartbeat = _function_source(
+            legacy_routes.read_text(encoding="utf-8"), "heartbeat_live_room"
+        )
+        if "heartbeat_room(" in heartbeat or "list_room_participants(" in heartbeat:
+            errors.append("legacy room heartbeat must not construct a roster snapshot")
+
+    if socket_routes.exists():
+        text = socket_routes.read_text(encoding="utf-8")
+        if "_room_heartbeat_for_user" in text:
+            errors.append("socket heartbeat must not retain the old DB heartbeat helper")
+        if "replay_room(" not in text:
+            errors.append("room resume must support bounded replay before snapshot fallback")
+
+    if presence_controller.exists():
+        text = presence_controller.read_text(encoding="utf-8")
+        if "Timer.periodic" in text or "_sendHeartbeat" in text:
+            errors.append("live room presence must not poll PostgreSQL with a timer")
+
+    if room_repository.exists():
+        text = room_repository.read_text(encoding="utf-8")
+        for token in ("reconcileDelta(", "recoverFromRealtimeGap("):
+            if token not in text:
+                errors.append(f"RoomSessionRepository missing Chunk 20 method {token}")
+
+    flutter_lib = ROOT / "frontend" / "vibematch_app" / "lib"
+    if flutter_lib.exists():
+        for source in flutter_lib.rglob("*.dart"):
+            text = source.read_text(encoding="utf-8")
+            if "RoomEngineManager.instance" in text:
+                errors.append(
+                    "RoomSessionRepository is canonical; RoomEngineManager.instance is forbidden: "
+                    f"{source.relative_to(ROOT)}"
+                )
+
 def _has_tracked_content(path: Path) -> bool:
     return path.exists() and any(item.is_file() for item in path.rglob("*"))
 
@@ -188,6 +299,7 @@ def main() -> int:
     errors: list[str] = []
     _validate_authority_registry(errors)
     _validate_redis_topology(errors)
+    _validate_room_state_engine(errors)
 
     for path in REQUIRED_PATHS:
         if not path.exists():
@@ -276,6 +388,7 @@ def main() -> int:
     print(" - /api/v1 is owned by the canonical router")
     print(" - mutable state ownership conforms to contracts/architecture/authorities.yaml")
     print(" - Redis roles conform to contracts/redis/topology.json")
+    print(" - Room State Engine v2 heartbeat/snapshot/current-state invariants hold")
     return 0
 
 
