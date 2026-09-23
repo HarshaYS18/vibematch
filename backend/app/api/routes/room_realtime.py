@@ -100,7 +100,12 @@ def _active_room_user(db: Session, user_id: int) -> User:
     return user
 
 
-def _prepare_room_join(token: str, room_id: str) -> tuple[int, dict | None]:
+def _prepare_room_join(
+    token: str,
+    room_id: str,
+    *,
+    include_snapshot: bool = True,
+) -> tuple[int, dict | None, bool, int, int]:
     with SessionLocal() as db:
         try:
             user = get_current_user_from_token(db, token)
@@ -114,15 +119,23 @@ def _prepare_room_join(token: str, room_id: str) -> tuple[int, dict | None]:
             )
             if participant is None or not participant.is_active:
                 db.rollback()
-                return user_id, None
+                return (
+                    user_id,
+                    None,
+                    False,
+                    int(room.realtime_version or 0),
+                    int(room.realtime_event_sequence or 0),
+                )
             room_permission_service.require_join(db, room, user)
             now = datetime.utcnow()
             participant.last_seen_at = now
             participant.left_at = None
             user.last_seen_at = now
-            snapshot = client_room_snapshot(db, room)
+            snapshot = client_room_snapshot(db, room) if include_snapshot else None
+            state_version = int(room.realtime_version or 0)
+            event_sequence = int(room.realtime_event_sequence or 0)
             db.commit()
-            return user_id, snapshot
+            return user_id, snapshot, True, state_version, event_sequence
         except Exception:
             db.rollback()
             raise
@@ -369,18 +382,27 @@ async def room_realtime_socket(websocket: WebSocket) -> None:
                     token = _join_token(payload)
                     if not token:
                         raise HTTPException(status_code=401, detail="Room access token required")
-                    authenticated_user_id, snapshot = await asyncio.to_thread(
+                    (
+                        authenticated_user_id,
+                        snapshot,
+                        participant_active,
+                        state_version,
+                        event_sequence,
+                    ) = await asyncio.to_thread(
                         _prepare_room_join,
                         token,
                         room_id,
+                        include_snapshot=command_type != "room/resume",
                     )
-                    if snapshot is None:
+                    if not participant_active:
                         snapshot = await execute_room_command_by_ids(
                             room_id,
                             authenticated_user_id,
                             "room/join",
                             payload,
                         )
+                        state_version = int(snapshot.get("state_version") or 0)
+                        event_sequence = int(snapshot.get("event_sequence") or 0)
                 except HTTPException as exc:
                     await room_realtime_connections.send_json(
                         websocket,
@@ -433,15 +455,64 @@ async def room_realtime_socket(websocket: WebSocket) -> None:
                     authenticated_user_id,
                 )
 
-                if command_type == "room/resume":
+                if command_type == "room/resume" and participant_active:
+                    stream = str(payload.get("stream") or "").strip()
+                    try:
+                        last_sequence = int(payload.get("last_sequence") or 0)
+                    except (TypeError, ValueError):
+                        last_sequence = -1
+                    replayed = bool(
+                        stream
+                        and last_sequence >= 0
+                        and await room_realtime_connections.replay_room(
+                            websocket,
+                            room_id,
+                            stream=stream,
+                            after_sequence=last_sequence,
+                        )
+                    )
+                    if replayed:
+                        await room_realtime_connections.send_json(
+                            websocket,
+                            {
+                                "type": "room/resumed",
+                                "payload": {
+                                    "room_id": room_id,
+                                    "replayed": True,
+                                    "stream": stream,
+                                    "last_sequence": last_sequence,
+                                    "state_version": state_version,
+                                    "event_sequence": event_sequence,
+                                },
+                            },
+                        )
+                        await _send_ack(
+                            websocket,
+                            room_id=room_id,
+                            command_id=command_id,
+                            command_type=command_type,
+                            state_version=state_version,
+                        )
+                        continue
+
+                    snapshot = await asyncio.to_thread(
+                        _room_snapshot_for_user,
+                        room_id,
+                        authenticated_user_id,
+                    )
+                    state_version = int(snapshot.get("state_version") or state_version)
+                    event_sequence = int(snapshot.get("event_sequence") or event_sequence)
                     await room_realtime_connections.send_json(
                         websocket,
                         {
                             "type": "room/resumed",
                             "payload": {
                                 "room_id": room_id,
+                                "replayed": False,
+                                "resync_required": True,
                                 "last_state_version": payload.get("last_state_version"),
-                                "state_version": int(snapshot.get("state_version") or 0),
+                                "state_version": state_version,
+                                "event_sequence": event_sequence,
                                 "room": snapshot,
                             },
                         },
