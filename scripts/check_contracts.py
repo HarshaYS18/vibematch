@@ -11,18 +11,23 @@ PROTO_ROOT = ROOT / "contracts" / "proto"
 EVENT_ROOT = ROOT / "contracts" / "events"
 
 REQUIRED_PROTOS = {
-    "common/v1/context.proto",
-    "identity/v1/identity.proto",
-    "room/v1/room.proto",
-    "economy/v1/economy.proto",
-    "inbox/v1/inbox.proto",
-    "vibes/v1/vibes.proto",
-    "game/v1/game.proto",
+    "funkey/common/v1/context.proto",
+    "funkey/identity/v1/identity.proto",
+    "funkey/room/v1/room.proto",
+    "funkey/economy/v1/economy.proto",
+    "funkey/inbox/v1/inbox.proto",
+    "funkey/vibes/v1/vibes.proto",
+    "funkey/game/v1/game.proto",
 }
 PACKAGE_RE = re.compile(r"^package\s+funkey\.([a-z][a-z0-9_]*)\.v([1-9][0-9]*)\s*;", re.MULTILINE)
 SERVICE_RE = re.compile(r"^service\s+[A-Za-z][A-Za-z0-9_]*\s*\{", re.MULTILINE)
-REQUEST_MESSAGE_RE = re.compile(r"message\s+([A-Za-z][A-Za-z0-9_]*(?:Request|Command))\s*\{(.*?)\n\}", re.DOTALL)
-CONTEXT_FIELD_RE = re.compile(r"funkey\.common\.v1\.RequestContext\s+context\s*=\s*1\s*;")
+REQUEST_MESSAGE_RE = re.compile(
+    r"message\s+([A-Za-z][A-Za-z0-9_]*(?:Request|Command))\s*\{(.*?)\n\}",
+    re.DOTALL,
+)
+CONTEXT_FIELD_RE = re.compile(
+    r"funkey\.common\.v1\.RequestContext\s+context\s*=\s*1\s*;"
+)
 
 
 def _fail(message: str) -> None:
@@ -49,12 +54,16 @@ def check_proto_contracts() -> None:
         match = PACKAGE_RE.search(text)
         if match is None:
             _fail(f"{relative}: package must be versioned as funkey.<domain>.vN")
-        if "/v" not in relative:
-            _fail(f"{relative}: file path must include a version directory")
+        domain, version = match.groups()
+        expected_prefix = f"funkey/{domain}/v{version}/"
+        if not relative.startswith(expected_prefix):
+            _fail(
+                f"{relative}: package path must start with {expected_prefix}"
+            )
         if "service " in text and SERVICE_RE.search(text) is None:
             _fail(f"{relative}: malformed service declaration")
 
-        if relative != "common/v1/context.proto":
+        if relative != "funkey/common/v1/context.proto":
             for message_name, body in REQUEST_MESSAGE_RE.findall(text):
                 if not CONTEXT_FIELD_RE.search(body):
                     _fail(
@@ -71,7 +80,8 @@ def check_proto_contracts() -> None:
     generated = PROTO_ROOT / "gen"
     if generated.exists():
         tracked_markers = [
-            path for path in generated.rglob("*")
+            path
+            for path in generated.rglob("*")
             if path.is_file() and path.name not in {".gitkeep"}
         ]
         if tracked_markers:
