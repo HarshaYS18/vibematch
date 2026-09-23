@@ -43,8 +43,14 @@ spec:
             - configMapRef: {name: funkey-config}
             - secretRef: {name: funkey-api-secrets}
           env:
-            - {name: DB_POOL_SIZE, value: "3"}
-            - {name: DB_MAX_OVERFLOW, value: "0"}
+            - name: DB_APPLICATION_NAME
+              value: funkey-worker
+            - name: DB_POOL_SIZE
+              valueFrom:
+                configMapKeyRef: {name: funkey-config, key: DB_WORKER_POOL_SIZE}
+            - name: DB_MAX_OVERFLOW
+              valueFrom:
+                configMapKeyRef: {name: funkey-config, key: DB_WORKER_MAX_OVERFLOW}
           resources:
             requests: {cpu: 100m, memory: 256Mi}
             limits: {cpu: "1", memory: 768Mi}
