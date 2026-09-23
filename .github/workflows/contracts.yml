@@ -1,0 +1,167 @@
+name: Service Contracts
+
+on:
+  push:
+    branches:
+      - chatgpt/funkey-frontend-architecture-v1
+      - codex/funkey-production-backend-v1
+  pull_request:
+    paths:
+      - 'contracts/**'
+      - 'scripts/check_contracts.py'
+      - 'docs/architecture/service-contracts.md'
+      - '.github/workflows/contracts.yml'
+
+permissions:
+  contents: read
+
+jobs:
+  schema-contracts:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.13'
+      - uses: bufbuild/buf-setup-action@v1
+        with:
+          version: '1.73.0'
+          github_token: ${{ github.token }}
+      - name: Run repository contract checks
+        run: python scripts/check_contracts.py
+      - name: Enforce canonical proto formatting
+        working-directory: contracts/proto
+        run: buf format -d --exit-code
+      - name: Lint protobuf contracts
+        working-directory: contracts/proto
+        run: buf lint
+      - name: Check protobuf breaking changes against main
+        shell: bash
+        run: |
+          git fetch origin main:refs/remotes/origin/main
+          if git cat-file -e origin/main:contracts/proto/buf.yaml 2>/dev/null; then
+            buf breaking contracts/proto --against '.git#branch=main,subdir=contracts/proto'
+          else
+            echo "No contracts/proto baseline exists on main yet; this PR establishes v1."
+          fi
+
+  generated-clients:
+    runs-on: ubuntu-latest
+    needs: schema-contracts
+    steps:
+      - uses: actions/checkout@v4
+      - uses: bufbuild/buf-setup-action@v1
+        with:
+          version: '1.73.0'
+          github_token: ${{ github.token }}
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.13'
+      - uses: actions/setup-go@v5
+        with:
+          go-version: '1.27.x'
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: npm
+      - uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+          cache: true
+
+      - name: Generate all contract clients
+        working-directory: contracts/proto
+        run: buf generate
+
+      - name: Verify generated language surfaces
+        shell: bash
+        working-directory: contracts/proto
+        run: |
+          test -n "$(find gen/go -type f -name '*.go' -print -quit)"
+          test -n "$(find gen/python -type f -name '*.py' -print -quit)"
+          test -n "$(find gen/ts -type f -name '*.ts' -print -quit)"
+          test -n "$(find gen/dart -type f -name '*.dart' -print -quit)"
+
+      - name: Verify deterministic generation
+        shell: bash
+        working-directory: contracts/proto
+        run: |
+          find gen -type f -print0 | sort -z | xargs -0 sha256sum > /tmp/funkey-contracts-first.sha256
+          buf generate
+          find gen -type f -print0 | sort -z | xargs -0 sha256sum > /tmp/funkey-contracts-second.sha256
+          diff -u /tmp/funkey-contracts-first.sha256 /tmp/funkey-contracts-second.sha256
+
+      - name: Compile generated Python clients
+        working-directory: contracts/proto
+        run: python -m compileall -q gen/python
+
+      - name: Compile generated Go clients
+        shell: bash
+        working-directory: contracts/proto/gen/go
+        run: |
+          cat > go.mod <<'EOF'
+          module github.com/HarshaYS18/vibematch/gen/go
+
+          go 1.27
+          EOF
+          go mod tidy
+          go test ./...
+
+      - name: Typecheck generated TypeScript clients
+        shell: bash
+        working-directory: contracts/proto/gen/ts
+        run: |
+          cat > package.json <<'EOF'
+          {
+            "name": "funkey-contracts-generated",
+            "private": true,
+            "type": "module",
+            "dependencies": {
+              "@bufbuild/protobuf": "2.15.0"
+            },
+            "devDependencies": {
+              "typescript": "5.9.3"
+            }
+          }
+          EOF
+          cat > tsconfig.json <<'EOF'
+          {
+            "compilerOptions": {
+              "target": "ES2022",
+              "module": "NodeNext",
+              "moduleResolution": "NodeNext",
+              "strict": true,
+              "skipLibCheck": true,
+              "noEmit": true
+            },
+            "include": ["**/*.ts"]
+          }
+          EOF
+          npm install --ignore-scripts
+          npx tsc -p tsconfig.json
+
+      - name: Analyze generated Dart clients
+        shell: bash
+        working-directory: contracts/proto/gen/dart
+        run: |
+          cat > pubspec.yaml <<'EOF'
+          name: funkey_contracts_generated
+          publish_to: none
+          environment:
+            sdk: '>=3.8.0 <4.0.0'
+          dependencies:
+            protobuf: 6.1.0
+            grpc: 5.1.0
+          EOF
+          dart pub get
+          dart analyze .
+
+      - name: Upload generated client artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: funkey-generated-service-contracts
+          path: contracts/proto/gen
+          if-no-files-found: error
+          retention-days: 7
