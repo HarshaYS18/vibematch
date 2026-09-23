@@ -139,11 +139,11 @@ type Client struct {
 	Token     string
 	SessionID string
 	DeviceID  string
-	Conn    *websocket.Conn
-	queue   *outboundQueue
-	done    chan struct{}
-	rooms   map[string]struct{}
-	once    sync.Once
+	Conn      *websocket.Conn
+	queue     *outboundQueue
+	done      chan struct{}
+	rooms     map[string]struct{}
+	once      sync.Once
 }
 
 func newClient(
