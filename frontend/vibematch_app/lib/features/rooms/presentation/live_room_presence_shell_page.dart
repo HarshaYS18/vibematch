@@ -109,6 +109,11 @@ class _LiveRoomPresenceShellPageState
 
   Future<void> _leaveRoomBestEffort() async {
     try {
+      await LiveRoomMediaSignalingService.instance.leaveRoom();
+    } catch (_) {
+      // Media teardown is best effort; durable room state still needs leave.
+    }
+    try {
       await _roomSessionRepository.leave();
     } catch (_) {
       // Route teardown must not be blocked by a failed leave request.
