@@ -14,6 +14,7 @@ from uuid import uuid4
 
 from fastapi import Request
 from fastapi.responses import JSONResponse
+from opentelemetry import trace
 from sqlalchemy import event
 
 from app.core.config import settings
@@ -31,6 +32,50 @@ _inflight = 0
 _buckets = (0.01, 0.05, 0.1, 0.25, 0.5, 1.0, 2.5, 5.0, 10.0)
 _db_query_count: ContextVar[int | None] = ContextVar("funkey_db_query_count", default=None)
 _counted_engines: set[int] = set()
+
+
+def standard_flow_name(method: str, path: str) -> str | None:
+    """Map stable route templates to low-cardinality product flow spans."""
+    method = method.upper()
+    path = path.lower()
+
+    if method == "POST" and path in {
+        "/api/v1/auth/dev-login",
+        "/api/v1/auth/google-login",
+    }:
+        return "auth.login"
+    if method == "GET" and (
+        path.startswith("/api/v1/home-banners")
+        or path in {
+            "/api/v1/rooms/trending",
+            "/api/v1/rooms/following",
+            "/api/v1/rooms/quick-match",
+        }
+    ):
+        return "home.load"
+    if method == "POST" and path.endswith("/realtime/join"):
+        return "room.join"
+    if method == "POST" and "/realtime/seat/" in path:
+        return "room.seat.change"
+    if method == "POST" and path == "/api/v1/economy/gifts/send":
+        return "gift.send"
+    if (
+        method == "POST"
+        and "/api/v1/inbox/conversations/" in path
+        and path.endswith("/messages")
+    ):
+        return "inbox.send"
+    if method == "GET" and path.startswith("/api/v1/vibes"):
+        return "vibes.load"
+    if method == "POST" and path.endswith("/realtime/watch-party/command"):
+        return "watch_party.command"
+    if method == "POST" and path.startswith("/api/v1/games/") and path.endswith("/rounds"):
+        return "game.start"
+    if method == "POST" and path.startswith("/api/v1/media/"):
+        return "media.upload"
+    if method in {"POST", "PATCH", "DELETE"} and path.startswith("/api/v1/wallets/"):
+        return "wallet.mutate"
+    return None
 
 
 def _request_id(request: Request) -> str:
@@ -105,10 +150,16 @@ async def operational_middleware(request: Request, call_next):
                 if elapsed <= bucket:
                     _latency[(method, path, str(bucket))] += 1
             _latency[(method, path, "+Inf")] += 1
+        flow = standard_flow_name(method, path)
+        active_span = trace.get_current_span()
+        if flow and active_span.is_recording():
+            active_span.update_name(flow)
+            active_span.set_attribute("funkey.flow", flow)
         payload = {
             "event": "http.request",
             "request_id": request_id,
             "trace_id": current_trace_id(),
+            "flow": flow,
             "method": method,
             "route": path,
             "status": status,

@@ -374,6 +374,7 @@ class VibeMatchApp extends StatelessWidget {
       title: 'FunKey',
       debugShowCheckedModeBanner: false,
       navigatorKey: rootNavigatorKey,
+      navigatorObservers: <NavigatorObserver>[SentryNavigatorObserver()],
       scaffoldMessengerKey: rootScaffoldMessengerKey,
       initialRoute: VmRoutes.auth,
       onGenerateRoute: AppRouteFactory.onGenerateRoute,
