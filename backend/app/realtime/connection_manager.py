@@ -22,7 +22,33 @@ _SOCKET_LEASE_SECONDS = 30
 _SOCKET_LEASE_REFRESH_SECONDS = 10
 _COMMAND_CLAIM_SECONDS = 5 * 60
 _REMOTE_EVENT_TTL_SECONDS = 5 * 60
+_ROOM_REPLAY_TTL_SECONDS = 5 * 60
+_ROOM_REPLAY_MAX_EVENTS = 256
+_ROOM_STREAM_TTL_SECONDS = 24 * 60 * 60
 _GATEWAY_CHANNEL = "funkey:realtime:events"
+
+_ROOM_STREAM_SEQUENCE_SCRIPT = """
+local epoch = redis.call('GET', KEYS[1])
+if not epoch then
+    redis.call('SET', KEYS[1], ARGV[1], 'EX', ARGV[2], 'NX')
+    epoch = redis.call('GET', KEYS[1])
+end
+local sequence = redis.call('INCR', KEYS[2])
+redis.call('EXPIRE', KEYS[1], ARGV[2])
+redis.call('EXPIRE', KEYS[2], ARGV[2])
+return {epoch, sequence}
+"""
+
+_ROOM_REPLAY_APPEND_SCRIPT = """
+redis.call('ZADD', KEYS[1], ARGV[1], ARGV[2])
+local size = redis.call('ZCARD', KEYS[1])
+local maximum = tonumber(ARGV[3])
+if size > maximum then
+    redis.call('ZREMRANGEBYRANK', KEYS[1], 0, size - maximum - 1)
+end
+redis.call('EXPIRE', KEYS[1], ARGV[4])
+return size
+"""
 
 
 def room_user_lease_key(room_public_id: str, user_id: int) -> str:
@@ -326,6 +352,122 @@ class RealtimeConnectionManager:
         event.setdefault("sent_at", datetime.now(timezone.utc).isoformat())
         return event
 
+    @staticmethod
+    def _room_stream_epoch_key(room_public_id: str) -> str:
+        return f"{_REDIS_PREFIX}:stream-epoch:{room_public_id}"
+
+    @staticmethod
+    def _room_stream_sequence_key(room_public_id: str) -> str:
+        return f"{_REDIS_PREFIX}:stream-sequence:{room_public_id}"
+
+    @staticmethod
+    def _room_replay_key(room_public_id: str, epoch: str) -> str:
+        return f"{_REDIS_PREFIX}:replay:{room_public_id}:{epoch}"
+
+    async def _decorate_room(
+        self,
+        room_public_id: str,
+        payload: dict[str, Any],
+    ) -> dict[str, Any]:
+        event = self._decorate(payload)
+        try:
+            epoch, sequence = await self._redis.eval(
+                _ROOM_STREAM_SEQUENCE_SCRIPT,
+                2,
+                self._room_stream_epoch_key(room_public_id),
+                self._room_stream_sequence_key(room_public_id),
+                uuid4().hex,
+                _ROOM_STREAM_TTL_SECONDS,
+            )
+            resolved_epoch = str(epoch)
+            resolved_sequence = int(sequence)
+            stream = f"room:{room_public_id}:{resolved_epoch}"
+            event.update(
+                {
+                    "eventId": event["event_id"],
+                    "stream": stream,
+                    "sequence": resolved_sequence,
+                    "serverTime": event["sent_at"],
+                }
+            )
+            body = event.get("payload")
+            room = body.get("room") if isinstance(body, dict) else None
+            if isinstance(room, dict):
+                event["room_version"] = int(room.get("state_version") or 0)
+                event["event_sequence"] = int(room.get("event_sequence") or 0)
+            await self._redis.eval(
+                _ROOM_REPLAY_APPEND_SCRIPT,
+                1,
+                self._room_replay_key(room_public_id, resolved_epoch),
+                resolved_sequence,
+                json.dumps(event, default=str, separators=(",", ":")),
+                _ROOM_REPLAY_MAX_EVENTS,
+                _ROOM_REPLAY_TTL_SECONDS,
+            )
+        except Exception:
+            # The durable room action already committed. Local compatibility
+            # delivery may continue, but sequenced clients must resync because
+            # cross-instance replay is unavailable without Redis.
+            event.update(
+                {
+                    "eventId": event["event_id"],
+                    "stream": f"room:{room_public_id}:degraded:{self._instance_id}",
+                    "sequence": 0,
+                    "serverTime": event["sent_at"],
+                    "resync_required": True,
+                }
+            )
+        return event
+
+    async def replay_room(
+        self,
+        websocket: WebSocket,
+        room_public_id: str,
+        *,
+        stream: str,
+        after_sequence: int,
+    ) -> bool:
+        """Replay one bounded contiguous room stream, otherwise require snapshot."""
+        prefix = f"room:{room_public_id}:"
+        if after_sequence < 0 or not stream.startswith(prefix):
+            return False
+        epoch = stream[len(prefix):]
+        if not epoch or epoch.startswith("degraded:"):
+            return False
+        try:
+            current_epoch, current_sequence = await self._redis.mget(
+                self._room_stream_epoch_key(room_public_id),
+                self._room_stream_sequence_key(room_public_id),
+            )
+            if str(current_epoch or "") != epoch:
+                return False
+            current = int(current_sequence or 0)
+            if after_sequence >= current:
+                return after_sequence == current
+            raw_events = await self._redis.zrangebyscore(
+                self._room_replay_key(room_public_id, epoch),
+                f"({after_sequence}",
+                "+inf",
+            )
+            if not raw_events:
+                return False
+            expected = after_sequence + 1
+            events: list[dict[str, Any]] = []
+            for raw in raw_events:
+                decoded = json.loads(raw)
+                if not isinstance(decoded, dict) or int(decoded.get("sequence") or 0) != expected:
+                    return False
+                events.append(decoded)
+                expected += 1
+            if expected - 1 != current:
+                return False
+            for event in events:
+                if not await self.send_json(websocket, event):
+                    return False
+            return True
+        except Exception:
+            return False
+
     async def _publish(
         self,
         room_public_id: str,
@@ -373,14 +515,23 @@ class RealtimeConnectionManager:
         authoritative REST snapshot after reconnect. Durable domain events use
         the PostgreSQL outbox, not this transport channel.
         """
+        event_id = str(payload.get("event_id") or uuid4().hex)
         envelope = {
-            "event_id": str(uuid4()),
+            "event_id": event_id,
+            "eventId": event_id,
             "event_type": "room.realtime",
-            "event_version": 1,
+            "type": str(payload.get("type") or "room.realtime"),
+            "event_version": 2,
             "occurred_at": datetime.now(timezone.utc).isoformat(),
+            "serverTime": payload.get("serverTime") or payload.get("sent_at"),
             "trace_id": current_trace_id(),
             "traceparent": current_traceparent(),
             "scope": "user" if user_id is not None else "room",
+            "stream": payload.get("stream"),
+            "sequence": int(payload.get("sequence") or 0),
+            "room_version": int(payload.get("room_version") or 0),
+            "event_sequence": int(payload.get("event_sequence") or 0),
+            "resync_required": bool(payload.get("resync_required", False)),
             "payload": payload,
         }
         if user_id is not None:
@@ -398,7 +549,7 @@ class RealtimeConnectionManager:
         await self._publish_global(event)
 
     async def broadcast_room(self, room_public_id: str, payload: dict[str, Any]) -> None:
-        event = self._decorate(payload)
+        event = await self._decorate_room(room_public_id, payload)
         await self._deliver_local(room_public_id, event)
         await self._publish(room_public_id, event)
         await self._publish_gateway(event, room_public_id=room_public_id)
