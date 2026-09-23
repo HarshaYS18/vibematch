@@ -1,10 +1,10 @@
 # Local development
 
-Work from this repository checkout on `codex/funkey-production-backend-v1`. The current Python/FastAPI API and the canonical `backend_media` TypeScript process are separate. PostgreSQL, Redis, and NATS JetStream are available through `infra/docker-compose.yml`. Kubernetes is not required for routine endpoint work.
+Work from this repository checkout on `codex/funkey-production-backend-v1`. The current Python/FastAPI API and the canonical `backend_media` TypeScript process are separate. PostgreSQL, three isolated Redis/Valkey roles, and NATS JetStream are available through `infra/docker-compose.yml`. Kubernetes is not required for routine endpoint work.
 
 ## PowerShell workflow for the checkpoint stack
 
-Install Docker Desktop, Python dependencies, Node.js, and Flutter when working on the client. The existing `scripts/dev-up.ps1` expects a Python virtual environment in the parent of the repository directory (`.venv/Scripts/python.exe`) and untracked `backend/.env` and `backend_media/.env` files. Copy each `.env.example` and replace local placeholders. Set matching `MEDIA_INTERNAL_TOKEN` values in both files. With default script ports, configure `database_url=postgresql://postgres:postgres@127.0.0.1:5433/vibematch`, `redis_url=redis://127.0.0.1:6380/0`, `APP_ENV=development`, and `FASTAPI_BASE_URL=http://127.0.0.1:8000` for media. Run `npm ci` once in `backend_media`.
+Install Docker Desktop, Python dependencies, Node.js, and Flutter when working on the client. The existing `scripts/dev-up.ps1` expects a Python virtual environment in the parent of the repository directory (`.venv/Scripts/python.exe`) and untracked `backend/.env` and `backend_media/.env` files. Copy each `.env.example` and replace local placeholders. Set matching `MEDIA_INTERNAL_TOKEN` values in both files. With default script ports, use PostgreSQL on `5433`, cache Redis on `6380`, realtime Redis on `6381`, and media-registry Redis on `6382`. `dev-up.ps1` injects the three Redis role URLs into FastAPI; keep `APP_ENV=development` locally and use `FASTAPI_BASE_URL=http://127.0.0.1:8000` for media. Run `npm ci` once in `backend_media`.
 
 ```powershell
 .\scripts\dev-up.ps1
@@ -12,14 +12,14 @@ Install Docker Desktop, Python dependencies, Node.js, and Flutter when working o
 .\scripts\dev-down.ps1
 ```
 
-`dev-up.ps1` starts only its managed PostgreSQL/Redis containers, applies `alembic upgrade head`, and launches FastAPI and `backend_media`. It records owned processes under ignored `scripts/.dev-runtime/`. `dev-down.ps1` stops those processes and managed containers without deleting database volumes. Port and container overrides are exposed as script parameters. Use `-StartFlutter` if desired, or run Flutter separately with the correct `VM_API_BASE_URL` define.
+`dev-up.ps1` starts only its managed PostgreSQL plus cache/realtime/media Redis containers, applies `alembic upgrade head`, and launches FastAPI and `backend_media`. It records owned processes under ignored `scripts/.dev-runtime/`. `dev-down.ps1` stops those processes and managed containers without deleting database volumes. Port and container overrides are exposed as script parameters. Use `-StartFlutter` if desired, or run Flutter separately with the correct `VM_API_BASE_URL` define.
 
 ## Compose platform workflow
 
-The new `infra/docker-compose.yml` defines local PostgreSQL, Redis, and NATS by default. Its `app` profile also defines a migration job, API, Go gateway, and worker. The gateway is a foundation/shadow component until Flutter WebSocket routing is migrated and parity tested. Check each service's health and logs before treating it as usable. Compose development credentials are local only.
+The new `infra/docker-compose.yml` defines local PostgreSQL, cache Redis, realtime Redis, media-registry Redis, and NATS by default. Its `app` profile also defines a migration job, API, Go gateway, and worker. The gateway is a foundation/shadow component until Flutter WebSocket routing is migrated and parity tested. Check each service's health and logs before treating it as usable. Compose development credentials are local only.
 
 ```powershell
-docker compose -f infra/docker-compose.yml up -d postgres redis nats
+docker compose -f infra/docker-compose.yml up -d postgres cache-redis realtime-redis media-redis nats
 docker compose -f infra/docker-compose.yml --profile app up --build
 ```
 
