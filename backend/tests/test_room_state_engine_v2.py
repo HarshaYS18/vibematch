@@ -107,6 +107,17 @@ class RoomReplayTests(IsolatedAsyncioTestCase):
                 "type": "room/test",
                 "payload": {
                     "room_id": "VM200001",
+                    "protocol": "room-state-v2",
+                    "room_version": version,
+                    "event_sequence": version,
+                    "delta": {
+                        "room_id": "VM200001",
+                        "room_version": version,
+                        "event_sequence": version,
+                    },
+                    # Legacy FastAPI compatibility delivery still carries the
+                    # full replacement room. Replay/application realtime strips
+                    # it and keeps only the bounded v2 delta.
                     "room": {
                         "room_id": "VM200001",
                         "state_version": version,
