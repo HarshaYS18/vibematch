@@ -16,7 +16,7 @@ from app.database import get_db
 from app.models.role import RoleName
 from app.models.room import Room
 from app.models.user import User
-from app.services import role_service
+from app.services import inbox_realtime_command_service, role_service
 from app.services.ban_service import is_device_banned
 from app.services.permissions.media_room_permission_service import evaluate_media_room_permission
 
@@ -42,6 +42,24 @@ class RealtimeVerifyResponse(BaseModel):
     allowed: bool
     user_id: int
     is_staff: bool = False
+
+
+class RealtimeCommandRequest(BaseModel):
+    type: Literal[
+        "inbox.chat_activity",
+        "inbox.typing_start",
+        "inbox.typing_stop",
+        "inbox.mark_read",
+    ]
+    conversation_id: str = Field(min_length=1, max_length=128)
+    activity: str | None = Field(default=None, max_length=32)
+    command_id: str | None = Field(default=None, max_length=128)
+
+
+class RealtimeCommandResponse(BaseModel):
+    accepted: bool = True
+    command_id: str | None = None
+    conversation_id: str
 
 
 @router.post("/verify", response_model=RealtimeVerifyResponse)
@@ -82,4 +100,24 @@ def verify_realtime_gateway(
         allowed=True,
         user_id=current_user.id,
         is_staff=role_service.get_primary_role(current_user) in _REALTIME_STAFF_ROLES,
+    )
+
+
+@router.post("/command", response_model=RealtimeCommandResponse)
+async def execute_realtime_command(
+    payload: RealtimeCommandRequest,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    """Execute one allowlisted client realtime command in the authoritative API."""
+    result = await inbox_realtime_command_service.execute_inbox_realtime_command(
+        db,
+        current_user,
+        command_type=payload.type,
+        conversation_id=payload.conversation_id,
+        activity=payload.activity,
+    )
+    return RealtimeCommandResponse(
+        command_id=payload.command_id,
+        conversation_id=result.conversation_id,
     )
