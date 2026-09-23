@@ -516,6 +516,14 @@ class RealtimeConnectionManager:
         the PostgreSQL outbox, not this transport channel.
         """
         event_id = str(payload.get("event_id") or uuid4().hex)
+        gateway_payload = dict(payload)
+        gateway_body = gateway_payload.get("payload")
+        if isinstance(gateway_body, dict) and isinstance(gateway_body.get("delta"), dict):
+            # The Go/application realtime path is v2 delta-first. Keep the
+            # full replacement room only on the legacy FastAPI room socket.
+            gateway_body = dict(gateway_body)
+            gateway_body.pop("room", None)
+            gateway_payload["payload"] = gateway_body
         envelope = {
             "event_id": event_id,
             "eventId": event_id,
@@ -532,7 +540,7 @@ class RealtimeConnectionManager:
             "room_version": int(payload.get("room_version") or 0),
             "event_sequence": int(payload.get("event_sequence") or 0),
             "resync_required": bool(payload.get("resync_required", False)),
-            "payload": payload,
+            "payload": gateway_payload,
         }
         if user_id is not None:
             envelope["user_id"] = user_id
