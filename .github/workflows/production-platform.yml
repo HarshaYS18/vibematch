@@ -8,11 +8,14 @@ on:
       - 'apps/**'
       - 'backend/Dockerfile'
       - 'backend_media/Dockerfile'
+      - 'contracts/**'
       - 'deploy/**'
       - 'infra/**'
       - 'tests/load/**'
       - 'tests/chaos/**'
+      - 'scripts/check_contracts.py'
       - 'scripts/prepare_gitops_promotion.py'
+      - '.github/workflows/contracts.yml'
       - '.github/workflows/production-platform.yml'
       - '.github/workflows/prepare-gitops-promotion.yml'
 
@@ -44,7 +47,7 @@ jobs:
       - run: terraform -chdir=infra/terraform fmt -check -recursive
       - run: terraform -chdir=infra/terraform init -backend=false
       - run: terraform -chdir=infra/terraform validate
-      - run: python -m py_compile scripts/prepare_gitops_promotion.py
+      - run: python -m py_compile scripts/prepare_gitops_promotion.py scripts/check_contracts.py
       - uses: azure/setup-kubectl@v4
         with:
           version: v1.31.0
