@@ -44,7 +44,7 @@ See [state-classification.md](state-classification.md) for AUTHORITY, PROJECTION
 
 **Watch Party/activities:** these are implemented. Current canonical state is persisted in `room_realtime_events`; later current-state tables remain under Room Control.
 
-**Presence:** current heartbeat behavior remains transitional. Online socket presence is EPHEMERAL and moves to Redis/Valkey leases in Chunk 20/21 while durable membership remains PostgreSQL-backed.
+**Presence:** Chunk 20 makes online room socket presence an EPHEMERAL Redis/Valkey lease. Periodic room DB heartbeat is no longer the normal liveness path. Join/leave and durable membership remain PostgreSQL-backed. Chunk 21 completes application-socket convergence.
 
 ## App source registry relationship
 
