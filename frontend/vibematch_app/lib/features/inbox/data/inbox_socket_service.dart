@@ -21,7 +21,7 @@ class InboxSocketService {
     });
 
     await _hub.start();
-    sendRaw(const <String, dynamic>{'event': 'ping'});
+    sendRaw(const <String, dynamic>{'type': 'ping'});
   }
 
   void sendTypingStart(String conversationId) {
@@ -37,34 +37,41 @@ class InboxSocketService {
     required String activity,
   }) {
     sendRaw(<String, dynamic>{
-      'event': 'chat_activity',
+      'type': 'inbox.chat_activity',
       'conversation_id': conversationId,
       'activity': activity,
+      'command_id': _commandId('activity'),
     });
 
     if (activity == 'typing') {
       sendRaw(<String, dynamic>{
-        'event': 'typing_start',
+        'type': 'inbox.typing_start',
         'conversation_id': conversationId,
+        'command_id': _commandId('typing-start'),
       });
     } else if (activity == 'idle') {
       sendRaw(<String, dynamic>{
-        'event': 'typing_stop',
+        'type': 'inbox.typing_stop',
         'conversation_id': conversationId,
+        'command_id': _commandId('typing-stop'),
       });
     }
   }
 
   void markRead(String conversationId) {
     sendRaw(<String, dynamic>{
-      'event': 'mark_read',
+      'type': 'inbox.mark_read',
       'conversation_id': conversationId,
+      'command_id': _commandId('mark-read'),
     });
   }
 
   void sendRaw(Map<String, dynamic> payload) {
     _hub.sendRaw(payload);
   }
+
+  String _commandId(String kind) =>
+      'inbox-$kind-${DateTime.now().microsecondsSinceEpoch}';
 
   void disconnect() {
     final subscription = _subscription;
