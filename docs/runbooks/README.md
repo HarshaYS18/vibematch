@@ -4,6 +4,7 @@ Choose the incident matching the failing layer. For planned deployment, start wi
 
 - [API degraded](api-degraded.md)
 - [Realtime degraded](realtime-degraded.md)
+- [Room state replay / desynchronization](room-state-desync.md)
 - [Realtime gateway drain](realtime-drain.md)
 - [Media node drain](media-node-drain.md)
 - [Media outage](media-outage.md)
