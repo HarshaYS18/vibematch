@@ -1,0 +1,41 @@
+syntax = "proto3";
+
+package funkey.inbox.v1;
+
+import "common/v1/context.proto";
+
+option go_package = "github.com/HarshaYS18/vibematch/gen/go/funkey/inbox/v1;inboxv1";
+
+service InboxService {
+  rpc SendMessage(SendMessageRequest) returns (Message);
+  rpc GetConversation(GetConversationRequest) returns (Conversation);
+}
+
+message SendMessageRequest {
+  funkey.common.v1.RequestContext context = 1;
+  string conversation_id = 2;
+  string client_message_id = 3;
+  string message_type = 4;
+  string body = 5;
+}
+
+message GetConversationRequest {
+  funkey.common.v1.RequestContext context = 1;
+  string conversation_id = 2;
+}
+
+message Message {
+  string message_id = 1;
+  string conversation_id = 2;
+  int64 sender_user_id = 3;
+  string message_type = 4;
+  string body = 5;
+  int64 created_at_unix_ms = 6;
+}
+
+message Conversation {
+  string conversation_id = 1;
+  repeated int64 participant_user_ids = 2;
+  string conversation_type = 3;
+  uint64 version = 4;
+}
