@@ -42,8 +42,8 @@ func TestRoomPermissionRevocationDropsSubscriptionAndLease(t *testing.T) {
 	server.touchRoomLease(client, "room-a")
 
 	payload, _ := json.Marshal(map[string]any{
-		"room_public_id":    "room-a",
-		"reason":            "room_membership_removed",
+		"room_public_id":     "room-a",
+		"reason":             "room_membership_removed",
 		"membership_version": 12,
 	})
 	server.applyCapabilityRevocation(Event{
