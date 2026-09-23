@@ -20,6 +20,11 @@ abstract final class VmApiConfig {
     defaultValue: 'vpsBeta',
   );
 
+  static const String _overrideRealtimeWsUrl = String.fromEnvironment(
+    'VM_REALTIME_WS_URL',
+    defaultValue: '',
+  );
+
   static String get originBaseUrl {
     final override = _overrideBaseUrl.trim();
     if (override.isNotEmpty) return _withoutTrailingSlash(override);
@@ -35,8 +40,38 @@ abstract final class VmApiConfig {
     return betaVpsOrigin;
   }
 
-  /// Canonical versioned API base used by all REST and API WebSocket calls.
+  /// Canonical versioned API base used by REST/control-plane calls.
   static String get baseUrl => '$originBaseUrl$apiPrefix';
+
+  /// One application WebSocket owned by AppRealtimeHub.
+  ///
+  /// Production should set VM_REALTIME_WS_URL to the dedicated Go gateway
+  /// ingress (for example wss://ws.funkey.example/ws). Local defaults use the
+  /// gateway's 8081 port. Mediasoup signaling is configured separately.
+  static String get realtimeWebSocketUrl {
+    final override = _overrideRealtimeWsUrl.trim();
+    if (override.isNotEmpty) return override;
+
+    if (_apiEnv == 'androidEmulator') {
+      return 'ws://10.0.2.2:8081/ws';
+    }
+    if (_apiEnv == 'local') {
+      return 'ws://127.0.0.1:8081/ws';
+    }
+    if (_apiEnv == 'vpsBeta') {
+      return 'ws://$betaVpsHost:8081/ws';
+    }
+
+    final uri = Uri.parse(originBaseUrl);
+    return uri
+        .replace(
+          scheme: uri.scheme == 'https' ? 'wss' : 'ws',
+          path: '/ws',
+          query: null,
+          fragment: null,
+        )
+        .toString();
+  }
 
   static String endpoint(String path) {
     if (path.startsWith('http://') || path.startsWith('https://')) {
