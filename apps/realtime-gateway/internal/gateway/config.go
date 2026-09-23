@@ -11,6 +11,8 @@ import (
 type Config struct {
 	ListenAddr            string
 	AuthVerifyURL         string
+	CommandURL            string
+	CommandTimeout        time.Duration
 	RedisURL              string
 	RedisPoolSize         int
 	RedisPoolTimeout      time.Duration
@@ -66,6 +68,8 @@ func LoadConfig() (Config, error) {
 	cfg := Config{
 		ListenAddr:            env("REALTIME_LISTEN_ADDR", ":8081"),
 		AuthVerifyURL:         strings.TrimSpace(os.Getenv("REALTIME_AUTH_VERIFY_URL")),
+		CommandURL:            strings.TrimSpace(os.Getenv("REALTIME_COMMAND_URL")),
+		CommandTimeout:        3 * time.Second,
 		RedisURL:              env("REALTIME_REDIS_URL", "redis://127.0.0.1:6379/0"),
 		RedisPoolSize:         100,
 		RedisPoolTimeout:      2 * time.Second,
@@ -88,8 +92,17 @@ func LoadConfig() (Config, error) {
 	if cfg.AuthVerifyURL == "" {
 		return cfg, errors.New("REALTIME_AUTH_VERIFY_URL is required")
 	}
+	if cfg.CommandURL == "" {
+		cfg.CommandURL = strings.TrimSuffix(cfg.AuthVerifyURL, "/verify") + "/command"
+	}
 
 	var err error
+	if cfg.CommandTimeout, err = positiveDurationEnv(
+		"REALTIME_COMMAND_TIMEOUT",
+		cfg.CommandTimeout,
+	); err != nil {
+		return cfg, err
+	}
 	if cfg.RedisPoolSize, err = positiveIntEnv("REALTIME_REDIS_POOL_SIZE", cfg.RedisPoolSize); err != nil {
 		return cfg, err
 	}
