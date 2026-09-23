@@ -25,3 +25,12 @@ Do not give the exporter the application write credential.
 ## Service extraction
 
 When a business service receives its own login, update the PgBouncer auth secret/managed pool configuration and restrict the PostgreSQL role to that service's owned schema. Do not preserve monolith-wide write grants as a convenience.
+
+
+## Inbox service role boundary
+
+After Alembic reaches the Chunk 23 head, run `deploy/postgres/inbox-ownership.sql` with a provider/admin or migration role. It creates the NOLOGIN `funkey_inbox_owner` and `funkey_inbox_runtime` group roles, transfers ownership of chat/call tables, grants Inbox DML only to the runtime group, and grants bounded identity reads.
+
+Provision the actual production Inbox LOGIN externally, grant it membership in `funkey_inbox_runtime`, and store its PgBouncer URL as `INBOX_DATABASE_URL` in `funkey-inbox-secrets`. Do not grant `funkey_inbox_runtime` to the core API login. The migration/admin role must retain the ability to SET ROLE to `funkey_inbox_owner` for later Alembic changes.
+
+Stories are intentionally excluded from the Inbox ownership script in Chunk 23.
