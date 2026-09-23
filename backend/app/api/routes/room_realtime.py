@@ -151,23 +151,6 @@ def _room_snapshot_for_user(room_id: str, user_id: int, include_chat: bool = Tru
         return snapshot
 
 
-def _room_heartbeat_for_user(room_id: str, user_id: int) -> dict:
-    with SessionLocal() as db:
-        try:
-            user = _active_room_user(db, user_id)
-            room = room_or_404(db, room_id, for_update=True)
-            room_action_service.heartbeat_room(db, room, user)
-            db.commit()
-            db.refresh(room)
-            # Websocket snapshots remain complete replacement snapshots.
-            # REST heartbeats use an explicit partial-snapshot contract.
-            snapshot = client_room_snapshot(db, room, include_chat=True)
-            db.commit()
-            return snapshot
-        except Exception:
-            db.rollback()
-            raise
-
 def _disconnect_is_superseded(
     participant: RoomParticipant,
     disconnected_at: datetime,
