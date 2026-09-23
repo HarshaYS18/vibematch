@@ -1,7 +1,9 @@
 [CmdletBinding()]
 param(
     [string]$PostgresContainer = 'funkey-postgres-test',
-    [string]$RedisContainer = 'funkey-redis-6380'
+    [string]$RedisContainer = 'funkey-cache-redis-6380',
+    [string]$RealtimeRedisContainer = 'funkey-realtime-redis-6381',
+    [string]$MediaRedisContainer = 'funkey-media-redis-6382'
 )
 
 $ErrorActionPreference = 'Stop'
@@ -72,5 +74,7 @@ function Stop-ManagedContainer([string]$Name) {
 Stop-OwnedProcess 'flutter'
 Stop-OwnedProcess 'backend_media'
 Stop-OwnedProcess 'fastapi'
+Stop-ManagedContainer $MediaRedisContainer
+Stop-ManagedContainer $RealtimeRedisContainer
 Stop-ManagedContainer $RedisContainer
 Stop-ManagedContainer $PostgresContainer
