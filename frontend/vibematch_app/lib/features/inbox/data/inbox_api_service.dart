@@ -7,6 +7,28 @@ import '../../../core/network/vm_api_config.dart';
 import '../../auth/data/auth_api_service.dart';
 import '../models/inbox_models.dart';
 
+class InboxConversationPage {
+  const InboxConversationPage({
+    required this.items,
+    this.nextCursor,
+  });
+
+  final List<InboxConversation> items;
+  final String? nextCursor;
+}
+
+class InboxMessagePage {
+  const InboxMessagePage({
+    required this.messages,
+    this.nextCursor,
+    required this.hasMore,
+  });
+
+  final List<InboxMessage> messages;
+  final String? nextCursor;
+  final bool hasMore;
+}
+
 class InboxApiService {
   InboxApiService({AuthApiService authApiService = const AuthApiService()})
     : _authApiService = authApiService;
@@ -134,19 +156,42 @@ class InboxApiService {
     return decoded['message']?.toString() ?? 'Recovery request submitted.';
   }
 
-  Future<List<InboxConversation>> loadConversations() async {
+  Future<void> bootstrapInbox() async {
+    final response = await http.post(
+      Uri.parse(VmApiConfig.endpoint('/inbox/bootstrap')),
+      headers: await _headers(),
+      body: jsonEncode({}),
+    );
+    _throwIfFailed(response, 'bootstrap inbox');
+  }
+
+  Future<InboxConversationPage> loadConversationPage({
+    String? cursor,
+    int limit = 40,
+  }) async {
+    final query = <String, String>{
+      'limit': limit.clamp(1, 100).toString(),
+      if (cursor != null && cursor.trim().isNotEmpty) 'cursor': cursor.trim(),
+    };
+    final base = Uri.parse(VmApiConfig.endpoint('/inbox/conversations'));
     final response = await http.get(
-      Uri.parse(VmApiConfig.endpoint('/inbox/conversations')),
+      base.replace(queryParameters: query),
       headers: await _headers(),
     );
     _throwIfFailed(response, 'load conversations');
     final decoded = jsonDecode(response.body) as Map<String, dynamic>;
     final items = decoded['conversations'] as List<dynamic>? ?? const [];
-    return items
-        .whereType<Map<String, dynamic>>()
-        .map(conversationFromJson)
-        .toList();
+    return InboxConversationPage(
+      items: items
+          .whereType<Map<String, dynamic>>()
+          .map(conversationFromJson)
+          .toList(),
+      nextCursor: _nullableString(decoded['next_cursor']),
+    );
   }
+
+  Future<List<InboxConversation>> loadConversations() async =>
+      (await loadConversationPage()).items;
 
   Future<InboxConversation> getConversation(String conversationId) async {
     final response = await http.get(
@@ -157,6 +202,48 @@ class InboxApiService {
     return conversationFromJson(
       jsonDecode(response.body) as Map<String, dynamic>,
     );
+  }
+
+  Future<InboxMessagePage> loadOlderMessages({
+    required String conversationId,
+    required String before,
+    int limit = 50,
+  }) async {
+    final query = <String, String>{
+      'limit': limit.clamp(1, 100).toString(),
+      'before': before,
+    };
+    final base = Uri.parse(
+      VmApiConfig.endpoint('/inbox/conversations/$conversationId/messages'),
+    );
+    final response = await http.get(
+      base.replace(queryParameters: query),
+      headers: await _headers(),
+    );
+    _throwIfFailed(response, 'load older messages');
+    final decoded = jsonDecode(response.body) as Map<String, dynamic>;
+    final items = decoded['messages'] as List<dynamic>? ?? const [];
+    return InboxMessagePage(
+      messages: items
+          .whereType<Map<String, dynamic>>()
+          .map(messageFromJson)
+          .toList(),
+      nextCursor: _nullableString(decoded['next_cursor']),
+      hasMore: decoded['has_more'] == true,
+    );
+  }
+
+  Future<void> openSecretDriftSession(String conversationId) async {
+    final response = await http.post(
+      Uri.parse(
+        VmApiConfig.endpoint(
+          '/inbox/conversations/$conversationId/secret-drift/open',
+        ),
+      ),
+      headers: await _headers(),
+      body: jsonEncode({}),
+    );
+    _throwIfFailed(response, 'open Secret Drift session');
   }
 
   Future<InboxConversation> createDirectConversation({
@@ -199,12 +286,14 @@ class InboxApiService {
     required String conversationId,
     bool? isMuted,
     bool? isPinned,
+    bool? isArchived,
     bool? isLocked,
     bool? isBlocked,
   }) async {
     final body = <String, Object>{};
     if (isMuted != null) body['is_muted'] = isMuted;
     if (isPinned != null) body['is_pinned'] = isPinned;
+    if (isArchived != null) body['is_archived'] = isArchived;
     if (isLocked != null) body['is_locked'] = isLocked;
     if (isBlocked != null) body['is_blocked'] = isBlocked;
 
@@ -379,6 +468,8 @@ class InboxApiService {
           .whereType<Map<String, dynamic>>()
           .map(messageFromJson)
           .toList(),
+      messagesNextCursor: _nullableString(json['messages_next_cursor']),
+      hasOlderMessages: json['has_older_messages'] == true,
       currentRoomName: _nullableString(json['current_room_name']),
       currentRoomId: _nullableString(json['current_room_id']),
       isLockedByBackend: json['is_locked_by_backend'] == true,
