@@ -14,9 +14,9 @@ from starlette.websockets import WebSocketState
 from app.core.config import settings
 
 
-_INBOX_CHANNEL = "funkey:inbox:events"
-_INBOX_LEASE_PREFIX = "funkey:inbox:leases"
-_CLIENT_SEQUENCE_PREFIX = "funkey:app-realtime:sequence"
+_INBOX_CHANNEL = "funkey:realtime:inbox:events"
+_INBOX_LEASE_PREFIX = "funkey:realtime:inbox:leases"
+_CLIENT_SEQUENCE_PREFIX = "funkey:realtime:app-sequence"
 _SOCKET_LEASE_SECONDS = 30
 _SOCKET_LEASE_REFRESH_SECONDS = 10
 _REMOTE_EVENT_TTL_SECONDS = 5 * 60
@@ -34,11 +34,13 @@ class InboxWebSocketManager:
         self._lease_tasks: dict[WebSocket, asyncio.Task[None]] = {}
         self._instance_id = uuid4().hex
         self._redis: Any = redis_client or Redis.from_url(
-            settings.redis_url,
+            settings.realtime_redis_url,
             decode_responses=True,
             socket_connect_timeout=settings.REDIS_CONNECT_TIMEOUT_SECONDS,
             socket_timeout=settings.REDIS_SOCKET_TIMEOUT_SECONDS,
             health_check_interval=20,
+            max_connections=settings.REALTIME_REDIS_MAX_CONNECTIONS,
+            client_name="funkey-inbox-realtime",
         )
         self._listener_task: asyncio.Task[None] | None = None
         self._seen_remote_events: dict[str, float] = {}
