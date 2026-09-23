@@ -23,9 +23,18 @@ class Settings(BaseSettings):
     # Database / Redis from .env
     database_url: str = "postgresql://postgres:postgres@localhost:5432/vibematch"
     MIGRATION_DATABASE_URL: str = ""
+    # Legacy redis_url remains a development fallback for the application
+    # cache/rate-limit role only. Production must provide all three explicit
+    # role endpoints so cache pressure cannot destabilize realtime/media.
     redis_url: str = "redis://localhost:6379/0"
+    CACHE_REDIS_URL: str = ""
+    REALTIME_REDIS_URL: str = ""
+    MEDIA_REGISTRY_REDIS_URL: str = ""
     REDIS_CONNECT_TIMEOUT_SECONDS: float = 2.0
     REDIS_SOCKET_TIMEOUT_SECONDS: float = 2.0
+    CACHE_REDIS_MAX_CONNECTIONS: int = 50
+    REALTIME_REDIS_MAX_CONNECTIONS: int = 100
+    MEDIA_REGISTRY_REDIS_MAX_CONNECTIONS: int = 30
 
     # PostgreSQL / PgBouncer platform policy.
     DB_POOLER_MODE: str = "direct"
@@ -119,6 +128,23 @@ class Settings(BaseSettings):
         return self.MIGRATION_DATABASE_URL.strip() or self.database_url
 
     @property
+    def cache_redis_url(self) -> str:
+        return self.CACHE_REDIS_URL.strip() or self.redis_url
+
+    @property
+    def realtime_redis_url(self) -> str:
+        return self.REALTIME_REDIS_URL.strip() or self.cache_redis_url
+
+    @property
+    def media_registry_redis_url(self) -> str:
+        return self.MEDIA_REGISTRY_REDIS_URL.strip() or self.cache_redis_url
+
+    @staticmethod
+    def _redis_endpoint_identity(value: str) -> tuple[str, str, int | None]:
+        parsed = urlsplit(value)
+        return parsed.scheme, parsed.hostname or "", parsed.port
+
+    @property
     def expected_pooler_client_connections(self) -> int:
         return (
             self.DB_API_CONNECTION_BUDGET
@@ -156,11 +182,29 @@ class Settings(BaseSettings):
                 if not parsed_migration.scheme.startswith("postgresql") or not parsed_migration.hostname:
                     unsafe.append("MIGRATION_DATABASE_URL")
 
-        redis_url = urlsplit(self.redis_url)
-        if redis_url.scheme not in {"redis", "rediss"} or not redis_url.hostname:
-            unsafe.append("redis_url")
-        if self.redis_url == "redis://localhost:6379/0":
-            unsafe.append("redis_url(default)")
+        explicit_redis_urls = {
+            "CACHE_REDIS_URL": self.CACHE_REDIS_URL.strip(),
+            "REALTIME_REDIS_URL": self.REALTIME_REDIS_URL.strip(),
+            "MEDIA_REGISTRY_REDIS_URL": self.MEDIA_REGISTRY_REDIS_URL.strip(),
+        }
+        redis_identities = []
+        for name, value in explicit_redis_urls.items():
+            if not value:
+                unsafe.append(name)
+                continue
+            parsed = urlsplit(value)
+            if parsed.scheme not in {"redis", "rediss"} or not parsed.hostname:
+                unsafe.append(name)
+                continue
+            redis_identities.append(self._redis_endpoint_identity(value))
+        if len(redis_identities) == 3 and len(set(redis_identities)) != 3:
+            unsafe.append("Redis role endpoint separation")
+        if (
+            self.CACHE_REDIS_MAX_CONNECTIONS < 1
+            or self.REALTIME_REDIS_MAX_CONNECTIONS < 1
+            or self.MEDIA_REGISTRY_REDIS_MAX_CONNECTIONS < 1
+        ):
+            unsafe.append("Redis connection budgets")
         if not self.GOOGLE_AUTH_CLIENT_IDS.strip():
             unsafe.append("GOOGLE_AUTH_CLIENT_IDS")
         if self.cors_allowed_origins == ["*"] or any(origin == "*" for origin in self.cors_allowed_origins):
