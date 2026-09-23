@@ -53,6 +53,7 @@ class Settings(BaseSettings):
     # Chunk 23 Inbox service boundary.
     INBOX_SERVICE_URL: str = "http://127.0.0.1:8083/api/v1"
     INBOX_SERVICE_TIMEOUT_SECONDS: float = 5.0
+    INBOX_INTERNAL_TOKEN: str = "change-this-inbox-internal-token"
     INBOX_DATABASE_URL: str = ""
     INBOX_DB_POOL_SIZE: int = 5
     INBOX_DB_MAX_OVERFLOW: int = 0
@@ -183,7 +184,12 @@ class Settings(BaseSettings):
         if not self.is_production:
             return
         unsafe = []
-        for name in ("JWT_SECRET_KEY", "MEDIA_INTERNAL_TOKEN", "INBOX_BACKUP_ENCRYPTION_KEY"):
+        for name in (
+            "JWT_SECRET_KEY",
+            "MEDIA_INTERNAL_TOKEN",
+            "INBOX_BACKUP_ENCRYPTION_KEY",
+            "INBOX_INTERNAL_TOKEN",
+        ):
             value = getattr(self, name).strip()
             if len(value) < 32 or "change-this" in value.lower():
                 unsafe.append(name)
@@ -316,6 +322,11 @@ class Settings(BaseSettings):
         if not self.is_production:
             return
         unsafe: list[str] = []
+        if (
+            len(self.INBOX_INTERNAL_TOKEN.strip()) < 32
+            or "change-this" in self.INBOX_INTERNAL_TOKEN.lower()
+        ):
+            unsafe.append("INBOX_INTERNAL_TOKEN")
         inbox_url = self.INBOX_DATABASE_URL.strip()
         if not inbox_url:
             unsafe.append("INBOX_DATABASE_URL")
