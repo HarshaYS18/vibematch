@@ -17,6 +17,25 @@ import (
 
 type testAuthorizer struct{}
 
+type testCommandExecutor struct {
+	commands chan clientCommand
+	err      error
+}
+
+func (e *testCommandExecutor) Execute(
+	_ context.Context,
+	_ string,
+	command clientCommand,
+) error {
+	if e.err != nil {
+		return e.err
+	}
+	if e.commands != nil {
+		e.commands <- command
+	}
+	return nil
+}
+
 func (testAuthorizer) Verify(_ context.Context, token, action, roomID string) (Principal, error) {
 	if token != "valid" || (action == "subscribe" && roomID != "room-a") {
 		return Principal{}, ErrUnauthorized
@@ -39,8 +58,15 @@ func newRealtimeTestServer(t *testing.T) (*Server, *redis.Client, context.Cancel
 		MaxMessageBytes: 4096, OutboundQueue: 16, MaxConnections: 10,
 		MaxConnectionsPerUser: 4,
 		LeaseTTL: time.Minute, NodeID: "test-node", Origins: map[string]struct{}{},
+		CommandTimeout: time.Second,
 	}
-	server := NewServer(cfg, testAuthorizer{}, redisClient, slog.Default())
+	server := NewServer(
+		cfg,
+		testAuthorizer{},
+		&testCommandExecutor{},
+		redisClient,
+		slog.Default(),
+	)
 	ctx, cancel := context.WithCancel(context.Background())
 	go server.ConsumeEvents(ctx)
 	deadline := time.Now().Add(time.Second)
@@ -175,10 +201,69 @@ func TestRoomSubscriptionReplaysContiguousChunk20StreamAndWritesLease(t *testing
 	}
 }
 
+func TestWebSocketRelaysAllowlistedInboxCommand(t *testing.T) {
+	redisServer, err := miniredis.Run()
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer redisServer.Close()
+	redisClient := redis.NewClient(&redis.Options{Addr: redisServer.Addr()})
+	defer redisClient.Close()
+
+	executor := &testCommandExecutor{commands: make(chan clientCommand, 1)}
+	cfg := Config{
+		AuthTimeout: time.Second, CommandTimeout: time.Second,
+		WriteTimeout: time.Second, PingInterval: time.Hour,
+		PongTimeout: time.Hour, ReauthInterval: time.Hour,
+		MaxMessageBytes: 4096, OutboundQueue: 16, MaxConnections: 10,
+		MaxConnectionsPerUser: 4, LeaseTTL: time.Minute,
+		NodeID: "test-node", Origins: map[string]struct{}{},
+	}
+	server := NewServer(cfg, testAuthorizer{}, executor, redisClient, slog.Default())
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+	go server.ConsumeEvents(ctx)
+	deadline := time.Now().Add(time.Second)
+	for !server.subscribed.Load() && time.Now().Before(deadline) {
+		time.Sleep(5 * time.Millisecond)
+	}
+	httpServer := httptest.NewServer(server.Handler())
+	defer httpServer.Close()
+	wsURL := "ws" + strings.TrimPrefix(httpServer.URL, "http") + "/ws"
+	conn := dialRealtime(t, wsURL)
+
+	if err := conn.WriteJSON(map[string]any{
+		"type": "inbox.mark_read",
+		"conversation_id": "conversation-1",
+		"command_id": "cmd-1",
+	}); err != nil {
+		t.Fatal(err)
+	}
+	select {
+	case command := <-executor.commands:
+		if command.Type != "inbox.mark_read" ||
+			command.ConversationID != "conversation-1" ||
+			command.CommandID != "cmd-1" {
+			t.Fatalf("unexpected relayed command: %+v", command)
+		}
+	case <-time.After(time.Second):
+		t.Fatal("command was not relayed")
+	}
+
+	var ack map[string]any
+	if err := conn.ReadJSON(&ack); err != nil {
+		t.Fatal(err)
+	}
+	if ack["type"] != "command/ack" || ack["command_id"] != "cmd-1" {
+		t.Fatalf("unexpected command ack: %+v", ack)
+	}
+}
+
 func TestWebSocketRejectsUnauthorizedTokenBeforeUpgrade(t *testing.T) {
 	server := NewServer(
 		Config{AuthTimeout: time.Second, Origins: map[string]struct{}{}},
 		testAuthorizer{},
+		&testCommandExecutor{},
 		nil,
 		slog.Default(),
 	)
