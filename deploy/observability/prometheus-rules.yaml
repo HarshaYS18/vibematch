@@ -81,6 +81,34 @@ spec:
           labels: {severity: ticket}
           annotations:
             summary: PostgreSQL lock count is unusually high; inspect blockers and workload
+    - name: funkey-redis
+      rules:
+        - alert: FunKeyRedisExporterDown
+          expr: redis_up < 1
+          for: 2m
+          labels: {severity: page}
+          annotations:
+            summary: A FunKey Redis/Valkey role is unavailable to its exporter
+        - alert: FunKeyRedisMemoryPressure
+          expr: |
+            (redis_memory_max_bytes > 0)
+            and
+            (redis_memory_used_bytes / redis_memory_max_bytes > 0.85)
+          for: 10m
+          labels: {severity: page}
+          annotations:
+            summary: A FunKey Redis/Valkey role is above 85% of its memory ceiling
+        - alert: FunKeyRedisEvictions
+          expr: increase(redis_evicted_keys_total[10m]) > 0
+          for: 5m
+          labels: {severity: ticket}
+          annotations:
+            summary: A FunKey Redis/Valkey role is evicting keys
+        - alert: FunKeyRedisRejectedConnections
+          expr: increase(redis_rejected_connections_total[10m]) > 0
+          labels: {severity: page}
+          annotations:
+            summary: A FunKey Redis/Valkey role rejected one or more connections
     - name: funkey-realtime
       rules:
         - alert: FunKeyRealtimeRedisSubscriptionDown
