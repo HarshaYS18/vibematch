@@ -2,92 +2,92 @@
 
 ## Purpose
 
-Manages WebSocket transport, reconnect, fanout, and drain while deferring durable decisions to FastAPI domain authority.
+Provides FunKey's single authenticated application WebSocket while deferring all durable business decisions to FastAPI/domain authority. Mediasoup/WebRTC signaling is a separate media-plane connection.
 
 ## Responsibilities
 
-Connection lifecycle and transient routing metadata; no room, seat, role, or wallet authority.
+- connection lifecycle and reauthorization;
+- authorized room subscriptions;
+- user/users/staff/all/room event routing;
+- sharded transient recipient indexes;
+- bounded priority backpressure and dedupe;
+- Chunk 20 room replay/resume;
+- allowlisted command relay to FastAPI;
+- gateway/user/room leases;
+- readiness, metrics, tracing, and drain.
 
 ## What this module owns
 
-Connection lifecycle and transient routing metadata; no room, seat, role, or wallet authority.
+Ephemeral realtime transport only. It owns live sockets, routing indexes, delivery queues, replay delivery, leases, rate limits, and node drain state.
 
 ## What this module does NOT own
 
-The gateway does not own identity, bans, room membership, seats, chat persistence, wallet value, media transport, or durable command authorization.
+Identity, bans, roles, room membership, seats, chat persistence, Inbox membership, wallet/economy value, gifts, notifications, Watch Party truth, game truth, or media transport. The Go gateway never performs a durable business mutation itself.
 
 ## Source of truth
 
-PostgreSQL remains the durable source of truth for application state.
+PostgreSQL-backed FastAPI/domain services remain authoritative. Redis/Valkey contains ephemeral fanout, leases, rate/idempotency metadata, and bounded room replay state.
 
 ## Important files
 
-`apps/realtime-gateway/README.md`, `apps/realtime-gateway/internal/gateway/server.go`, `backend/app/realtime/event_bus.py`, `backend/app/api/routes/realtime_gateway_auth.py`.
+- `apps/realtime-gateway/README.md`
+- `apps/realtime-gateway/internal/gateway/server.go`
+- `apps/realtime-gateway/internal/gateway/hub.go`
+- `apps/realtime-gateway/internal/gateway/commands.go`
+- `backend/app/api/routes/realtime_gateway_auth.py`
+- `backend/app/services/realtime_command_service.py`
+- `frontend/vibematch_app/lib/realtime/app_realtime_hub.dart`
+- `contracts/events/realtime-gateway-v2.schema.json`
 
 ## Public API/contracts
 
-Go `GET /ws`, `/live`, `/ready`, `/metrics`; backend `POST /api/v1/realtime/verify`. The gateway implements the production transport contract; traffic cutover remains controlled by deployment/client compatibility. Existing FastAPI compatibility paths stay available until the client migration is explicitly completed.
+Go:
+- `GET /ws`
+- `GET /live`
+- `GET /ready`
+- `GET /metrics`
 
-## Events published
+FastAPI control plane:
+- `POST /api/v1/realtime/verify`
+- `POST /api/v1/realtime/command`
 
-No domain events. The gateway sends WebSocket transport controls only; durable commands remain with FastAPI.
+The WebSocket protocol is `funkey.v2`. Browser-compatible authentication uses `bearer.<token>` as an additional offered subprotocol; only `funkey.v2` is selected.
 
 ## Events consumed
 
-The Go gateway consumes backend-published, versioned envelopes from Redis channel `funkey:realtime:events` and delivers them to authorized local sockets. It does not publish domain events or make durable commands. Redis Pub/Sub is ephemeral. Chunk 20 room traffic carries a bounded contiguous transport sequence and replay window before snapshot fallback; the transport sequence is intentionally distinct from durable PostgreSQL `event_sequence`. This is distinct from durable JetStream work delivery.
+The gateway consumes versioned backend envelopes from `funkey:realtime:events` with `room`, `user`, `users`, `staff`, or `all` scope.
+
+Chunk 20 room traffic carries an ephemeral contiguous transport stream/sequence and bounded replay window before authoritative snapshot fallback.
+
+## Commands
+
+Client commands are strictly allowlisted. The gateway forwards authenticated commands to FastAPI and returns transport acknowledgements/errors. FastAPI owns permission checks, idempotency, durable writes, and resulting domain-event publication.
 
 ## Database tables/state owned
 
-Database: No gateway-owned durable tables; room_realtime_events remain authoritative replay data.
+None.
 
-## Redis keys/state owned
+## Redis keys/state
 
-`funkey:realtime:gateway:node:<node_id>`, `funkey:realtime:gateway:user:<user_id>:<connection_id>`, `funkey:realtime:gateway:rate:<user_id>`, and the Room State Engine v2 stream/replay keys under `funkey:realtime:room:*` are expiring transport state. Process memory holds only live sockets and recipient indexes.
-
-## Dependencies
-
-Depends on Go, Redis/Valkey, and the FastAPI `POST /api/v1/realtime/verify` endpoint. FastAPI owns PostgreSQL access for authorization; the gateway has no direct database pool.
-
-## Security considerations
-
-Authenticate every connection and command; bound message sizes and outbound queues. Do not log tokens, credentials, private content, or payment secrets.
+Gateway/user/rate keys under `funkey:realtime:gateway:*` plus room leases and Chunk 20 replay keys under `funkey:realtime:room:*`. All expire and are non-authoritative.
 
 ## Failure modes
 
-On pod drain, reject upgrades and direct reconnect; clients reload snapshot after gaps.
+- Redis down: readiness fails; reconnect/resync is required.
+- FastAPI verify down: new connect/subscribe fails closed.
+- FastAPI command down: command errors; no local mutation.
+- replay discontinuity: client refreshes authoritative room snapshot.
+- slow consumer: best-effort traffic drops first; required-overflow client closes.
+- planned drain: upgrades stop and clients reconnect to healthy replicas.
 
-## Retry/idempotency behavior
+## Security considerations
 
-Use bounded timeouts and explicit retry budgets. Only replay writes when a stable idempotency key or reconciliation proves the commit outcome.
-
-## Scaling behavior
-
-Scale this workload independently when deployed.
-
-## Autoscaling metrics
-
-Measure active WebSockets (`funkey_realtime_connections`), accepted connections, auth denials, slow-client closes, Redis subscription health, CPU, memory, network egress, queue/backpressure, and reconnect rate. Drain before scale-in.
-
-## Observability
-
-Propagate request and trace IDs through internal calls. Emit structured logs and low-cardinality metrics for readiness, throughput, failures, and drain progress. Pair alerts with the matching runbook.
-
-## Local development
-
-See the root README and local development guide for PostgreSQL, Redis, FastAPI, media, and optional broker setup.
+Never trust client-supplied identity or staff status. Keep commands allowlisted, frames/rates/queues/concurrency bounded, tokens out of logs, Redis private, and browser origins allowlisted.
 
 ## Testing
 
-Run the component's unit/contract checks and an integration test against real dependencies before changing a distributed contract.
-
-## Deployment notes
-
-Deploy compatible contracts first, then producers/consumers or routing. Verify health, rollback path, and operational dashboards.
-
-## Change checklist
-
-Review security boundaries, schema changes, resource limits, autoscaling signals, and scale-in drain behavior.
+Run `gofmt`, `go vet ./...`, `go test ./...`, and `go test -race ./...` plus repository architecture/contract/Flutter/backend/media/infrastructure CI.
 
 ## Known migration status
 
-Transport implementation complete: bounded queues, connection/device budgets, authorization revalidation, subscription authorization, Redis cross-instance fanout, event dedupe, leases, reconnect/resync controls, metrics and graceful drain are implemented. Client traffic cutover is a deployment decision, not a missing gateway feature.
+**Chunk 21 application-socket cutover is implemented.** Flutter uses one Go application WebSocket. Legacy FastAPI Inbox/room WebSocket routes and feature-owned application sockets are retired. Mediasoup signaling remains separate by design.
