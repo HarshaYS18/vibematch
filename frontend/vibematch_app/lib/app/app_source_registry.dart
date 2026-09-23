@@ -77,7 +77,7 @@ class AppSourceRegistry {
   static const String canonicalMasterRead = '/users/me/master-state';
   static const String canonicalRoomSnapshot =
       '/rooms/{room_public_id}/realtime/snapshot';
-  static const String canonicalRoomRealtimeChannel = '/ws/room-realtime';
+  static const String canonicalRoomRealtimeChannel = '/ws';
   static const String canonicalWatchPartyCommand =
       '/rooms/{room_public_id}/realtime/watch-party/command';
   static const Set<String> canonicalRoomLifecycleWrites = <String>{
