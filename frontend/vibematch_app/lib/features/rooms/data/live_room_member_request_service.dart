@@ -1,11 +1,9 @@
 import 'dart:async';
-import 'dart:convert';
 
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
-import 'package:web_socket_channel/web_socket_channel.dart';
 
-import '../../../core/network/vm_media_config.dart';
+import '../../../realtime/app_realtime_hub.dart';
 import '../presentation/live_room_models.dart';
 import 'live_room_membership_service.dart';
 
@@ -18,7 +16,7 @@ class LiveRoomMemberRequestService {
   final ValueNotifier<List<SeatUser>> pendingRequests =
       ValueNotifier<List<SeatUser>>(<SeatUser>[]);
 
-  WebSocketChannel? _channel;
+  final AppRealtimeHub _hub = AppRealtimeHub.shared;
   StreamSubscription<dynamic>? _subscription;
   String _roomId = '';
   SeatUser? _currentUser;
@@ -27,106 +25,89 @@ class LiveRoomMemberRequestService {
     final cleanRoomId = roomId.trim();
     if (cleanRoomId.isEmpty) return;
 
-    final sameSession = _roomId == cleanRoomId && _currentUser?.id == currentUser.id;
     _roomId = cleanRoomId;
     _currentUser = currentUser;
+    _subscription ??= _hub.events.listen((event) {
+      final legacy = event.toLegacyEvent();
+      final eventRoomId =
+          legacy['room_id']?.toString().trim() ??
+          legacy['room_public_id']?.toString().trim() ??
+          '';
+      if (eventRoomId.isNotEmpty && eventRoomId != _roomId) return;
 
-    if (sameSession && _channel != null) {
-      _send('room/snapshot', <String, Object?>{});
-      return;
-    }
-
-    unawaited(_subscription?.cancel());
-    unawaited(_channel?.sink.close());
-    _subscription = null;
-    _channel = null;
-
-    try {
-      final channel = WebSocketChannel.connect(Uri.parse(VmMediaConfig.wsUrl));
-      _channel = channel;
-      _subscription = channel.stream.listen(
-        _handleMessage,
-        onError: (_) => _resetSocketOnly(),
-        onDone: _resetSocketOnly,
-        cancelOnError: true,
+      final nestedPayload = _map(legacy['payload']);
+      final delta = _map(
+        legacy['delta'] ??
+            nestedPayload['delta'] ??
+            event.payload['delta'],
       );
-      _send('room/snapshot', <String, Object?>{});
-    } catch (_) {
-      _resetSocketOnly();
-    }
+      if (delta.isNotEmpty) {
+        _syncFromRoomSnapshot(delta);
+        return;
+      }
+
+      final room = _map(
+        legacy['room'] ??
+            nestedPayload['room'] ??
+            event.payload['room'],
+      );
+      if (room.isNotEmpty) {
+        _syncFromRoomSnapshot(room);
+      }
+    });
+
+    unawaited(_hub.start());
   }
 
   void requestMembership() {
     if (_currentUser == null || _roomId.isEmpty) return;
-    _send('room_member/request', <String, Object?>{});
+    _send('room_member/request');
   }
 
   void approveMembership(SeatUser user) {
     if (_roomId.isEmpty || user.id.trim().isEmpty) return;
-    _send('room_member/approve', <String, Object?>{
-      'target_user_id': user.id,
-    });
+    _send(
+      'room_member/approve',
+      <String, Object?>{'target_user_id': user.id},
+    );
   }
 
   void rejectMembership(SeatUser user) {
     if (_roomId.isEmpty || user.id.trim().isEmpty) return;
-    _send('room_member/reject', <String, Object?>{
-      'target_user_id': user.id,
-    });
+    _send(
+      'room_member/reject',
+      <String, Object?>{'target_user_id': user.id},
+    );
   }
 
   void removeRoomMember(SeatUser user) {
     if (_roomId.isEmpty || user.id.trim().isEmpty) return;
-    _send('room_member/remove', <String, Object?>{
-      'target_user_id': user.id,
-    });
+    _send(
+      'room_member/remove',
+      <String, Object?>{'target_user_id': user.id},
+    );
   }
 
   void stop() {
     unawaited(_subscription?.cancel());
-    unawaited(_channel?.sink.close());
     _subscription = null;
-    _channel = null;
     _roomId = '';
     _currentUser = null;
     pendingRequests.value = <SeatUser>[];
   }
 
-  void _send(String type, Map<String, Object?> payload) {
-    final channel = _channel;
-    final roomId = _roomId;
-    final user = _currentUser;
-    if (channel == null || roomId.isEmpty || user == null) return;
-
-    final messagePayload = <String, Object?>{
-      'room_id': roomId,
-      'user_id': user.id,
-      'display_name': user.name,
-      'avatar_url': user.avatarUrl,
-      'is_host': user.isHost,
-      'is_room_admin': user.isRoomAdmin || user.isHost,
-      ...payload,
-    };
-
-    channel.sink.add(
-      jsonEncode(<String, Object?>{
-        'type': type,
-        'payload': messagePayload,
-      }),
-    );
-  }
-
-  void _handleMessage(dynamic raw) {
-    try {
-      final decoded = jsonDecode(raw.toString()) as Map<String, dynamic>;
-      final payload = decoded['payload'];
-      if (payload is! Map<String, dynamic>) return;
-      final roomData = payload['room'];
-      if (roomData is! Map<String, dynamic>) return;
-      _syncFromRoomSnapshot(roomData);
-    } catch (_) {
-      // Ignore malformed realtime packets.
-    }
+  void _send(
+    String type, [
+    Map<String, Object?> payload = const <String, Object?>{},
+  ]) {
+    if (_roomId.isEmpty) return;
+    _hub.sendRaw(<String, dynamic>{
+      'type': type,
+      'room_public_id': _roomId,
+      'command_id':
+          'room-member-${DateTime.now().microsecondsSinceEpoch}',
+      'payload': payload,
+    });
   }
 
   void _syncFromRoomSnapshot(Map<String, dynamic> roomData) {
@@ -134,20 +115,25 @@ class LiveRoomMemberRequestService {
 
     final rawRequests = roomData['pending_room_member_requests'];
     final requestMaps = rawRequests is List
-        ? rawRequests.whereType<Map<String, dynamic>>().toList(growable: false)
+        ? rawRequests
+              .whereType<Map>()
+              .map((item) => item.cast<String, dynamic>())
+              .toList(growable: false)
         : const <Map<String, dynamic>>[];
-    pendingRequests.value = requestMaps
-        .map(_pendingRequestToSeatUser)
-        .whereType<SeatUser>()
-        .toList(growable: false);
+    if (rawRequests is List) {
+      pendingRequests.value = requestMaps
+          .map(_pendingRequestToSeatUser)
+          .whereType<SeatUser>()
+          .toList(growable: false);
+    }
 
-    // Durable membership is separate from online peers. Only this list is
-    // complete enough to reconcile offline members and removals.
+    // Durable membership is separate from online peers. Only the full roster
+    // is complete enough to reconcile offline members and removals.
     final rawMembershipRoster = roomData['membership_roster'];
     if (rawMembershipRoster is List) {
       final backendMembership = <String, bool>{};
-      for (final rawMember
-          in rawMembershipRoster.whereType<Map<String, dynamic>>()) {
+      for (final raw in rawMembershipRoster.whereType<Map>()) {
+        final rawMember = raw.cast<String, dynamic>();
         final isRoomMember = _isRoomMemberRecord(rawMember);
         for (final alias in _identityAliases(rawMember)) {
           backendMembership[alias] = isRoomMember;
@@ -159,12 +145,11 @@ class LiveRoomMemberRequestService {
         completeRoster: true,
       );
     } else {
-      // Older snapshots expose active peers only. They can update known users,
-      // but absence here must never remove an offline member.
       final peers = roomData['peers'];
       if (peers is List) {
         final backendMembership = <String, bool>{};
-        for (final rawPeer in peers.whereType<Map<String, dynamic>>()) {
+        for (final raw in peers.whereType<Map>()) {
+          final rawPeer = raw.cast<String, dynamic>();
           final isRoomMember = _isRoomMemberRecord(rawPeer);
           for (final alias in _identityAliases(rawPeer)) {
             backendMembership[alias] = isRoomMember;
@@ -177,8 +162,6 @@ class LiveRoomMemberRequestService {
       }
     }
 
-    // pending_room_member_requests is a complete backend snapshot, so absence
-    // resolves stale local pending state after approve/reject/remove.
     if (rawRequests is List) {
       final pendingUserIds = <String>{};
       for (final request in requestMaps) {
@@ -206,7 +189,8 @@ class LiveRoomMemberRequestService {
 
   bool _isRoomMemberRecord(Map<String, dynamic> json) {
     final status = json['membership_request_status']?.toString() ?? 'none';
-    final participantType = json['participant_type']?.toString() ?? 'visitor';
+    final participantType =
+        json['participant_type']?.toString() ?? 'visitor';
     return json['is_room_member'] == true ||
         json['is_member'] == true ||
         json['is_room_admin'] == true ||
@@ -219,9 +203,15 @@ class LiveRoomMemberRequestService {
   }
 
   SeatUser? _pendingRequestToSeatUser(Map<String, dynamic> json) {
-    final backendUserId = json['backend_user_id']?.toString() ?? json['user_id']?.toString() ?? '';
+    final backendUserId =
+        json['backend_user_id']?.toString() ??
+        json['user_id']?.toString() ??
+        '';
     if (backendUserId.isEmpty) return null;
-    final name = json['display_name']?.toString() ?? json['username']?.toString() ?? 'Vibe User';
+    final name =
+        json['display_name']?.toString() ??
+        json['username']?.toString() ??
+        'Vibe User';
     final avatarUrl = json['avatar_url']?.toString();
     return SeatUser(
       id: backendUserId,
@@ -235,14 +225,20 @@ class LiveRoomMemberRequestService {
       sentExp: 0,
       receivedExp: 0,
       medals: const <String>[],
-      avatarColors: const <Color>[Color(0xFF12C7B7), Color(0xFF6D5DF6)],
-      avatarUrl: avatarUrl == null || avatarUrl.isEmpty || avatarUrl == 'null' ? null : avatarUrl,
+      avatarColors: const <Color>[
+        Color(0xFF12C7B7),
+        Color(0xFF6D5DF6),
+      ],
+      avatarUrl:
+          avatarUrl == null || avatarUrl.isEmpty || avatarUrl == 'null'
+          ? null
+          : avatarUrl,
     );
   }
+}
 
-  void _resetSocketOnly() {
-    unawaited(_subscription?.cancel());
-    _subscription = null;
-    _channel = null;
-  }
+Map<String, dynamic> _map(dynamic value) {
+  if (value is Map<String, dynamic>) return value;
+  if (value is Map) return value.cast<String, dynamic>();
+  return const <String, dynamic>{};
 }
