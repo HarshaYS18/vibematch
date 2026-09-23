@@ -8,7 +8,7 @@ from sqlalchemy.orm import Session
 from app.api.routes.super_owner import require_super_owner
 from app.api.routes.users import get_current_user
 from app.core.config import settings
-from app.core.redis_client import get_redis
+from app.core.redis_client import get_media_registry_redis, get_realtime_redis
 from app.database import get_db
 from app.models.user import User
 from app.realtime.connection_manager import has_active_room_user_lease
@@ -55,7 +55,8 @@ def resolve_room_media(
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db),
 ):
-    redis_client = get_redis()
+    realtime_redis = get_realtime_redis()
+    media_registry_redis = get_media_registry_redis()
     permission = verify_media_realtime_request(
         db=db,
         user=current_user,
@@ -63,7 +64,7 @@ def resolve_room_media(
         requested_action="join_room",
         device_id=device_id,
         has_active_room_connection=has_active_room_user_lease(
-            redis_client,
+            realtime_redis,
             room_public_id,
             current_user.id,
         ),
@@ -72,7 +73,7 @@ def resolve_room_media(
         raise HTTPException(status_code=403, detail=permission["reason"] or "Room media access denied.")
 
     try:
-        node = media_node_registry_service.resolve_room_node(redis_client, room_public_id)
+        node = media_node_registry_service.resolve_room_node(media_registry_redis, room_public_id)
     except media_node_registry_service.MediaNodeUnavailable as exc:
         raise HTTPException(status_code=503, detail=str(exc)) from exc
 
@@ -99,7 +100,7 @@ def media_node_heartbeat(payload: MediaNodeHeartbeatRequest, request: Request, b
         if settings.MEDIA_REGISTRY_TRACE:
             logger.info("media_registry.heartbeat.redis_start request_id=%s", request_id)
         node = media_node_registry_service.heartbeat_node(
-            get_redis(),
+            get_media_registry_redis(),
             node_id=payload.node_id,
             public_url=str(payload.public_url),
             room_count=payload.room_count,
@@ -124,7 +125,7 @@ def media_node_heartbeat(payload: MediaNodeHeartbeatRequest, request: Request, b
 def media_node_offline(node_id: str, request: Request):
     _internal_media_auth(request)
     try:
-        media_node_registry_service.remove_node(get_redis(), node_id)
+        media_node_registry_service.remove_node(get_media_registry_redis(), node_id)
     except media_node_registry_service.MediaNodeUnavailable as exc:
         raise HTTPException(status_code=503, detail=str(exc)) from exc
     return {"ok": True, "node_id": node_id}
@@ -139,7 +140,7 @@ def media_node_internal_drain(node_id: str, request: Request):
     """Called by the media node before Kubernetes removes it from service."""
     _internal_media_auth(request)
     try:
-        node = media_node_registry_service.set_node_draining(get_redis(), node_id, True)
+        node = media_node_registry_service.set_node_draining(get_media_registry_redis(), node_id, True)
     except media_node_registry_service.MediaNodeUnavailable as exc:
         raise HTTPException(status_code=503, detail=str(exc)) from exc
     return _node_response(node)
@@ -151,7 +152,7 @@ def admin_list_media_nodes(
 ):
     require_super_owner(current_user)
     try:
-        return [_node_response(node) for node in media_node_registry_service.list_nodes(get_redis())]
+        return [_node_response(node) for node in media_node_registry_service.list_nodes(get_media_registry_redis())]
     except media_node_registry_service.MediaNodeUnavailable as exc:
         raise HTTPException(status_code=503, detail=str(exc)) from exc
 
@@ -164,7 +165,7 @@ def admin_set_media_node_drain(
 ):
     require_super_owner(current_user)
     try:
-        node = media_node_registry_service.set_node_draining(get_redis(), node_id, payload.draining)
+        node = media_node_registry_service.set_node_draining(get_media_registry_redis(), node_id, payload.draining)
     except media_node_registry_service.MediaNodeUnavailable as exc:
         raise HTTPException(status_code=503, detail=str(exc)) from exc
     return _node_response(node)
