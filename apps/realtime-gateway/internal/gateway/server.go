@@ -15,6 +15,7 @@ import (
 	"time"
 
 	"github.com/gorilla/websocket"
+	"github.com/nats-io/nats.go"
 	"github.com/redis/go-redis/v9"
 	"go.opentelemetry.io/contrib/instrumentation/net/http/otelhttp"
 	"go.opentelemetry.io/otel"
@@ -36,8 +37,9 @@ type Server struct {
 	Redis        *redis.Client
 	Hub          *Hub
 	Logger       *slog.Logger
-	subscribed   atomic.Bool
-	authSlots    chan struct{}
+	subscribed     atomic.Bool
+	natsSubscribed atomic.Bool
+	authSlots      chan struct{}
 	commandSlots chan struct{}
 }
 
@@ -81,6 +83,11 @@ func (s *Server) Handler() http.Handler {
 		} else {
 			_, _ = w.Write([]byte("funkey_realtime_redis_subscription_up 0\n"))
 		}
+		if !s.Config.NATSEnabled || s.natsSubscribed.Load() {
+			_, _ = w.Write([]byte("funkey_realtime_nats_inbox_subscription_up 1\n"))
+		} else {
+			_, _ = w.Write([]byte("funkey_realtime_nats_inbox_subscription_up 0\n"))
+		}
 	})
 	mux.HandleFunc("GET /ws", s.serveWS)
 	return otelhttp.NewHandler(
@@ -98,7 +105,9 @@ func (s *Server) Handler() http.Handler {
 }
 
 func (s *Server) ready(w http.ResponseWriter, r *http.Request) {
-	if s.Hub.IsDraining() || !s.subscribed.Load() {
+	if s.Hub.IsDraining() ||
+		!s.subscribed.Load() ||
+		(s.Config.NATSEnabled && !s.natsSubscribed.Load()) {
 		http.Error(w, "not ready", http.StatusServiceUnavailable)
 		return
 	}
@@ -754,6 +763,113 @@ func containsInt64(values []int64, expected int64) bool {
 	return false
 }
 
+func (s *Server) consumeEventPayload(raw []byte, messagingSystem string) {
+	if len(raw) > 64*1024 {
+		s.Hub.stats.InvalidEvents.Add(1)
+		return
+	}
+	var event Event
+	if err := json.Unmarshal(raw, &event); err != nil {
+		s.Hub.stats.InvalidEvents.Add(1)
+		return
+	}
+	eventContext := context.Background()
+	if event.Traceparent != "" {
+		eventContext = otel.GetTextMapPropagator().Extract(
+			eventContext,
+			propagation.MapCarrier{"traceparent": event.Traceparent},
+		)
+	}
+	_, span := otel.Tracer("funkey.realtime").Start(
+		eventContext,
+		"realtime.fanout",
+		trace.WithSpanKind(trace.SpanKindConsumer),
+		trace.WithAttributes(attribute.String("messaging.system", messagingSystem)),
+	)
+	s.Hub.Publish(event, raw)
+	s.applyCapabilityRevocation(event)
+	span.End()
+}
+
+func (s *Server) ConsumeNATSEvents(ctx context.Context) {
+	if !s.Config.NATSEnabled {
+		return
+	}
+
+	for ctx.Err() == nil {
+		nc, err := nats.Connect(
+			s.Config.NATSURL,
+			nats.Name("funkey-realtime-"+s.Config.NodeID),
+			nats.MaxReconnects(-1),
+			nats.ReconnectWait(time.Second),
+			nats.DisconnectErrHandler(func(_ *nats.Conn, err error) {
+				s.natsSubscribed.Store(false)
+				if err != nil {
+					s.Logger.Warn("nats inbox stream disconnected", "error", err)
+				}
+			}),
+			nats.ReconnectHandler(func(_ *nats.Conn) {
+				s.natsSubscribed.Store(true)
+			}),
+			nats.ClosedHandler(func(_ *nats.Conn) {
+				s.natsSubscribed.Store(false)
+			}),
+		)
+		if err != nil {
+			s.natsSubscribed.Store(false)
+			s.Logger.Warn("nats inbox connection failed", "error", err)
+			if !waitRetry(ctx, time.Second) {
+				return
+			}
+			continue
+		}
+
+		messages := make(chan *nats.Msg, 1024)
+		subscription, err := nc.ChanSubscribe(
+			s.Config.NATSInboxSubject,
+			messages,
+		)
+		if err == nil {
+			err = nc.FlushTimeout(time.Second)
+		}
+		if err != nil {
+			s.natsSubscribed.Store(false)
+			_ = nc.Drain()
+			s.Logger.Warn("nats inbox subscription failed", "error", err)
+			if !waitRetry(ctx, time.Second) {
+				return
+			}
+			continue
+		}
+		s.natsSubscribed.Store(true)
+
+		consume := true
+		for consume && ctx.Err() == nil {
+			select {
+			case <-ctx.Done():
+				consume = false
+			case msg := <-messages:
+				if msg == nil {
+					consume = false
+					continue
+				}
+				s.consumeEventPayload(msg.Data, "nats")
+			}
+		}
+
+		s.natsSubscribed.Store(false)
+		_ = subscription.Unsubscribe()
+		if ctx.Err() != nil {
+			_ = nc.Drain()
+			return
+		}
+		nc.Close()
+		if !waitRetry(ctx, time.Second) {
+			return
+		}
+	}
+}
+
 func (s *Server) ConsumeEvents(ctx context.Context) {
 	interrupted := false
 	for ctx.Err() == nil {
@@ -784,31 +900,7 @@ func (s *Server) ConsumeEvents(ctx context.Context) {
 				interrupted = true
 				break
 			}
-			if len(msg.Payload) > 64*1024 {
-				s.Hub.stats.InvalidEvents.Add(1)
-				continue
-			}
-			var event Event
-			if err := json.Unmarshal([]byte(msg.Payload), &event); err != nil {
-				s.Hub.stats.InvalidEvents.Add(1)
-				continue
-			}
-			eventContext := context.Background()
-			if event.Traceparent != "" {
-				eventContext = otel.GetTextMapPropagator().Extract(
-					eventContext,
-					propagation.MapCarrier{"traceparent": event.Traceparent},
-				)
-			}
-			_, span := otel.Tracer("funkey.realtime").Start(
-				eventContext,
-				"realtime.fanout",
-				trace.WithSpanKind(trace.SpanKindConsumer),
-				trace.WithAttributes(attribute.String("messaging.system", "redis")),
-			)
-			s.Hub.Publish(event, []byte(msg.Payload))
-			s.applyCapabilityRevocation(event)
-			span.End()
+			s.consumeEventPayload([]byte(msg.Payload), "redis")
 		}
 		s.subscribed.Store(false)
 		_ = pubsub.Close()
