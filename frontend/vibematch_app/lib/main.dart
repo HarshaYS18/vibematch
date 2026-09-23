@@ -26,10 +26,15 @@ const String _sentryEnvironment = String.fromEnvironment(
   defaultValue: 'development',
 );
 const String _sentryRelease = String.fromEnvironment('SENTRY_RELEASE');
-const double _sentryTracesSampleRate = double.fromEnvironment(
+const String _sentryTracesSampleRateRaw = String.fromEnvironment(
   'SENTRY_TRACES_SAMPLE_RATE',
-  defaultValue: 0.10,
+  defaultValue: '0.10',
 );
+
+double get _sentryTracesSampleRate =>
+    (double.tryParse(_sentryTracesSampleRateRaw) ?? 0.10)
+        .clamp(0.0, 1.0)
+        .toDouble();
 bool _sentryReady = false;
 
 void main() {
