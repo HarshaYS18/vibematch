@@ -224,9 +224,10 @@ type clientCommand struct {
 	Stream         string `json:"stream,omitempty"`
 	LastSequence   int64  `json:"last_sequence,omitempty"`
 	ConversationID string `json:"conversation_id,omitempty"`
-	Activity       string `json:"activity,omitempty"`
-	CommandID      string `json:"command_id,omitempty"`
-	Traceparent    string `json:"traceparent,omitempty"`
+	Activity       string         `json:"activity,omitempty"`
+	CommandID      string         `json:"command_id,omitempty"`
+	Payload        map[string]any `json:"payload,omitempty"`
+	Traceparent    string         `json:"traceparent,omitempty"`
 }
 
 func validRoomID(roomID string) bool {
