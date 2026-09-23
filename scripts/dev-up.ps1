@@ -7,7 +7,7 @@ param(
     [int]$ApiPort = 8000,
     [int]$MediaPort = 4100,
     [string]$PostgresContainer = 'funkey-postgres-test',
-    [string]$RedisContainer = 'funkey-cache-redis-6380',
+    [string]$RedisContainer = 'funkey-redis-6380',
     [string]$RealtimeRedisContainer = 'funkey-realtime-redis-6381',
     [string]$MediaRedisContainer = 'funkey-media-redis-6382',
     [switch]$SkipMigrations,
