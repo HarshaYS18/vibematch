@@ -13,6 +13,17 @@ CHAT_THEMES = {"pearl", "midnight", "royal", "ocean", "rose"}
 WALLPAPERS = {"premium_pearl", "midnight_blur", "royal_plum", "ocean_glass", "rose_gold"}
 
 
+def get_preferences_read_only(db: Session, user: User) -> InboxUserPreference:
+    """Return persisted preferences or an unsaved default projection."""
+
+    preference = (
+        db.query(InboxUserPreference)
+        .filter(InboxUserPreference.user_id == user.id)
+        .first()
+    )
+    return preference or InboxUserPreference(user_id=user.id)
+
+
 def get_or_create_preferences(db: Session, user: User) -> InboxUserPreference:
     preference = db.query(InboxUserPreference).filter(InboxUserPreference.user_id == user.id).first()
     if preference is not None:
@@ -143,7 +154,7 @@ def update_conversation_theme(
 
 
 def conversation_theme_payload(db: Session, conversation: InboxConversation, user: User) -> dict:
-    preference = get_or_create_preferences(db, user)
+    preference = get_preferences_read_only(db, user)
     setting = (
         db.query(InboxConversationUserSetting)
         .filter(
