@@ -130,6 +130,55 @@ class RoomSessionRepository extends StateNotifier<RoomSessionState> {
     return state;
   }
 
+  RoomSessionState reconcileDelta(
+    Map<String, dynamic> delta, {
+    RoomSessionConnection? connection,
+  }) {
+    if (state.connection == RoomSessionConnection.left) return state;
+
+    final incomingVersion = _asInt(
+      delta['room_version'] ?? delta['state_version'],
+    );
+    if (incomingVersion > 0 &&
+        state.stateVersion > 0 &&
+        incomingVersion < state.stateVersion) {
+      return state;
+    }
+
+    final incomingEventSequence = _asInt(delta['event_sequence']);
+    final merged = <String, dynamic>{
+      ...state.room,
+      ...delta,
+      'room_id': _roomId,
+      if (incomingVersion > 0) 'state_version': incomingVersion,
+      if (incomingEventSequence > 0)
+        'event_sequence': incomingEventSequence,
+    };
+    return reconcileSnapshot(
+      merged,
+      connection: connection ?? RoomSessionConnection.connected,
+      force: true,
+    );
+  }
+
+  RoomSessionState reconcileRealtimeEvent(Map<String, dynamic> event) {
+    final outerPayload = _asMap(event['payload']);
+    final wireEvent = outerPayload.containsKey('payload')
+        ? outerPayload
+        : event;
+    final body = _asMap(wireEvent['payload']);
+    final delta = _asMap(body['delta']);
+    if (delta.isEmpty) return state;
+    return reconcileDelta(delta);
+  }
+
+  Future<RoomSessionState> recoverFromRealtimeGap() {
+    return refreshSnapshot(
+      connection: RoomSessionConnection.connected,
+      force: true,
+    );
+  }
+
   Future<RoomSessionState> takeSeat(int seatIndex) {
     return _postCanonical(
       '/rooms/$_roomId/realtime/seat/take',
@@ -298,3 +347,16 @@ final roomSessionRepositoryProvider = StateNotifierProvider.family<
         ref.read(sessionRepositoryProvider).accessToken,
   );
 });
+
+
+Map<String, dynamic> _asMap(dynamic value) {
+  if (value is Map<String, dynamic>) return value;
+  if (value is Map) return value.cast<String, dynamic>();
+  return const <String, dynamic>{};
+}
+
+int _asInt(dynamic value) {
+  if (value is int) return value;
+  if (value is num) return value.toInt();
+  return int.tryParse(value?.toString() ?? '') ?? 0;
+}
