@@ -138,8 +138,12 @@ class LiveRoomPresenceRepository {
     },
   );
 
-  Future<LiveRoomPresenceSnapshot> heartbeat(String roomId) =>
-      _postSnapshot('/rooms/$roomId/heartbeat');
+  Future<void> heartbeat(String roomId) async {
+    await _apiClient.postMap(
+      '/rooms/$roomId/heartbeat',
+      headers: _headers(),
+    );
+  }
 
   Future<LiveRoomPresenceSnapshot> fetchParticipants(String roomId) async {
     final response = await _apiClient.getMap(
