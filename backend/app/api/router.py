@@ -11,7 +11,7 @@ from app.api.routes import (
     coin_sales, control_center, economy, economy_admin, economy_master,
     experience, families, families_economy, game_pool_admin, game_props_admin,
     game_settlements, games, games_master, gift_catalog, health, home_banners,
-    inbox_proxy, love_bonds, lucky_coins,
+    inbox_proxy, inbox_stories, love_bonds, lucky_coins,
     lucky_gifts, lucky_gift_admin, lucky_packets, media, media_control, media_realtime_auth, media_safety_admin,
     moderation, notifications, presence, profile_display, push, rankings,
     relationship_exp, role_badges, room_levels, room_music_media,
@@ -45,9 +45,12 @@ for router in (
 ):
     api_router.include_router(router)
 
-# Inbox is a separately deployed durable authority. The core API retains only
-# a compatibility proxy for local development/rollback; production ingress
-# routes these prefixes directly to funkey-inbox.
+# Stories remain on the social/core boundary until the Vibes/Profile chunks.
+# Register the concrete route before the Inbox catch-all compatibility proxy.
+api_router.include_router(inbox_stories.router, prefix="/inbox", tags=["Inbox Stories"])
+
+# Inbox chat is a separately deployed durable authority. The core API retains
+# only a compatibility proxy for local development/rollback.
 api_router.include_router(inbox_proxy.router)
 
 # Media storage/upload.
