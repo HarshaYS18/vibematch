@@ -57,8 +57,23 @@ class RealtimeEventEnvelope {
   }
 
   Map<String, dynamic> toLegacyEvent() {
-    final legacy = Map<String, dynamic>.from(raw);
+    // The Go gateway wraps authoritative backend payloads in transport
+    // metadata. Compatibility feature adapters should see the domain payload,
+    // not the transport envelope.
+    final legacy = Map<String, dynamic>.from(payload);
     legacy.putIfAbsent('event', () => type);
+    legacy.putIfAbsent('type', () => type);
+    legacy.putIfAbsent('eventId', () => eventId);
+    legacy.putIfAbsent('event_id', () => eventId);
+    if (stream.trim().isNotEmpty) {
+      legacy.putIfAbsent('stream', () => stream);
+    }
+    if (sequence > 0) {
+      legacy.putIfAbsent('sequence', () => sequence);
+    }
+    if (serverTime != null) {
+      legacy.putIfAbsent('serverTime', () => serverTime!.toIso8601String());
+    }
     return legacy;
   }
 }
