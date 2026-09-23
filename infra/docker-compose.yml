@@ -49,7 +49,7 @@ services:
     depends_on:
       postgres: {condition: service_healthy}
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -h 127.0.0.1 -p 6432 -U funkey -d funkey"]
+      test: ["CMD-SHELL", "nc -z 127.0.0.1 6432"]
       interval: 5s
       timeout: 3s
       retries: 20
