@@ -8,7 +8,7 @@ Presence, fanout, media registry, and short leases need shared low-latency coord
 
 ## Decision
 
-Use Redis/Valkey for TTL presence, cache, routing, rate limits, reservations, and media assignment. PostgreSQL remains the record for identity, roles, bans, wallet, ledgers, and moderation history.
+Use Redis/Valkey for TTL presence, cache, routing, rate limits, reservations, and media assignment. Isolate application cache/rate-limit, realtime/presence, and media registry into separate failure domains as defined by ADR-015. PostgreSQL remains the record for identity, roles, bans, wallet, ledgers, and moderation history.
 
 ## Consequences
 
@@ -16,4 +16,4 @@ Consumers must tolerate cache loss and rebuild transient state. Key namespaces, 
 
 ## Validation and change criteria
 
-Never infer a durable ban or balance only from a cache hit. Separate media registry topology is defined by ADR-008.
+Never infer a durable ban or balance only from a cache hit. Separate media registry topology is defined by ADR-008; role isolation and current Redis Cluster limitations are defined by ADR-015.
