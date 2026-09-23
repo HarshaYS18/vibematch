@@ -1,11 +1,13 @@
 from __future__ import annotations
 
+import asyncio
 import json
 import time
 from datetime import datetime
 from typing import Any
 from uuid import uuid4
 
+from app.core.config import settings
 from app.core.redis_client import get_async_realtime_redis, get_realtime_redis
 from app.core.telemetry import current_trace_id, current_traceparent
 
@@ -26,10 +28,48 @@ class InboxWebSocketManager:
     def __init__(self, redis_client: Any | None = None):
         self._redis: Any = redis_client or get_async_realtime_redis()
         self._local_sequence_fallback: dict[str, int] = {}
+        self._nats: Any | None = None
+        self._nats_lock = asyncio.Lock()
 
     async def shutdown(self) -> None:
         # The shared realtime Redis client is closed by FastAPI lifespan.
-        return None
+        if self._nats is not None:
+            try:
+                await self._nats.drain()
+            except Exception:
+                try:
+                    await self._nats.close()
+                except Exception:
+                    pass
+            finally:
+                self._nats = None
+
+    async def _nats_connection(self) -> Any:
+        connection = self._nats
+        if connection is not None and not getattr(connection, "is_closed", False):
+            return connection
+        async with self._nats_lock:
+            connection = self._nats
+            if connection is not None and not getattr(connection, "is_closed", False):
+                return connection
+            # nats-py is installed only in the extracted Inbox deployable.
+            import nats  # type: ignore[import-not-found]
+
+            connection = await nats.connect(
+                settings.NATS_URL,
+                name="funkey-inbox",
+                reconnect_time_wait=1,
+                max_reconnect_attempts=-1,
+            )
+            self._nats = connection
+            return connection
+
+    async def _publish_nats(self, envelope: dict[str, Any]) -> None:
+        connection = await self._nats_connection()
+        await connection.publish(
+            settings.INBOX_NATS_SUBJECT,
+            json.dumps(envelope, default=str, separators=(",", ":")).encode(),
+        )
 
     @staticmethod
     def _is_client_envelope(payload: dict[str, Any]) -> bool:
@@ -138,13 +178,16 @@ class InboxWebSocketManager:
             envelope["user_ids"] = [int(item) for item in user_ids]
 
         try:
-            await self._redis.publish(
-                _GATEWAY_CHANNEL,
-                json.dumps(envelope, default=str, separators=(",", ":")),
-            )
+            if settings.INBOX_REALTIME_TRANSPORT.strip().lower() == "nats":
+                await self._publish_nats(envelope)
+            else:
+                await self._redis.publish(
+                    _GATEWAY_CHANNEL,
+                    json.dumps(envelope, default=str, separators=(",", ":")),
+                )
         except Exception:
-            # Delivery is transient. Durable Inbox/wallet/social state remains
-            # authoritative in PostgreSQL and reconnects recover through REST.
+            # Delivery is transient. Durable Inbox state remains authoritative
+            # in PostgreSQL and reconnects recover through bounded REST reads.
             pass
 
     async def send_to_user(self, user_id: int, payload: dict) -> None:
