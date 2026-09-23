@@ -668,6 +668,92 @@ func (s *Server) heartbeatOnce(ctx context.Context) {
 	}
 }
 
+func (s *Server) applyCapabilityRevocation(event Event) {
+	switch event.EventType {
+	case "auth.session_revoked":
+		if event.Scope != "user" || event.UserID <= 0 {
+			return
+		}
+		var payload struct {
+			SessionID string `json:"session_id"`
+			DeviceID  string `json:"device_id"`
+		}
+		_ = json.Unmarshal(event.Payload, &payload)
+		for _, client := range s.Hub.Clients() {
+			if client.UserID != event.UserID {
+				continue
+			}
+			if payload.SessionID != "" && client.SessionID != payload.SessionID {
+				continue
+			}
+			if payload.DeviceID != "" && client.DeviceID != payload.DeviceID {
+				continue
+			}
+			// The revocation event is already queued at critical priority.
+			// Give the writer a brief chance to deliver it before closing.
+			go func(c *Client) {
+				timer := time.NewTimer(100 * time.Millisecond)
+				defer timer.Stop()
+				select {
+				case <-c.done:
+					return
+				case <-timer.C:
+					s.Hub.Remove(c)
+					s.deleteClientLease(c)
+				}
+			}(client)
+		}
+	case "room.permission_revoked":
+		var payload struct {
+			RoomPublicID string `json:"room_public_id"`
+		}
+		_ = json.Unmarshal(event.Payload, &payload)
+		roomID := strings.TrimSpace(payload.RoomPublicID)
+		if roomID == "" {
+			roomID = strings.TrimSpace(event.RoomPublicID)
+		}
+		if !validRoomID(roomID) {
+			return
+		}
+		for _, client := range s.Hub.Clients() {
+			switch event.Scope {
+			case "user":
+				if client.UserID != event.UserID {
+					continue
+				}
+			case "users":
+				if !containsInt64(event.UserIDs, client.UserID) {
+					continue
+				}
+			case "room":
+				// Room-scoped permission changes intentionally force every
+				// current subscriber to mint a fresh room capability.
+			default:
+				continue
+			}
+			if !containsString(s.Hub.Rooms(client), roomID) {
+				continue
+			}
+			s.Hub.Unsubscribe(client, roomID)
+			s.deleteRoomLease(client, roomID)
+			notice, _ := json.Marshal(map[string]string{
+				"type":           "subscription_revoked",
+				"room_public_id": roomID,
+			})
+			s.Hub.EnqueueCritical(client, notice)
+		}
+	}
+}
+
+func containsInt64(values []int64, expected int64) bool {
+	for _, value := range values {
+		if value == expected {
+			return true
+		}
+	}
+	return false
+}
+
 func (s *Server) ConsumeEvents(ctx context.Context) {
 	interrupted := false
 	for ctx.Err() == nil {
@@ -721,6 +807,7 @@ func (s *Server) ConsumeEvents(ctx context.Context) {
 				trace.WithAttributes(attribute.String("messaging.system", "redis")),
 			)
 			s.Hub.Publish(event, []byte(msg.Payload))
+			s.applyCapabilityRevocation(event)
 			span.End()
 		}
 		s.subscribed.Store(false)
