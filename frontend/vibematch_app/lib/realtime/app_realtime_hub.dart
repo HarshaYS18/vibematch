@@ -3,6 +3,8 @@ import 'dart:async';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../core/network/vm_api_config.dart';
+import '../foundation/di/app_dependencies.dart';
+import '../foundation/realtime/realtime_capability_service.dart';
 import '../foundation/realtime/realtime_client.dart';
 import '../foundation/realtime/realtime_event_envelope.dart';
 import '../session/data/session_repository.dart';
@@ -36,7 +38,13 @@ class _RoomSubscriptionCursor {
 
   String? stream;
   int lastSequence;
+  RealtimeCapabilityGrant? capability;
+  bool capabilityPending = false;
 }
+
+typedef RoomCapabilityProvider = Future<RealtimeCapabilityGrant> Function(
+  String roomId,
+);
 
 class AppRealtimeHub {
   AppRealtimeHub._();
@@ -51,6 +59,7 @@ class AppRealtimeHub {
       <String, _RoomSubscriptionCursor>{};
 
   RealtimeClient? _client;
+  RoomCapabilityProvider? _roomCapabilityProvider;
   StreamSubscription<RealtimeEventEnvelope>? _eventSubscription;
   StreamSubscription<RealtimeGap>? _gapSubscription;
   StreamSubscription<int>? _reconnectSubscription;
@@ -59,7 +68,10 @@ class AppRealtimeHub {
   Stream<RealtimeResyncRequest> get resyncRequests => _resyncController.stream;
   bool get isConnected => _client?.isConnected ?? false;
 
-  void configure(RealtimeClient client) {
+  void configure(
+    RealtimeClient client, {
+    required RoomCapabilityProvider roomCapabilityProvider,
+  }) {
     if (identical(_client, client)) return;
 
     unawaited(_eventSubscription?.cancel());
@@ -70,6 +82,7 @@ class AppRealtimeHub {
     }
 
     _client = client;
+    _roomCapabilityProvider = roomCapabilityProvider;
     _eventSubscription = client.events.listen(_handleEvent);
     _gapSubscription = client.gaps.listen(_handleGap);
     _reconnectSubscription = client.reconnects.listen((_) {
@@ -126,10 +139,37 @@ class AppRealtimeHub {
 
   void _sendRoomSubscription(String roomId) {
     final cursor = _roomSubscriptions[roomId];
-    if (cursor == null) return;
+    if (cursor == null || cursor.capabilityPending) return;
+    unawaited(_sendRoomSubscriptionWithCapability(roomId, cursor));
+  }
+
+  Future<void> _sendRoomSubscriptionWithCapability(
+    String roomId,
+    _RoomSubscriptionCursor cursor,
+  ) async {
+    if (!isConnected || _roomSubscriptions[roomId] != cursor) return;
+    var grant = cursor.capability;
+    if (grant == null || !grant.isFresh) {
+      final provider = _roomCapabilityProvider;
+      if (provider == null) return;
+      cursor.capabilityPending = true;
+      try {
+        grant = await provider(roomId);
+        if (_roomSubscriptions[roomId] != cursor) return;
+        cursor.capability = grant;
+      } catch (_) {
+        return;
+      } finally {
+        cursor.capabilityPending = false;
+      }
+    }
+    if (!isConnected || grant == null || _roomSubscriptions[roomId] != cursor) {
+      return;
+    }
     final payload = <String, dynamic>{
       'type': 'subscribe',
       'room_public_id': roomId,
+      'capability': grant.token,
     };
     final stream = cursor.stream;
     if (stream != null && stream.isNotEmpty) {
@@ -223,12 +263,22 @@ class AppRealtimeHub {
 final appRealtimeHubProvider = Provider.autoDispose<AppRealtimeHub>((ref) {
   final hub = AppRealtimeHub.shared;
   final sessions = ref.read(sessionRepositoryProvider.notifier);
+  final capabilityService = RealtimeCapabilityService(
+    networkClient: ref.read(appNetworkClientProvider),
+    accessTokenProvider: () => ref.read(sessionRepositoryProvider).accessToken,
+  );
 
   final client = RealtimeClient(
     tokenProvider: () => ref.read(sessionRepositoryProvider).accessToken,
+    capabilityTokenProvider: () async =>
+        (await capabilityService.issue()).token,
     socketUriBuilder: (_) => Uri.parse(VmApiConfig.realtimeWebSocketUrl),
   );
-  hub.configure(client);
+  hub.configure(
+    client,
+    roomCapabilityProvider: (roomId) =>
+        capabilityService.issue(roomId: roomId),
+  );
 
   final invalidationSubscription = hub.events.listen((event) {
     if (event.type == 'session_replaced') {
