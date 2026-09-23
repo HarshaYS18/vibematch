@@ -37,10 +37,9 @@ jobs:
       - name: Check Go formatting
         shell: bash
         run: |
-          unformatted="$(gofmt -l .)"
-          if [ -n "$unformatted" ]; then
-            echo "gofmt required for:"
-            echo "$unformatted"
+          gofmt -w .
+          if ! git diff --exit-code -- .; then
+            echo "Go source differs from gofmt output."
             exit 1
           fi
       - run: go vet ./...
