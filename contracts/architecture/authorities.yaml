@@ -1,6 +1,6 @@
 {
   "schema_version": 1,
-  "updated_for_chunk": 15,
+  "updated_for_chunk": 23,
   "status": "architecture contract; current fields describe repository reality and target fields describe approved migration direction",
   "classifications": [
     "AUTHORITY",
@@ -174,25 +174,25 @@
       "domain": "families",
       "classification": "AUTHORITY",
       "logical_owner": "inbox",
-      "current_deployable": "core-api",
+      "current_deployable": "inbox-service",
       "current_storage": [
-        "postgres:inbox_conversations(type=family)",
+        "postgres Inbox authority: inbox_conversations(type=family)",
         "postgres:inbox_participants",
         "postgres:inbox_messages"
       ],
       "target_storage": [
-        "inbox-service postgres"
+        "inbox-service PostgreSQL authority"
       ],
       "mutated_by": [
-        "inbox service via family adapter"
+        "inbox-service via authenticated family adapter"
       ],
       "source_states": [],
       "rebuild_from": [],
       "change_contract": {
-        "status": "planned",
-        "name": "inbox.message.created.v1"
+        "status": "live",
+        "name": "Inbox family chat service contract"
       },
-      "migration_status": "family chat is Inbox-owned"
+      "migration_status": "Chunk 23 extracted; family domain no longer writes Inbox tables"
     },
     {
       "id": "rooms.definition",
@@ -400,41 +400,43 @@
       "domain": "inbox",
       "classification": "AUTHORITY",
       "logical_owner": "inbox",
-      "current_deployable": "core-api",
+      "current_deployable": "inbox-service",
       "current_storage": [
-        "postgres:inbox_conversations",
+        "postgres service-isolated Inbox role: inbox_conversations",
         "postgres:inbox_participants",
         "postgres:inbox_messages",
-        "postgres inbox user-state/preferences"
+        "postgres:inbox_read_receipts",
+        "postgres:inbox_user_preferences/inbox_conversation_user_settings/inbox_message_user_states",
+        "postgres:call_sessions/call_participants"
       ],
       "target_storage": [
-        "inbox-service postgres"
+        "inbox-service PostgreSQL authority"
       ],
       "mutated_by": [
-        "inbox service"
+        "inbox-service only"
       ],
       "source_states": [],
       "rebuild_from": [],
       "change_contract": {
-        "status": "planned",
-        "name": "inbox.message.created.v1"
+        "status": "live",
+        "name": "Inbox realtime envelope via NATS -> Go"
       },
-      "migration_status": "Chunk 23"
+      "migration_status": "Chunk 23 extracted; cursor-bounded reads and isolated write authority live"
     },
     {
       "id": "inbox.typing",
       "domain": "inbox",
       "classification": "EPHEMERAL",
       "logical_owner": "realtime",
-      "current_deployable": "core-api compatibility websocket",
+      "current_deployable": "realtime-gateway + inbox-service command authority",
       "current_storage": [
-        "socket/redis transient state"
+        "Go socket state + Redis/Valkey ephemeral presence/activity"
       ],
       "target_storage": [
-        "Go realtime + redis/valkey TTL state"
+        "Go realtime + Redis/Valkey TTL state"
       ],
       "mutated_by": [
-        "compatibility inbox websocket"
+        "Go realtime transport; Inbox service authorizes conversation context"
       ],
       "source_states": [
         "inbox.conversations"
@@ -443,10 +445,10 @@
         "active conversation subscriptions"
       ],
       "change_contract": {
-        "status": "planned",
-        "name": "inbox.typing.v2"
+        "status": "live",
+        "name": "inbox typing/activity realtime v2"
       },
-      "migration_status": "Chunk 21/23"
+      "migration_status": "Chunk 21 transport + Chunk 23 Inbox command ownership live"
     },
     {
       "id": "vibes.content",
