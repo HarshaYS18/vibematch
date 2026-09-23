@@ -17,9 +17,11 @@ on:
       - 'tests/load/**'
       - 'tests/chaos/**'
       - '.github/workflows/production-platform.yml'
+      - '.github/workflows/contracts.yml'
       - 'frontend/vibematch_app/**'
       - 'scripts/check_backend_architecture.py'
-      - 'contracts/architecture/**'
+      - 'scripts/check_contracts.py'
+      - 'contracts/**'
       - 'docs/architecture/**'
       - 'docs/modules/**'
       - 'docs/master-source-of-truth-architecture.md'
@@ -41,7 +43,9 @@ jobs:
         with:
           python-version: '3.13'
       - name: Verify canonical backend/media architecture
-        run: python scripts/check_backend_architecture.py
+        run: |
+          python scripts/check_backend_architecture.py
+          python scripts/check_contracts.py
 
   backend-tests:
     runs-on: ubuntu-latest
