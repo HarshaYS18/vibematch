@@ -175,14 +175,19 @@ def _send_direct_mention_inbox_snapshot(db: Session, post: VibePost, sender: Use
     del db
     text = f"Mentioned you in a Vibe\n\n{caption_preview}\n\nVibe ID: {post.id}"
     message_type = "image" if post.media_type == "photo" and post.media_url else "text"
-    inbox_service_client.send_direct_message(
-        sender_user_id=sender.id,
-        target_user_id=recipient.id,
-        text=text,
-        message_type=message_type,
-        attachment_url=post.media_url,
-        metadata={"vibe_post_id": post.id, "source": "vibe_mention"},
-    )
+    try:
+        inbox_service_client.send_direct_message(
+            sender_user_id=sender.id,
+            target_user_id=recipient.id,
+            text=text,
+            message_type=message_type,
+            attachment_url=post.media_url,
+            metadata={"vibe_post_id": post.id, "source": "vibe_mention"},
+        )
+    except (inbox_service_client.InboxServiceUnavailable, ValueError):
+        # The Vibe is authoritative and already committed. Inbox mention
+        # delivery is a secondary projection and must not fake a failed post.
+        return
 
 
 def _send_vibe_notifications(db: Session, post: VibePost, current_user: User, mentions: list[str], uses_mention_all: bool) -> None:
