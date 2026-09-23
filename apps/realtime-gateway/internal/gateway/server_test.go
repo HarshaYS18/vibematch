@@ -57,7 +57,7 @@ func newRealtimeTestServer(t *testing.T) (*Server, *redis.Client, context.Cancel
 		PingInterval: time.Hour, PongTimeout: time.Hour, ReauthInterval: time.Hour,
 		MaxMessageBytes: 4096, OutboundQueue: 16, MaxConnections: 10,
 		MaxConnectionsPerUser: 4,
-		LeaseTTL: time.Minute, NodeID: "test-node", Origins: map[string]struct{}{},
+		LeaseTTL:              time.Minute, NodeID: "test-node", Origins: map[string]struct{}{},
 		CommandTimeout: time.Second,
 	}
 	server := NewServer(
@@ -159,11 +159,11 @@ func TestRoomSubscriptionReplaysContiguousChunk20StreamAndWritesLease(t *testing
 	}
 	for sequence := int64(1); sequence <= 2; sequence++ {
 		raw, _ := json.Marshal(map[string]any{
-			"eventId": "replay-" + string(rune('0'+sequence)),
-			"type": "room/test",
-			"stream": stream,
+			"eventId":  "replay-" + string(rune('0'+sequence)),
+			"type":     "room/test",
+			"stream":   stream,
 			"sequence": sequence,
-			"payload": map[string]any{"room_id": "room-a"},
+			"payload":  map[string]any{"room_id": "room-a"},
 		})
 		if err := redisClient.ZAdd(ctx, roomReplayKey("room-a", epoch), redis.Z{
 			Score: float64(sequence), Member: string(raw),
@@ -233,9 +233,9 @@ func TestWebSocketRelaysAllowlistedInboxCommand(t *testing.T) {
 	conn := dialRealtime(t, wsURL)
 
 	if err := conn.WriteJSON(map[string]any{
-		"type": "inbox.mark_read",
+		"type":            "inbox.mark_read",
 		"conversation_id": "conversation-1",
-		"command_id": "cmd-1",
+		"command_id":      "cmd-1",
 	}); err != nil {
 		t.Fatal(err)
 	}
