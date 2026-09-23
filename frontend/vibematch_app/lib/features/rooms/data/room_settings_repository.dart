@@ -63,12 +63,22 @@ class RoomSettingsRepository {
     required String roomPublicId,
     required String seatLayoutId,
   }) async {
-    final response = await _apiClient.patchMap(
-      '/rooms/$roomPublicId/seat-layout',
+    final response = await _apiClient.postMap(
+      '/rooms/$roomPublicId/realtime/settings/seat-layout',
       headers: await _authHeaders(),
       body: {'seat_layout_id': seatLayoutId},
     );
-    return RoomSettingsDto.fromJson(response);
+    final rawRoom = response['room'];
+    final room = rawRoom is Map
+        ? rawRoom.cast<String, dynamic>()
+        : response;
+    return RoomSettingsDto.fromJson(<String, dynamic>{
+      ...room,
+      'room_public_id':
+          room['room_public_id']?.toString() ??
+          room['room_id']?.toString() ??
+          roomPublicId,
+    });
   }
 
   Future<RoomSettingsDto> updateAnnouncement({
