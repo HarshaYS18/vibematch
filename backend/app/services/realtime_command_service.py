@@ -12,6 +12,7 @@ from app.api.routes import room_realtime_commands
 from app.models.user import User
 from app.realtime.connection_manager import room_realtime_connections
 from app.services import inbox_realtime_command_service
+from app.services.rooms import room_permission_service
 
 
 logger = logging.getLogger("uvicorn.error")
@@ -71,11 +72,21 @@ ROOM_REALTIME_COMMANDS = frozenset({
     "watch_party/transfer_control",
 })
 
+ROOM_EPHEMERAL_COMMANDS = frozenset({
+    "room_music/control_external",
+    "room_music/stop_external",
+    "room_music/producer_started_external",
+})
+
 INBOX_REALTIME_COMMANDS = frozenset(
     inbox_realtime_command_service.ALLOWED_INBOX_REALTIME_COMMANDS
 )
 
-APPLICATION_REALTIME_COMMANDS = ROOM_REALTIME_COMMANDS | INBOX_REALTIME_COMMANDS
+APPLICATION_REALTIME_COMMANDS = (
+    ROOM_REALTIME_COMMANDS
+    | ROOM_EPHEMERAL_COMMANDS
+    | INBOX_REALTIME_COMMANDS
+)
 
 
 def _room_db_sqlstate(exc: OperationalError) -> str:
@@ -157,6 +168,26 @@ async def execute_application_realtime_command(
     room_id = str(room_public_id or "").strip()
     if not room_id:
         raise HTTPException(status_code=422, detail="room_public_id is required")
+
+    if command in ROOM_EPHEMERAL_COMMANDS:
+        room = room_realtime_commands.room_or_404(db, room_id)
+        room_permission_service.require_room_settings(db, room, user)
+        event_payload = dict(payload or {})
+        event_payload["room_id"] = room_id
+        await room_realtime_connections.broadcast_room(
+            room_id,
+            {
+                "type": command,
+                "payload": event_payload,
+            },
+        )
+        return {
+            "scope": "room",
+            "room_public_id": room_id,
+            "state_version": int(room.realtime_version or 0),
+            "event_sequence": int(room.realtime_event_sequence or 0),
+            "result": "applied",
+        }
 
     safe_command_id = str(command_id or "").strip()
     claimed = False
