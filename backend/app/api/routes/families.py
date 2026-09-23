@@ -389,13 +389,21 @@ def _family_chat_contract(
     )
 
 
-def _sync_family_chat(db: Session, family_id: int) -> None:
+def _sync_family_chat(db: Session, family_id: int) -> bool:
+    """Best-effort projection sync after the family transaction commits."""
+
     title, member_ids = _family_chat_contract(db, family_id)
-    inbox_service_client.sync_family(
-        family_id=family_id,
-        title=title,
-        member_user_ids=member_ids,
-    )
+    try:
+        inbox_service_client.sync_family(
+            family_id=family_id,
+            title=title,
+            member_user_ids=member_ids,
+        )
+        return True
+    except (inbox_service_client.InboxServiceUnavailable, ValueError):
+        # Family membership remains authoritative here. A later chat send or
+        # reconciliation pass repairs the Inbox projection.
+        return False
 
 
 @router.get("/{family_id}/chat")
