@@ -2,15 +2,15 @@
 
 ## Purpose
 
-Owns room metadata, membership decisions, seats, chat state, and room snapshots.
+Owns room metadata, membership decisions, seats, chat state, current room request state, durable room versions/events, and authoritative room snapshots.
 
 ## Responsibilities
 
-The module owns rooms, room_participants, room_seat_states, room_realtime_events, room_chat_messages, room_kickouts. Routes should validate input and delegate business decisions to services.
+The module owns `rooms`, `room_participants`, `room_seat_states`, `room_member_requests`, `room_seat_applications`, `room_realtime_events`, `room_chat_messages`, and `room_kickouts`. Routes validate input and delegate business decisions to services. Normal socket liveness is an expiring realtime Redis lease, not a PostgreSQL heartbeat.
 
 ## What this module owns
 
-rooms, room_participants, room_seat_states, room_realtime_events, room_chat_messages, room_kickouts.
+`rooms`, `room_participants`, `room_seat_states`, `room_member_requests`, `room_seat_applications`, `room_realtime_events`, `room_chat_messages`, and `room_kickouts`.
 
 ## What this module does NOT own
 
@@ -18,11 +18,11 @@ This module does not own SFU transport state, edge routing, or client UI state.
 
 ## Source of truth
 
-PostgreSQL is the durable source of truth for rooms, room_participants, room_seat_states, room_realtime_events, room_chat_messages.
+PostgreSQL is durable authority. Redis room leases, transport sequences, and replay buffers are ephemeral/rebuildable and never override PostgreSQL state.
 
 ## Important files
 
-`backend/app/services/rooms/room_action_service.py`, `backend/app/services/rooms/room_state_service.py`, `backend/app/api/routes/room_realtime.py`.
+`backend/app/services/rooms/room_action_service.py`, `backend/app/services/rooms/room_state_service.py`, `backend/app/api/routes/room_realtime.py`, `backend/app/realtime/connection_manager.py`, and `docs/architecture/room-state-engine-v2.md`.
 
 ## Public API/contracts
 
@@ -42,7 +42,7 @@ Database tables and state: `rooms, room_participants, room_seat_states, room_rea
 
 ## Redis keys/state owned
 
-Room fanout coordination and media assignment are transient Redis uses.
+`funkey:realtime:room:*` leases, stream epoch/sequence, replay, command-dedupe, and fanout keys are transient. Media assignment is a separate Redis role.
 
 ## Dependencies
 
@@ -54,7 +54,7 @@ Room privacy, kick, membership, seat, and mic policy are checked in FastAPI. Nev
 
 ## Failure modes
 
-Clients missing an event must refetch the versioned room snapshot.
+Clients first attempt bounded contiguous room replay. If the stream epoch changed, replay is trimmed/unavailable, or Redis sequencing fails, they refetch the versioned authoritative room snapshot.
 
 ## Retry/idempotency behavior
 
@@ -90,4 +90,4 @@ Before changing this module: identify the owning table and contract, add an addi
 
 ## Known migration status
 
-Existing FastAPI authority; gateway transport migration is planned.
+Chunk 20 Room State Engine v2 is implemented: snapshot reads are side-effect free, periodic room DB heartbeat is removed, current membership/seat request state has dedicated tables, durable room/event versions are explicit, and bounded Redis replay falls back to snapshots. Legacy FastAPI room-socket replacement payloads remain during migration; Chunk 21 owns the one-Go-socket cutover.
