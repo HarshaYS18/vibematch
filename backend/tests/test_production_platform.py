@@ -40,12 +40,20 @@ class ProductionConfigTests(TestCase):
             MEDIA_CDN_BASE_URL="https://cdn.funkey.example", RATE_LIMIT_ENABLED=True,
             database_url="postgresql://funkey:strong-secret@postgres.internal:5432/funkey",
             redis_url="rediss://cache.internal:6379/0",
+            CACHE_REDIS_URL="rediss://cache.internal:6379/0",
+            REALTIME_REDIS_URL="rediss://realtime.internal:6379/0",
+            MEDIA_REGISTRY_REDIS_URL="rediss://media-redis.internal:6379/0",
         )
         Settings(**safe, _env_file=None).validate_production()
         with self.assertRaisesRegex(RuntimeError, "database_url\\(default\\)"):
             Settings(**{**safe, "database_url": "postgresql://postgres:postgres@localhost:5432/vibematch"}, _env_file=None).validate_production()
-        with self.assertRaisesRegex(RuntimeError, "redis_url\\(default\\)"):
-            Settings(**{**safe, "redis_url": "redis://localhost:6379/0"}, _env_file=None).validate_production()
+        with self.assertRaisesRegex(RuntimeError, "CACHE_REDIS_URL"):
+            Settings(**{**safe, "CACHE_REDIS_URL": ""}, _env_file=None).validate_production()
+        with self.assertRaisesRegex(RuntimeError, "Redis role endpoint separation"):
+            Settings(
+                **{**safe, "REALTIME_REDIS_URL": safe["CACHE_REDIS_URL"]},
+                _env_file=None,
+            ).validate_production()
         with self.assertRaisesRegex(RuntimeError, "DB_API_CONNECTION_BUDGET"):
             Settings(**safe, DB_POOL_SIZE=10, DB_API_CONNECTION_BUDGET=100, _env_file=None).validate_production()
 
@@ -61,6 +69,9 @@ class ProductionConfigTests(TestCase):
             MIGRATION_DATABASE_URL="postgresql://funkey_migrate:strong-secret@postgres.internal:5432/funkey",
             DB_POOLER_MODE="transaction",
             redis_url="rediss://cache.internal:6379/0",
+            CACHE_REDIS_URL="rediss://cache.internal:6379/0",
+            REALTIME_REDIS_URL="rediss://realtime.internal:6379/0",
+            MEDIA_REGISTRY_REDIS_URL="rediss://media-redis.internal:6379/0",
         )
         settings_obj = Settings(**safe, _env_file=None)
         settings_obj.validate_production()
@@ -166,7 +177,7 @@ class GatewayAuthTests(TestCase):
         heartbeat_node(redis, node_id="node-1", public_url="https://media.example",
                        room_count=0, peer_count=0, max_rooms=10, max_peers=100, room_ids=[])
         request = Request({"type": "http", "headers": [(b"x-media-internal-token", settings.MEDIA_INTERNAL_TOKEN.encode())]})
-        with patch.object(media_control, "get_redis", return_value=redis):
+        with patch.object(media_control, "get_media_registry_redis", return_value=redis):
             drained = media_control.media_node_internal_drain("node-1", request)
         self.assertTrue(drained.draining)
 
