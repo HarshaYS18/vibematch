@@ -61,6 +61,7 @@ class Settings(BaseSettings):
     DB_INBOX_CONNECTION_BUDGET: int = 100
     INBOX_REALTIME_TRANSPORT: str = "redis"
     INBOX_NATS_SUBJECT: str = "funkey.events.inbox.realtime"
+    NATS_URL: str = "nats://127.0.0.1:4222"
 
     # Topology budgets. These are planning/validation limits, not capacity claims.
     API_MAX_REPLICAS: int = 20
@@ -270,10 +271,6 @@ class Settings(BaseSettings):
             unsafe.append("DB_API_CONNECTION_BUDGET")
         if not self.INBOX_SERVICE_URL.strip():
             unsafe.append("INBOX_SERVICE_URL")
-        if not self.INBOX_DATABASE_URL.strip():
-            unsafe.append("INBOX_DATABASE_URL")
-        elif self.INBOX_DATABASE_URL.strip() == self.database_url.strip():
-            unsafe.append("INBOX_DATABASE_URL(service-isolated credentials required)")
         if self.INBOX_DB_POOL_SIZE <= 0 or self.INBOX_DB_MAX_OVERFLOW < 0:
             unsafe.append("INBOX_DB_POOL_SIZE/INBOX_DB_MAX_OVERFLOW")
         if (
@@ -312,6 +309,37 @@ class Settings(BaseSettings):
                 unsafe.append("OTEL_TRACE_SAMPLE_RATIO")
         if unsafe:
             raise RuntimeError("Unsafe production configuration: " + ", ".join(unsafe))
+
+    def validate_inbox_service(self) -> None:
+        """Validate settings that belong only to the extracted Inbox deployable."""
+
+        if not self.is_production:
+            return
+        unsafe: list[str] = []
+        inbox_url = self.INBOX_DATABASE_URL.strip()
+        if not inbox_url:
+            unsafe.append("INBOX_DATABASE_URL")
+        elif inbox_url == self.database_url.strip():
+            unsafe.append("INBOX_DATABASE_URL(service-isolated credentials required)")
+        if self.INBOX_REALTIME_TRANSPORT.strip().lower() != "nats":
+            unsafe.append("INBOX_REALTIME_TRANSPORT(nats required)")
+        if not self.NATS_URL.strip():
+            unsafe.append("NATS_URL")
+        if not self.INBOX_NATS_SUBJECT.strip():
+            unsafe.append("INBOX_NATS_SUBJECT")
+        if self.INBOX_DB_POOL_SIZE <= 0 or self.INBOX_DB_MAX_OVERFLOW < 0:
+            unsafe.append("INBOX_DB_POOL_SIZE/INBOX_DB_MAX_OVERFLOW")
+        if (
+            self.INBOX_MAX_REPLICAS
+            * (self.INBOX_DB_POOL_SIZE + self.INBOX_DB_MAX_OVERFLOW)
+            > self.DB_INBOX_CONNECTION_BUDGET
+        ):
+            unsafe.append("DB_INBOX_CONNECTION_BUDGET")
+        if unsafe:
+            raise RuntimeError(
+                "Unsafe Inbox service production configuration: "
+                + ", ".join(unsafe)
+            )
 
     model_config = SettingsConfigDict(
         env_file=".env",
