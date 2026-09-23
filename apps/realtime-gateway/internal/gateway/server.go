@@ -30,17 +30,30 @@ return count
 `
 
 type Server struct {
-	Config     Config
-	Auth       Authorizer
-	Redis      *redis.Client
-	Hub        *Hub
-	Logger     *slog.Logger
-	subscribed atomic.Bool
-	authSlots  chan struct{}
+	Config       Config
+	Auth         Authorizer
+	Commands     CommandExecutor
+	Redis        *redis.Client
+	Hub          *Hub
+	Logger       *slog.Logger
+	subscribed   atomic.Bool
+	authSlots    chan struct{}
+	commandSlots chan struct{}
 }
 
-func NewServer(cfg Config, auth Authorizer, client *redis.Client, logger *slog.Logger) *Server {
-	return &Server{Config: cfg, Auth: auth, Redis: client, Hub: NewHub(), Logger: logger, authSlots: make(chan struct{}, 512)}
+func NewServer(
+	cfg Config,
+	auth Authorizer,
+	commands CommandExecutor,
+	client *redis.Client,
+	logger *slog.Logger,
+) *Server {
+	return &Server{
+		Config: cfg, Auth: auth, Commands: commands, Redis: client,
+		Hub: NewHub(), Logger: logger,
+		authSlots: make(chan struct{}, 512),
+		commandSlots: make(chan struct{}, 256),
+	}
 }
 
 func (s *Server) verify(ctx context.Context, token, action, roomID string) (Principal, error) {
@@ -206,11 +219,14 @@ func (s *Server) serveWS(w http.ResponseWriter, r *http.Request) {
 }
 
 type clientCommand struct {
-	Type         string `json:"type"`
-	RoomPublicID string `json:"room_public_id,omitempty"`
-	Stream       string `json:"stream,omitempty"`
-	LastSequence int64  `json:"last_sequence,omitempty"`
-	Traceparent  string `json:"traceparent,omitempty"`
+	Type           string `json:"type"`
+	RoomPublicID   string `json:"room_public_id,omitempty"`
+	Stream         string `json:"stream,omitempty"`
+	LastSequence   int64  `json:"last_sequence,omitempty"`
+	ConversationID string `json:"conversation_id,omitempty"`
+	Activity       string `json:"activity,omitempty"`
+	CommandID      string `json:"command_id,omitempty"`
+	Traceparent    string `json:"traceparent,omitempty"`
 }
 
 func validRoomID(roomID string) bool {
@@ -272,9 +288,72 @@ func (s *Server) readPump(c *Client) {
 			s.Hub.Unsubscribe(c, command.RoomPublicID)
 			s.deleteRoomLease(c, command.RoomPublicID)
 		default:
+			if _, allowed := allowedApplicationCommands[command.Type]; allowed {
+				s.executeApplicationCommand(c, command)
+				continue
+			}
 			s.Hub.EnqueueCritical(c, []byte(`{"type":"error","code":"unsupported_command"}`))
 		}
 	}
+}
+
+func (s *Server) executeApplicationCommand(c *Client, command clientCommand) {
+	parent := context.Background()
+	if command.Traceparent != "" {
+		parent = otel.GetTextMapPropagator().Extract(
+			parent,
+			propagation.MapCarrier{"traceparent": command.Traceparent},
+		)
+	}
+	parent, span := otel.Tracer("funkey.realtime").Start(
+		parent,
+		"realtime.command",
+		trace.WithSpanKind(trace.SpanKindServer),
+		trace.WithAttributes(
+			attribute.String("messaging.system", "websocket"),
+			attribute.String("funkey.command_type", command.Type),
+		),
+	)
+	defer span.End()
+
+	select {
+	case s.commandSlots <- struct{}{}:
+		defer func() { <-s.commandSlots }()
+	case <-parent.Done():
+		s.Hub.EnqueueCritical(c, []byte(`{"type":"command/error","code":"command_cancelled"}`))
+		return
+	default:
+		s.Hub.EnqueueCritical(c, []byte(`{"type":"command/error","code":"command_busy"}`))
+		return
+	}
+
+	ctx, cancel := context.WithTimeout(parent, s.Config.CommandTimeout)
+	err := s.Commands.Execute(ctx, c.Token, command)
+	cancel()
+	if err != nil {
+		if !errors.Is(err, ErrCommandRejected) {
+			span.RecordError(err)
+		}
+		code := "command_unavailable"
+		if errors.Is(err, ErrCommandRejected) {
+			code = "command_rejected"
+		}
+		body, _ := json.Marshal(map[string]any{
+			"type":         "command/error",
+			"code":         code,
+			"command_type": command.Type,
+			"command_id":   command.CommandID,
+		})
+		s.Hub.EnqueueCritical(c, body)
+		return
+	}
+
+	body, _ := json.Marshal(map[string]any{
+		"type":         "command/ack",
+		"command_type": command.Type,
+		"command_id":   command.CommandID,
+	})
+	s.Hub.Enqueue(c, body)
 }
 
 func (s *Server) subscribeCommand(c *Client, command clientCommand) bool {
@@ -657,7 +736,7 @@ func (s *Server) DeleteNodeLease(ctx context.Context) {
 }
 
 func (s *Server) Validate() error {
-	if s.Auth == nil || s.Redis == nil || s.Hub == nil {
+	if s.Auth == nil || s.Commands == nil || s.Redis == nil || s.Hub == nil {
 		return fmt.Errorf("gateway dependencies are required")
 	}
 	return nil
