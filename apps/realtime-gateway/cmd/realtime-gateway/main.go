@@ -54,7 +54,11 @@ func main() {
 			cfg.CapabilityTokenVersion,
 			cfg.AuthTimeout,
 		),
-		gateway.NewHTTPCommandExecutor(cfg.CommandURL, cfg.CommandTimeout),
+		gateway.NewRoutedHTTPCommandExecutor(
+			cfg.CommandURL,
+			cfg.InboxCommandURL,
+			cfg.CommandTimeout,
+		),
 		client,
 		logger,
 	)
