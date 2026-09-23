@@ -69,6 +69,7 @@ data:
   NATS_URL: nats://nats.example.invalid:4222
   REALTIME_NATS_URL: nats://nats.example.invalid:4222
   REALTIME_NATS_INBOX_SUBJECT: funkey.events.inbox.realtime
+  REALTIME_INBOX_COMMAND_URL: http://funkey-inbox:8083/api/v1/realtime/command
 
   INBOX_SERVICE_URL: http://funkey-inbox:8083/api/v1
   INBOX_REALTIME_TRANSPORT: nats
