@@ -16,6 +16,7 @@ from app.api.routes import (
 from app.core.config import settings
 from app.database import get_db
 from database import engine, get_inbox_db
+from realtime import router as realtime_router
 
 
 settings.validate_inbox_service()
@@ -36,6 +37,7 @@ api.include_router(inbox_message_tools.router, prefix="/inbox", tags=["Inbox"])
 api.include_router(inbox_calls.router, prefix="/inbox", tags=["Inbox Calls"])
 for router in (inbox_backup_google.router, inbox_ai.router, calls.router):
     api.include_router(router)
+api.include_router(realtime_router)
 app.include_router(api)
 
 
