@@ -126,6 +126,18 @@ func bearerToken(r *http.Request) string {
 	return ""
 }
 
+func capabilityToken(r *http.Request) string {
+	if token := strings.TrimSpace(r.Header.Get("X-Realtime-Capability")); token != "" {
+		return token
+	}
+	for _, protocol := range websocket.Subprotocols(r) {
+		if strings.HasPrefix(protocol, "capability.") {
+			return strings.TrimPrefix(protocol, "capability.")
+		}
+	}
+	return ""
+}
+
 func newID() string {
 	var bytes [16]byte
 	if _, err := rand.Read(bytes[:]); err != nil {
@@ -162,13 +174,14 @@ func (s *Server) serveWS(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 	token := bearerToken(r)
-	if token == "" {
+	capability := capabilityToken(r)
+	if token == "" || capability == "" {
 		s.Hub.stats.AuthDenied.Add(1)
 		http.Error(w, "unauthorized", http.StatusUnauthorized)
 		return
 	}
 	ctx, cancel := context.WithTimeout(traceContext, s.Config.AuthTimeout)
-	principal, err := s.verify(ctx, token, "connect", "")
+	principal, err := s.verify(ctx, capability, "connect", "")
 	cancel()
 	if err != nil {
 		s.Hub.stats.AuthDenied.Add(1)
@@ -202,6 +215,8 @@ func (s *Server) serveWS(w http.ResponseWriter, r *http.Request) {
 		conn,
 		s.Config.OutboundQueue,
 	)
+	client.SessionID = principal.SessionID
+	client.DeviceID = principal.DeviceID
 	if !s.Hub.Add(client, s.Config.MaxConnections, s.Config.MaxConnectionsPerUser) {
 		_ = conn.WriteControl(websocket.CloseMessage, websocket.FormatCloseMessage(websocket.CloseTryAgainLater, "capacity"), time.Now().Add(time.Second))
 		_ = conn.Close()
@@ -228,6 +243,7 @@ type clientCommand struct {
 	CommandID      string         `json:"command_id,omitempty"`
 	Payload        map[string]any `json:"payload,omitempty"`
 	Traceparent    string         `json:"traceparent,omitempty"`
+	Capability     string         `json:"capability,omitempty"`
 }
 
 func validRoomID(roomID string) bool {
@@ -377,7 +393,7 @@ func (s *Server) subscribeCommand(c *Client, command clientCommand) bool {
 	)
 	defer span.End()
 	ctx, cancel := context.WithTimeout(parent, s.Config.AuthTimeout)
-	principal, err := s.verify(ctx, c.Token, "subscribe", command.RoomPublicID)
+	principal, err := s.verify(ctx, command.Capability, "subscribe", command.RoomPublicID)
 	cancel()
 	if err != nil || principal.UserID != c.UserID {
 		s.Hub.stats.AuthDenied.Add(1)
@@ -425,8 +441,6 @@ func (s *Server) subscribeCommand(c *Client, command clientCommand) bool {
 func (s *Server) writePump(c *Client) {
 	ticker := time.NewTicker(s.Config.PingInterval)
 	defer ticker.Stop()
-	reauth := time.NewTicker(s.Config.ReauthInterval)
-	defer reauth.Stop()
 	defer s.Hub.Remove(c)
 	for {
 		select {
@@ -446,26 +460,6 @@ func (s *Server) writePump(c *Client) {
 		case <-ticker.C:
 			if err := c.Conn.WriteControl(websocket.PingMessage, nil, time.Now().Add(s.Config.WriteTimeout)); err != nil {
 				return
-			}
-		case <-reauth.C:
-			ctx, cancel := context.WithTimeout(context.Background(), s.Config.AuthTimeout)
-			principal, err := s.verify(ctx, c.Token, "connect", "")
-			cancel()
-			if err != nil || principal.UserID != c.UserID || principal.IsStaff != c.IsStaff {
-				s.Hub.stats.AuthDenied.Add(1)
-				_ = c.Conn.WriteControl(websocket.CloseMessage, websocket.FormatCloseMessage(websocket.ClosePolicyViolation, "reauthorization failed"), time.Now().Add(time.Second))
-				return
-			}
-			for _, roomID := range s.Hub.Rooms(c) {
-				ctx, cancel := context.WithTimeout(context.Background(), s.Config.AuthTimeout)
-				principal, err := s.verify(ctx, c.Token, "subscribe", roomID)
-				cancel()
-				if err != nil || principal.UserID != c.UserID {
-					s.Hub.Unsubscribe(c, roomID)
-					s.deleteRoomLease(c, roomID)
-					notice, _ := json.Marshal(map[string]string{"type": "subscription_revoked", "room_public_id": roomID})
-					s.Hub.EnqueueCritical(c, notice)
-				}
 			}
 		}
 	}
