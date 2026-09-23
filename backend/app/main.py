@@ -11,7 +11,13 @@ from app.api.router import api_router
 from app.core.config import settings
 from app.core.operational import install_query_counter, operational_middleware, render_metrics
 from app.core.rate_limit import rate_limit_middleware
-from app.core.redis_client import get_async_redis, get_redis
+from app.core.redis_client import (
+    get_async_redis,
+    get_async_realtime_redis,
+    get_media_registry_redis,
+    get_realtime_redis,
+    get_redis,
+)
 from app.core.schema_guard import assert_database_schema_current
 from app.core.telemetry import configure_telemetry, shutdown_telemetry
 from app.database import engine
@@ -44,7 +50,10 @@ async def lifespan(_app: FastAPI):
     await room_realtime_connections.shutdown()
     await inbox_ws_manager.shutdown()
     await get_async_redis().aclose()
+    await get_async_realtime_redis().aclose()
     get_redis().close()
+    get_realtime_redis().close()
+    get_media_registry_redis().close()
     engine.dispose()
     shutdown_telemetry()
 
