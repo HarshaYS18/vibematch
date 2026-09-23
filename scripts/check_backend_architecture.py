@@ -410,7 +410,6 @@ def _validate_inbox_service_extraction(errors: list[str]) -> None:
         "from app.models.inbox import",
         "from app.models.inbox_preferences import",
         "from app.services.inbox_service import",
-        "from app.services import inbox_service",
     )
     if backend_app.exists():
         for source in backend_app.rglob("*.py"):
@@ -418,7 +417,12 @@ def _validate_inbox_service_extraction(errors: list[str]) -> None:
             if relative in allowed_direct:
                 continue
             text = source.read_text(encoding="utf-8-sig")
-            if any(token in text for token in direct_tokens):
+            imports_direct_service = re.search(
+                r"from app\.services import(?:\s*\([^)]*)?\binbox_service\b",
+                text,
+                flags=re.DOTALL,
+            )
+            if any(token in text for token in direct_tokens) or imports_direct_service:
                 errors.append(
                     "cross-domain direct Inbox access is forbidden; use "
                     "inbox_service_client: "
