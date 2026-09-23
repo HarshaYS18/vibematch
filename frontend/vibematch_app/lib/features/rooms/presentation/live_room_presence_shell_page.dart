@@ -98,6 +98,7 @@ class _LiveRoomPresenceShellPageState
     _heartbeatTimer?.cancel();
     _enteredMessageTimer?.cancel();
     if (!LiveRoomMinimizedOverlayService.instance.isShowing) {
+      _roomSessionRealtimeBridge.deactivate();
       unawaited(_leaveRoomBestEffort());
     }
     _roomSessionRealtimeBridge.dispose();
@@ -127,6 +128,7 @@ class _LiveRoomPresenceShellPageState
     _presenceEstablished = true;
     _presenceError = null;
     _startHeartbeat();
+    unawaited(_roomSessionRealtimeBridge.activate());
     // A minimized-room restore may render cached visual state immediately, but
     // backend presence is still authoritative. Reconcile now instead of waiting
     // for the first periodic heartbeat.
@@ -241,6 +243,7 @@ class _LiveRoomPresenceShellPageState
       _showEnteredMessageIfNeeded(snapshot);
       _autoSeatIfAllowed(snapshot);
       _startHeartbeat();
+      await _roomSessionRealtimeBridge.activate();
     } catch (error) {
       if (!mounted) return;
 
