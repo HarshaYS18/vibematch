@@ -48,6 +48,35 @@ for root in CANONICAL_ROOTS:
         if "WebSocketChannel.connect" in text and "/foundation/realtime/" not in f"/{rel}":
             violations.append(f"{rel}: websocket creation belongs in foundation/realtime")
 
+
+# Chunk 21: one physical application WebSocket.
+#
+# Application features subscribe through AppRealtimeHub. Raw websocket creation
+# belongs only to foundation/realtime. The mediasoup transport is a separate
+# media-plane implementation and must not use the retired FastAPI app sockets.
+for path in APP.rglob("*.dart"):
+    text = path.read_text(encoding="utf-8-sig")
+    rel = path.relative_to(ROOT).as_posix()
+
+    if (
+        ("WebSocketChannel.connect" in text or "WebSocket.connect" in text)
+        and "/foundation/realtime/" not in f"/{rel}"
+    ):
+        violations.append(
+            f"{rel}: raw application websocket creation must stay in foundation/realtime"
+        )
+
+    for retired_path in ("/ws/inbox", "/ws/room-realtime"):
+        if retired_path in text:
+            violations.append(
+                f"{rel}: retired FastAPI application websocket path {retired_path} is forbidden"
+            )
+
+    if "VmMediaConfig" in text or "vm_media_config.dart" in text:
+        violations.append(
+            f"{rel}: retired VmMediaConfig must not be referenced after the Go realtime cutover"
+        )
+
 # Chunk 6: room feature code must depend on RoomMediaEngine rather than the
 # concrete production mediasoup implementation. The implementation itself is
 # intentionally retained behind room_media/data as a compatibility delegate.
