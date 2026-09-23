@@ -13,9 +13,12 @@ from app.api.routes import (
     inbox_preferences,
     inbox_stories,
 )
+from app.core.config import settings
 from app.database import get_db
 from database import engine, get_inbox_db
 
+
+settings.validate_inbox_service()
 
 app = FastAPI(
     title="FunKey Inbox Service",
