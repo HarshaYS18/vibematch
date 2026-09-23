@@ -136,6 +136,9 @@ class RoomReplayTests(IsolatedAsyncioTestCase):
             )
         self.assertTrue(replayed)
         self.assertEqual(2, sender.await_count)
+        first_replayed = sender.await_args_list[0].args[1]
+        self.assertNotIn("room", first_replayed["payload"])
+        self.assertIn("delta", first_replayed["payload"])
 
     async def test_trimmed_replay_requires_snapshot_when_gap_is_too_old(self):
         with patch.object(connection_manager, "_ROOM_REPLAY_MAX_EVENTS", 3):
