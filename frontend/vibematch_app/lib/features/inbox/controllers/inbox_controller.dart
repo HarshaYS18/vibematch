@@ -98,10 +98,14 @@ class InboxController extends ChangeNotifier {
   ];
 
   List<InboxConversation> _conversations = <InboxConversation>[];
+  String? _conversationNextCursor;
+  bool _loadingMoreConversations = false;
   final List<InboxReportTask> _reportTasks = <InboxReportTask>[];
 
   List<InboxConversation> get conversations =>
       List.unmodifiable(_conversations);
+  bool get hasMoreConversations => _conversationNextCursor != null;
+  bool get isLoadingMoreConversations => _loadingMoreConversations;
   List<InboxReportTask> get reportTasks => List.unmodifiable(_reportTasks);
   int get pendingReportTaskCount =>
       _reportTasks.where((task) => task.isPending).length;
@@ -182,7 +186,10 @@ class InboxController extends ChangeNotifier {
       backupStatus = await _backupApiService.loadStatus();
       preferenceSettings = await _preferencesApiService.loadPreferences();
       _syncLegacyPreferenceFlags();
-      _conversations = await _apiService.loadConversations();
+      await _apiService.bootstrapInbox();
+      final conversationPage = await _apiService.loadConversationPage();
+      _conversations = conversationPage.items;
+      _conversationNextCursor = conversationPage.nextCursor;
       _reportTasks
         ..clear()
         ..addAll(await _apiService.loadReportTasks());
@@ -192,6 +199,27 @@ class InboxController extends ChangeNotifier {
       _conversations = <InboxConversation>[];
     } finally {
       isLoading = false;
+      _safeNotify();
+    }
+  }
+
+  Future<void> loadMoreConversations() async {
+    final cursor = _conversationNextCursor;
+    if (cursor == null || _loadingMoreConversations || isLoading) return;
+    _loadingMoreConversations = true;
+    _safeNotify();
+    try {
+      final page = await _apiService.loadConversationPage(cursor: cursor);
+      final existingIds = _conversations.map((item) => item.id).toSet();
+      _conversations = [
+        ..._conversations,
+        ...page.items.where((item) => existingIds.add(item.id)),
+      ];
+      _conversationNextCursor = page.nextCursor;
+    } catch (error) {
+      errorMessage = error.toString();
+    } finally {
+      _loadingMoreConversations = false;
       _safeNotify();
     }
   }
@@ -512,10 +540,53 @@ class InboxController extends ChangeNotifier {
   Future<void> openConversationFromBackend(String conversationId) async {
     try {
       final updated = await _apiService.getConversation(conversationId);
+      if (updated.secretDriftEnabled) {
+        await _apiService.openSecretDriftSession(conversationId);
+      }
       _upsertConversation(updated);
-      notifyListeners();
-    } catch (_) {
       markConversationRead(conversationId);
+    } catch (error) {
+      errorMessage = error.toString();
+      _safeNotify();
+    }
+  }
+
+  Future<int> loadOlderMessages(String conversationId) async {
+    final conversation = conversationById(conversationId);
+    final cursor = conversation?.messagesNextCursor;
+    if (conversation == null ||
+        !conversation.hasOlderMessages ||
+        cursor == null ||
+        cursor.isEmpty) {
+      return 0;
+    }
+
+    try {
+      final page = await _apiService.loadOlderMessages(
+        conversationId: conversationId,
+        before: cursor,
+      );
+      final existingIds = conversation.messages
+          .map((item) => item.id)
+          .whereType<String>()
+          .toSet();
+      final older = page.messages
+          .where((item) => item.id == null || existingIds.add(item.id!))
+          .toList();
+      _replaceConversation(
+        conversationId,
+        (chat) => chat.copyWith(
+          messages: [...older, ...chat.messages],
+          messagesNextCursor: page.nextCursor,
+          clearMessagesNextCursor: page.nextCursor == null,
+          hasOlderMessages: page.hasMore,
+        ),
+      );
+      return older.length;
+    } catch (error) {
+      errorMessage = error.toString();
+      _safeNotify();
+      return 0;
     }
   }
 
