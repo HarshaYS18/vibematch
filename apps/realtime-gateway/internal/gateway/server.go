@@ -573,8 +573,11 @@ func (s *Server) replayRoom(
 	if expected-1 != currentSequence {
 		return false, currentSequence
 	}
+	// Recovery replay is protocol-critical and must remain FIFO with the
+	// final subscribed acknowledgement. Using the critical tier prevents a
+	// later critical ack from overtaking replay deltas queued at normal priority.
 	for _, raw := range rawEvents {
-		if !s.Hub.Enqueue(c, []byte(raw)) {
+		if !s.Hub.EnqueueCritical(c, []byte(raw)) {
 			return false, currentSequence
 		}
 	}
