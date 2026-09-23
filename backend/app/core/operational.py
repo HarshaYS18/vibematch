@@ -5,6 +5,7 @@ are ContextVar-scoped so tests can detect N+1 regressions without production APM
 """
 
 from contextvars import ContextVar, Token
+import hashlib
 import json
 import logging
 import threading
@@ -28,6 +29,7 @@ _latency: dict[tuple[str, str, str], int] = defaultdict(int)
 _latency_count: dict[tuple[str, str], int] = defaultdict(int)
 _latency_sum: dict[tuple[str, str], float] = defaultdict(float)
 _db_query_sum: dict[tuple[str, str], int] = defaultdict(int)
+_db_slow_queries_total = 0
 _inflight = 0
 _buckets = (0.01, 0.05, 0.1, 0.25, 0.5, 1.0, 2.5, 5.0, 10.0)
 _db_query_count: ContextVar[int | None] = ContextVar("funkey_db_query_count", default=None)
@@ -89,13 +91,48 @@ def install_query_counter(engine) -> None:
     if id(engine) in _counted_engines:
         return
     event.listen(engine, "before_cursor_execute", _count_query)
+    event.listen(engine, "after_cursor_execute", _observe_query_duration)
     _counted_engines.add(id(engine))
 
 
-def _count_query(_conn, _cursor, _statement, _parameters, _context, _executemany) -> None:
+def _count_query(_conn, _cursor, _statement, _parameters, context, _executemany) -> None:
     current = _db_query_count.get()
     if current is not None:
         _db_query_count.set(current + 1)
+    context._funkey_query_started_at = time.monotonic()
+
+
+def statement_fingerprint(statement: str) -> str:
+    """Return a non-reversible identifier without logging SQL or parameters."""
+    return hashlib.sha256(statement.encode("utf-8", errors="replace")).hexdigest()[:16]
+
+
+def _observe_query_duration(_conn, _cursor, statement, _parameters, context, _executemany) -> None:
+    global _db_slow_queries_total
+    started = getattr(context, "_funkey_query_started_at", None)
+    if started is None:
+        return
+    duration_ms = (time.monotonic() - started) * 1000.0
+    if duration_ms < settings.DB_SLOW_QUERY_MS:
+        return
+
+    operation = statement.lstrip().split(None, 1)[0].upper() if statement.strip() else "UNKNOWN"
+    with _lock:
+        _db_slow_queries_total += 1
+
+    active_span = trace.get_current_span()
+    if active_span.is_recording():
+        active_span.set_attribute("funkey.db.slow_query", True)
+        active_span.set_attribute("db.operation.name", operation)
+        active_span.set_attribute("funkey.db.statement_fingerprint", statement_fingerprint(statement))
+
+    _logger.warning(json.dumps({
+        "event": "db.slow_query",
+        "trace_id": current_trace_id(),
+        "duration_ms": round(duration_ms, 2),
+        "operation": operation,
+        "statement_fingerprint": statement_fingerprint(statement),
+    }, separators=(",", ":")))
 
 
 def begin_query_count() -> Token:
@@ -177,6 +214,7 @@ def render_metrics(pool=None) -> str:
         latency_count = dict(_latency_count)
         latency_sum = dict(_latency_sum)
         db_query_sum = dict(_db_query_sum)
+        db_slow_queries_total = _db_slow_queries_total
         inflight = _inflight
     lines = [
         "# TYPE funkey_http_inflight_requests gauge",
@@ -204,6 +242,10 @@ def render_metrics(pool=None) -> str:
         lines.append(
             f'funkey_http_db_queries_total{{method={json.dumps(method)},route={json.dumps(path)}}} {count}'
         )
+    lines.extend([
+        "# TYPE funkey_db_slow_queries_total counter",
+        f"funkey_db_slow_queries_total {db_slow_queries_total}",
+    ])
     if pool is not None and hasattr(pool, "checkedout"):
         lines.extend([
             "# TYPE funkey_db_pool_checked_out gauge",
