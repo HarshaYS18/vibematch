@@ -51,7 +51,7 @@ func NewServer(
 	return &Server{
 		Config: cfg, Auth: auth, Commands: commands, Redis: client,
 		Hub: NewHub(), Logger: logger,
-		authSlots: make(chan struct{}, 512),
+		authSlots:    make(chan struct{}, 512),
 		commandSlots: make(chan struct{}, 256),
 	}
 }
@@ -219,11 +219,11 @@ func (s *Server) serveWS(w http.ResponseWriter, r *http.Request) {
 }
 
 type clientCommand struct {
-	Type           string `json:"type"`
-	RoomPublicID   string `json:"room_public_id,omitempty"`
-	Stream         string `json:"stream,omitempty"`
-	LastSequence   int64  `json:"last_sequence,omitempty"`
-	ConversationID string `json:"conversation_id,omitempty"`
+	Type           string         `json:"type"`
+	RoomPublicID   string         `json:"room_public_id,omitempty"`
+	Stream         string         `json:"stream,omitempty"`
+	LastSequence   int64          `json:"last_sequence,omitempty"`
+	ConversationID string         `json:"conversation_id,omitempty"`
 	Activity       string         `json:"activity,omitempty"`
 	CommandID      string         `json:"command_id,omitempty"`
 	Payload        map[string]any `json:"payload,omitempty"`
@@ -654,7 +654,7 @@ func (s *Server) heartbeatOnce(ctx context.Context) {
 		pipe.Set(ctx, key, s.Config.NodeID, s.Config.LeaseTTL)
 		presenceKey := userPresenceLeaseKey(c.UserID)
 		pipe.ZAdd(ctx, presenceKey, redis.Z{
-			Score: roomLeaseScore,
+			Score:  roomLeaseScore,
 			Member: c.ID,
 		})
 		pipe.ZRemRangeByScore(ctx, presenceKey, "-inf", roomLeaseExpiry)
