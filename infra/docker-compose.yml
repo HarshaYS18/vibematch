@@ -3,14 +3,53 @@ name: funkey-dev
 services:
   postgres:
     image: postgres:16-alpine
+    command:
+      - postgres
+      - -c
+      - shared_preload_libraries=pg_stat_statements
+      - -c
+      - track_io_timing=on
+      - -c
+      - log_lock_waits=on
+      - -c
+      - deadlock_timeout=1s
     environment:
       POSTGRES_USER: funkey
       POSTGRES_PASSWORD: funkey_dev_only
       POSTGRES_DB: funkey
     ports: ["127.0.0.1:5432:5432"]
-    volumes: ["postgres_data:/var/lib/postgresql/data"]
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ./postgres/init:/docker-entrypoint-initdb.d:ro
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U funkey -d funkey"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+
+  pgbouncer:
+    image: pgbouncer/pgbouncer:1.25.2
+    environment:
+      DATABASES_HOST: postgres
+      DATABASES_PORT: "5432"
+      DATABASES_USER: funkey
+      DATABASES_PASSWORD: funkey_dev_only
+      DATABASES_DBNAME: funkey
+      DATABASES_MAX_DB_CONNECTIONS: "30"
+      PGBOUNCER_LISTEN_PORT: "6432"
+      PGBOUNCER_POOL_MODE: transaction
+      PGBOUNCER_MAX_CLIENT_CONN: "100"
+      PGBOUNCER_DEFAULT_POOL_SIZE: "20"
+      PGBOUNCER_RESERVE_POOL_SIZE: "5"
+      PGBOUNCER_MAX_PREPARED_STATEMENTS: "200"
+      PGBOUNCER_AUTH_TYPE: scram-sha-256
+      PGBOUNCER_QUERY_WAIT_TIMEOUT: "5"
+      QUIET: "1"
+    ports: ["127.0.0.1:6432:6432"]
+    depends_on:
+      postgres: {condition: service_healthy}
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -h 127.0.0.1 -p 6432 -U funkey -d funkey"]
       interval: 5s
       timeout: 3s
       retries: 20
@@ -47,7 +86,10 @@ services:
     environment: &api_environment
       APP_ENV: development
       ENFORCE_SCHEMA_CURRENT: "false"
-      database_url: postgresql://funkey:funkey_dev_only@postgres:5432/funkey
+      database_url: postgresql://funkey:funkey_dev_only@pgbouncer:6432/funkey
+      MIGRATION_DATABASE_URL: postgresql://funkey:funkey_dev_only@postgres:5432/funkey
+      DB_POOLER_MODE: transaction
+      DB_APPLICATION_NAME: funkey-api
       redis_url: redis://redis:6379/0
       JWT_SECRET_KEY: local-development-only-secret-change-before-production
       MEDIA_INTERNAL_TOKEN: local-development-only-media-token-change-me
@@ -63,6 +105,7 @@ services:
     ports: ["127.0.0.1:8000:8000"]
     depends_on:
       migrate: {condition: service_completed_successfully}
+      pgbouncer: {condition: service_healthy}
       redis: {condition: service_healthy}
 
   realtime:
@@ -85,10 +128,14 @@ services:
     build: {context: .., dockerfile: apps/worker/Dockerfile}
     environment:
       <<: *api_environment
+      DB_APPLICATION_NAME: funkey-worker
+      DB_POOL_SIZE: "3"
+      DB_MAX_OVERFLOW: "0"
       NATS_URL: nats://nats:4222
     depends_on:
       nats: {condition: service_healthy}
       migrate: {condition: service_completed_successfully}
+      pgbouncer: {condition: service_healthy}
 
 volumes:
   postgres_data:
