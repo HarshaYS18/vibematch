@@ -1,7 +1,7 @@
 from datetime import datetime
 from enum import Enum
 
-from sqlalchemy import Boolean, DateTime, ForeignKey, Integer, JSON, String, Text
+from sqlalchemy import Boolean, DateTime, ForeignKey, Index, Integer, JSON, String, Text, UniqueConstraint
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.database import Base
@@ -72,6 +72,10 @@ class InboxConversation(Base):
 
 class InboxParticipant(Base):
     __tablename__ = "inbox_participants"
+    __table_args__ = (
+        UniqueConstraint("conversation_id", "user_id", name="uq_inbox_participant_conversation_user"),
+        Index("ix_inbox_participant_user_state", "user_id", "is_archived", "is_pinned"),
+    )
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True, index=True)
     conversation_id: Mapped[int] = mapped_column(ForeignKey("inbox_conversations.id"), index=True, nullable=False)
@@ -79,6 +83,9 @@ class InboxParticipant(Base):
     unread_count: Mapped[int] = mapped_column(Integer, default=0)
     last_read_message_id: Mapped[int | None] = mapped_column(Integer, nullable=True)
     is_deleted_for_user: Mapped[bool] = mapped_column(Boolean, default=False, index=True)
+    is_muted: Mapped[bool] = mapped_column(Boolean, default=False, index=True)
+    is_pinned: Mapped[bool] = mapped_column(Boolean, default=False, index=True)
+    is_archived: Mapped[bool] = mapped_column(Boolean, default=False, index=True)
     created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
     updated_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
 
@@ -110,6 +117,24 @@ class InboxMessage(Base):
 
     conversation = relationship("InboxConversation", back_populates="messages")
     sender = relationship("User")
+
+
+class InboxReadReceipt(Base):
+    __tablename__ = "inbox_read_receipts"
+    __table_args__ = (
+        UniqueConstraint("message_id", "user_id", name="uq_inbox_read_receipt_message_user"),
+        Index("ix_inbox_read_receipt_conversation_user", "conversation_id", "user_id", "message_id"),
+    )
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, index=True)
+    message_id: Mapped[int] = mapped_column(ForeignKey("inbox_messages.id", ondelete="CASCADE"), nullable=False, index=True)
+    conversation_id: Mapped[int] = mapped_column(ForeignKey("inbox_conversations.id", ondelete="CASCADE"), nullable=False, index=True)
+    user_id: Mapped[int] = mapped_column(ForeignKey("users.id"), nullable=False, index=True)
+    read_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow, nullable=False, index=True)
+
+    message = relationship("InboxMessage")
+    conversation = relationship("InboxConversation")
+    user = relationship("User")
 
 
 class InboxReport(Base):
