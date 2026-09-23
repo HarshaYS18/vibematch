@@ -47,7 +47,13 @@ func main() {
 	defer client.Close()
 	service := gateway.NewServer(
 		cfg,
-		gateway.NewHTTPAuthorizer(cfg.AuthVerifyURL, cfg.AuthTimeout),
+		gateway.NewCapabilityAuthorizer(
+			cfg.CapabilityKeyURL,
+			cfg.CapabilityIssuer,
+			cfg.CapabilityAudience,
+			cfg.CapabilityTokenVersion,
+			cfg.AuthTimeout,
+		),
 		gateway.NewHTTPCommandExecutor(cfg.CommandURL, cfg.CommandTimeout),
 		client,
 		logger,
