@@ -140,6 +140,8 @@ services:
       JWT_SECRET_KEY: local-development-only-secret-change-before-production
       MEDIA_INTERNAL_TOKEN: local-development-only-media-token-change-me
       INBOX_SERVICE_URL: http://inbox:8083/api/v1
+      INBOX_INTERNAL_URL: http://inbox:8083/internal/inbox
+      INBOX_INTERNAL_TOKEN: local-development-inbox-internal-token-2026
       INBOX_REALTIME_TRANSPORT: nats
       INBOX_NATS_SUBJECT: funkey.events.inbox.realtime
       NATS_URL: nats://nats:4222
