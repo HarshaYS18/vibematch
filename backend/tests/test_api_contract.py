@@ -42,7 +42,7 @@ class CanonicalApiContractTests(unittest.TestCase):
             "/health", "/app/source-of-truth/master",
             "/families/{family_id}/members",
             "/rooms/{room_public_id}/realtime/snapshot",
-            "/ws/room-realtime", "/lucky-packets", "/lucky-packets/active",
+            "/realtime/verify", "/realtime/command", "/lucky-packets", "/lucky-packets/active",
             "/admin/games/pools", "/admin/games/props/jungle-hunt",
             "/admin/games/seed-defaults", "/admin/games/catalog/{game_key}",
             "/rooms/{room_public_id}/media", "/admin/media/nodes", "/support/tickets",
