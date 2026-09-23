@@ -8,6 +8,7 @@ import (
 	"encoding/json"
 	"net/http"
 	"net/http/httptest"
+	"strings"
 	"testing"
 	"time"
 )
@@ -107,7 +108,17 @@ func TestCapabilityAuthorizerRejectsWrongRoomExpiredAndTamperedTokens(t *testing
 		t.Fatalf("expired capability accepted: %v", err)
 	}
 
-	tampered := token[:len(token)-1] + "A"
+	parts := strings.Split(token, ".")
+	if len(parts) != 3 {
+		t.Fatalf("unexpected signed capability shape: %q", token)
+	}
+	signature, err := base64.RawURLEncoding.DecodeString(parts[2])
+	if err != nil || len(signature) != ed25519.SignatureSize {
+		t.Fatalf("invalid test signature: len=%d err=%v", len(signature), err)
+	}
+	signature[0] ^= 0x01
+	tampered := parts[0] + "." + parts[1] + "." +
+		base64.RawURLEncoding.EncodeToString(signature)
 	if _, err := authorizer.Verify(context.Background(), tampered, "subscribe", "room-a"); err == nil {
 		t.Fatal("tampered capability accepted")
 	}
