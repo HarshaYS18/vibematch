@@ -37,7 +37,7 @@ func newCapabilityTestAuthorizer(t *testing.T) (*CapabilityAuthorizer, ed25519.P
 	keyServer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
 		_ = json.NewEncoder(w).Encode(map[string]any{
 			"kty": "OKP", "crv": "Ed25519", "alg": "EdDSA", "kid": keyID,
-			"x": base64.RawURLEncoding.EncodeToString(publicKey),
+			"x":      base64.RawURLEncoding.EncodeToString(publicKey),
 			"issuer": "funkey-api", "audience": "funkey-realtime", "token_version": 1,
 		})
 	}))
