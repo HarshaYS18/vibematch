@@ -748,17 +748,14 @@ class InboxController extends ChangeNotifier {
       _updateState(conversation, isMuted: !conversation.isMuted);
   Future<void> togglePin(InboxConversation conversation) =>
       _updateState(conversation, isPinned: !conversation.isPinned);
-  void toggleArchive(InboxConversation conversation) {
-    _replaceConversation(
-      conversation.id,
-      (chat) => chat.copyWith(isArchived: !chat.isArchived),
-    );
-  }
+  Future<void> toggleArchive(InboxConversation conversation) =>
+      _updateState(conversation, isArchived: !conversation.isArchived);
 
   Future<void> _updateState(
     InboxConversation conversation, {
     bool? isMuted,
     bool? isPinned,
+    bool? isArchived,
     bool? isLocked,
     bool? isBlocked,
   }) async {
@@ -771,6 +768,7 @@ class InboxController extends ChangeNotifier {
       (chat) => chat.copyWith(
         isMuted: isMuted,
         isPinned: isPinned,
+        isArchived: isArchived,
         isLockedByBackend: isLocked,
         isBlocked: isBlocked,
       ),
@@ -780,6 +778,7 @@ class InboxController extends ChangeNotifier {
         conversationId: conversation.id,
         isMuted: isMuted,
         isPinned: isPinned,
+        isArchived: isArchived,
         isLocked: isLocked,
         isBlocked: isBlocked,
       );
