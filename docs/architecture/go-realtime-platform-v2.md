@@ -85,19 +85,22 @@ Redis replay remains ephemeral. PostgreSQL room version/event sequence remain du
 
 ## Authentication
 
-Connection and room subscription decisions are delegated to `POST /api/v1/realtime/verify`.
+FastAPI/Identity remains the authorization issuer, but connection/subscription verification is no longer a periodic HTTP hot path.
 
-The verification response includes:
-- user ID
-- staff eligibility
+Before opening the application socket, Flutter requests a short-lived Ed25519 connect capability from `POST /api/v1/realtime/capability`. The capability contains server-derived identity/session/device claims and the `realtime:connect` scope. For a room subscription, Flutter requests a separate room-bound capability after the authoritative room join; that grant contains `room:subscribe`, the exact room ID, server-derived permission hints, and the current durable room realtime version as the membership-version binding.
 
-The gateway never trusts a client-supplied user/staff identity.
+Go fetches only the public Ed25519 key from `GET /api/v1/realtime/capability-key`, caches it, and verifies signature, issuer, audience, token version, expiry, scope, and room binding locally. The gateway never trusts client-supplied user/staff identity.
 
-Browser clients authenticate through the WebSocket subprotocol list:
+Browser-compatible clients authenticate through the WebSocket subprotocol list:
 - `funkey.v2`
 - `bearer.<access-token>`
+- `capability.<connect-capability>`
 
-The server selects only `funkey.v2`; the bearer subprotocol is never echoed.
+The server selects only `funkey.v2`; credential-bearing subprotocol values are never echoed and must be redacted by edge logs. The access token remains available only for allowlisted command relay back to authoritative FastAPI.
+
+Room subscribe commands include their own short-lived `capability`. There is no periodic Go-to-FastAPI reauthorization timer. Immediate invalidation is event-driven through critical `auth.session_revoked` and `room.permission_revoked` events; missed revocations are bounded by capability expiry and the next authoritative mint.
+
+`POST /api/v1/realtime/verify` is retained temporarily as a rollback/control-plane seam, not the normal connect/subscribe path.
 
 ## Migration sequence
 
@@ -144,9 +147,27 @@ The migration sequence above has been completed in the application codebase:
 - room subscriptions carry replay cursors and reconcile into `RoomSessionRepository`;
 - Inbox, room membership, seat/settings/chat/activity/Watch Party, room-music control, and other application commands use the shared transport while FastAPI remains authoritative;
 - backend events support `room`, `user`, `users`, `staff`, and `all` routing;
-- bounded priority backpressure, bounded dedupe, reauthorization, leases, drain, and room replay are implemented;
+- bounded priority backpressure, bounded dedupe, capability authentication/revocation, leases, drain, and room replay are implemented;
 - legacy FastAPI Inbox and room application WebSocket routes are retired/unmounted;
 - feature-owned application WebSocket creation is blocked by CI architecture guards;
 - mediasoup/WebRTC signaling remains separate by design.
 
 This checkpoint does not make Redis or Go a durable domain authority. Snapshot recovery and FastAPI/PostgreSQL ownership remain mandatory invariants.
+
+
+## Chunk 22 capability-auth checkpoint
+
+Chunk 22 moves connection and room-subscription authorization from repeated HTTP verification to short-lived signed capabilities without moving authority into Go:
+
+- FastAPI mints Ed25519 capabilities only after normal access-token/session/device/ban/policy checks;
+- connect and room-subscribe scopes are separate, and room grants are bound to one room;
+- Go verifies capabilities locally using only the API public key;
+- the access token remains confined to authoritative command relay;
+- session/device replacement and bans publish critical user revocations;
+- kicks and membership removal revoke the affected room subscription;
+- room privacy changes invalidate current room grants so clients must remint;
+- Flutter remints connect capabilities on reconnect and room grants on expiry/revocation;
+- the periodic HTTP reauthorization loop is removed;
+- the old verify endpoint remains available only as a temporary rollback seam.
+
+See `docs/adr/ADR-018-realtime-capability-authentication.md` for key ownership, rotation, and failure semantics.
