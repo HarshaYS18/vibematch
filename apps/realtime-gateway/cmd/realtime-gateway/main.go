@@ -38,6 +38,11 @@ func main() {
 		logger.Error("invalid Redis URL", "error", err)
 		os.Exit(1)
 	}
+	options.PoolSize = cfg.RedisPoolSize
+	options.PoolTimeout = cfg.RedisPoolTimeout
+	options.ReadTimeout = cfg.RedisReadTimeout
+	options.WriteTimeout = cfg.RedisWriteTimeout
+	options.ClientName = "funkey-realtime-" + cfg.NodeID
 	client := redis.NewClient(options)
 	defer client.Close()
 	service := gateway.NewServer(cfg, gateway.NewHTTPAuthorizer(cfg.AuthVerifyURL, cfg.AuthTimeout), client, logger)
