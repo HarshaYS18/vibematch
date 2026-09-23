@@ -33,6 +33,7 @@ from app.schemas.room_realtime import (
     RoomWatchPartyCommand,
 )
 from app.services.permissions import room_permission_service as policy_permissions
+from app.services import realtime_revocation_service
 from app.services.rooms import room_action_service, room_activity_service, room_permission_service, room_state_service, watch_party_service
 from app.services.user_master_state_service import get_user_master_state
 
@@ -483,6 +484,17 @@ def _execute_room_command_in_session(
             )
         )
         emissions.append(RoomCommandEmission(target="room", room_id=room.room_public_id, message=_system_event(room, "user_removed", f"{_display_name(target)} was removed from the room", actor=actor, target=target)))
+        emissions.append(
+            RoomCommandEmission(
+                target="permission_revoke",
+                room_id=room.room_public_id,
+                user_id=target.id,
+                message={
+                    "reason": "room_kicked",
+                    "membership_version": int(snapshot.get("state_version") or 0),
+                },
+            )
+        )
         return snapshot
 
     if event_type == "admin/kick_remove":
@@ -509,7 +521,20 @@ def _execute_room_command_in_session(
         else:
             room_action_service.remove_room_member(db, room, actor, target)
             decision = "removed"
-        return _finish(db, room, emissions, "room_member/request_updated", extra={"target_user_id": target.id, "decision": decision})
+        snapshot = _finish(db, room, emissions, "room_member/request_updated", extra={"target_user_id": target.id, "decision": decision})
+        if decision == "removed":
+            emissions.append(
+                RoomCommandEmission(
+                    target="permission_revoke",
+                    room_id=room.room_public_id,
+                    user_id=target.id,
+                    message={
+                        "reason": "room_membership_removed",
+                        "membership_version": int(snapshot.get("state_version") or 0),
+                    },
+                )
+            )
+        return snapshot
 
     if event_type == "room_admin/set":
         target = resolve_target_user(db, payload)
@@ -531,7 +556,18 @@ def _execute_room_command_in_session(
 
     if event_type == "room_settings/privacy":
         room_action_service.set_room_privacy(db, room, actor, str(payload.get("mode") or payload.get("privacy_mode") or "Open"))
-        return _finish(db, room, emissions, "room_settings/updated")
+        snapshot = _finish(db, room, emissions, "room_settings/updated")
+        emissions.append(
+            RoomCommandEmission(
+                target="permission_revoke_room",
+                room_id=room.room_public_id,
+                message={
+                    "reason": "room_privacy_changed",
+                    "membership_version": int(snapshot.get("state_version") or 0),
+                },
+            )
+        )
+        return snapshot
 
     if event_type == "room_settings/screenshots":
         room_action_service.set_room_screenshots(db, room, actor, _bool(payload, "allow_screenshots", True))
@@ -696,7 +732,17 @@ def _execute_room_command_transaction(
 
 async def _emit_room_command(outcome: RoomCommandOutcome) -> None:
     for emission in outcome.emissions:
-        if emission.target == "user":
+        if emission.target in {"permission_revoke", "permission_revoke_room"}:
+            reason = str(emission.message.get("reason") or "room_permission_changed")
+            membership_version = int(emission.message.get("membership_version") or 0)
+            await asyncio.to_thread(
+                realtime_revocation_service.publish_room_permission_revoked,
+                emission.room_id,
+                reason=reason,
+                membership_version=membership_version,
+                user_id=emission.user_id if emission.target == "permission_revoke" else None,
+            )
+        elif emission.target == "user":
             if emission.user_id is None:
                 continue
             await room_realtime_connections.send_room_user(emission.room_id, emission.user_id, emission.message)
