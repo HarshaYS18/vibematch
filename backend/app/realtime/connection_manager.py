@@ -547,8 +547,12 @@ class RealtimeConnectionManager:
             pass
 
     async def _publish_gateway(
-        self, payload: dict[str, Any], *, room_public_id: str | None = None,
+        self,
+        payload: dict[str, Any],
+        *,
+        room_public_id: str | None = None,
         user_id: int | None = None,
+        scope: str | None = None,
     ) -> None:
         """Mirror committed transport events for Go gateway shadow traffic.
 
@@ -570,7 +574,7 @@ class RealtimeConnectionManager:
             "serverTime": payload.get("serverTime") or payload.get("sent_at"),
             "trace_id": current_trace_id(),
             "traceparent": current_traceparent(),
-            "scope": "user" if user_id is not None else "room",
+            "scope": scope or ("user" if user_id is not None else "room"),
             "stream": payload.get("stream"),
             "sequence": int(payload.get("sequence") or 0),
             "room_version": int(payload.get("room_version") or 0),
@@ -580,7 +584,7 @@ class RealtimeConnectionManager:
         }
         if user_id is not None:
             envelope["user_id"] = user_id
-        else:
+        elif (scope or "room") == "room":
             envelope["room_public_id"] = room_public_id
         try:
             await self._redis.publish(_GATEWAY_CHANNEL, json.dumps(envelope, default=str))
@@ -591,6 +595,7 @@ class RealtimeConnectionManager:
         event = self._decorate(payload)
         await self._deliver_global_local(event)
         await self._publish_global(event)
+        await self._publish_gateway(event, scope="all")
 
     async def broadcast_room(self, room_public_id: str, payload: dict[str, Any]) -> None:
         event = await self._decorate_room(room_public_id, payload)
@@ -602,6 +607,7 @@ class RealtimeConnectionManager:
         if global_gift_event is not None:
             await self._deliver_global_local(global_gift_event)
             await self._publish_global(global_gift_event)
+            await self._publish_gateway(global_gift_event, scope="all")
 
     async def send_room_user(
         self,
