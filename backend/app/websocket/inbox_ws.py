@@ -12,9 +12,11 @@ from redis.asyncio import Redis
 from starlette.websockets import WebSocketState
 
 from app.core.config import settings
+from app.core.telemetry import current_trace_id, current_traceparent
 
 
 _INBOX_CHANNEL = "funkey:realtime:inbox:events"
+_GATEWAY_CHANNEL = "funkey:realtime:events"
 _INBOX_LEASE_PREFIX = "funkey:realtime:inbox:leases"
 _CLIENT_SEQUENCE_PREFIX = "funkey:realtime:app-sequence"
 _SOCKET_LEASE_SECONDS = 30
@@ -191,6 +193,57 @@ class InboxWebSocketManager:
         except Exception:
             # Inbox data is durable in PostgreSQL. Reconnects recover through
             # the authoritative REST snapshot when transient fanout is lost.
+            pass
+
+        event_id = str(
+            payload.get("eventId")
+            or payload.get("event_id")
+            or envelope["event_id"]
+        )
+        event_type = str(
+            payload.get("type")
+            or payload.get("event")
+            or "inbox.event"
+        ).strip() or "inbox.event"
+        priority = (
+            "best_effort"
+            if event_type in {
+                "inbox_typing_start",
+                "inbox_typing_stop",
+                "inbox_chat_activity",
+                "inbox_presence_updated",
+            }
+            else "critical"
+            if event_type == "session_replaced"
+            else "normal"
+        )
+        gateway_envelope: dict[str, Any] = {
+            "event_id": event_id,
+            "eventId": event_id,
+            "event_type": event_type,
+            "type": event_type,
+            "event_version": 2,
+            "occurred_at": datetime.utcnow().isoformat(timespec="milliseconds") + "Z",
+            "serverTime": payload.get("serverTime") or payload.get("server_time"),
+            "trace_id": current_trace_id(),
+            "traceparent": current_traceparent(),
+            "scope": scope,
+            "stream": payload.get("stream"),
+            "sequence": int(payload.get("sequence") or 0),
+            "priority": priority,
+            "payload": payload,
+        }
+        if user_id is not None:
+            gateway_envelope["user_id"] = int(user_id)
+        if user_ids is not None:
+            gateway_envelope["user_ids"] = [int(item) for item in user_ids]
+        try:
+            await self._redis.publish(
+                _GATEWAY_CHANNEL,
+                json.dumps(gateway_envelope, default=str),
+            )
+        except Exception:
+            # Shadow transport failure must never fail the committed domain action.
             pass
 
     async def connect(
