@@ -182,6 +182,20 @@ class AppRealtimeHub {
   void _handleEvent(RealtimeEventEnvelope event) {
     _rememberRoomCursor(event);
 
+    if (event.type == 'room.permission_revoked' ||
+        event.type == 'subscription_revoked') {
+      final roomId =
+          event.payload['room_public_id']?.toString().trim() ??
+          event.raw['room_public_id']?.toString().trim();
+      final cursor = roomId == null ? null : _roomSubscriptions[roomId];
+      if (cursor != null) {
+        cursor.capability = null;
+        if (isConnected) {
+          _sendRoomSubscription(roomId!);
+        }
+      }
+    }
+
     if (event.type == 'subscribed' &&
         _bool(event.payload['resync_required'])) {
       final roomId = event.payload['room_public_id']?.toString().trim();
@@ -281,7 +295,8 @@ final appRealtimeHubProvider = Provider.autoDispose<AppRealtimeHub>((ref) {
   );
 
   final invalidationSubscription = hub.events.listen((event) {
-    if (event.type == 'session_replaced') {
+    if (event.type == 'session_replaced' ||
+        event.type == 'auth.session_revoked') {
       unawaited(sessions.logout());
     }
   });
