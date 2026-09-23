@@ -700,21 +700,32 @@ def heartbeat(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
-    """Refresh durable presence and return one canonical room snapshot."""
-    room = room_or_404(db, room_public_id, for_update=True)
-    try:
-        room_permission_service.require_room_view(db, room, current_user)
-        data = room_action_service.heartbeat_room(db, room, current_user)
-        db.commit()
-        return {
-            "room_id": room_public_id,
-            "room": data,
-            "snapshot_mode": "partial",
-            "omitted_sections": ["recent_messages"],
-        }
-    except Exception:
-        db.rollback()
-        raise
+    """Compatibility heartbeat: validate access without rebuilding room state.
+
+    Normal connected presence is refreshed by the realtime socket lease. This
+    endpoint intentionally performs no participant/room writes and returns no
+    room snapshot.
+    """
+    room = room_or_404(db, room_public_id)
+    room_permission_service.require_room_view(db, room, current_user)
+    participant = (
+        db.query(RoomParticipant.id)
+        .filter(
+            RoomParticipant.room_id == room.id,
+            RoomParticipant.user_id == current_user.id,
+            RoomParticipant.is_active.is_(True),
+        )
+        .first()
+    )
+    if participant is None:
+        raise HTTPException(status_code=409, detail="Room session is not active")
+    return {
+        "room_id": room_public_id,
+        "state_version": int(room.realtime_version or 0),
+        "event_sequence": int(room.realtime_event_sequence or 0),
+        "heartbeat_mode": "socket_lease",
+        "snapshot_mode": "none",
+    }
 
 
 @router.post("/leave")
