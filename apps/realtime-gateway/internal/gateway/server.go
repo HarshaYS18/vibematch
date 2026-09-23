@@ -581,18 +581,43 @@ func (s *Server) replayRoom(
 	return true, currentSequence
 }
 
+func userPresenceLeaseKey(userID int64) string {
+	return "funkey:realtime:gateway:user-active:" + strconv.FormatInt(userID, 10)
+}
+
 func (s *Server) touchClient(c *Client) {
 	ctx, cancel := context.WithTimeout(context.Background(), time.Second)
 	defer cancel()
-	key := "funkey:realtime:gateway:user:" + strconv.FormatInt(c.UserID, 10) + ":" + c.ID
-	_ = s.Redis.Set(ctx, key, s.Config.NodeID, s.Config.LeaseTTL).Err()
+
+	now := time.Now()
+	expiresAt := float64(now.Add(s.Config.LeaseTTL).UnixMilli()) / 1000.0
+	nowScore := strconv.FormatFloat(
+		float64(now.UnixMilli())/1000.0,
+		'f',
+		3,
+		64,
+	)
+	connectionKey := "funkey:realtime:gateway:user:" +
+		strconv.FormatInt(c.UserID, 10) + ":" + c.ID
+	presenceKey := userPresenceLeaseKey(c.UserID)
+
+	pipe := s.Redis.Pipeline()
+	pipe.Set(ctx, connectionKey, s.Config.NodeID, s.Config.LeaseTTL)
+	pipe.ZAdd(ctx, presenceKey, redis.Z{Score: expiresAt, Member: c.ID})
+	pipe.ZRemRangeByScore(ctx, presenceKey, "-inf", nowScore)
+	pipe.Expire(ctx, presenceKey, s.Config.LeaseTTL*3)
+	_, _ = pipe.Exec(ctx)
 }
 
 func (s *Server) deleteClientLease(c *Client) {
 	ctx, cancel := context.WithTimeout(context.Background(), time.Second)
 	defer cancel()
-	key := "funkey:realtime:gateway:user:" + strconv.FormatInt(c.UserID, 10) + ":" + c.ID
-	_ = s.Redis.Del(ctx, key).Err()
+	connectionKey := "funkey:realtime:gateway:user:" +
+		strconv.FormatInt(c.UserID, 10) + ":" + c.ID
+	pipe := s.Redis.Pipeline()
+	pipe.Del(ctx, connectionKey)
+	pipe.ZRem(ctx, userPresenceLeaseKey(c.UserID), c.ID)
+	_, _ = pipe.Exec(ctx)
 }
 
 func (s *Server) Heartbeat(ctx context.Context) {
@@ -627,6 +652,13 @@ func (s *Server) heartbeatOnce(ctx context.Context) {
 	for _, c := range clients {
 		key := "funkey:realtime:gateway:user:" + strconv.FormatInt(c.UserID, 10) + ":" + c.ID
 		pipe.Set(ctx, key, s.Config.NodeID, s.Config.LeaseTTL)
+		presenceKey := userPresenceLeaseKey(c.UserID)
+		pipe.ZAdd(ctx, presenceKey, redis.Z{
+			Score: roomLeaseScore,
+			Member: c.ID,
+		})
+		pipe.ZRemRangeByScore(ctx, presenceKey, "-inf", roomLeaseExpiry)
+		pipe.Expire(ctx, presenceKey, s.Config.LeaseTTL*3)
 		for _, roomID := range s.Hub.Rooms(c) {
 			leaseKey := roomLeaseKey(roomID, c.UserID)
 			pipe.ZAdd(ctx, leaseKey, redis.Z{Score: roomLeaseScore, Member: c.ID})
