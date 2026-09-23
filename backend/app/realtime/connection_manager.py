@@ -452,7 +452,12 @@ class RealtimeConnectionManager:
                 return False
             current = int(current_sequence or 0)
             if after_sequence >= current:
-                return after_sequence == current
+                if after_sequence == current:
+                    self._room_replay_successes += 1
+                    return True
+                self._room_replay_fallbacks += 1
+                return False
+
             raw_events = await self._redis.zrangebyscore(
                 self._room_replay_key(room_public_id, epoch),
                 f"({after_sequence}",
@@ -461,24 +466,33 @@ class RealtimeConnectionManager:
             if not raw_events:
                 self._room_replay_fallbacks += 1
                 return False
+
             expected = after_sequence + 1
             events: list[dict[str, Any]] = []
             for raw in raw_events:
                 decoded = json.loads(raw)
-                if not isinstance(decoded, dict) or int(decoded.get("sequence") or 0) != expected:
+                if (
+                    not isinstance(decoded, dict)
+                    or int(decoded.get("sequence") or 0) != expected
+                ):
                     self._room_replay_fallbacks += 1
-                return False
+                    return False
                 events.append(decoded)
                 expected += 1
+
             if expected - 1 != current:
                 self._room_replay_fallbacks += 1
                 return False
+
             for event in events:
                 if not await self.send_json(websocket, event):
                     self._room_replay_fallbacks += 1
-                return False
+                    return False
+
+            self._room_replay_successes += 1
             return True
         except Exception:
+            self._room_replay_fallbacks += 1
             return False
 
     async def _publish(
