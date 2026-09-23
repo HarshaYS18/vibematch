@@ -140,9 +140,13 @@ class Settings(BaseSettings):
         return self.MEDIA_REGISTRY_REDIS_URL.strip() or self.cache_redis_url
 
     @staticmethod
-    def _redis_endpoint_identity(value: str) -> tuple[str, str, int | None]:
+    def _redis_endpoint_identity(value: str) -> tuple[str, int | None]:
         parsed = urlsplit(value)
-        return parsed.scheme, parsed.hostname or "", parsed.port
+        try:
+            port = parsed.port
+        except ValueError:
+            port = None
+        return parsed.hostname or "", port
 
     @property
     def expected_pooler_client_connections(self) -> int:
