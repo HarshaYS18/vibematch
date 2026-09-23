@@ -56,6 +56,7 @@ jobs:
       - run: kubectl kustomize deploy/kubernetes/overlays/production > /tmp/funkey-production.yaml
       - run: kubectl kustomize deploy/kubernetes/media > /tmp/funkey-media.yaml
       - run: kubectl kustomize deploy/observability > /tmp/funkey-observability.yaml
+      - run: kubectl kustomize deploy/postgres > /tmp/funkey-postgres-platform.yaml
       - name: Enforce immutable production images
         run: |
           python - <<'PY'
