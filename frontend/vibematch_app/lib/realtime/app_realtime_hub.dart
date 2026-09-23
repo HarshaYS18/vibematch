@@ -152,6 +152,7 @@ class AppRealtimeHub {
           stream: cursor?.stream ?? event.payload['stream']?.toString() ?? '',
           roomId: roomId,
           expectedSequence: cursor == null ? null : cursor.lastSequence + 1,
+          observedSequence: _int(event.payload['current_sequence']),
         ),
       );
     }
@@ -246,4 +247,11 @@ bool _bool(dynamic value) {
   if (value is bool) return value;
   final text = value?.toString().trim().toLowerCase();
   return text == 'true' || text == '1';
+}
+
+
+int? _int(dynamic value) {
+  if (value is int) return value;
+  if (value is num) return value.toInt();
+  return int.tryParse(value?.toString() ?? '');
 }
