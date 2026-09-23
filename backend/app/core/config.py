@@ -50,6 +50,18 @@ class Settings(BaseSettings):
     DB_POOL_RECYCLE_SECONDS: int = 1800
     DB_POOL_USE_LIFO: bool = True
 
+    # Chunk 23 Inbox service boundary.
+    INBOX_SERVICE_URL: str = "http://127.0.0.1:8083/api/v1"
+    INBOX_SERVICE_TIMEOUT_SECONDS: float = 5.0
+    INBOX_DATABASE_URL: str = ""
+    INBOX_DB_POOL_SIZE: int = 5
+    INBOX_DB_MAX_OVERFLOW: int = 0
+    INBOX_DB_POOL_TIMEOUT_SECONDS: int = 3
+    INBOX_MAX_REPLICAS: int = 20
+    DB_INBOX_CONNECTION_BUDGET: int = 100
+    INBOX_REALTIME_TRANSPORT: str = "redis"
+    INBOX_NATS_SUBJECT: str = "funkey.events.inbox.realtime"
+
     # Topology budgets. These are planning/validation limits, not capacity claims.
     API_MAX_REPLICAS: int = 20
     DB_API_CONNECTION_BUDGET: int = 100
@@ -256,6 +268,20 @@ class Settings(BaseSettings):
             unsafe.append("DB_POOL_SIZE/DB_MAX_OVERFLOW/replica budgets")
         if self.API_MAX_REPLICAS * (self.DB_POOL_SIZE + self.DB_MAX_OVERFLOW) > self.DB_API_CONNECTION_BUDGET:
             unsafe.append("DB_API_CONNECTION_BUDGET")
+        if not self.INBOX_SERVICE_URL.strip():
+            unsafe.append("INBOX_SERVICE_URL")
+        if not self.INBOX_DATABASE_URL.strip():
+            unsafe.append("INBOX_DATABASE_URL")
+        elif self.INBOX_DATABASE_URL.strip() == self.database_url.strip():
+            unsafe.append("INBOX_DATABASE_URL(service-isolated credentials required)")
+        if self.INBOX_DB_POOL_SIZE <= 0 or self.INBOX_DB_MAX_OVERFLOW < 0:
+            unsafe.append("INBOX_DB_POOL_SIZE/INBOX_DB_MAX_OVERFLOW")
+        if (
+            self.INBOX_MAX_REPLICAS
+            * (self.INBOX_DB_POOL_SIZE + self.INBOX_DB_MAX_OVERFLOW)
+            > self.DB_INBOX_CONNECTION_BUDGET
+        ):
+            unsafe.append("DB_INBOX_CONNECTION_BUDGET")
         if self.WORKER_MAX_REPLICAS * (
             self.DB_WORKER_POOL_SIZE + self.DB_WORKER_MAX_OVERFLOW
         ) > self.DB_WORKER_CONNECTION_BUDGET:
