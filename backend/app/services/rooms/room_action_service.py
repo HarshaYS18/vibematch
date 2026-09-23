@@ -2,27 +2,24 @@ from __future__ import annotations
 
 from datetime import datetime, timedelta
 from typing import Any
+from uuid import uuid4
 
 from fastapi import HTTPException, status
 from sqlalchemy.orm import Session
 
 from app.models.room import Room, RoomMode
 from app.models.room_participant import RoomParticipant
-from app.models.room_realtime_state import RoomChatMessage, RoomRealtimeEvent, RoomSeatState
+from app.models.room_realtime_state import RoomChatMessage, RoomMemberRequest, RoomRealtimeEvent, RoomSeatApplication, RoomSeatState
 from app.models.user import User
 from app.services.event_outbox_service import enqueue_event
 from app.services.permissions import room_permission_service
 from app.services.rooms.room_kickout_service import create_room_kickout_for_user, deactivate_room_user_for_kickout
 from app.services.rooms.room_service import assert_room_entry_allowed, close_other_active_room_sessions, deactivate_user_in_room, mark_user_room_presence_active, user_has_active_room_conflict
-from app.services.rooms.room_state_service import ensure_room_seats, normalize_layout, room_sequence, room_snapshot, seat_count_for_layout
+from app.services.rooms.room_state_service import ensure_room_seats, normalize_layout, room_snapshot, seat_count_for_layout
 from app.services.rooms import room_activity_service, watch_party_service
 
 SEAT_APPLICATION_EXPIRY_SECONDS = 20
 SEAT_APPLICATION_COOLDOWN_SECONDS = 30
-
-
-def _next_sequence(db: Session, room: Room) -> int:
-    return room_sequence(db, room) + 1
 
 
 def record_room_event(
@@ -34,15 +31,22 @@ def record_room_event(
     payload: dict[str, Any] | None = None,
     privacy_scope: str = "room",
 ) -> RoomRealtimeEvent:
+    # The room row is locked by canonical command execution. Keep the two
+    # counters explicit: room_version tracks authoritative state transitions;
+    # event_sequence identifies durable audit/replay events.
+    room.realtime_version = int(room.realtime_version or 0) + 1
+    room.realtime_event_sequence = int(room.realtime_event_sequence or 0) + 1
     event = RoomRealtimeEvent(
         room_id=room.id,
         room_public_id=room.room_public_id,
         event_type=event_type,
+        event_id=uuid4().hex,
         actor_user_id=actor_user_id,
         target_user_id=target_user_id,
         payload=payload or {},
         privacy_scope=privacy_scope,
-        sequence=_next_sequence(db, room),
+        sequence=room.realtime_event_sequence,
+        room_version=room.realtime_version,
     )
     db.add(event)
     if event_type in {"room.joined", "room.left", "seat.taken", "seat.left"}:
@@ -118,11 +122,40 @@ def _auto_place_host_admin_if_needed(db: Session, room: Room, user: User, partic
 
 
 def _has_pending_room_member_request(db: Session, room: Room, user_id: int) -> bool:
-    pending = db.query(RoomRealtimeEvent).filter(RoomRealtimeEvent.room_id == room.id, RoomRealtimeEvent.event_type == "room.member_request.pending", RoomRealtimeEvent.actor_user_id == user_id).order_by(RoomRealtimeEvent.id.desc()).first()
-    if pending is None:
-        return False
-    decision = db.query(RoomRealtimeEvent).filter(RoomRealtimeEvent.room_id == room.id, RoomRealtimeEvent.event_type.in_(["room.member_request.approved", "room.member_request.rejected", "room.member.removed"]), RoomRealtimeEvent.target_user_id == user_id, RoomRealtimeEvent.id > pending.id).first()
-    return decision is None
+    return (
+        db.query(RoomMemberRequest.id)
+        .filter(
+            RoomMemberRequest.room_id == room.id,
+            RoomMemberRequest.requester_user_id == user_id,
+            RoomMemberRequest.status == "pending",
+        )
+        .first()
+        is not None
+    )
+
+
+def _resolve_room_member_requests(
+    db: Session,
+    room: Room,
+    user_id: int,
+    *,
+    status: str,
+    decided_by_user_id: int | None,
+) -> None:
+    now = datetime.utcnow()
+    rows = (
+        db.query(RoomMemberRequest)
+        .filter(
+            RoomMemberRequest.room_id == room.id,
+            RoomMemberRequest.requester_user_id == user_id,
+            RoomMemberRequest.status == "pending",
+        )
+        .all()
+    )
+    for request in rows:
+        request.status = status
+        request.decided_at = now
+        request.decided_by_user_id = decided_by_user_id
 
 
 def _is_room_manager(db: Session, room: Room, user: User) -> bool:
@@ -150,13 +183,12 @@ def _seat_can_receive_invite(db: Session, room: Room, seat_index: int) -> bool:
 
 def latest_seat_application_request_id(db: Session, room: Room, user: User) -> int | None:
     latest = (
-        db.query(RoomRealtimeEvent.id)
+        db.query(RoomSeatApplication.id)
         .filter(
-            RoomRealtimeEvent.room_id == room.id,
-            RoomRealtimeEvent.event_type == "seat.application.requested",
-            RoomRealtimeEvent.actor_user_id == user.id,
+            RoomSeatApplication.room_id == room.id,
+            RoomSeatApplication.applicant_user_id == user.id,
         )
-        .order_by(RoomRealtimeEvent.id.desc())
+        .order_by(RoomSeatApplication.id.desc())
         .first()
     )
     return int(latest[0]) if latest else None
@@ -181,19 +213,41 @@ def latest_seat_invite_id(db: Session, room: Room, actor: User, target: User, se
 
 def _seat_application_cooldown_remaining(db: Session, room: Room, user: User) -> int:
     latest = (
-        db.query(RoomRealtimeEvent)
+        db.query(RoomSeatApplication)
         .filter(
-            RoomRealtimeEvent.room_id == room.id,
-            RoomRealtimeEvent.event_type == "seat.application.requested",
-            RoomRealtimeEvent.actor_user_id == user.id,
+            RoomSeatApplication.room_id == room.id,
+            RoomSeatApplication.applicant_user_id == user.id,
         )
-        .order_by(RoomRealtimeEvent.id.desc())
+        .order_by(RoomSeatApplication.requested_at.desc())
         .first()
     )
     if latest is None:
         return 0
-    elapsed = int((datetime.utcnow() - latest.created_at).total_seconds())
+    elapsed = int((datetime.utcnow() - latest.requested_at).total_seconds())
     return max(0, SEAT_APPLICATION_COOLDOWN_SECONDS - elapsed)
+
+
+def _resolve_seat_applications(
+    db: Session,
+    room: Room,
+    user_id: int,
+    *,
+    status: str,
+    decided_by_user_id: int | None,
+    seat_index: int | None = None,
+) -> None:
+    now = datetime.utcnow()
+    query = db.query(RoomSeatApplication).filter(
+        RoomSeatApplication.room_id == room.id,
+        RoomSeatApplication.applicant_user_id == user_id,
+        RoomSeatApplication.status == "pending",
+    )
+    if seat_index is not None:
+        query = query.filter(RoomSeatApplication.seat_index == seat_index)
+    for application in query.all():
+        application.status = status
+        application.decided_at = now
+        application.decided_by_user_id = decided_by_user_id
 
 
 def _safe_room_join_event_payload(
