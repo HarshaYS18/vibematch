@@ -357,6 +357,16 @@ class RealtimeConnectionManager:
         return event
 
     @staticmethod
+    def _delta_only_event(payload: dict[str, Any]) -> dict[str, Any]:
+        event = dict(payload)
+        body = event.get("payload")
+        if isinstance(body, dict) and isinstance(body.get("delta"), dict):
+            body = dict(body)
+            body.pop("room", None)
+            event["payload"] = body
+        return event
+
+    @staticmethod
     def _room_stream_epoch_key(room_public_id: str) -> str:
         return f"{_REDIS_PREFIX}:stream-epoch:{room_public_id}"
 
@@ -404,7 +414,11 @@ class RealtimeConnectionManager:
                 1,
                 self._room_replay_key(room_public_id, resolved_epoch),
                 resolved_sequence,
-                json.dumps(event, default=str, separators=(",", ":")),
+                json.dumps(
+                    self._delta_only_event(event),
+                    default=str,
+                    separators=(",", ":"),
+                ),
                 _ROOM_REPLAY_MAX_EVENTS,
                 _ROOM_REPLAY_TTL_SECONDS,
             )
@@ -543,14 +557,9 @@ class RealtimeConnectionManager:
         the PostgreSQL outbox, not this transport channel.
         """
         event_id = str(payload.get("event_id") or uuid4().hex)
-        gateway_payload = dict(payload)
-        gateway_body = gateway_payload.get("payload")
-        if isinstance(gateway_body, dict) and isinstance(gateway_body.get("delta"), dict):
-            # The Go/application realtime path is v2 delta-first. Keep the
-            # full replacement room only on the legacy FastAPI room socket.
-            gateway_body = dict(gateway_body)
-            gateway_body.pop("room", None)
-            gateway_payload["payload"] = gateway_body
+        # The Go/application realtime path is v2 delta-first. Keep the
+        # full replacement room only on the legacy FastAPI room socket.
+        gateway_payload = self._delta_only_event(payload)
         envelope = {
             "event_id": event_id,
             "eventId": event_id,
