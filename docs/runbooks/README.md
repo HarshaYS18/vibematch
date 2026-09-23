@@ -10,6 +10,7 @@ Choose the incident matching the failing layer. For planned deployment, start wi
 - [TURN outage](turn-outage.md)
 - [Redis/Valkey outage](redis-outage.md)
 - [PostgreSQL outage](database-outage.md)
+- [PostgreSQL / PgBouncer saturation](database-pool-saturation.md)
 - [Database restore](database-restore.md)
 - [Queue backlog](queue-backlog.md)
 - [Failed deployment](failed-deployment.md)
