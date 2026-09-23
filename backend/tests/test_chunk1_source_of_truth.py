@@ -89,26 +89,27 @@ class ChunkOneSourceOfTruthTests(TestCase):
             background_theme_id="default",
             seat_layout_id="5x2",
             announcement_text=None,
+            realtime_version=11,
+            realtime_event_sequence=13,
             updated_at=None,
         )
         db = Mock()
+        db.query.return_value.filter.return_value.order_by.return_value.all.return_value = []
         durable_roster = [{"backend_user_id": 9, "public_user_id": 6418001009, "is_room_member": True}]
 
         with (
-            patch.object(room_state_service, "ensure_room_seats", return_value=[]),
             patch.object(room_state_service, "active_participants", return_value=[]),
-            patch.object(room_state_service, "cleanup_orphaned_seat_occupants"),
             patch.object(room_state_service, "pending_room_member_requests", return_value=[]),
             patch.object(room_state_service, "room_membership_roster", return_value=durable_roster),
             patch.object(room_state_service, "pending_seat_applications", return_value=[]),
             patch.object(room_state_service, "calculate_room_trending_score", return_value=0),
-            patch.object(room_state_service, "room_sequence", return_value=11),
         ):
             snapshot = room_state_service.room_snapshot(db, room, include_chat=False)
 
         self.assertEqual([], snapshot["peers"])
         self.assertEqual(durable_roster, snapshot["membership_roster"])
         self.assertEqual(11, snapshot["state_version"])
+        self.assertEqual(13, snapshot["event_sequence"])
 
 
 if __name__ == "__main__":
