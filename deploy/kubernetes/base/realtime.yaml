@@ -41,7 +41,7 @@ spec:
           ports: [{name: http, containerPort: 8081}]
           envFrom:
             - configMapRef: {name: funkey-config}
-            - secretRef: {name: funkey-realtime-secrets, optional: true}
+            - secretRef: {name: funkey-realtime-secrets}
           env:
             - name: REALTIME_NODE_ID
               valueFrom: {fieldRef: {fieldPath: metadata.name}}
