@@ -12,6 +12,7 @@ class InboxConversationType(str, Enum):
     CHAT = "chat"
     ROOM_INVITE = "room_invite"
     STRANGER = "stranger"
+    FAMILY = "family"
 
 
 class InboxMessageType(str, Enum):
