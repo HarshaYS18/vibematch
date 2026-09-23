@@ -176,6 +176,7 @@ class Settings(BaseSettings):
     def expected_pooler_client_connections(self) -> int:
         return (
             self.DB_API_CONNECTION_BUDGET
+            + self.DB_INBOX_CONNECTION_BUDGET
             + self.DB_WORKER_CONNECTION_BUDGET
             + self.DB_ROLLOUT_SURGE_CONNECTION_RESERVE
         )
