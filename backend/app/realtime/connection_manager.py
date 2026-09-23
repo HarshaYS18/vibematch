@@ -16,7 +16,7 @@ from app.core.config import settings
 from app.core.telemetry import current_trace_id, current_traceparent
 
 
-_REDIS_PREFIX = "funkey:room"
+_REDIS_PREFIX = "funkey:realtime:room"
 _GLOBAL_ROOM_ID = "__global__"
 _SOCKET_LEASE_SECONDS = 30
 _SOCKET_LEASE_REFRESH_SECONDS = 10
@@ -99,11 +99,13 @@ class RealtimeConnectionManager:
         self._room_versions: dict[str, int] = {}
         self._instance_id = uuid4().hex
         self._redis: Redis = Redis.from_url(
-            settings.redis_url,
+            settings.realtime_redis_url,
             decode_responses=True,
             socket_connect_timeout=settings.REDIS_CONNECT_TIMEOUT_SECONDS,
             socket_timeout=settings.REDIS_SOCKET_TIMEOUT_SECONDS,
             health_check_interval=20,
+            max_connections=settings.REALTIME_REDIS_MAX_CONNECTIONS,
+            client_name="funkey-fastapi-realtime",
         )
         self._listener_task: asyncio.Task[None] | None = None
         self._local_command_claims: dict[str, float] = {}
