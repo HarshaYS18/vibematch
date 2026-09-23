@@ -163,7 +163,7 @@ class AppRealtimeHub {
         cursor.capabilityPending = false;
       }
     }
-    if (!isConnected || grant == null || _roomSubscriptions[roomId] != cursor) {
+    if (!isConnected || _roomSubscriptions[roomId] != cursor) {
       return;
     }
     final payload = <String, dynamic>{
