@@ -30,6 +30,7 @@ class InboxChatPage extends StatefulWidget {
 class _InboxChatPageState extends State<InboxChatPage> {
   final TextEditingController _textController = TextEditingController();
   final ScrollController _scrollController = ScrollController();
+  bool _loadingOlderMessages = false;
   String? _replyToText;
   String? _lastActivity;
 
@@ -52,6 +53,7 @@ class _InboxChatPageState extends State<InboxChatPage> {
     widget.controller.markConversationRead(widget.conversation.id);
     widget.controller.addListener(_handleChanged);
     _textController.addListener(_handleInputChanged);
+    _scrollController.addListener(_handleMessageScroll);
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (mounted)
         unawaited(
@@ -68,6 +70,7 @@ class _InboxChatPageState extends State<InboxChatPage> {
     widget.controller.clearActiveConversation(widget.conversation.id);
     widget.controller.removeListener(_handleChanged);
     _textController.removeListener(_handleInputChanged);
+    _scrollController.removeListener(_handleMessageScroll);
     _textController.dispose();
     _scrollController.dispose();
     super.dispose();
@@ -76,7 +79,46 @@ class _InboxChatPageState extends State<InboxChatPage> {
   void _handleChanged() {
     if (!mounted) return;
     setState(() {});
-    WidgetsBinding.instance.addPostFrameCallback((_) => _jumpToBottom());
+    if (!_loadingOlderMessages) {
+      WidgetsBinding.instance.addPostFrameCallback((_) => _jumpToBottom());
+    }
+  }
+
+  void _handleMessageScroll() {
+    if (_loadingOlderMessages || !_scrollController.hasClients) return;
+    if (_scrollController.position.pixels > 96) return;
+    final conversation = _conversation;
+    if (!conversation.hasOlderMessages ||
+        conversation.messagesNextCursor == null) {
+      return;
+    }
+    unawaited(_loadOlderMessagesPreservingPosition());
+  }
+
+  Future<void> _loadOlderMessagesPreservingPosition() async {
+    if (_loadingOlderMessages || !_scrollController.hasClients) return;
+    _loadingOlderMessages = true;
+    final oldMaxExtent = _scrollController.position.maxScrollExtent;
+    final oldOffset = _scrollController.position.pixels;
+    final added = await widget.controller.loadOlderMessages(_conversation.id);
+    if (!mounted) return;
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted || !_scrollController.hasClients) {
+        _loadingOlderMessages = false;
+        return;
+      }
+      if (added > 0) {
+        final delta =
+            _scrollController.position.maxScrollExtent - oldMaxExtent;
+        _scrollController.jumpTo(
+          (oldOffset + delta).clamp(
+            _scrollController.position.minScrollExtent,
+            _scrollController.position.maxScrollExtent,
+          ),
+        );
+      }
+      _loadingOlderMessages = false;
+    });
   }
 
   void _jumpToBottom() {
