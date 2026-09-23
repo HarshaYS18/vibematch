@@ -13,8 +13,8 @@ import (
 
 const (
 	defaultHubShardCount = 32
-	defaultDedupeEntries  = 65536
-	defaultDedupeTTL      = 5 * time.Minute
+	defaultDedupeEntries = 65536
+	defaultDedupeTTL     = 5 * time.Minute
 )
 
 type deliveryPriority uint8
@@ -184,11 +184,11 @@ type dedupeRecord struct {
 }
 
 type boundedDedupe struct {
-	mu      sync.Mutex
-	seen    map[string]time.Time
-	order   []dedupeRecord
-	max     int
-	ttl     time.Duration
+	mu    sync.Mutex
+	seen  map[string]time.Time
+	order []dedupeRecord
+	max   int
+	ttl   time.Duration
 }
 
 func newBoundedDedupe(max int, ttl time.Duration) *boundedDedupe {
