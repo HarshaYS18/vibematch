@@ -56,10 +56,13 @@ def _send_media_team_message(db: Session, *, asset: CdnMediaAsset, text: str) ->
     owner = _asset_owner(db, asset)
     if owner is None:
         return
-    inbox_service_client.send_team_message(
-        target_user_id=owner.id,
-        text=text,
-    )
+    try:
+        inbox_service_client.send_team_message(
+            target_user_id=owner.id,
+            text=text,
+        )
+    except (inbox_service_client.InboxServiceUnavailable, ValueError):
+        return
 
 
 @router.get("/dashboard", response_model=CdnMediaDashboardResponse)
