@@ -16,14 +16,26 @@ class RealtimeResyncRequest {
   const RealtimeResyncRequest({
     required this.reason,
     required this.stream,
+    this.roomId,
     this.expectedSequence,
     this.observedSequence,
   });
 
   final RealtimeResyncReason reason;
   final String stream;
+  final String? roomId;
   final int? expectedSequence;
   final int? observedSequence;
+}
+
+class _RoomSubscriptionCursor {
+  _RoomSubscriptionCursor({
+    this.stream,
+    this.lastSequence = 0,
+  });
+
+  String? stream;
+  int lastSequence;
 }
 
 class AppRealtimeHub {
@@ -35,6 +47,8 @@ class AppRealtimeHub {
       StreamController<RealtimeEventEnvelope>.broadcast();
   final StreamController<RealtimeResyncRequest> _resyncController =
       StreamController<RealtimeResyncRequest>.broadcast();
+  final Map<String, _RoomSubscriptionCursor> _roomSubscriptions =
+      <String, _RoomSubscriptionCursor>{};
 
   RealtimeClient? _client;
   StreamSubscription<RealtimeEventEnvelope>? _eventSubscription;
@@ -56,18 +70,12 @@ class AppRealtimeHub {
     }
 
     _client = client;
-    _eventSubscription = client.events.listen(_eventController.add);
-    _gapSubscription = client.gaps.listen((gap) {
-      _resyncController.add(
-        RealtimeResyncRequest(
-          reason: RealtimeResyncReason.sequenceGap,
-          stream: gap.stream,
-          expectedSequence: gap.expectedSequence,
-          observedSequence: gap.observedSequence,
-        ),
-      );
-    });
+    _eventSubscription = client.events.listen(_handleEvent);
+    _gapSubscription = client.gaps.listen(_handleGap);
     _reconnectSubscription = client.reconnects.listen((_) {
+      for (final roomId in _roomSubscriptions.keys) {
+        _sendRoomSubscription(roomId);
+      }
       _resyncController.add(
         const RealtimeResyncRequest(
           reason: RealtimeResyncReason.reconnect,
@@ -79,6 +87,108 @@ class AppRealtimeHub {
 
   Future<void> start() async {
     await _client?.connect();
+    if (isConnected) {
+      for (final roomId in _roomSubscriptions.keys) {
+        _sendRoomSubscription(roomId);
+      }
+    }
+  }
+
+  void subscribeRoom(
+    String roomId, {
+    String? stream,
+    int lastSequence = 0,
+  }) {
+    final normalized = roomId.trim();
+    if (normalized.isEmpty) return;
+    final cursor = _roomSubscriptions.putIfAbsent(
+      normalized,
+      () => _RoomSubscriptionCursor(),
+    );
+    if (stream != null && stream.trim().isNotEmpty) {
+      cursor.stream = stream.trim();
+      cursor.lastSequence = lastSequence > 0 ? lastSequence : 0;
+    }
+    if (isConnected) {
+      _sendRoomSubscription(normalized);
+    }
+  }
+
+  void unsubscribeRoom(String roomId) {
+    final normalized = roomId.trim();
+    if (normalized.isEmpty) return;
+    _roomSubscriptions.remove(normalized);
+    sendRaw(<String, dynamic>{
+      'type': 'unsubscribe',
+      'room_public_id': normalized,
+    });
+  }
+
+  void _sendRoomSubscription(String roomId) {
+    final cursor = _roomSubscriptions[roomId];
+    if (cursor == null) return;
+    final payload = <String, dynamic>{
+      'type': 'subscribe',
+      'room_public_id': roomId,
+    };
+    final stream = cursor.stream;
+    if (stream != null && stream.isNotEmpty) {
+      payload['stream'] = stream;
+      payload['last_sequence'] = cursor.lastSequence;
+    }
+    sendRaw(payload);
+  }
+
+  void _handleEvent(RealtimeEventEnvelope event) {
+    _rememberRoomCursor(event);
+
+    if (event.type == 'subscribed' &&
+        _bool(event.payload['resync_required'])) {
+      final roomId = event.payload['room_public_id']?.toString().trim();
+      final cursor = roomId == null ? null : _roomSubscriptions[roomId];
+      _resyncController.add(
+        RealtimeResyncRequest(
+          reason: RealtimeResyncReason.sequenceGap,
+          stream: cursor?.stream ?? event.payload['stream']?.toString() ?? '',
+          roomId: roomId,
+          expectedSequence: cursor == null ? null : cursor.lastSequence + 1,
+        ),
+      );
+    }
+
+    _eventController.add(event);
+  }
+
+  void _handleGap(RealtimeGap gap) {
+    final roomId = _roomIdFromStream(gap.stream);
+    if (roomId != null && _roomSubscriptions.containsKey(roomId)) {
+      final cursor = _roomSubscriptions[roomId]!;
+      cursor.stream = gap.stream;
+      cursor.lastSequence = gap.expectedSequence - 1;
+      _sendRoomSubscription(roomId);
+      return;
+    }
+
+    _resyncController.add(
+      RealtimeResyncRequest(
+        reason: RealtimeResyncReason.sequenceGap,
+        stream: gap.stream,
+        expectedSequence: gap.expectedSequence,
+        observedSequence: gap.observedSequence,
+      ),
+    );
+  }
+
+  void _rememberRoomCursor(RealtimeEventEnvelope event) {
+    if (!event.isSequenced) return;
+    final roomId = _roomIdFromStream(event.stream);
+    if (roomId == null) return;
+    final cursor = _roomSubscriptions[roomId];
+    if (cursor == null) return;
+    cursor.stream = event.stream;
+    if (event.sequence > cursor.lastSequence) {
+      cursor.lastSequence = event.sequence;
+    }
   }
 
   void sendRaw(Map<String, dynamic> payload) {
@@ -87,10 +197,25 @@ class AppRealtimeHub {
 
   void markResynced(String stream, int sequence) {
     _client?.markResynced(stream, sequence);
+    final roomId = _roomIdFromStream(stream);
+    if (roomId == null) return;
+    final cursor = _roomSubscriptions[roomId];
+    if (cursor == null) return;
+    cursor.stream = stream;
+    if (sequence > cursor.lastSequence) {
+      cursor.lastSequence = sequence;
+    }
   }
 
   Future<void> stop() async {
     await _client?.stop();
+  }
+
+  String? _roomIdFromStream(String stream) {
+    if (!stream.startsWith('room:')) return null;
+    final parts = stream.split(':');
+    if (parts.length < 3 || parts[1].trim().isEmpty) return null;
+    return parts[1];
   }
 }
 
@@ -100,14 +225,7 @@ final appRealtimeHubProvider = Provider.autoDispose<AppRealtimeHub>((ref) {
 
   final client = RealtimeClient(
     tokenProvider: () => ref.read(sessionRepositoryProvider).accessToken,
-    socketUriBuilder: (token) {
-      final base = VmApiConfig.baseUrl
-          .replaceFirst('https://', 'wss://')
-          .replaceFirst('http://', 'ws://');
-      return Uri.parse(
-        '$base/ws/inbox?token=${Uri.encodeQueryComponent(token)}',
-      );
-    },
+    socketUriBuilder: (_) => Uri.parse(VmApiConfig.realtimeWebSocketUrl),
   );
   hub.configure(client);
 
@@ -123,3 +241,9 @@ final appRealtimeHubProvider = Provider.autoDispose<AppRealtimeHub>((ref) {
   });
   return hub;
 });
+
+bool _bool(dynamic value) {
+  if (value is bool) return value;
+  final text = value?.toString().trim().toLowerCase();
+  return text == 'true' || text == '1';
+}
