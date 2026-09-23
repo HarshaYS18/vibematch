@@ -1,31 +1,53 @@
 # Redis/Valkey outage
 
-Use this procedure with the production incident commander and environment-specific access controls. Record every change and its UTC timestamp. Replace example paths with the active environment; never paste credentials into incident notes.
+Use this procedure with the production incident commander and environment-specific access controls. Record every change and its UTC timestamp. Never paste credentials, URLs containing passwords, private content, or payment data into incident notes.
+
+## Identify the failed role first
+
+FunKey intentionally separates:
+- application cache/rate-limit Redis;
+- realtime/presence/routing Redis;
+- media-registry Redis.
+
+Do not treat them as interchangeable during mitigation.
 
 ## Symptoms
 
-Media assignment, presence, fanout, or rate limiting fails; media nodes may become unready.
+**Cache/rate-limit role:** API rate limiting can fail closed; cache hit rate drops.
 
-## Dashboards and metrics to inspect
+**Realtime role:** socket leases, cross-instance fanout, gateway routing and distributed command dedupe degrade; clients may require snapshot resync.
 
-Primary/replica health, failover state, memory and eviction, Lua latency, connection errors, registry heartbeat failures.
+**Media-registry role:** new media assignment/heartbeat/drain operations fail unavailable until registry health returns.
+
+## Dashboards and metrics
+
+Inspect Redis availability, primary/replica/failover state, used versus max memory, evictions, rejected connections, connected clients, command latency/ops, application realtime subscription health, and media-registry heartbeat failures.
 
 ## Immediate actions
 
-Identify whether media dedicated primary or general cache is affected; stop media scale-in and risky deployments.
+1. Identify the exact role and endpoint.
+2. Stop risky deploys or scale changes that increase pressure.
+3. For realtime failure, expect reconnect/resync and preserve authoritative PostgreSQL state.
+4. For media-registry failure, stop media node scale-in until assignments/heartbeats are healthy.
+5. For cache/rate-limit failure, do not bypass abuse controls by silently failing open.
 
 ## Safe mitigation
 
-Fail over through the managed HA mechanism; restore connectivity; let nodes heartbeat and clients re-resolve.
+Use the selected provider's tested HA failover path for that role. Restore connectivity and let TTL state rebuild naturally. Realtime clients refetch authoritative snapshots. Media nodes heartbeat and rooms re-resolve.
 
-## Dangerous actions to avoid
+## Dangerous actions
 
-Do not switch registry to Redis Cluster or delete all keys to clear an incident; Lua spans dynamic keys.
+Do not:
+- copy media-registry traffic onto the cache/realtime Redis during an incident;
+- enable Redis Cluster for current clients;
+- remove memory ceilings;
+- bulk-delete keys to clear pressure without understanding the affected role;
+- reconstruct wallet, membership, message, moderation, or other durable truth from Redis.
 
 ## Recovery validation
 
-Media registry rebuilds heartbeats, discovery selects healthy nodes, room snapshots reconcile, cache errors clear. Keep elevated monitoring until the incident window and delayed work are reconciled.
+Verify the affected exporter reports healthy, memory/connection pressure normalizes, realtime subscription health recovers, clients reconcile snapshots, media heartbeats/assignments recover, and API rate limiting resumes. Confirm no durable correctness invariant depended on the lost Redis keys.
 
-## Escalation and data to collect
+## Escalation evidence
 
-Collect failover timeline, key/ops metrics, script errors, data loss window, and affected node IDs. Escalate to the owning application, database, network, or security team when mitigation exceeds the runbook or data integrity is uncertain.
+Collect role name, provider incident/failover timeline, memory/eviction/rejected-connection charts, command latency, application error window, and affected node/room counts without exposing user content or credentials.
