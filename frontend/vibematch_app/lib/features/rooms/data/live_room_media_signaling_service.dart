@@ -1357,9 +1357,6 @@ class LiveRoomMediaSignalingService with WidgetsBindingObserver {
     );
   }
 
-  void _resetConnectionState() {
-    _connecting = false;
-  }
 
   void _debug(String message) {
     LiveRoomLog.trace('Media', message);
