@@ -1,0 +1,104 @@
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: funkey-pgbouncer
+automountServiceAccountToken: false
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: funkey-pgbouncer
+  labels: {app: funkey-pgbouncer}
+spec:
+  replicas: 2
+  revisionHistoryLimit: 5
+  strategy:
+    type: RollingUpdate
+    rollingUpdate: {maxSurge: 1, maxUnavailable: 0}
+  selector:
+    matchLabels: {app: funkey-pgbouncer}
+  template:
+    metadata:
+      labels: {app: funkey-pgbouncer}
+    spec:
+      serviceAccountName: funkey-pgbouncer
+      automountServiceAccountToken: false
+      terminationGracePeriodSeconds: 30
+      nodeSelector: {funkey.io/workload: application}
+      securityContext: {runAsNonRoot: true, seccompProfile: {type: RuntimeDefault}}
+      volumes:
+        - name: auth
+          secret:
+            secretName: funkey-pgbouncer-auth
+            items:
+              - key: userlist.txt
+                path: userlist.txt
+      containers:
+        - name: pgbouncer
+          image: pgbouncer/pgbouncer:1.25.2
+          imagePullPolicy: IfNotPresent
+          ports: [{name: postgres, containerPort: 6432}]
+          env:
+            - name: DATABASES_HOST
+              valueFrom:
+                configMapKeyRef: {name: funkey-config, key: POSTGRES_HOST}
+            - {name: DATABASES_PORT, value: "5432"}
+            - name: DATABASES_DBNAME
+              valueFrom:
+                configMapKeyRef: {name: funkey-config, key: POSTGRES_DB}
+            - name: DATABASES_MAX_DB_CONNECTIONS
+              valueFrom:
+                configMapKeyRef: {name: funkey-config, key: DB_POOLER_MAX_SERVER_CONNECTIONS}
+            - {name: PGBOUNCER_LISTEN_PORT, value: "6432"}
+            - {name: PGBOUNCER_POOL_MODE, value: transaction}
+            - name: PGBOUNCER_MAX_CLIENT_CONN
+              valueFrom:
+                configMapKeyRef: {name: funkey-config, key: DB_POOLER_MAX_CLIENT_CONNECTIONS}
+            - name: PGBOUNCER_DEFAULT_POOL_SIZE
+              valueFrom:
+                configMapKeyRef: {name: funkey-config, key: DB_POOLER_DEFAULT_POOL_SIZE}
+            - name: PGBOUNCER_RESERVE_POOL_SIZE
+              valueFrom:
+                configMapKeyRef: {name: funkey-config, key: DB_POOLER_RESERVE_POOL_SIZE}
+            - {name: PGBOUNCER_MAX_PREPARED_STATEMENTS, value: "200"}
+            - {name: PGBOUNCER_AUTH_TYPE, value: scram-sha-256}
+            - {name: PGBOUNCER_AUTH_FILE, value: /etc/pgbouncer-auth/userlist.txt}
+            - {name: PGBOUNCER_QUERY_WAIT_TIMEOUT, value: "5"}
+            - {name: PGBOUNCER_SERVER_TLS_SSLMODE, value: require}
+            - {name: QUIET, value: "1"}
+          volumeMounts:
+            - {name: auth, mountPath: /etc/pgbouncer-auth, readOnly: true}
+          resources:
+            requests: {cpu: 50m, memory: 64Mi}
+            limits: {cpu: 500m, memory: 256Mi}
+          startupProbe:
+            tcpSocket: {port: postgres}
+            failureThreshold: 30
+            periodSeconds: 2
+          livenessProbe:
+            tcpSocket: {port: postgres}
+            periodSeconds: 20
+          readinessProbe:
+            tcpSocket: {port: postgres}
+            periodSeconds: 5
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            capabilities: {drop: [ALL]}
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: funkey-pgbouncer
+spec:
+  selector: {app: funkey-pgbouncer}
+  ports: [{name: postgres, port: 6432, targetPort: postgres}]
+---
+apiVersion: policy/v1
+kind: PodDisruptionBudget
+metadata:
+  name: funkey-pgbouncer
+spec:
+  minAvailable: 1
+  selector:
+    matchLabels: {app: funkey-pgbouncer}
