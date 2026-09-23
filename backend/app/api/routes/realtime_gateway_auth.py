@@ -16,7 +16,7 @@ from app.database import get_db
 from app.models.role import RoleName
 from app.models.room import Room
 from app.models.user import User
-from app.services import realtime_command_service, role_service
+from app.services import realtime_capability_service, realtime_command_service, role_service
 from app.services.ban_service import is_device_banned
 from app.services.permissions.media_room_permission_service import evaluate_media_room_permission
 
@@ -44,6 +44,21 @@ class RealtimeVerifyResponse(BaseModel):
     is_staff: bool = False
 
 
+class RealtimeCapabilityRequest(BaseModel):
+    room_public_id: str | None = Field(default=None, min_length=1, max_length=32)
+
+
+class RealtimeCapabilityResponse(BaseModel):
+    token: str
+    expires_at: int
+    session_id: str
+    token_version: int
+    scopes: list[str]
+    room_public_id: str | None = None
+    permissions: list[str] = Field(default_factory=list)
+    membership_version: int | None = None
+
+
 class RealtimeCommandRequest(BaseModel):
     type: str = Field(min_length=1, max_length=80)
     room_public_id: str | None = Field(default=None, min_length=1, max_length=32)
@@ -62,6 +77,77 @@ class RealtimeCommandResponse(BaseModel):
     state_version: int | None = None
     event_sequence: int | None = None
     result: str | None = None
+
+
+@router.get("/capability-key")
+def get_realtime_capability_key():
+    """Expose only the public Ed25519 verification key."""
+
+    return realtime_capability_service.public_jwk()
+
+
+@router.post("/capability", response_model=RealtimeCapabilityResponse)
+def issue_realtime_capability(
+    payload: RealtimeCapabilityRequest,
+    authorization: str | None = Header(default=None),
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    """Mint one short-lived connect or room-bound realtime capability."""
+
+    access_token = (authorization or "").removeprefix("Bearer ").strip()
+    claims = decode_access_token(access_token) or {}
+    device_id = str(claims.get("device_id") or "").strip()
+    if device_id and is_device_banned(db, device_id):
+        raise HTTPException(status_code=403, detail="Device is banned")
+
+    is_staff = role_service.get_primary_role(current_user) in _REALTIME_STAFF_ROLES
+    room_public_id = payload.room_public_id
+    permissions: list[str] = []
+    membership_version: int | None = None
+    scopes = ["realtime:connect"]
+
+    if room_public_id:
+        room = db.query(Room).filter(Room.room_public_id == room_public_id).first()
+        if room is None or not room.is_active:
+            raise HTTPException(status_code=404, detail="Room unavailable")
+        decision = evaluate_media_room_permission(
+            db=db,
+            user=current_user,
+            room=room,
+            action="join_room",
+            device_id=device_id,
+            has_active_room_connection=False,
+        )
+        if not decision.allowed:
+            raise HTTPException(
+                status_code=403,
+                detail=decision.reason or "Room access denied",
+            )
+        scopes = ["room:subscribe"]
+        permissions = list(decision.permissions)
+        membership_version = int(room.realtime_version or 0)
+
+    issued = realtime_capability_service.issue_realtime_capability(
+        access_token=access_token,
+        user_id=current_user.id,
+        device_id=device_id,
+        is_staff=is_staff,
+        scopes=scopes,
+        room_id=room_public_id,
+        permissions=permissions,
+        membership_version=membership_version,
+    )
+    return RealtimeCapabilityResponse(
+        token=issued.token,
+        expires_at=issued.expires_at,
+        session_id=issued.session_id,
+        token_version=realtime_capability_service.settings.REALTIME_CAPABILITY_TOKEN_VERSION,
+        scopes=scopes,
+        room_public_id=room_public_id,
+        permissions=permissions,
+        membership_version=membership_version,
+    )
 
 
 @router.post("/verify", response_model=RealtimeVerifyResponse)
