@@ -15,3 +15,4 @@ These decisions describe the target and invariants; they do not assert every imp
 - [ADR-011: Database connection budget](ADR-011-database-connection-budget.md)
 - [ADR-012: Argo CD GitOps deployment strategy](ADR-012-gitops-deployment.md)
 - [ADR-013: Machine-readable state authority registry](ADR-013-authority-registry.md)
+- [ADR-014: PostgreSQL transaction pooling and credential boundaries](ADR-014-postgresql-pooling-boundaries.md)
