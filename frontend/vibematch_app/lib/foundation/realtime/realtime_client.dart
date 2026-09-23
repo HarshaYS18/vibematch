@@ -15,18 +15,24 @@ enum RealtimeConnectionStatus {
 
 typedef RealtimeTokenProvider = String? Function();
 typedef RealtimeSocketUriBuilder = Uri Function(String token);
+typedef RealtimeProtocolsBuilder = Iterable<String> Function(String token);
 
 class RealtimeClient {
   RealtimeClient({
     required RealtimeTokenProvider tokenProvider,
     required RealtimeSocketUriBuilder socketUriBuilder,
+    RealtimeProtocolsBuilder? protocolsBuilder,
     AppLogger logger = const AppLogger(),
   })  : _tokenProvider = tokenProvider,
         _socketUriBuilder = socketUriBuilder,
+        _protocolsBuilder =
+            protocolsBuilder ??
+            ((token) => <String>['funkey.v2', 'bearer.$token']),
         _logger = logger;
 
   final RealtimeTokenProvider _tokenProvider;
   final RealtimeSocketUriBuilder _socketUriBuilder;
+  final RealtimeProtocolsBuilder _protocolsBuilder;
   final AppLogger _logger;
   final RealtimeStreamCursor _cursor = RealtimeStreamCursor();
 
@@ -69,7 +75,10 @@ class RealtimeClient {
     );
 
     try {
-      final channel = WebSocketChannel.connect(_socketUriBuilder(token));
+      final channel = WebSocketChannel.connect(
+        _socketUriBuilder(token),
+        protocols: _protocolsBuilder(token),
+      );
       _channel = channel;
       _subscription = channel.stream.listen(
         _handleRawMessage,
@@ -89,7 +98,7 @@ class RealtimeClient {
       }
       _everConnected = true;
       _startPing();
-      sendRaw(const <String, dynamic>{'event': 'ping'});
+      sendRaw(const <String, dynamic>{'type': 'ping'});
     } catch (error) {
       _logger.warning('Realtime', 'connect failed', error);
       _channel = null;
@@ -157,7 +166,7 @@ class RealtimeClient {
   void _startPing() {
     _pingTimer?.cancel();
     _pingTimer = Timer.periodic(const Duration(seconds: 25), (_) {
-      sendRaw(const <String, dynamic>{'event': 'ping'});
+      sendRaw(const <String, dynamic>{'type': 'ping'});
     });
   }
 
