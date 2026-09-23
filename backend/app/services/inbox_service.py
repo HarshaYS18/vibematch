@@ -872,7 +872,10 @@ def conversation_to_dict(conversation: InboxConversation, current_user: User) ->
     other_user_online = inbox_ws_manager.is_user_online(other_user.id if other_user is not None else None)
     last_seen_at = inbox_ws_manager.last_seen_at(other_user.id if other_user is not None else None)
     if last_seen_at is None and other_user is not None:
-        last_seen_at = getattr(other_user, "last_login_at", None)
+        last_seen_at = (
+            getattr(other_user, "last_seen_at", None)
+            or getattr(other_user, "last_login_at", None)
+        )
     last_seen_text = "online" if other_user_online else "offline"
 
     return {
