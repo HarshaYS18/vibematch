@@ -117,7 +117,8 @@ def ready():
 
 @app.get("/metrics", tags=["System"], response_class=PlainTextResponse)
 def metrics():
-    return PlainTextResponse(render_metrics(engine.pool), media_type="text/plain; version=0.0.4")
+    payload = render_metrics(engine.pool) + room_realtime_connections.render_room_state_metrics()
+    return PlainTextResponse(payload, media_type="text/plain; version=0.0.4")
 
 
 app.include_router(api_router)
