@@ -8,7 +8,6 @@ class LiveRoomPresenceController {
   }) : _presenceApi = presenceApi;
 
   final PresenceApiService _presenceApi;
-  Timer? _heartbeatTimer;
   bool _left = true;
   String _roomPublicId = '';
   String _roomName = '';
@@ -28,12 +27,9 @@ class LiveRoomPresenceController {
       isSecret: isSecret,
     );
     _left = false;
-    _heartbeatTimer?.cancel();
+    // The room realtime socket owns live presence through its Redis lease.
+    // PostgreSQL presence is checkpointed on lifecycle edges, not every 25s.
     unawaited(_enterRoomPresence());
-    _heartbeatTimer = Timer.periodic(
-      const Duration(seconds: 25),
-      (_) => unawaited(_sendHeartbeat()),
-    );
   }
 
   void updateRoom({
@@ -51,20 +47,15 @@ class LiveRoomPresenceController {
   Future<void> leave() async {
     if (_left) return;
     _left = true;
-    _heartbeatTimer?.cancel();
-    _heartbeatTimer = null;
 
     try {
       await _presenceApi.leaveRoom();
     } catch (_) {
-      // Best effort. Backend also expires stale presence by heartbeat.
+      // Best effort. Socket lease expiry also removes live presence.
     }
   }
 
-  void dispose() {
-    _heartbeatTimer?.cancel();
-    _heartbeatTimer = null;
-  }
+  void dispose() {}
 
   Future<void> _enterRoomPresence() async {
     try {
@@ -79,18 +70,4 @@ class LiveRoomPresenceController {
     }
   }
 
-  Future<void> _sendHeartbeat() async {
-    if (_left) return;
-
-    try {
-      await _presenceApi.heartbeat(
-        roomPublicId: _roomPublicId,
-        roomName: _roomName,
-        roomMode: _roomMode,
-        isSecret: _isSecret,
-      );
-    } catch (_) {
-      // Keep the live room stable even if visibility heartbeat fails.
-    }
-  }
 }
