@@ -1,7 +1,7 @@
 # Go Realtime Platform v2
 
 **Owner:** Realtime Platform  
-**Status:** Chunk 21 strangler-cutover contract  
+**Status:** Chunk 21 implemented  
 **Application transport:** one Go WebSocket  
 **Media signaling:** separate mediasoup Socket.IO/WebSocket path
 
@@ -133,3 +133,20 @@ Chunk 21 requires:
 - legacy FastAPI application sockets disabled/removed only after parity;
 - architecture guard forbidding new feature application sockets;
 - load/race/chaos/reconnect tests and all repository CI green.
+
+
+## Implemented Chunk 21 checkpoint
+
+The migration sequence above has been completed in the application codebase:
+
+- the Go gateway exposes the single `funkey.v2` application socket;
+- Flutter `AppRealtimeHub` owns the physical application connection;
+- room subscriptions carry replay cursors and reconcile into `RoomSessionRepository`;
+- Inbox, room membership, seat/settings/chat/activity/Watch Party, room-music control, and other application commands use the shared transport while FastAPI remains authoritative;
+- backend events support `room`, `user`, `users`, `staff`, and `all` routing;
+- bounded priority backpressure, bounded dedupe, reauthorization, leases, drain, and room replay are implemented;
+- legacy FastAPI Inbox and room application WebSocket routes are retired/unmounted;
+- feature-owned application WebSocket creation is blocked by CI architecture guards;
+- mediasoup/WebRTC signaling remains separate by design.
+
+This checkpoint does not make Redis or Go a durable domain authority. Snapshot recovery and FastAPI/PostgreSQL ownership remain mandatory invariants.
