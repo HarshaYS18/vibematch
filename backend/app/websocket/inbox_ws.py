@@ -12,6 +12,7 @@ from redis.asyncio import Redis
 from starlette.websockets import WebSocketState
 
 from app.core.config import settings
+from app.core.redis_client import get_realtime_redis
 from app.core.telemetry import current_trace_id, current_traceparent
 
 
@@ -498,13 +499,26 @@ class InboxWebSocketManager:
         await self._publish("all", canonical)
 
     def is_user_online(self, user_id: int | None) -> bool:
-        """Return local-instance online state for legacy synchronous callers."""
+        """Return app-online state from local legacy sockets or Go gateway leases."""
         if user_id is None:
             return False
-        return any(
+        if any(
             self._is_connected(socket)
             for socket in self._connections.get(user_id, set())
-        )
+        ):
+            return True
+
+        key = f"funkey:realtime:gateway:user-active:{int(user_id)}"
+        try:
+            now = time.time()
+            redis_client = get_realtime_redis()
+            pipe = redis_client.pipeline(transaction=False)
+            pipe.zremrangebyscore(key, "-inf", now)
+            pipe.zcard(key)
+            _, count = pipe.execute()
+            return int(count or 0) > 0
+        except Exception:
+            return False
 
     def last_seen_at(self, user_id: int | None) -> datetime | None:
         if user_id is None:
