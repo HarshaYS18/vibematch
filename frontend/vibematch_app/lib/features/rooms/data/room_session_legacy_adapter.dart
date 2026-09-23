@@ -144,9 +144,10 @@ class RoomSessionLegacyRealtimeBridge {
     }
 
     final previousVersion = repository.state.stateVersion;
+    final previousEventSequence = repository.state.eventSequence;
     final next = repository.reconcileRealtimeEvent(event.raw);
     if (next.stateVersion == previousVersion &&
-        next.eventSequence == repository.state.eventSequence) {
+        next.eventSequence == previousEventSequence) {
       // Non-state room events (system messages, invites, etc.) are handled by
       // the compatibility media/event facade. There is nothing to project.
       return;
@@ -204,6 +205,12 @@ class RoomSessionLegacyRealtimeBridge {
   void _project(RoomSessionState state) {
     RoomSessionLegacyAdapter.publishLegacy(state);
     mediaSignalingService.applyCanonicalRoomState(state.room);
+  }
+
+  void deactivate() {
+    if (!_active) return;
+    _active = false;
+    _hub.unsubscribeRoom(roomId);
   }
 
   void dispose() {
