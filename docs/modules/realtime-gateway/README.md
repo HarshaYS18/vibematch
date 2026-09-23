@@ -34,7 +34,7 @@ No domain events. The gateway sends WebSocket transport controls only; durable c
 
 ## Events consumed
 
-The Go gateway consumes backend-published, versioned envelopes from Redis channel `funkey:realtime:events` and delivers them to authorized local sockets. It does not publish domain events or make durable commands. Redis Pub/Sub is ephemeral; after reconnect, the client must refetch the authoritative snapshot. This is distinct from durable JetStream work delivery.
+The Go gateway consumes backend-published, versioned envelopes from Redis channel `funkey:realtime:events` and delivers them to authorized local sockets. It does not publish domain events or make durable commands. Redis Pub/Sub is ephemeral. Chunk 20 room traffic carries a bounded contiguous transport sequence and replay window before snapshot fallback; the transport sequence is intentionally distinct from durable PostgreSQL `event_sequence`. This is distinct from durable JetStream work delivery.
 
 ## Database tables/state owned
 
@@ -42,7 +42,7 @@ Database: No gateway-owned durable tables; room_realtime_events remain authorita
 
 ## Redis keys/state owned
 
-`funkey:realtime:gateway:node:<node_id>`, `funkey:realtime:gateway:user:<user_id>:<connection_id>`, and `funkey:realtime:gateway:rate:<user_id>` are expiring routing and rate-limit keys. Process memory holds only live sockets and recipient indexes.
+`funkey:realtime:gateway:node:<node_id>`, `funkey:realtime:gateway:user:<user_id>:<connection_id>`, `funkey:realtime:gateway:rate:<user_id>`, and the Room State Engine v2 stream/replay keys under `funkey:realtime:room:*` are expiring transport state. Process memory holds only live sockets and recipient indexes.
 
 ## Dependencies
 
