@@ -4,3 +4,4 @@ namespace: funkey
 resources:
   - pgbouncer.yaml
   - postgres-exporter.yaml
+  - network-policy.yaml
