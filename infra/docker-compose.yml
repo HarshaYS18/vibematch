@@ -183,6 +183,7 @@ services:
       REALTIME_REDIS_URL: redis://realtime-redis:6379/0
       REALTIME_NATS_URL: nats://nats:4222
       REALTIME_NATS_INBOX_SUBJECT: funkey.events.inbox.realtime
+      REALTIME_INBOX_COMMAND_URL: http://inbox:8083/api/v1/realtime/command
       REALTIME_ORIGINS: http://localhost:3000,http://localhost:8080
       REALTIME_NODE_ID: realtime-local-1
       REALTIME_DRAIN_TIMEOUT: 30s
