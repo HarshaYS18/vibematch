@@ -42,6 +42,45 @@ def upgrade() -> None:
         """
     )
 
+    # Historical duplicate direct-chat repair could leave duplicate participant
+    # rows. Collapse them before enforcing one participant state per user/chat.
+    op.execute(
+        """
+        WITH aggregate AS (
+            SELECT
+                conversation_id,
+                user_id,
+                MIN(id) AS keep_id,
+                MAX(unread_count) AS unread_count,
+                MAX(last_read_message_id) AS last_read_message_id,
+                BOOL_AND(is_deleted_for_user) AS is_deleted_for_user,
+                BOOL_OR(is_muted) AS is_muted,
+                BOOL_OR(is_pinned) AS is_pinned,
+                BOOL_OR(is_archived) AS is_archived
+            FROM inbox_participants
+            GROUP BY conversation_id, user_id
+        )
+        UPDATE inbox_participants p
+        SET unread_count = a.unread_count,
+            last_read_message_id = a.last_read_message_id,
+            is_deleted_for_user = a.is_deleted_for_user,
+            is_muted = a.is_muted,
+            is_pinned = a.is_pinned,
+            is_archived = a.is_archived
+        FROM aggregate a
+        WHERE p.id = a.keep_id
+        """
+    )
+    op.execute(
+        """
+        DELETE FROM inbox_participants p
+        USING inbox_participants duplicate
+        WHERE p.conversation_id = duplicate.conversation_id
+          AND p.user_id = duplicate.user_id
+          AND p.id > duplicate.id
+        """
+    )
+
     op.create_unique_constraint(
         "uq_inbox_participant_conversation_user",
         "inbox_participants",
