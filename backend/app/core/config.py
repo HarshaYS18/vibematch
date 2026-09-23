@@ -74,6 +74,15 @@ class Settings(BaseSettings):
     JWT_ALGORITHM: str = "HS256"
     ACCESS_TOKEN_EXPIRE_MINUTES: int = 60 * 24 * 7
 
+    # Chunk 22 realtime capabilities. The API alone owns the Ed25519 private
+    # key; the Go gateway fetches only the public key and verifies locally.
+    REALTIME_CAPABILITY_PRIVATE_KEY_B64: str = ""
+    REALTIME_CAPABILITY_KEY_ID: str = "funkey-realtime-v1"
+    REALTIME_CAPABILITY_ISSUER: str = "funkey-api"
+    REALTIME_CAPABILITY_AUDIENCE: str = "funkey-realtime"
+    REALTIME_CAPABILITY_TTL_SECONDS: int = 300
+    REALTIME_CAPABILITY_TOKEN_VERSION: int = 1
+
     # Founder Owner
     FOUNDER_OWNER_PUBLIC_ID: int = 6922022
     FOUNDER_OWNER_EMAIL: str = "founder@vibematch.com"
@@ -169,6 +178,18 @@ class Settings(BaseSettings):
             unsafe.append("ENABLE_DEV_LOGIN")
         if self.JWT_ALGORITHM not in {"HS256", "HS384", "HS512"}:
             unsafe.append("JWT_ALGORITHM")
+        if not self.REALTIME_CAPABILITY_PRIVATE_KEY_B64.strip():
+            unsafe.append("REALTIME_CAPABILITY_PRIVATE_KEY_B64")
+        if not self.REALTIME_CAPABILITY_KEY_ID.strip():
+            unsafe.append("REALTIME_CAPABILITY_KEY_ID")
+        if not self.REALTIME_CAPABILITY_ISSUER.strip():
+            unsafe.append("REALTIME_CAPABILITY_ISSUER")
+        if not self.REALTIME_CAPABILITY_AUDIENCE.strip():
+            unsafe.append("REALTIME_CAPABILITY_AUDIENCE")
+        if not 60 <= self.REALTIME_CAPABILITY_TTL_SECONDS <= 600:
+            unsafe.append("REALTIME_CAPABILITY_TTL_SECONDS")
+        if self.REALTIME_CAPABILITY_TOKEN_VERSION < 1:
+            unsafe.append("REALTIME_CAPABILITY_TOKEN_VERSION")
 
         db_url = urlsplit(self.database_url)
         if not db_url.scheme.startswith("postgresql") or not db_url.hostname:
