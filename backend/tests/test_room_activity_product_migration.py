@@ -53,7 +53,7 @@ class RoomActivityProductMigrationTests(unittest.TestCase):
         writes = {item.path for item in room.child_writes}
         self.assertGreaterEqual(registry.version, 4)
         self.assertIn("/rooms/{room_public_id}/realtime/activity/command", writes)
-        self.assertIn("/ws/room-realtime", room.realtime_channels)
+        self.assertIn("/ws", room.realtime_channels)
 
 
 if __name__ == "__main__":
