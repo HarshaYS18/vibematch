@@ -81,8 +81,9 @@ type CommandExecutor interface {
 }
 
 type HTTPCommandExecutor struct {
-	URL    string
-	Client *http.Client
+	URL      string
+	InboxURL string
+	Client   *http.Client
 }
 
 func NewHTTPCommandExecutor(url string, timeout time.Duration) *HTTPCommandExecutor {
@@ -97,6 +98,16 @@ func NewHTTPCommandExecutor(url string, timeout time.Duration) *HTTPCommandExecu
 			}),
 		},
 	}
+}
+
+func NewRoutedHTTPCommandExecutor(
+	url string,
+	inboxURL string,
+	timeout time.Duration,
+) *HTTPCommandExecutor {
+	executor := NewHTTPCommandExecutor(url, timeout)
+	executor.InboxURL = strings.TrimSpace(inboxURL)
+	return executor
 }
 
 func (e *HTTPCommandExecutor) Execute(
@@ -130,10 +141,14 @@ func (e *HTTPCommandExecutor) Execute(
 		return err
 	}
 
+	targetURL := e.URL
+	if isInbox && strings.TrimSpace(e.InboxURL) != "" {
+		targetURL = e.InboxURL
+	}
 	req, err := http.NewRequestWithContext(
 		ctx,
 		http.MethodPost,
-		e.URL,
+		targetURL,
 		bytes.NewReader(body),
 	)
 	if err != nil {
