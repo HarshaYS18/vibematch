@@ -1,0 +1,59 @@
+{
+  "version": 1,
+  "authority": "EPHEMERAL_OR_CACHE_ONLY",
+  "roles": {
+    "app_cache_rate_limit": {
+      "endpoint_env": "CACHE_REDIS_URL",
+      "logical_name": "application-cache-rate-limit",
+      "key_prefixes": [
+        "funkey:cache:",
+        "funkey:ratelimit:"
+      ],
+      "ttl_required_for_business_keys": true,
+      "memory_policy": "allkeys-lfu",
+      "maxmemory_required": true,
+      "persistence_required": false,
+      "ha_required": true,
+      "redis_cluster_supported_by_current_client": false,
+      "loss_behavior": "cache rebuilds; rate-limit state resets; durable business state remains PostgreSQL-backed"
+    },
+    "realtime_presence": {
+      "endpoint_env": "REALTIME_REDIS_URL",
+      "logical_name": "realtime-presence-routing",
+      "key_prefixes": [
+        "funkey:realtime:"
+      ],
+      "ttl_required_for_business_keys": true,
+      "memory_policy": "volatile-ttl",
+      "maxmemory_required": true,
+      "persistence_required": false,
+      "ha_required": true,
+      "redis_cluster_supported_by_current_client": false,
+      "loss_behavior": "leases/routing/fanout are reconstructed; clients resync authoritative snapshots"
+    },
+    "media_registry": {
+      "endpoint_env": "MEDIA_REGISTRY_REDIS_URL",
+      "logical_name": "media-registry",
+      "key_prefixes": [
+        "funkey:media:"
+      ],
+      "ttl_required_for_business_keys": true,
+      "memory_policy": "noeviction",
+      "maxmemory_required": true,
+      "persistence_required": false,
+      "ha_required": true,
+      "single_primary_required": true,
+      "redis_cluster_supported_by_current_client": false,
+      "loss_behavior": "media assignments are re-resolved from healthy node heartbeats; no durable business truth is lost"
+    }
+  },
+  "ttl_seconds": {
+    "rate_limit_window_key": 120,
+    "fastapi_socket_lease_score": 30,
+    "fastapi_socket_lease_key": 90,
+    "realtime_gateway_lease": 60,
+    "realtime_command_dedupe": 300,
+    "media_node_heartbeat": 30,
+    "media_room_assignment": 86400
+  }
+}
