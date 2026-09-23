@@ -52,6 +52,7 @@ class Settings(BaseSettings):
 
     # Chunk 23 Inbox service boundary.
     INBOX_SERVICE_URL: str = "http://127.0.0.1:8083/api/v1"
+    INBOX_INTERNAL_URL: str = "http://127.0.0.1:8083/internal/inbox"
     INBOX_SERVICE_TIMEOUT_SECONDS: float = 5.0
     INBOX_INTERNAL_TOKEN: str = "change-this-inbox-internal-token"
     INBOX_DATABASE_URL: str = ""
@@ -277,6 +278,8 @@ class Settings(BaseSettings):
             unsafe.append("DB_API_CONNECTION_BUDGET")
         if not self.INBOX_SERVICE_URL.strip():
             unsafe.append("INBOX_SERVICE_URL")
+        if not self.INBOX_INTERNAL_URL.strip():
+            unsafe.append("INBOX_INTERNAL_URL")
         if self.INBOX_DB_POOL_SIZE <= 0 or self.INBOX_DB_MAX_OVERFLOW < 0:
             unsafe.append("INBOX_DB_POOL_SIZE/INBOX_DB_MAX_OVERFLOW")
         if (
