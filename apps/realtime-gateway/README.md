@@ -8,8 +8,8 @@ The gateway is transport infrastructure, not a business authority. PostgreSQL-ba
 
 ## Responsibilities
 
-- Authenticate each connection through the authoritative FastAPI control plane.
-- Authorize every room subscription and periodically re-authorize active access.
+- Verify short-lived FastAPI-issued Ed25519 connect capabilities locally.
+- Verify a separate room-bound capability for every room subscription; authorization changes arrive as critical revocation events instead of periodic HTTP rechecks.
 - Route backend events with `room`, `user`, `users`, `staff`, or `all` scope.
 - Maintain sharded in-process room/user recipient indexes.
 - Enforce connection budgets, frame/rate limits, bounded priority queues, slow-consumer eviction, and bounded event deduplication.
@@ -53,7 +53,8 @@ Redis Pub/Sub is not treated as durable delivery. Clients recover application tr
 ## Important files
 
 - `cmd/realtime-gateway/main.go`: process startup and SIGTERM drain.
-- `internal/gateway/auth.go`: FastAPI connection/subscription verification client.
+- `internal/gateway/auth.go`: authorization interface and rollback HTTP verifier.
+- `internal/gateway/capability.go`: local Ed25519 capability verification and public-key cache.
 - `internal/gateway/commands.go`: allowlisted FastAPI command relay.
 - `internal/gateway/server.go`: WebSocket protocol, room replay, leases, rate limits, Redis consumer, drain.
 - `internal/gateway/hub.go`: sharded recipient indexes, bounded priority queues, dedupe, fanout.
@@ -73,20 +74,21 @@ Redis Pub/Sub is not treated as durable delivery. Clients recover application tr
 
 ### WebSocket authentication
 
-Native clients may send `Authorization: Bearer <token>`.
+Connections carry both the normal API bearer token and a short-lived connect capability. The bearer token is retained only for allowlisted command relay to FastAPI; the connect decision is made from the capability.
 
 Browser-compatible clients use subprotocols:
 
 - `funkey.v2`
 - `bearer.<access-token>`
+- `capability.<connect-capability>`
 
-The server selects `funkey.v2`; it never echoes the bearer-token subprotocol. Edge access logs must redact `Sec-WebSocket-Protocol` because it may carry a bearer token.
+The server selects `funkey.v2`; it never echoes credential-bearing subprotocols. Edge access logs must redact `Sec-WebSocket-Protocol` because it may carry credentials.
 
 ### Transport commands
 
 - `{"type":"ping"}`
-- `{"type":"subscribe","room_public_id":"ROOM1"}`
-- `{"type":"subscribe","room_public_id":"ROOM1","stream":"room:ROOM1:<epoch>","last_sequence":42}`
+- `{"type":"subscribe","room_public_id":"ROOM1","capability":"<room-capability>"}`
+- `{"type":"subscribe","room_public_id":"ROOM1","capability":"<room-capability>","stream":"room:ROOM1:<epoch>","last_sequence":42}`
 - `{"type":"unsubscribe","room_public_id":"ROOM1"}`
 
 A successful room subscription returns `subscribed` plus replay/resync metadata. If the supplied stream cursor cannot be proven contiguous, `resync_required=true` and the client refreshes `RoomSessionRepository` from the authoritative snapshot.
@@ -106,10 +108,12 @@ FastAPI performs all business authorization and durable mutations. A command pro
 
 ### FastAPI control plane
 
-- `POST /api/v1/realtime/verify`
-- `POST /api/v1/realtime/command`
+- `POST /api/v1/realtime/capability` — authenticated mint for connect or one room.
+- `GET /api/v1/realtime/capability-key` — public Ed25519 verification key and contract metadata.
+- `POST /api/v1/realtime/command` — authoritative allowlisted business command relay.
+- `POST /api/v1/realtime/verify` — temporary rollback/control-plane seam; not the normal hot path.
 
-Verification responses include the authenticated `user_id` and server-derived `is_staff`; the gateway never trusts client-supplied identity or staff flags.
+The API alone owns `REALTIME_CAPABILITY_PRIVATE_KEY_B64`. The Go gateway receives only the public key. Capabilities carry server-derived identity/session/device claims, scope, expiry and version; room grants are bound to an exact room and include permission/membership-version context.
 
 ## Backend event contract
 
@@ -150,7 +154,7 @@ with a contiguous transport `sequence`.
 On reconnect:
 
 1. Flutter re-subscribes with its last stream/sequence cursor.
-2. Go verifies room access through FastAPI.
+2. Go verifies the room-bound Ed25519 capability locally.
 3. Go reads the bounded Redis replay stream.
 4. If every missing sequence is present and the epoch matches, Go replays it.
 5. Otherwise Go returns `resync_required=true`.
@@ -176,7 +180,7 @@ All are expiring transport state, not business authority.
 
 ## Security considerations
 
-- Connection and room access fail closed when FastAPI verification is unavailable.
+- Connection and room access fail closed when a fresh capability cannot be obtained or locally verified.
 - Browser origins are allowlisted in production.
 - The gateway never accepts client-supplied user/staff identity.
 - Commands are compile-time allowlisted and re-authorized by FastAPI.
@@ -191,9 +195,9 @@ All are expiring transport state, not business authority.
 
 Readiness fails and new upgrades stop. Connected clients can miss ephemeral Pub/Sub traffic. When the consumer recovers, clients receive `resync_required`; room clients attempt bounded replay or fetch authoritative snapshots.
 
-### FastAPI verification failure
+### Capability issuer/public-key failure
 
-New connections/subscriptions fail closed. Periodic reauthorization closes invalid sessions or revokes room subscriptions.
+New connections or subscriptions that need a fresh capability fail closed. Existing authorized sockets are not periodically dependent on FastAPI verification. Session/device/room permission changes are accelerated by critical revocation events, and capability expiry bounds missed-revocation exposure. A public-key cache miss during API/key-endpoint failure also fails closed.
 
 ### FastAPI command failure
 
@@ -209,7 +213,7 @@ Only ephemeral transport state is lost. Durable application state remains in Pos
 
 ## Retry/idempotency behavior
 
-HTTP verification uses bounded timeouts.
+Capability public-key refresh and authoritative command forwarding use bounded timeouts. Normal connect/subscribe decisions do not perform per-request HTTP verification inside Go.
 
 Room command forwarding supports stable `command_id` claims in FastAPI/Redis so duplicate retries do not blindly repeat authoritative mutations. Transient PostgreSQL lock/deadlock/serialization failures receive a small bounded retry budget in the FastAPI command service.
 
@@ -231,7 +235,9 @@ Structured logs avoid tokens. OpenTelemetry spans cover connection, subscription
 
 Start FastAPI, Redis/Valkey, and the Go gateway. Configure:
 
-- `REALTIME_AUTH_VERIFY_URL`
+- `REALTIME_AUTH_VERIFY_URL` (rollback seam and default base for derived endpoints)
+- optional `REALTIME_CAPABILITY_KEY_URL` (defaults next to the verify endpoint)
+- `REALTIME_CAPABILITY_ISSUER`, `REALTIME_CAPABILITY_AUDIENCE`, and token version where overridden
 - optional `REALTIME_COMMAND_URL` (defaults next to the verify endpoint)
 - `REALTIME_REDIS_URL`
 - `REALTIME_ORIGINS` where required
@@ -259,7 +265,9 @@ Do not route mediasoup signaling through this gateway.
 
 Before changing this contract, verify:
 
-- FastAPI verify/command parity;
+- FastAPI capability/key/command parity;
+- Ed25519 signature/issuer/audience/version/expiry/scope validation;
+- user/device and room-permission revocation handling;
 - room replay and snapshot fallback;
 - user/users/staff/all routing isolation;
 - queue priority/backpressure;
@@ -272,6 +280,13 @@ Before changing this contract, verify:
 
 ## Migration status
 
-**Chunk 21 cutover implemented.**
+**Chunks 21–22 cutover implemented.**
 
 Flutter `AppRealtimeHub` targets the Go `/ws` endpoint. Inbox and room application traffic use the shared socket. The legacy FastAPI Inbox and room application WebSocket routes are retired/unmounted and protected by architecture tests. Feature-created application sockets have been removed. Mediasoup/WebRTC signaling remains intentionally separate.
+
+
+## Capability key ownership and rotation
+
+`REALTIME_CAPABILITY_PRIVATE_KEY_B64` is a dedicated API secret containing a base64url-encoded 32-byte Ed25519 private seed. It must exist in the API secret manager in production and must never be mounted into this gateway.
+
+The public-key endpoint currently exposes one active `kid`. Before the first zero-downtime production key rotation, expand the endpoint/verifier to support overlapping old/new public keys for at least the maximum capability lifetime. Rotate by expand → canary → soak → retire; never replace the only verification key abruptly.
