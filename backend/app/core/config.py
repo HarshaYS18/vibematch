@@ -22,18 +22,37 @@ class Settings(BaseSettings):
 
     # Database / Redis from .env
     database_url: str = "postgresql://postgres:postgres@localhost:5432/vibematch"
+    MIGRATION_DATABASE_URL: str = ""
     redis_url: str = "redis://localhost:6379/0"
     REDIS_CONNECT_TIMEOUT_SECONDS: float = 2.0
     REDIS_SOCKET_TIMEOUT_SECONDS: float = 2.0
+
+    # PostgreSQL / PgBouncer platform policy.
+    DB_POOLER_MODE: str = "direct"
+    DB_APPLICATION_NAME: str = "funkey-api"
     DB_LOCK_TIMEOUT_MS: int = 1000
     DB_STATEMENT_TIMEOUT_MS: int = 3000
+    DB_IDLE_IN_TRANSACTION_SESSION_TIMEOUT_MS: int = 10000
+    DB_SLOW_QUERY_MS: int = 500
     DB_CONNECT_TIMEOUT_SECONDS: int = 5
     DB_POOL_SIZE: int = 5
     DB_MAX_OVERFLOW: int = 0
     DB_POOL_TIMEOUT_SECONDS: int = 3
     DB_POOL_RECYCLE_SECONDS: int = 1800
+    DB_POOL_USE_LIFO: bool = True
+
+    # Topology budgets. These are planning/validation limits, not capacity claims.
     API_MAX_REPLICAS: int = 20
     DB_API_CONNECTION_BUDGET: int = 100
+    WORKER_MAX_REPLICAS: int = 20
+    DB_WORKER_POOL_SIZE: int = 3
+    DB_WORKER_MAX_OVERFLOW: int = 0
+    DB_WORKER_CONNECTION_BUDGET: int = 60
+    DB_ROLLOUT_SURGE_CONNECTION_RESERVE: int = 20
+    DB_POOLER_MAX_CLIENT_CONNECTIONS: int = 400
+    DB_SERVER_CONNECTION_LIMIT: int = 160
+    DB_POOLER_MAX_SERVER_CONNECTIONS: int = 120
+    DB_DIRECT_CONNECTION_RESERVE: int = 40
 
     # Media control plane / node registry
     MEDIA_INTERNAL_TOKEN: str = "change-this-media-internal-token"
@@ -95,6 +114,18 @@ class Settings(BaseSettings):
     def is_production(self) -> bool:
         return self.APP_ENV.lower() in {"production", "prod"}
 
+    @property
+    def migration_database_url(self) -> str:
+        return self.MIGRATION_DATABASE_URL.strip() or self.database_url
+
+    @property
+    def expected_pooler_client_connections(self) -> int:
+        return (
+            self.DB_API_CONNECTION_BUDGET
+            + self.DB_WORKER_CONNECTION_BUDGET
+            + self.DB_ROLLOUT_SURGE_CONNECTION_RESERVE
+        )
+
     def validate_production(self) -> None:
         """Reject unsafe deploys before the application accepts traffic."""
         if not self.is_production:
@@ -108,11 +139,23 @@ class Settings(BaseSettings):
             unsafe.append("ENABLE_DEV_LOGIN")
         if self.JWT_ALGORITHM not in {"HS256", "HS384", "HS512"}:
             unsafe.append("JWT_ALGORITHM")
+
         db_url = urlsplit(self.database_url)
         if not db_url.scheme.startswith("postgresql") or not db_url.hostname:
             unsafe.append("database_url")
         if self.database_url == "postgresql://postgres:postgres@localhost:5432/vibematch":
             unsafe.append("database_url(default)")
+        if self.DB_POOLER_MODE not in {"direct", "transaction"}:
+            unsafe.append("DB_POOLER_MODE")
+        if self.DB_POOLER_MODE == "transaction":
+            migration_url = self.MIGRATION_DATABASE_URL.strip()
+            if not migration_url or migration_url == self.database_url:
+                unsafe.append("MIGRATION_DATABASE_URL")
+            else:
+                parsed_migration = urlsplit(migration_url)
+                if not parsed_migration.scheme.startswith("postgresql") or not parsed_migration.hostname:
+                    unsafe.append("MIGRATION_DATABASE_URL")
+
         redis_url = urlsplit(self.redis_url)
         if redis_url.scheme not in {"redis", "rediss"} or not redis_url.hostname:
             unsafe.append("redis_url")
@@ -132,10 +175,41 @@ class Settings(BaseSettings):
             unsafe.append("MEDIA_S3_ENDPOINT_URL(https)")
         if not self.RATE_LIMIT_ENABLED:
             unsafe.append("RATE_LIMIT_ENABLED")
-        if self.DB_POOL_SIZE < 1 or self.DB_MAX_OVERFLOW < 0 or self.API_MAX_REPLICAS < 3:
-            unsafe.append("DB_POOL_SIZE/DB_MAX_OVERFLOW/API_MAX_REPLICAS")
+
+        if (
+            self.DB_POOL_SIZE < 1
+            or self.DB_MAX_OVERFLOW < 0
+            or self.API_MAX_REPLICAS < 3
+            or self.DB_WORKER_POOL_SIZE < 1
+            or self.DB_WORKER_MAX_OVERFLOW < 0
+            or self.WORKER_MAX_REPLICAS < 1
+        ):
+            unsafe.append("DB_POOL_SIZE/DB_MAX_OVERFLOW/replica budgets")
         if self.API_MAX_REPLICAS * (self.DB_POOL_SIZE + self.DB_MAX_OVERFLOW) > self.DB_API_CONNECTION_BUDGET:
             unsafe.append("DB_API_CONNECTION_BUDGET")
+        if self.WORKER_MAX_REPLICAS * (
+            self.DB_WORKER_POOL_SIZE + self.DB_WORKER_MAX_OVERFLOW
+        ) > self.DB_WORKER_CONNECTION_BUDGET:
+            unsafe.append("DB_WORKER_CONNECTION_BUDGET")
+        if self.expected_pooler_client_connections > self.DB_POOLER_MAX_CLIENT_CONNECTIONS:
+            unsafe.append("DB_POOLER_MAX_CLIENT_CONNECTIONS")
+        if (
+            self.DB_POOLER_MAX_SERVER_CONNECTIONS < 1
+            or self.DB_DIRECT_CONNECTION_RESERVE < 1
+            or self.DB_POOLER_MAX_SERVER_CONNECTIONS + self.DB_DIRECT_CONNECTION_RESERVE
+            > self.DB_SERVER_CONNECTION_LIMIT
+        ):
+            unsafe.append("DB_SERVER_CONNECTION_LIMIT")
+        if (
+            self.DB_LOCK_TIMEOUT_MS <= 0
+            or self.DB_STATEMENT_TIMEOUT_MS <= 0
+            or self.DB_IDLE_IN_TRANSACTION_SESSION_TIMEOUT_MS <= 0
+            or self.DB_SLOW_QUERY_MS <= 0
+            or self.DB_CONNECT_TIMEOUT_SECONDS <= 0
+            or self.DB_POOL_TIMEOUT_SECONDS <= 0
+        ):
+            unsafe.append("database timeouts")
+
         if self.OTEL_TRACES_ENABLED:
             if not self.OTEL_EXPORTER_OTLP_TRACES_ENDPOINT.startswith(("http://", "https://")):
                 unsafe.append("OTEL_EXPORTER_OTLP_TRACES_ENDPOINT")
