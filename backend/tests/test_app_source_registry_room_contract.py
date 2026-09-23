@@ -35,7 +35,7 @@ class AppSourceRegistryRoomContractTests(unittest.TestCase):
         }:
             self.assertNotIn(legacy, writes)
 
-        self.assertIn("/ws/room-realtime", room.realtime_channels)
+        self.assertIn("/ws", room.realtime_channels)
         self.assertEqual(
             "canonical_room_session_active",
             room.migration_status,
