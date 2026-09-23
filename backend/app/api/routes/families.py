@@ -11,9 +11,8 @@ from sqlalchemy.orm import Session
 from app.api.routes.users import get_current_user
 from app.database import get_db
 from app.models.economy_stats import FamilyEconomyStats, FamilyMemberStats
-from app.models.inbox import InboxConversation, InboxParticipant, InboxMessageType
 from app.models.user import User
-from app.services import inbox_service
+from app.services import inbox_service_client
 
 router = APIRouter(prefix="/families", tags=["Families"])
 
@@ -283,6 +282,7 @@ def create_family(payload: FamilyCreateRequest, db: Session = Depends(get_db), c
     db.flush()
     db.add(FamilyMemberStats(family_id=family_id, user_id=current_user.id, family_role="owner"))
     db.commit()
+    _sync_family_chat(db, family_id)
     return _family_response_for_user(db, current_user)
 
 
@@ -296,6 +296,7 @@ def request_join_family(family_id: str, db: Session = Depends(get_db), current_u
     db.add(FamilyMemberStats(family_id=parsed_id, user_id=current_user.id, family_role="member"))
     _recount_members(db, parsed_id)
     db.commit()
+    _sync_family_chat(db, parsed_id)
     return {"status": "joined", **_family_response_for_user(db, current_user)}
 
 
@@ -314,6 +315,7 @@ def leave_family(family_id: str, db: Session = Depends(get_db), current_user: Us
     db.delete(member)
     _recount_members(db, parsed_id)
     db.commit()
+    _sync_family_chat(db, parsed_id)
     return _empty_family(current_user)
 
 
@@ -324,8 +326,17 @@ def disband_family(family_id: str, db: Session = Depends(get_db), current_user: 
     for member in _family_members(db, parsed_id):
         db.delete(member)
     family = _family_by_id(db, parsed_id)
+    family_title = family.family_name or f"Family {parsed_id}"
     db.delete(family)
     db.commit()
+    try:
+        inbox_service_client.sync_family(
+            family_id=parsed_id,
+            title=family_title,
+            member_user_ids=[],
+        )
+    except inbox_service_client.InboxServiceUnavailable:
+        pass
     return _empty_family(current_user)
 
 
@@ -353,47 +364,6 @@ def send_family_invites(family_id: str, payload: FamilyInviteRequest, db: Sessio
     return {"status": "sent", "sent_count": len([user for user in valid_targets if user is not None])}
 
 
-def _family_chat_public_id(family_id: int) -> str:
-    return f"family_chat_{family_id}"
-
-
-def _ensure_family_chat_conversation(db: Session, family_id: int) -> InboxConversation:
-    family = _family_by_id(db, family_id)
-    conversation = (
-        db.query(InboxConversation)
-        .filter(InboxConversation.public_id == _family_chat_public_id(family_id))
-        .first()
-    )
-    if conversation is None:
-        title = family.family_name or f"Family {family_id}"
-        conversation = InboxConversation(
-            public_id=_family_chat_public_id(family_id),
-            title=title,
-            avatar_text=(title.strip()[:2] or "FK").upper(),
-            conversation_type="family",
-            is_official=False,
-            metadata_json={"family_id": family_id},
-        )
-        db.add(conversation)
-        db.flush()
-
-    active_member_ids = {member.user_id for member in _family_members(db, family_id)}
-    existing = {item.user_id: item for item in conversation.participants}
-    for user_id in active_member_ids:
-        participant = existing.get(user_id)
-        if participant is None:
-            db.add(InboxParticipant(conversation_id=conversation.id, user_id=user_id))
-        elif participant.is_deleted_for_user:
-            participant.is_deleted_for_user = False
-    for user_id, participant in existing.items():
-        if user_id not in active_member_ids:
-            db.delete(participant)
-    conversation.title = family.family_name or conversation.title
-    db.flush()
-    db.expire(conversation, ["participants"])
-    return conversation
-
-
 def _require_family_member(db: Session, family_id: int, user: User) -> FamilyMemberStats:
     member = (
         db.query(FamilyMemberStats)
@@ -408,6 +378,26 @@ def _require_family_member(db: Session, family_id: int, user: User) -> FamilyMem
     return member
 
 
+def _family_chat_contract(
+    db: Session,
+    family_id: int,
+) -> tuple[str, list[int]]:
+    family = _family_by_id(db, family_id)
+    return (
+        family.family_name or f"Family {family_id}",
+        [member.user_id for member in _family_members(db, family_id)],
+    )
+
+
+def _sync_family_chat(db: Session, family_id: int) -> None:
+    title, member_ids = _family_chat_contract(db, family_id)
+    inbox_service_client.sync_family(
+        family_id=family_id,
+        title=title,
+        member_user_ids=member_ids,
+    )
+
+
 @router.get("/{family_id}/chat")
 def get_family_chat(
     family_id: str,
@@ -417,14 +407,16 @@ def get_family_chat(
 ):
     parsed_id = _parse_family_id(family_id)
     _require_family_member(db, parsed_id, current_user)
-    conversation = _ensure_family_chat_conversation(db, parsed_id)
-    db.commit()
-    visible = list(conversation.messages)[-max(1, min(limit, 100)):]
-    return {
-        "family_id": parsed_id,
-        "conversation_id": conversation.public_id,
-        "messages": [inbox_service.message_to_dict(message, current_user) for message in visible],
-    }
+    try:
+        return inbox_service_client.get_family_messages(
+            family_id=parsed_id,
+            user_id=current_user.id,
+            limit=limit,
+        )
+    except inbox_service_client.InboxServiceUnavailable as exc:
+        raise HTTPException(status_code=503, detail=str(exc)) from exc
+    except ValueError as exc:
+        raise HTTPException(status_code=404, detail=str(exc)) from exc
 
 
 @router.post("/{family_id}/chat/messages")
@@ -436,17 +428,16 @@ def send_family_chat_message(
 ):
     parsed_id = _parse_family_id(family_id)
     _require_family_member(db, parsed_id, current_user)
-    conversation = _ensure_family_chat_conversation(db, parsed_id)
-    message = inbox_service.send_message(
-        db,
-        conversation,
-        current_user,
-        payload.text,
-        message_type=InboxMessageType.TEXT.value,
-        metadata={"family_id": parsed_id},
-    )
-    return {
-        "family_id": parsed_id,
-        "conversation_id": conversation.public_id,
-        "message": inbox_service.message_to_dict(message, current_user),
-    }
+    title, member_ids = _family_chat_contract(db, parsed_id)
+    try:
+        return inbox_service_client.send_family_message(
+            family_id=parsed_id,
+            sender_user_id=current_user.id,
+            title=title,
+            member_user_ids=member_ids,
+            text=payload.text,
+        )
+    except inbox_service_client.InboxServiceUnavailable as exc:
+        raise HTTPException(status_code=503, detail=str(exc)) from exc
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
