@@ -370,6 +370,12 @@ def main() -> int:
         router_text = router_py.read_text(encoding="utf-8")
         if 'APIRouter(prefix="/api/v1")' not in router_text:
             errors.append("backend/app/api/router.py must own the /api/v1 root prefix")
+        for retired_mount in ("inbox_ws.router", "room_realtime.router"):
+            if retired_mount in router_text:
+                errors.append(
+                    "Chunk 21 one-socket cutover forbids mounted legacy FastAPI websocket: "
+                    + retired_mount
+                )
 
     versions = ROOT / "backend" / "alembic" / "versions"
     if versions.exists() and not any(versions.glob("*.py")):
@@ -389,6 +395,7 @@ def main() -> int:
     print(" - mutable state ownership conforms to contracts/architecture/authorities.yaml")
     print(" - Redis roles conform to contracts/redis/topology.json")
     print(" - Room State Engine v2 heartbeat/snapshot/current-state invariants hold")
+    print(" - legacy FastAPI application websocket routes are not mounted")
     return 0
 
 
