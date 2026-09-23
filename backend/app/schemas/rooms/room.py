@@ -91,6 +91,13 @@ class RoomJoinResponse(BaseModel):
     closed_room_ids: list[str] = Field(default_factory=list)
 
 
+class RoomHeartbeatResponse(BaseModel):
+    room_id: str
+    state_version: int = 0
+    event_sequence: int = 0
+    heartbeat_mode: str = "socket_lease"
+
+
 class RoomLeaveResponse(BaseModel):
     room_id: str
     online_count: int
