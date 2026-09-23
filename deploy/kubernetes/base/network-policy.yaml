@@ -29,3 +29,15 @@ spec:
     - from:
         - namespaceSelector: {}
       ports: [{protocol: TCP, port: 8081}]
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: funkey-inbox-ingress
+spec:
+  podSelector: {matchLabels: {app: funkey-inbox}}
+  policyTypes: [Ingress]
+  ingress:
+    - from:
+        - namespaceSelector: {}
+      ports: [{protocol: TCP, port: 8083}]
