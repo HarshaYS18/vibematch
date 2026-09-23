@@ -1,11 +1,11 @@
 from datetime import datetime, timedelta
 
-from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException
+from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, Query
 from sqlalchemy.orm import Session
 
 from app.api.routes.users import get_current_user
 from app.database import get_db
-from app.models.inbox import InboxConversation, InboxReport
+from app.models.inbox import InboxConversation, InboxMessage, InboxReport
 from app.models.role import RoleName
 from app.models.user import User
 from app.schemas.inbox import (
@@ -29,7 +29,9 @@ from app.schemas.inbox import (
     InboxLockVerifyRequest,
     InboxLockVerifySetupRequest,
     InboxMessageActionRequest,
+    InboxMessagePageResponse,
     InboxMessageResponse,
+    InboxReadReceiptResponse,
     InboxMonitorActionRequest,
     InboxReportCreateRequest,
     InboxReportDecisionRequest,
@@ -65,8 +67,19 @@ def _require_owner_or_founder(user: User) -> None:
         raise HTTPException(status_code=403, detail="Only Owner or Super Owner can reset inbox lock in special cases.")
 
 
-def _conversation_payload(conversation: InboxConversation, user: User) -> dict:
-    return inbox_service.conversation_to_dict(conversation, user)
+def _conversation_payload(
+    conversation: InboxConversation,
+    user: User,
+    db: Session | None = None,
+    *,
+    participant=None,
+) -> dict:
+    return inbox_service.conversation_to_dict(
+        conversation,
+        user,
+        db=db,
+        participant=participant,
+    )
 
 
 def _find_user_by_visible_id(db: Session, value: str) -> User | None:
@@ -265,20 +278,173 @@ def owner_reset_lock_by_visible_id(request: InboxLockOwnerResetByIdentifierReque
     return InboxLockStatusResponse(**inbox_lock_service.get_status(db, target_user))
 
 
+@router.post("/bootstrap")
+def bootstrap_inbox(
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """Explicit idempotent bootstrap; ordinary GETs remain read-only."""
+
+    conversation = inbox_service.ensure_team_conversation(db, current_user)
+    return {"status": "ready", "team_conversation_id": conversation.public_id}
+
+
 @router.get("/conversations", response_model=InboxConversationListResponse)
-def list_conversations(db: Session = Depends(get_db), current_user: User = Depends(get_current_user)):
-    conversations = inbox_service.list_conversations(db, current_user)
-    return InboxConversationListResponse(conversations=[InboxConversationResponse(**_conversation_payload(conversation, current_user)) for conversation in conversations])
+def list_conversations(
+    limit: int = Query(default=40, ge=1, le=100),
+    cursor: str | None = Query(default=None),
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    try:
+        rows, next_cursor = inbox_service.list_conversations_page(
+            db,
+            current_user,
+            limit=limit,
+            cursor=cursor,
+        )
+    except ValueError as error:
+        raise HTTPException(status_code=400, detail=str(error)) from error
+    return InboxConversationListResponse(
+        conversations=[
+            InboxConversationResponse(
+                **_conversation_payload(
+                    conversation,
+                    current_user,
+                    db,
+                    participant=participant,
+                )
+            )
+            for conversation, participant in rows
+        ],
+        next_cursor=next_cursor,
+    )
 
 
 @router.get("/conversations/{conversation_id}", response_model=InboxConversationResponse)
-def get_conversation(conversation_id: str, db: Session = Depends(get_db), current_user: User = Depends(get_current_user)):
-    conversation = inbox_service.get_conversation_for_user(db, current_user, conversation_id)
+def get_conversation(
+    conversation_id: str,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    conversation = inbox_service.get_conversation_for_user(
+        db,
+        current_user,
+        conversation_id,
+    )
     if not conversation:
         raise HTTPException(status_code=404, detail="Conversation not found")
-    conversation = inbox_service.mark_secret_drift_open(db, conversation, current_user)
-    read_updates = inbox_service.mark_messages_read_for_user(db, conversation, current_user)
-    return InboxConversationResponse(**_conversation_payload(conversation, current_user))
+    # Read-only by contract. Read receipts and Secret Drift open state have
+    # explicit mutation endpoints below.
+    return InboxConversationResponse(
+        **_conversation_payload(conversation, current_user, db)
+    )
+
+
+@router.get(
+    "/conversations/{conversation_id}/messages",
+    response_model=InboxMessagePageResponse,
+)
+def list_conversation_messages(
+    conversation_id: str,
+    limit: int = Query(default=50, ge=1, le=100),
+    before: str | None = Query(default=None),
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    conversation = inbox_service.get_conversation_for_user(
+        db,
+        current_user,
+        conversation_id,
+    )
+    if not conversation:
+        raise HTTPException(status_code=404, detail="Conversation not found")
+    try:
+        messages, next_cursor, has_more = inbox_service.list_messages_page(
+            db,
+            conversation,
+            current_user,
+            limit=limit,
+            before=before,
+        )
+    except ValueError as error:
+        raise HTTPException(status_code=400, detail=str(error)) from error
+    statuses = inbox_service.message_statuses_for_user(db, messages, current_user)
+    return InboxMessagePageResponse(
+        messages=[
+            InboxMessageResponse(
+                **inbox_service.message_to_dict(
+                    message,
+                    current_user,
+                    status_override=statuses.get(message.id),
+                )
+            )
+            for message in messages
+        ],
+        next_cursor=next_cursor,
+        has_more=has_more,
+    )
+
+
+@router.post(
+    "/conversations/{conversation_id}/read",
+    response_model=InboxReadReceiptResponse,
+)
+def mark_conversation_read(
+    conversation_id: str,
+    background_tasks: BackgroundTasks,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    conversation = inbox_service.get_conversation_for_user(
+        db,
+        current_user,
+        conversation_id,
+    )
+    if not conversation:
+        raise HTTPException(status_code=404, detail="Conversation not found")
+    inbox_service.mark_messages_read_for_user(db, conversation, current_user)
+    participant = next(
+        (item for item in conversation.participants if item.user_id == current_user.id),
+        None,
+    )
+    latest = (
+        db.query(InboxMessage)
+        .filter(InboxMessage.conversation_id == conversation.id)
+        .order_by(InboxMessage.id.desc())
+        .first()
+    )
+    background_tasks.add_task(
+        inbox_ws_manager.broadcast_to_users,
+        inbox_service.participant_user_ids(conversation),
+        {
+            "event": "inbox_messages_read",
+            "conversation_id": conversation.public_id,
+            "reader_user_id": current_user.id,
+        },
+    )
+    return InboxReadReceiptResponse(
+        conversation_id=conversation.public_id,
+        last_read_message_id=latest.public_id if latest else None,
+        unread_count=participant.unread_count if participant else 0,
+    )
+
+
+@router.post("/conversations/{conversation_id}/secret-drift/open")
+def open_secret_drift_session(
+    conversation_id: str,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    conversation = inbox_service.get_conversation_for_user(
+        db,
+        current_user,
+        conversation_id,
+    )
+    if not conversation:
+        raise HTTPException(status_code=404, detail="Conversation not found")
+    inbox_service.mark_secret_drift_open(db, conversation, current_user)
+    return {"status": "opened"}
 
 
 @router.post("/conversations/direct", response_model=InboxConversationResponse)
@@ -287,7 +453,7 @@ def create_direct_conversation(request: InboxDirectConversationRequest, db: Sess
     if not target:
         raise HTTPException(status_code=404, detail="Target user not found")
     conversation = inbox_service.create_direct_conversation(db, current_user, target)
-    return InboxConversationResponse(**_conversation_payload(conversation, current_user))
+    return InboxConversationResponse(**_conversation_payload(conversation, current_user, db))
 
 
 @router.post("/conversations/{conversation_id}/messages", response_model=InboxMessageResponse)
@@ -418,7 +584,7 @@ def update_secret_drift(
                 "conversation_id": conversation.public_id,
             },
         )
-    return InboxConversationResponse(**_conversation_payload(conversation, current_user))
+    return InboxConversationResponse(**_conversation_payload(conversation, current_user, db))
 
 @router.post("/conversations/{conversation_id}/secret-drift/close")
 def close_secret_drift_session(
@@ -457,8 +623,17 @@ def update_conversation_state(conversation_id: str, request: InboxConversationSt
     conversation = inbox_service.get_conversation_for_user(db, current_user, conversation_id)
     if not conversation:
         raise HTTPException(status_code=404, detail="Conversation not found")
-    conversation = inbox_service.update_conversation_state(db, conversation, is_muted=request.is_muted, is_pinned=request.is_pinned, is_locked=request.is_locked, is_blocked=request.is_blocked)
-    return InboxConversationResponse(**_conversation_payload(conversation, current_user))
+    conversation = inbox_service.update_conversation_state(
+        db,
+        conversation,
+        current_user,
+        is_muted=request.is_muted,
+        is_pinned=request.is_pinned,
+        is_archived=request.is_archived,
+        is_locked=request.is_locked,
+        is_blocked=request.is_blocked,
+    )
+    return InboxConversationResponse(**_conversation_payload(conversation, current_user, db))
 
 
 @router.post("/conversations/{conversation_id}/reports", response_model=InboxReportTaskResponse)
