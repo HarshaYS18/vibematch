@@ -22,7 +22,7 @@ PostgreSQL remains the durable source of truth for application state.
 
 ## Important files
 
-`backend/app/database.py`, `backend/alembic/env.py`, `backend/alembic/versions`.
+`backend/app/database.py`, `backend/alembic/env.py`, `backend/alembic/versions`, `deploy/postgres`, `infra/postgres`, and `docs/architecture/postgresql-platform.md`.
 
 ## Public API/contracts
 
@@ -50,7 +50,7 @@ Dependencies include the configured runtime, PostgreSQL, Redis/Valkey, and relev
 
 ## Security considerations
 
-Pool maximums, credentials, SQL timeouts, least privilege, and backups are critical. Do not log tokens, credentials, private content, or payment secrets.
+Pool maximums, PgBouncer client/server budgets, direct migration credentials, SQL timeouts, least privilege, and backups are critical. Transaction-pooled code must not depend on arbitrary session state. Do not log tokens, credentials, raw SQL parameters, private content, or payment secrets.
 
 ## Failure modes
 
@@ -70,7 +70,7 @@ Measure its primary work unit, CPU, memory, saturation, errors, p95 latency, que
 
 ## Observability
 
-Propagate request and trace IDs through internal calls. Emit structured logs and low-cardinality metrics for readiness, throughput, failures, and drain progress. Pair alerts with the matching runbook.
+Propagate request and trace IDs through internal calls. Track SQLAlchemy pool saturation, privacy-safe slow-query fingerprints, PostgreSQL connection usage, deadlocks, lock counts, long-running transactions, and pg_stat_statements query IDs. Pair alerts with the matching runbook.
 
 ## Local development
 
@@ -90,4 +90,4 @@ Review security boundaries, schema changes, resource limits, autoscaling signals
 
 ## Known migration status
 
-PostgreSQL active; connection budget and managed pool rollout must be verified.
+PostgreSQL is active. Chunk 18 adds bounded transaction PgBouncer manifests, direct migration DSN separation, client/server connection-budget validation, pg_stat_statements bootstrap/observer contracts, and future per-service credential/schema policy. Provider-specific production endpoints, secrets, limits, backups, and extension enablement remain environment prerequisites.
