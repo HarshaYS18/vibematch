@@ -52,6 +52,12 @@ ROOM_STATE_ENGINE_MIGRATION = (
     ROOT / "backend" / "alembic" / "versions" /
     "20260923_0200_room_state_engine_v2.py"
 )
+INBOX_SERVICE_MIGRATION = (
+    ROOT / "backend" / "alembic" / "versions" /
+    "20260923_0300_inbox_service_extraction.py"
+)
+INBOX_OWNERSHIP_SQL = ROOT / "deploy" / "postgres" / "inbox-ownership.sql"
+INBOX_SERVICE_ROOT = ROOT / "apps" / "inbox-service"
 ALLOWED_STATE_CLASSES = {"AUTHORITY", "PROJECTION", "CACHE", "EPHEMERAL"}
 REQUIRED_AUTHORITY_STATE_IDS = {
     "identity.accounts", "identity.sessions", "profiles.public", "rooms.definition",
@@ -291,6 +297,158 @@ def _validate_room_state_engine(errors: list[str]) -> None:
                     f"{source.relative_to(ROOT)}"
                 )
 
+def _validate_inbox_service_extraction(errors: list[str]) -> None:
+    required = (
+        INBOX_SERVICE_ROOT / "main.py",
+        INBOX_SERVICE_ROOT / "database.py",
+        INBOX_SERVICE_ROOT / "internal.py",
+        INBOX_SERVICE_ROOT / "realtime.py",
+        INBOX_SERVICE_ROOT / "Dockerfile",
+        INBOX_SERVICE_MIGRATION,
+        INBOX_OWNERSHIP_SQL,
+    )
+    for path in required:
+        if not path.exists():
+            errors.append(
+                "Chunk 23 Inbox extraction path is missing: "
+                + str(path.relative_to(ROOT))
+            )
+
+    router_path = ROOT / "backend" / "app" / "api" / "router.py"
+    if router_path.exists():
+        text = router_path.read_text(encoding="utf-8")
+        if "inbox_proxy.router" not in text:
+            errors.append("core API must use the Inbox service compatibility proxy")
+        for forbidden in (
+            "api_router.include_router(inbox.router)",
+            "api_router.include_router(inbox_preferences.router",
+            "api_router.include_router(inbox_calls.router",
+            "api_router.include_router(inbox_message_tools.router",
+        ):
+            if forbidden in text:
+                errors.append(
+                    "core API must not mount Inbox chat write authority: " + forbidden
+                )
+
+    route_path = ROOT / "backend" / "app" / "api" / "routes" / "inbox.py"
+    if route_path.exists():
+        text = route_path.read_text(encoding="utf-8")
+        for function_name in ("list_conversations", "get_conversation"):
+            source = _function_source(text, function_name)
+            for forbidden in (
+                "ensure_team_conversation(",
+                "_merge_duplicate_direct_conversations_for_user(",
+                "mark_messages_read_for_user(",
+                "mark_secret_drift_open(",
+                ".commit(",
+            ):
+                if forbidden in source:
+                    errors.append(
+                        f"Inbox {function_name} GET must be read-only; found {forbidden}"
+                    )
+        for required_token in (
+            "list_conversations_page(",
+            "list_messages_page(",
+            '"/conversations/{conversation_id}/read"',
+        ):
+            if required_token not in text:
+                errors.append(
+                    "Inbox public API missing bounded/explicit read contract: "
+                    + required_token
+                )
+
+    service_path = ROOT / "backend" / "app" / "services" / "inbox_service.py"
+    if service_path.exists():
+        text = service_path.read_text(encoding="utf-8")
+        list_source = _function_source(text, "list_conversations")
+        if (
+            "ensure_team_conversation(" in list_source
+            or "_merge_duplicate_direct_conversations_for_user(" in list_source
+        ):
+            errors.append("Inbox list_conversations must never repair/bootstrap during reads")
+        for required_token in (
+            "ACTIVE_MESSAGE_WINDOW",
+            "def list_conversations_page(",
+            "def list_messages_page(",
+            "InboxReadReceipt",
+        ):
+            if required_token not in text:
+                errors.append(
+                    "Inbox service missing Chunk 23 bounded state contract: "
+                    + required_token
+                )
+
+    # Direct Inbox ORM/service writes are legal only inside the extracted
+    # module implementation. Other domains must cross the authenticated
+    # service client boundary.
+    backend_app = ROOT / "backend" / "app"
+    allowed_direct = {
+        Path("models/inbox.py"),
+        Path("models/inbox_backup.py"),
+        Path("models/inbox_preferences.py"),
+        Path("models/call_session.py"),
+        Path("services/inbox_service.py"),
+        Path("services/inbox_preference_service.py"),
+        Path("services/inbox_backup_service.py"),
+        Path("services/inbox_lock_service.py"),
+        Path("services/inbox_call_service.py"),
+        Path("services/inbox_call_contract_service.py"),
+        Path("services/inbox_realtime_command_service.py"),
+        Path("services/inbox_ai_service.py"),
+        Path("services/message_search_service.py"),
+        Path("services/call_session_service.py"),
+        Path("api/routes/inbox.py"),
+        Path("api/routes/inbox_preferences.py"),
+        Path("api/routes/inbox_backup_google.py"),
+        Path("api/routes/inbox_message_tools.py"),
+        Path("api/routes/inbox_calls.py"),
+        Path("api/routes/inbox_ai.py"),
+        Path("api/routes/calls.py"),
+        Path("websocket/inbox_ws.py"),
+    }
+    direct_tokens = (
+        "from app.models.inbox import",
+        "from app.models.inbox_preferences import",
+        "from app.services.inbox_service import",
+        "from app.services import inbox_service",
+    )
+    if backend_app.exists():
+        for source in backend_app.rglob("*.py"):
+            relative = source.relative_to(backend_app)
+            if relative in allowed_direct:
+                continue
+            text = source.read_text(encoding="utf-8-sig")
+            if any(token in text for token in direct_tokens):
+                errors.append(
+                    "cross-domain direct Inbox access is forbidden; use "
+                    "inbox_service_client: "
+                    + str(source.relative_to(ROOT))
+                )
+            if 'ForeignKey("inbox_' in text or "ForeignKey('inbox_" in text:
+                errors.append(
+                    "cross-domain Inbox foreign key is forbidden after extraction: "
+                    + str(source.relative_to(ROOT))
+                )
+
+    authority = json.loads(AUTHORITY_REGISTRY.read_text(encoding="utf-8"))
+    inbox = next(
+        (state for state in authority.get("states", [])
+         if state.get("id") == "inbox.conversations"),
+        None,
+    )
+    if not inbox or inbox.get("current_deployable") != "inbox-service":
+        errors.append("authority registry must declare inbox-service as current Inbox deployable")
+
+    gateway_server = (
+        ROOT / "apps" / "realtime-gateway" / "internal" / "gateway" / "server.go"
+    )
+    if gateway_server.exists():
+        text = gateway_server.read_text(encoding="utf-8")
+        for token in ("ConsumeNATSEvents", "NATSInboxSubject"):
+            if token not in text:
+                errors.append("Go realtime missing Inbox NATS fanout: " + token)
+
+
 def _has_tracked_content(path: Path) -> bool:
     return path.exists() and any(item.is_file() for item in path.rglob("*"))
 
@@ -300,6 +458,7 @@ def main() -> int:
     _validate_authority_registry(errors)
     _validate_redis_topology(errors)
     _validate_room_state_engine(errors)
+    _validate_inbox_service_extraction(errors)
 
     for path in REQUIRED_PATHS:
         if not path.exists():
@@ -396,6 +555,7 @@ def main() -> int:
     print(" - Redis roles conform to contracts/redis/topology.json")
     print(" - Room State Engine v2 heartbeat/snapshot/current-state invariants hold")
     print(" - legacy FastAPI application websocket routes are not mounted")
+    print(" - Inbox chat authority is isolated, bounded, and routed through NATS/Go")
     return 0
 
 
