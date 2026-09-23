@@ -16,6 +16,7 @@ from app.api.routes import (
 from app.core.config import settings
 from app.database import get_db
 from database import engine, get_inbox_db
+from internal import router as internal_router
 from realtime import router as realtime_router
 
 
@@ -39,6 +40,7 @@ for router in (inbox_backup_google.router, inbox_ai.router, calls.router):
     api.include_router(router)
 api.include_router(realtime_router)
 app.include_router(api)
+app.include_router(internal_router)
 
 
 @app.get("/live", include_in_schema=False)
