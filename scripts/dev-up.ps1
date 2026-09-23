@@ -2,10 +2,14 @@
 param(
     [int]$PostgresPort = 5433,
     [int]$RedisPort = 6380,
+    [int]$RealtimeRedisPort = 6381,
+    [int]$MediaRedisPort = 6382,
     [int]$ApiPort = 8000,
     [int]$MediaPort = 4100,
     [string]$PostgresContainer = 'funkey-postgres-test',
-    [string]$RedisContainer = 'funkey-redis-6380',
+    [string]$RedisContainer = 'funkey-cache-redis-6380',
+    [string]$RealtimeRedisContainer = 'funkey-realtime-redis-6381',
+    [string]$MediaRedisContainer = 'funkey-media-redis-6382',
     [switch]$SkipMigrations,
     [switch]$StartFlutter
 )
@@ -177,9 +181,25 @@ Start-ManagedContainer $PostgresContainer @(
     '-e', 'POSTGRES_USER=postgres', '-e', 'POSTGRES_PASSWORD=postgres', '-e', 'POSTGRES_DB=vibematch',
     '-p', "127.0.0.1:${PostgresPort}:5432", '-v', "$PostgresContainer-data:/var/lib/postgresql/data", 'postgres:16'
 )
-Start-ManagedContainer $RedisContainer @('-p', "127.0.0.1:${RedisPort}:6379", 'redis:7')
+Start-ManagedContainer $RedisContainer @(
+    '-p', "127.0.0.1:${RedisPort}:6379",
+    'redis:7', 'redis-server', '--appendonly', 'no',
+    '--maxmemory', '256mb', '--maxmemory-policy', 'allkeys-lfu'
+)
+Start-ManagedContainer $RealtimeRedisContainer @(
+    '-p', "127.0.0.1:${RealtimeRedisPort}:6379",
+    'redis:7', 'redis-server', '--appendonly', 'no',
+    '--maxmemory', '256mb', '--maxmemory-policy', 'volatile-ttl'
+)
+Start-ManagedContainer $MediaRedisContainer @(
+    '-p', "127.0.0.1:${MediaRedisPort}:6379",
+    'redis:7', 'redis-server', '--appendonly', 'yes',
+    '--maxmemory', '256mb', '--maxmemory-policy', 'noeviction'
+)
 Wait-ForContainerCommand $PostgresContainer @('pg_isready', '-U', 'postgres', '-d', 'vibematch') 'PostgreSQL'
-Wait-ForContainerCommand $RedisContainer @('redis-cli', 'ping') 'Redis'
+Wait-ForContainerCommand $RedisContainer @('redis-cli', 'ping') 'Cache Redis'
+Wait-ForContainerCommand $RealtimeRedisContainer @('redis-cli', 'ping') 'Realtime Redis'
+Wait-ForContainerCommand $MediaRedisContainer @('redis-cli', 'ping') 'Media Redis'
 
 if (-not $SkipMigrations) {
     Push-Location $backendDir
@@ -191,6 +211,9 @@ if (-not (Test-OwnedProcessRunning 'backend_media')) { Assert-PortAvailable $Med
 Start-OwnedProcess 'fastapi' $venvPython @('-m', 'uvicorn', 'app.main:app', '--host', '127.0.0.1', '--port', $ApiPort) $backendDir @{
     database_url = "postgresql://postgres:postgres@127.0.0.1:$PostgresPort/vibematch"
     redis_url = "redis://127.0.0.1:$RedisPort/0"
+    CACHE_REDIS_URL = "redis://127.0.0.1:$RedisPort/0"
+    REALTIME_REDIS_URL = "redis://127.0.0.1:$RealtimeRedisPort/0"
+    MEDIA_REGISTRY_REDIS_URL = "redis://127.0.0.1:$MediaRedisPort/0"
 }
 Wait-ForHttpHealthy "http://127.0.0.1:$ApiPort/health" 'FastAPI'
 Push-Location $mediaDir
@@ -216,4 +239,4 @@ do {
     } catch { }
     Start-Sleep -Seconds 1
 } while ((Get-Date) -lt $readyDeadline)
-& (Join-Path $PSScriptRoot 'dev-status.ps1') -PostgresPort $PostgresPort -RedisPort $RedisPort -ApiPort $ApiPort -MediaPort $MediaPort -PostgresContainer $PostgresContainer -RedisContainer $RedisContainer
+& (Join-Path $PSScriptRoot 'dev-status.ps1') -PostgresPort $PostgresPort -RedisPort $RedisPort -RealtimeRedisPort $RealtimeRedisPort -MediaRedisPort $MediaRedisPort -ApiPort $ApiPort -MediaPort $MediaPort -PostgresContainer $PostgresContainer -RedisContainer $RedisContainer -RealtimeRedisContainer $RealtimeRedisContainer -MediaRedisContainer $MediaRedisContainer
