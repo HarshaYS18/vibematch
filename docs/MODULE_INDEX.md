@@ -48,6 +48,8 @@ Each guide records ownership, contracts, state, security, scaling, operations, a
 - [Architecture authority registry](architecture/authority-registry.md)
 - [State classification](architecture/state-classification.md)
 - [Service boundaries](architecture/service-boundaries.md)
+- [Service contracts](architecture/service-contracts.md)
+- [Protobuf contract source tree](../contracts/proto/README.md)
 - [Authority conformance runbook](runbooks/authority-registry.md)
 - [Capacity model](architecture/capacity-model.md)
 - [Node autoscaling strategy](architecture/node-autoscaling.md)
