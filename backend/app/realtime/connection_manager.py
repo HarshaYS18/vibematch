@@ -136,6 +136,10 @@ class RealtimeConnectionManager:
         self._listener_task: asyncio.Task[None] | None = None
         self._local_command_claims: dict[str, float] = {}
         self._seen_remote_events: dict[str, float] = {}
+        self._room_replay_attempts = 0
+        self._room_replay_successes = 0
+        self._room_replay_fallbacks = 0
+        self._room_sequence_failures = 0
 
     async def _ensure_listener(self) -> None:
         if self._listener_task is not None and not self._listener_task.done():
@@ -405,6 +409,7 @@ class RealtimeConnectionManager:
                 _ROOM_REPLAY_TTL_SECONDS,
             )
         except Exception:
+            self._room_sequence_failures += 1
             # The durable room action already committed. Local compatibility
             # delivery may continue, but sequenced clients must resync because
             # cross-instance replay is unavailable without Redis.
@@ -428,11 +433,14 @@ class RealtimeConnectionManager:
         after_sequence: int,
     ) -> bool:
         """Replay one bounded contiguous room stream, otherwise require snapshot."""
+        self._room_replay_attempts += 1
         prefix = f"room:{room_public_id}:"
         if after_sequence < 0 or not stream.startswith(prefix):
+            self._room_replay_fallbacks += 1
             return False
         epoch = stream[len(prefix):]
         if not epoch or epoch.startswith("degraded:"):
+            self._room_replay_fallbacks += 1
             return False
         try:
             current_epoch, current_sequence = await self._redis.mget(
@@ -440,6 +448,7 @@ class RealtimeConnectionManager:
                 self._room_stream_sequence_key(room_public_id),
             )
             if str(current_epoch or "") != epoch:
+                self._room_replay_fallbacks += 1
                 return False
             current = int(current_sequence or 0)
             if after_sequence >= current:
@@ -450,20 +459,24 @@ class RealtimeConnectionManager:
                 "+inf",
             )
             if not raw_events:
+                self._room_replay_fallbacks += 1
                 return False
             expected = after_sequence + 1
             events: list[dict[str, Any]] = []
             for raw in raw_events:
                 decoded = json.loads(raw)
                 if not isinstance(decoded, dict) or int(decoded.get("sequence") or 0) != expected:
-                    return False
+                    self._room_replay_fallbacks += 1
+                return False
                 events.append(decoded)
                 expected += 1
             if expected - 1 != current:
+                self._room_replay_fallbacks += 1
                 return False
             for event in events:
                 if not await self.send_json(websocket, event):
-                    return False
+                    self._room_replay_fallbacks += 1
+                return False
             return True
         except Exception:
             return False
@@ -617,6 +630,25 @@ class RealtimeConnectionManager:
             return int(count or 0) > 0
         except Exception:
             return True
+
+    def render_room_state_metrics(self) -> str:
+        return "\n".join(
+            [
+                "# HELP funkey_room_replay_attempts_total Room replay attempts.",
+                "# TYPE funkey_room_replay_attempts_total counter",
+                f"funkey_room_replay_attempts_total {self._room_replay_attempts}",
+                "# HELP funkey_room_replay_success_total Successful contiguous room replays.",
+                "# TYPE funkey_room_replay_success_total counter",
+                f"funkey_room_replay_success_total {self._room_replay_successes}",
+                "# HELP funkey_room_replay_fallback_total Room replay attempts requiring snapshot fallback.",
+                "# TYPE funkey_room_replay_fallback_total counter",
+                f"funkey_room_replay_fallback_total {self._room_replay_fallbacks}",
+                "# HELP funkey_room_sequence_failures_total Redis room stream sequencing failures.",
+                "# TYPE funkey_room_sequence_failures_total counter",
+                f"funkey_room_sequence_failures_total {self._room_sequence_failures}",
+                "",
+            ]
+        )
 
     async def claim_command(
         self,
