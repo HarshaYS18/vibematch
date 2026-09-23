@@ -595,6 +595,12 @@ class _InboxPageState extends State<InboxPage> {
   }
 
   bool _onScrollNotification(ScrollNotification notification) {
+    if (notification.metrics.pixels > 0 &&
+        notification.metrics.extentAfter < 600 &&
+        _controller.hasMoreConversations &&
+        !_controller.isLoadingMoreConversations) {
+      _controller.loadMoreConversations();
+    }
     if (notification.metrics.pixels > 0) return false;
     if (notification is OverscrollNotification && notification.overscroll < 0) {
       setState(() {
