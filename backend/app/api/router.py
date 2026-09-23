@@ -11,8 +11,7 @@ from app.api.routes import (
     coin_sales, control_center, economy, economy_admin, economy_master,
     experience, families, families_economy, game_pool_admin, game_props_admin,
     game_settlements, games, games_master, gift_catalog, health, home_banners,
-    inbox, inbox_ai, inbox_backup_google, inbox_calls, inbox_message_tools,
-    inbox_preferences, inbox_stories, love_bonds, lucky_coins,
+    inbox_proxy, love_bonds, lucky_coins,
     lucky_gifts, lucky_gift_admin, lucky_packets, media, media_control, media_realtime_auth, media_safety_admin,
     moderation, notifications, presence, profile_display, push, rankings,
     relationship_exp, role_badges, room_levels, room_music_media,
@@ -46,14 +45,10 @@ for router in (
 ):
     api_router.include_router(router)
 
-# Inbox parent and children.
-api_router.include_router(inbox.router)
-api_router.include_router(inbox_preferences.router, prefix="/inbox", tags=["Inbox"])
-api_router.include_router(inbox_stories.router, prefix="/inbox", tags=["Inbox"])
-api_router.include_router(inbox_message_tools.router, prefix="/inbox", tags=["Inbox"])
-api_router.include_router(inbox_calls.router, prefix="/inbox", tags=["Inbox Calls"])
-for router in (inbox_backup_google.router, inbox_ai.router, calls.router):
-    api_router.include_router(router)
+# Inbox is a separately deployed durable authority. The core API retains only
+# a compatibility proxy for local development/rollback; production ingress
+# routes these prefixes directly to funkey-inbox.
+api_router.include_router(inbox_proxy.router)
 
 # Media storage/upload.
 api_router.include_router(media.router)
