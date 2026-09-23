@@ -129,6 +129,25 @@ spec:
           labels: {severity: page}
           annotations:
             summary: Realtime gateway is rejecting connections at configured capacity
+        - alert: FunKeyRoomReplayFallbackHigh
+          expr: |
+            sum(increase(funkey_room_replay_attempts_total[10m])) > 20
+            and
+            (
+              sum(increase(funkey_room_replay_fallback_total[10m]))
+              /
+              clamp_min(sum(increase(funkey_room_replay_attempts_total[10m])), 1)
+            ) > 0.25
+          for: 10m
+          labels: {severity: ticket}
+          annotations:
+            summary: Room reconnects are falling back to full snapshots too often
+        - alert: FunKeyRoomStreamSequencingFailures
+          expr: increase(funkey_room_sequence_failures_total[10m]) > 0
+          for: 5m
+          labels: {severity: ticket}
+          annotations:
+            summary: Room-state Redis sequencing or replay append is failing
     - name: funkey-worker-media
       rules:
         - alert: FunKeyWorkerDeadLetters
