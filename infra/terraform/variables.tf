@@ -69,6 +69,8 @@ variable "connection_budget" {
     database_max_connections = number
     api_max_pods             = number
     api_pool_per_pod         = number
+    inbox_max_pods           = number
+    inbox_pool_per_pod       = number
     worker_max_pods          = number
     worker_pool_per_pod      = number
     reserved_connections     = number
@@ -78,6 +80,8 @@ variable "connection_budget" {
       var.connection_budget.database_max_connections,
       var.connection_budget.api_max_pods,
       var.connection_budget.api_pool_per_pod,
+      var.connection_budget.inbox_max_pods,
+      var.connection_budget.inbox_pool_per_pod,
       var.connection_budget.worker_max_pods,
       var.connection_budget.worker_pool_per_pod,
       var.connection_budget.reserved_connections
