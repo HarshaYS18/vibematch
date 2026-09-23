@@ -35,6 +35,7 @@ from app.schemas.rooms.room import (
     RoomDetailResponse,
     RoomJoinRequest,
     RoomJoinResponse,
+    RoomHeartbeatResponse,
     RoomLeaveResponse,
     RoomMemberActionRequest,
     RoomModeUpdateRequest,
@@ -58,7 +59,6 @@ from app.services.rooms.room_service import (
     create_room,
     get_my_created_room,
     get_room_by_public_id,
-    heartbeat_room,
     join_room,
     leave_room,
     list_following_rooms,
@@ -850,23 +850,39 @@ def _prepare_join(
     return joined, was_active
 
 
-@router.post("/{room_public_id}/heartbeat", response_model=RoomJoinResponse)
+@router.post("/{room_public_id}/heartbeat", response_model=RoomHeartbeatResponse)
 def heartbeat_live_room(
     room_public_id: str,
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
-    joined = heartbeat_room(
-        db=db,
-        room_public_id=room_public_id,
-        current_user=current_user,
-    )
-    if joined is None:
+    """Deprecated compatibility heartbeat; live presence is the socket lease."""
+    room = get_room_by_public_id(db, room_public_id)
+    if room is None:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
             detail="Room not found or not accessible",
         )
-    return joined
+    room_permission_service.require_room_view(db, room, current_user)
+    participant = (
+        db.query(RoomParticipant.id)
+        .filter(
+            RoomParticipant.room_id == room.id,
+            RoomParticipant.user_id == current_user.id,
+            RoomParticipant.is_active.is_(True),
+        )
+        .first()
+    )
+    if participant is None:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="Room session is not active",
+        )
+    return RoomHeartbeatResponse(
+        room_id=room.room_public_id,
+        state_version=int(room.realtime_version or 0),
+        event_sequence=int(room.realtime_event_sequence or 0),
+    )
 
 
 @router.post("/{room_public_id}/leave", response_model=RoomLeaveResponse)
