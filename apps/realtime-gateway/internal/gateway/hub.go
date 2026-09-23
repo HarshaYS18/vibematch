@@ -133,10 +133,12 @@ func (q *outboundQueue) len() int {
 }
 
 type Client struct {
-	ID      string
-	UserID  int64
-	IsStaff bool
-	Token   string
+	ID        string
+	UserID    int64
+	IsStaff   bool
+	Token     string
+	SessionID string
+	DeviceID  string
 	Conn    *websocket.Conn
 	queue   *outboundQueue
 	done    chan struct{}
