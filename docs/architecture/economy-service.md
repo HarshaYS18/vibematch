@@ -29,6 +29,8 @@ Primary financial state:
 - `ruby_withdraw_requests`
 - `economy_transactions`
 - `economy_bulk_grants` / recipients
+- `economy_house_reservations`
+- `lucky_packets` / `lucky_packet_claims`
 
 Accounting evidence:
 
@@ -46,14 +48,18 @@ atomically.
 
 ## Accounting model
 
-The existing wallet/pool ledgers remain the operational materialization model.
-The balanced journal provides explicit debit/credit evidence per transaction and
-currency. It is append-only and does not become a competing wallet balance.
+The existing wallet/supply/game-pool ledgers remain the operational materialization model.
+The balanced journal provides explicit debit/credit evidence for wallet and pool value movement per
+transaction and currency. Durable `economy_house_reservations` are the liability authority;
+`game_pools.reserved_balance` is an atomically maintained materialization checked by reconciliation.
+The journal is append-only and does not become a competing wallet or pool balance.
 
 ## Reconciliation
 
-A bounded reconciliation pass runs periodically from the Economy bulk-worker
-runtime. It never writes repairs. Any mismatch becomes an operational incident.
+A bounded reconciliation pass runs periodically from the Economy worker and verifies wallets,
+supply pools, game pools, active reservations and balanced journal totals. It never writes repairs.
+The same Economy-owned worker finalizes expired Lucky Packet escrow through deterministic Economy
+transactions. Any mismatch becomes an operational incident.
 
 ## Cross-domain projections
 
