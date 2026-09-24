@@ -10,7 +10,15 @@ from sqlalchemy.orm import Session
 
 from app.core.config import settings
 from app.database import get_db
-from app.models.economy import EconomyCurrency, GiftTransaction, RubyWithdrawRequest, WalletLedger
+from app.models.economy import (
+    EconomyCurrency,
+    EconomyPoolStatus,
+    GamePool,
+    GamePoolType,
+    GiftTransaction,
+    RubyWithdrawRequest,
+    WalletLedger,
+)
 from app.models.economy_stats import LuckyGiftTransaction
 from app.models.user import User
 from app.services import (
@@ -95,6 +103,17 @@ class GamePoolConfigureCommandRequest(MutationContext):
     daily_loss_limit: int = Field(default=0, ge=0)
     max_single_payout: int = Field(default=0, ge=0)
     rtp_target_basis_points: int = Field(default=8000, ge=0, le=10000)
+
+
+class LuckyGiftControlHousePoolCommandRequest(MutationContext):
+    actor_user_id: int
+    balance: int | None = Field(default=None, ge=0)
+    reserved_balance: int | None = Field(default=None, ge=0)
+    max_payout_per_round: int | None = Field(default=None, ge=0)
+    daily_house_loss_limit: int | None = Field(default=None, ge=0)
+    rtp_target_basis_points: int | None = Field(default=None, ge=0, le=10000)
+    status: str | None = Field(default=None, max_length=20)
+    reason: str = Field(min_length=3, max_length=255)
 
 
 class LuckyGiftPropsAdminCommandRequest(MutationContext):
@@ -238,6 +257,65 @@ def _lucky_gift_transaction_payload(row: LuckyGiftTransaction) -> dict[str, Any]
         "created_at": row.created_at,
     }
 
+
+
+LUCKY_GIFT_CONTROL_POOL_KEY = "lucky_gifts"
+LUCKY_GIFT_CONTROL_POOL_TYPE = GamePoolType.GAME_HOUSE_POOL.value
+
+
+def _get_or_create_lucky_gift_control_pool(db: Session) -> GamePool:
+    pool = (
+        db.query(GamePool)
+        .filter(
+            GamePool.game_key == LUCKY_GIFT_CONTROL_POOL_KEY,
+            GamePool.pool_type == LUCKY_GIFT_CONTROL_POOL_TYPE,
+        )
+        .first()
+    )
+    if pool is not None:
+        return pool
+    pool = GamePool(
+        game_key=LUCKY_GIFT_CONTROL_POOL_KEY,
+        pool_type=LUCKY_GIFT_CONTROL_POOL_TYPE,
+        balance=0,
+        reserved_balance=0,
+        status=EconomyPoolStatus.ACTIVE.value,
+        daily_payout_cap=0,
+        daily_loss_limit=0,
+        max_single_payout=0,
+        rtp_target_basis_points=8000,
+    )
+    db.add(pool)
+    db.flush()
+    return pool
+
+
+def _lucky_gift_control_pool_payload(db: Session, pool: GamePool) -> dict[str, Any]:
+    snapshot = house_pool_service.calculate_payout_pressure(
+        db,
+        LUCKY_GIFT_CONTROL_POOL_TYPE,
+    )
+    balance = int(pool.balance or 0)
+    reserved = int(pool.reserved_balance or 0)
+    pressure = 0.0 if balance <= 0 else min(reserved / max(balance, 1), 1.0)
+    risk_tier = "high" if pressure >= 0.75 else "medium" if pressure >= 0.35 else "low"
+    return {
+        "game_key": pool.game_key,
+        "pool_type": pool.pool_type,
+        "house_pool_balance": balance,
+        "house_reserved_liability": reserved,
+        "house_exposure": reserved,
+        "max_payout_per_round": int(
+            pool.max_single_payout or snapshot.max_payout_per_round or 0
+        ),
+        "daily_house_loss_limit": int(
+            pool.daily_loss_limit or snapshot.daily_house_loss_limit or 0
+        ),
+        "risk_tier": risk_tier,
+        "payout_pressure": pressure,
+        "rtp_target_basis_points": int(pool.rtp_target_basis_points or 8000),
+        "status": pool.status,
+    }
 
 
 
@@ -819,6 +897,67 @@ def settle_lucky_gift(
             "multiplier": multiplier,
         },
     )
+
+@router.get("/lucky-gifts/admin/control-center/house-pool", dependencies=[Depends(require_internal_token)])
+def get_lucky_gift_control_house_pool(db: Session = Depends(get_db)):
+    pool = _get_or_create_lucky_gift_control_pool(db)
+    db.commit()
+    db.refresh(pool)
+    return _lucky_gift_control_pool_payload(db, pool)
+
+
+@router.post("/lucky-gifts/admin/control-center/house-pool", dependencies=[Depends(require_internal_token)])
+def update_lucky_gift_control_house_pool(
+    payload: LuckyGiftControlHousePoolCommandRequest,
+    db: Session = Depends(get_db),
+):
+    actor = db.query(User).filter(User.id == payload.actor_user_id).first()
+    if actor is None:
+        raise HTTPException(status_code=404, detail="Actor user not found")
+    tx, cached = _begin(
+        db,
+        payload,
+        operation="lucky_gift.control_house_pool.update",
+        actor_user_id=actor.id,
+    )
+    if cached is not None:
+        return cached
+
+    pool = _get_or_create_lucky_gift_control_pool(db)
+    if payload.balance is not None:
+        pool.balance = int(payload.balance)
+    if payload.reserved_balance is not None:
+        pool.reserved_balance = int(payload.reserved_balance)
+    if payload.max_payout_per_round is not None:
+        pool.max_single_payout = int(payload.max_payout_per_round)
+    if payload.daily_house_loss_limit is not None:
+        pool.daily_loss_limit = int(payload.daily_house_loss_limit)
+        pool.daily_payout_cap = int(payload.daily_house_loss_limit)
+    if payload.rtp_target_basis_points is not None:
+        pool.rtp_target_basis_points = int(payload.rtp_target_basis_points)
+    if payload.status is not None:
+        normalized_status = payload.status.upper()
+        if normalized_status not in {item.value for item in EconomyPoolStatus}:
+            raise HTTPException(status_code=400, detail="Invalid pool status")
+        pool.status = normalized_status
+    db.flush()
+
+    result = {
+        "transaction_id": tx.transaction_id,
+        **_lucky_gift_control_pool_payload(db, pool),
+    }
+    return economy_transaction_service.complete(
+        db,
+        tx=tx,
+        result=result,
+        event_type="economy.lucky_gift.control_house_pool_updated.v1",
+        event_payload={
+            "actor_user_id": actor.id,
+            "game_key": pool.game_key,
+            "pool_type": pool.pool_type,
+        },
+    )
+
 
 @router.get("/lucky-gifts/admin/props", dependencies=[Depends(require_internal_token)])
 def get_lucky_gift_props_admin(db: Session = Depends(get_db)):

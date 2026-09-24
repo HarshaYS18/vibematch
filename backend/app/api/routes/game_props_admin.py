@@ -1,12 +1,12 @@
 from typing import Any
+from uuid import uuid4
 
-from fastapi import APIRouter, Body, Depends
+from fastapi import APIRouter, Body, Depends, HTTPException
 from sqlalchemy.orm import Session
 
 from app.api.routes.super_owner import require_super_owner
 from app.api.routes.users import get_current_user
 from app.database import get_db
-from app.models.economy import EconomyPoolStatus, GamePool, GamePoolType
 from app.models.user import User
 from app.schemas.game_props import (
     JungleHuntPropsResponse,
@@ -14,14 +14,10 @@ from app.schemas.game_props import (
     LuckyGiftHousePoolUpdateRequest,
     LuckyGiftPropsResponse,
 )
-from app.services import house_pool_service, jungle_hunt_props_runtime_service, lucky_gift_props_service
+from app.services import economy_service_client, jungle_hunt_props_runtime_service
 from app.services.audit_log_service import create_admin_log
 
 router = APIRouter(prefix="/admin/games/props", tags=["Admin Game Props"])
-
-LUCKY_GIFT_POOL_KEY = "lucky_gifts"
-LUCKY_GIFT_POOL_TYPE = GamePoolType.GAME_HOUSE_POOL.value
-
 
 @router.get("/jungle-hunt", response_model=JungleHuntPropsResponse)
 def get_jungle_hunt_props(
@@ -65,7 +61,13 @@ def get_lucky_gift_props(
     current_user: User = Depends(get_current_user),
 ):
     require_super_owner(current_user)
-    return LuckyGiftPropsResponse(**lucky_gift_props_service.get_props(db))
+    try:
+        result = economy_service_client.get_lucky_gift_admin_props()
+    except economy_service_client.EconomyServiceUnavailable as exc:
+        raise HTTPException(status_code=503, detail=str(exc)) from exc
+    except economy_service_client.EconomyServiceError as exc:
+        raise HTTPException(status_code=exc.status_code, detail=exc.detail) from exc
+    return LuckyGiftPropsResponse(**result)
 
 
 @router.post("/lucky-gifts", response_model=LuckyGiftPropsResponse)
@@ -75,7 +77,18 @@ def update_lucky_gift_props(
     current_user: User = Depends(get_current_user),
 ):
     require_super_owner(current_user)
-    result = lucky_gift_props_service.update_props(db, current_user, payload)
+    request_id = str(payload.get("request_id") or uuid4()).strip()
+    props_payload = {key: value for key, value in payload.items() if key != "request_id"}
+    try:
+        result = economy_service_client.update_lucky_gift_props(
+            request_id=request_id,
+            actor_user_id=current_user.id,
+            props=props_payload,
+        )
+    except economy_service_client.EconomyServiceUnavailable as exc:
+        raise HTTPException(status_code=503, detail=str(exc)) from exc
+    except economy_service_client.EconomyServiceError as exc:
+        raise HTTPException(status_code=exc.status_code, detail=exc.detail) from exc
 
     create_admin_log(
         db=db,
@@ -83,76 +96,19 @@ def update_lucky_gift_props(
         action="SUPER_OWNER_LUCKY_GIFT_PROPS_UPDATED",
         resource_type="game_props",
         resource_id="lucky_gifts",
-        reason=str(payload.get("reason") or "Super Owner lucky gift props update"),
-        metadata_json={
-            "testing_mode_enabled": result["testing_mode_enabled"],
-            "payout_pool_safe_ratio_basis_points": result["payout_pool_safe_ratio_basis_points"],
-            "whale_daily_spend": result["whale_daily_spend"],
-            "whale_single_spend": result["whale_single_spend"],
-            "manual_review_score": result["manual_review_score"],
-            "block_score": result["block_score"],
-            "multipliers": result["multipliers"],
-        },
-    )
-
-    return LuckyGiftPropsResponse(**result)
-
-
-def _get_or_create_lucky_gift_house_pool(db: Session) -> GamePool:
-    pool = (
-        db.query(GamePool)
-        .filter(GamePool.game_key == LUCKY_GIFT_POOL_KEY, GamePool.pool_type == LUCKY_GIFT_POOL_TYPE)
-        .first()
-    )
-    if pool is not None:
-        return pool
-    pool = GamePool(
-        game_key=LUCKY_GIFT_POOL_KEY,
-        pool_type=LUCKY_GIFT_POOL_TYPE,
-        balance=0,
-        reserved_balance=0,
-        status=EconomyPoolStatus.ACTIVE.value,
-        daily_payout_cap=0,
-        daily_loss_limit=0,
-        max_single_payout=0,
-        rtp_target_basis_points=8000,
-    )
-    db.add(pool)
-    db.commit()
-    db.refresh(pool)
-    return pool
-
-
-def _lucky_gift_pool_payload(db: Session, pool: GamePool) -> dict[str, Any]:
-    snapshot = house_pool_service.calculate_payout_pressure(db, LUCKY_GIFT_POOL_TYPE)
-    # calculate_payout_pressure reads by pool_type only; prefer the lucky_gifts row values for CP display.
-    balance = int(pool.balance or 0)
-    reserved = int(pool.reserved_balance or 0)
-    pressure = 0.0 if balance <= 0 else min(reserved / max(balance, 1), 1.0)
-    risk_tier = "high" if pressure >= 0.75 else "medium" if pressure >= 0.35 else "low"
-    return {
-        "game_key": pool.game_key,
-        "pool_type": pool.pool_type,
-        "house_pool_balance": balance,
-        "house_reserved_liability": reserved,
-        "house_exposure": reserved,
-        "max_payout_per_round": int(pool.max_single_payout or snapshot.max_payout_per_round or 0),
-        "daily_house_loss_limit": int(pool.daily_loss_limit or snapshot.daily_house_loss_limit or 0),
-        "risk_tier": risk_tier,
-        "payout_pressure": pressure,
-        "rtp_target_basis_points": int(pool.rtp_target_basis_points or 8000),
-        "status": pool.status,
-    }
-
-
-@router.get("/lucky-gifts/house-pool", response_model=LuckyGiftHousePoolResponse)
+        reason=str(props_payload.get("reason") or "Super Owner lucky g@router.get("/lucky-gifts/house-pool", response_model=LuckyGiftHousePoolResponse)
 def get_lucky_gift_house_pool(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
     require_super_owner(current_user)
-    pool = _get_or_create_lucky_gift_house_pool(db)
-    return LuckyGiftHousePoolResponse(**_lucky_gift_pool_payload(db, pool))
+    try:
+        result = economy_service_client.get_lucky_gift_control_house_pool()
+    except economy_service_client.EconomyServiceUnavailable as exc:
+        raise HTTPException(status_code=503, detail=str(exc)) from exc
+    except economy_service_client.EconomyServiceError as exc:
+        raise HTTPException(status_code=exc.status_code, detail=exc.detail) from exc
+    return LuckyGiftHousePoolResponse(**result)
 
 
 @router.post("/lucky-gifts/house-pool", response_model=LuckyGiftHousePoolResponse)
@@ -162,34 +118,38 @@ def update_lucky_gift_house_pool(
     current_user: User = Depends(get_current_user),
 ):
     require_super_owner(current_user)
-    pool = _get_or_create_lucky_gift_house_pool(db)
-
-    if payload.balance is not None:
-        pool.balance = int(payload.balance)
-    if payload.reserved_balance is not None:
-        pool.reserved_balance = int(payload.reserved_balance)
-    if payload.max_payout_per_round is not None:
-        pool.max_single_payout = int(payload.max_payout_per_round)
-    if payload.daily_house_loss_limit is not None:
-        pool.daily_loss_limit = int(payload.daily_house_loss_limit)
-        pool.daily_payout_cap = int(payload.daily_house_loss_limit)
-    if payload.rtp_target_basis_points is not None:
-        pool.rtp_target_basis_points = int(payload.rtp_target_basis_points)
-    if payload.status is not None:
-        pool.status = payload.status.upper()
-
-    db.commit()
-    db.refresh(pool)
-    result = _lucky_gift_pool_payload(db, pool)
+    request_id = (payload.request_id or str(uuid4())).strip()
+    try:
+        result = economy_service_client.update_lucky_gift_control_house_pool(
+            request_id=request_id,
+            actor_user_id=current_user.id,
+            balance=payload.balance,
+            reserved_balance=payload.reserved_balance,
+            max_payout_per_round=payload.max_payout_per_round,
+            daily_house_loss_limit=payload.daily_house_loss_limit,
+            rtp_target_basis_points=payload.rtp_target_basis_points,
+            status=payload.status,
+            reason=payload.reason,
+        )
+    except economy_service_client.EconomyServiceUnavailable as exc:
+        raise HTTPException(status_code=503, detail=str(exc)) from exc
+    except economy_service_client.EconomyServiceError as exc:
+        raise HTTPException(status_code=exc.status_code, detail=exc.detail) from exc
 
     create_admin_log(
         db=db,
         actor_user_id=current_user.id,
         action="SUPER_OWNER_LUCKY_GIFT_HOUSE_POOL_UPDATED",
         resource_type="game_pool",
-        resource_id=f"{pool.game_key}:{pool.pool_type}",
+        resource_id=f'{result["game_key"]}:{result["pool_type"]}',
         reason=payload.reason,
-        metadata_json=result,
+        metadata_json={
+            key: value
+            for key, value in result.items()
+            if key != "transaction_id"
+        }
+        | {"economy_transaction_id": result.get("transaction_id")},
     )
 
     return LuckyGiftHousePoolResponse(**result)
+

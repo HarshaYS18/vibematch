@@ -483,6 +483,42 @@ def queue_bulk_grant(
         },
     )
 
+def get_lucky_gift_control_house_pool() -> dict[str, Any]:
+    return _get("lucky-gifts/admin/control-center/house-pool")
+
+
+def update_lucky_gift_control_house_pool(
+    *,
+    request_id: str,
+    actor_user_id: int,
+    balance: int | None,
+    reserved_balance: int | None,
+    max_payout_per_round: int | None,
+    daily_house_loss_limit: int | None,
+    rtp_target_basis_points: int | None,
+    status: str | None,
+    reason: str,
+) -> dict[str, Any]:
+    business_reference = f"lucky-gift-control-house-pool:{actor_user_id}:{request_id}"
+    return _request(
+        "lucky-gifts/admin/control-center/house-pool",
+        {
+            **mutation_context(
+                "lucky_gift.control_house_pool.update",
+                business_reference,
+            ),
+            "actor_user_id": actor_user_id,
+            "balance": balance,
+            "reserved_balance": reserved_balance,
+            "max_payout_per_round": max_payout_per_round,
+            "daily_house_loss_limit": daily_house_loss_limit,
+            "rtp_target_basis_points": rtp_target_basis_points,
+            "status": status,
+            "reason": reason,
+        },
+    )
+
+
 def get_lucky_gift_admin_props() -> dict[str, Any]:
     return _get("lucky-gifts/admin/props")
 
