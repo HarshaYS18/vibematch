@@ -21,12 +21,13 @@ Redis is only ephemeral presence/transport state. NATS carries transient realtim
 ## Read contract
 
 - conversation lists use keyset cursors;
-- conversation payloads contain at most the bounded active message window;
+- conversation list payloads are summary-only and contain no message history;
+- opening a conversation fetches a bounded active message window;
 - older messages use a message cursor;
 - ordinary GETs do not bootstrap, repair, mark-read, reopen Secret Drift, or otherwise mutate state;
 - read receipts use explicit mutation commands/endpoints.
 
-The default active message window is 50 and public page sizes are capped at 100.
+The active chat message window defaults to 50 and public page sizes are capped at 100. Conversation-list pages use only a last-message summary row for preview and serialize an empty `messages` array for compatibility.
 
 ## Realtime
 
