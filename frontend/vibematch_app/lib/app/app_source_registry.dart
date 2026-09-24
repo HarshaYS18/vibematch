@@ -82,7 +82,6 @@ class AppSourceRegistry {
       '/rooms/{room_public_id}/realtime/watch-party/command';
   static const Set<String> canonicalRoomLifecycleWrites = <String>{
     '/rooms/{room_public_id}/realtime/join',
-    '/rooms/{room_public_id}/realtime/heartbeat',
     '/rooms/{room_public_id}/realtime/leave',
   };
   static const Set<String> mainShellTabKeys = <String>{
