@@ -21,6 +21,8 @@ reader role.
 - mission reward credits
 - Economy transaction/idempotency records
 - balanced accounting journal
+- durable house-liability reservations
+- Lucky Packet funding/claim/refund escrow
 - bulk financial grants
 - Economy-owned gift/rule configuration
 
@@ -38,10 +40,10 @@ ledger, balanced journal and outbox event commit atomically.
 
 ## Accounting
 
-`user_wallets` + `wallet_ledger` are operational balance truth.
-`economy_journal_entries` is append-only balanced debit/credit evidence. It is
-validated before transaction commit and continuously reconciled by the Economy
-worker runtime.
+`user_wallets` plus wallet/supply/game pool ledgers are operational balance truth.
+`economy_journal_entries` is append-only balanced debit/credit evidence for value movement.
+`economy_house_reservations` is durable liability truth and the pool reserved-balance column is
+its reconciled materialization. These invariants are continuously checked by the Economy worker.
 
 ## Database ownership
 
