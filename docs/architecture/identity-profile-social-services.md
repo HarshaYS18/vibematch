@@ -3,7 +3,7 @@
 ## Decision
 FunKey deploys two coherent services rather than tiny services: Identity and Profile/Social. Public mobile URLs remain unchanged through the core compatibility facade.
 
-Identity owns authentication, account/security state, durable devices and sessions. Profile/Social owns profile mutation/display state, social relationships and family membership.
+Identity owns authentication, account/security state, durable devices/sessions, roles, special permissions and user/device ban state. The existing admin and user/device-ban routers execute inside Identity and are exposed through exact compatibility proxies. Profile/Social owns profile mutation/display state, social relationships and family membership.
 
 ## Safe users-table migration
 The existing users table mixes account and profile columns. A big-bang copy would create dual-write and mobile-version risk. Chunk 27 therefore keeps one physical row while enforcing column-level mutation rights: Identity owns the table and account/security columns; Profile/Social can update only the declared profile columns.

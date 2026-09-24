@@ -26,13 +26,17 @@
       "current_storage": [
         "postgres:users account/security columns",
         "postgres:auth_identities",
-        "postgres:login_history"
+        "postgres:login_history",
+        "postgres:user_roles",
+        "postgres:special_permissions",
+        "postgres:user_bans",
+        "postgres:device_bans"
       ],
       "target_storage": [
         "identity-service PostgreSQL authority"
       ],
       "mutated_by": [
-        "identity/auth services"
+        "identity/auth/account-security services"
       ],
       "source_states": [],
       "rebuild_from": [],

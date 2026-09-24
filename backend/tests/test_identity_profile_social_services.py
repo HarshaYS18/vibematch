@@ -30,12 +30,21 @@ class IdentityProfileSocialBoundaryTests(unittest.TestCase):
         self.assertIn("profile_social_proxy.router", router)
         for forbidden in (
             "auth.router",
+            "admin.router",
+            "moderation.router",
             "social.router",
             "love_bonds.router",
             "families.router",
             "profile_display.router",
         ):
             self.assertNotIn(forbidden, router)
+
+    def test_identity_owns_privileged_account_security_routes(self):
+        identity = (ROOT / "apps/identity-service/main.py").read_text(encoding="utf-8")
+        self.assertIn("api.include_router(admin.router)", identity)
+        self.assertIn("api.include_router(moderation.router)", identity)
+        permissions = (ROOT / "backend/app/services/special_permission_service.py").read_text(encoding="utf-8")
+        self.assertNotIn("special_permission.is_active = False", permissions)
 
     def test_profile_mutation_routes_to_service(self):
         users = (ROOT / "backend/app/api/routes/users.py").read_text(encoding="utf-8")

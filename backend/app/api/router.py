@@ -7,13 +7,13 @@ modules own resource behavior; this module owns hierarchy and registration.
 from fastapi import APIRouter
 
 from app.api.routes import (
-    admin, admin_support, ai_moderation, app_source_registry, calls,
+    admin_support, ai_moderation, app_source_registry, calls,
     coin_sales, control_center, economy, economy_admin, economy_master,
     experience, families_economy, game_pool_admin, game_props_admin,
     game_settlements, games, games_master, gift_catalog, health, home_banners,
     identity_proxy, inbox_proxy, inbox_stories, lucky_coins,
     lucky_gifts, lucky_gift_admin, lucky_packets, media, media_control, media_realtime_auth, media_safety_admin,
-    moderation, notifications, presence, profile_social_proxy, push, rankings,
+    notifications, presence, profile_social_proxy, push, rankings,
     relationship_exp, role_badges, room_control_proxy, room_cross_domain,
     room_levels, room_music_media, realtime_gateway_auth, settings, super_owner,
     support, users, vibes_proxy, vip_admin, wallet,
@@ -74,7 +74,7 @@ api_router.include_router(lucky_packets.router)
 
 # Administrative surfaces.
 for router in (
-    admin.router, admin_support.router, moderation.router, ai_moderation.router,
+    admin_support.router, ai_moderation.router,
     media_safety_admin.router, vip_admin.router, super_owner.router,
     control_center.router, game_pool_admin.router, game_props_admin.router,
     economy_admin.router, games.admin_router, gift_catalog.admin_router,

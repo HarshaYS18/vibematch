@@ -3,13 +3,13 @@
 Chunk 27 extracts authentication, account identity and durable session/device authority.
 
 ## Responsibilities
-Identity owns account and security mutation, auth identities, login history, identity devices, identity sessions, login issuance, and session validation.
+Identity owns account and security mutation, auth identities, login history, roles, special permissions, user/device bans, identity devices, identity sessions, login issuance, and session validation.
 
 ## Non-responsibilities
 It does not own public profile presentation, social graph, family membership, wallet/economy, rooms, Inbox, Vibes, search or recommendation state.
 
 ## Interfaces
-Public API: /api/v1/auth/** through the core compatibility facade.
+Public API: /api/v1/auth/** plus the existing account/security admin and user/device-ban routes, all through exact core compatibility proxies.
 Internal API: /internal/identity/verify and /internal/identity/sessions/revoke.
 Operations: /live, /ready, /metrics.
 

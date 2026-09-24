@@ -9,11 +9,14 @@ ALTER TABLE auth_identities OWNER TO funkey_identity_owner;
 ALTER TABLE login_history OWNER TO funkey_identity_owner;
 ALTER TABLE identity_devices OWNER TO funkey_identity_owner;
 ALTER TABLE identity_sessions OWNER TO funkey_identity_owner;
-REVOKE ALL ON TABLE users,auth_identities,login_history,identity_devices,identity_sessions FROM PUBLIC;
-GRANT SELECT,INSERT,UPDATE,DELETE ON TABLE users,auth_identities,login_history,identity_devices,identity_sessions TO funkey_identity_runtime;
-GRANT SELECT,INSERT ON TABLE user_roles TO funkey_identity_runtime;
-GRANT SELECT ON TABLE user_bans,device_bans TO funkey_identity_runtime;
+ALTER TABLE user_roles OWNER TO funkey_identity_owner;
+ALTER TABLE special_permissions OWNER TO funkey_identity_owner;
+ALTER TABLE user_bans OWNER TO funkey_identity_owner;
+ALTER TABLE device_bans OWNER TO funkey_identity_owner;
+REVOKE ALL ON TABLE users,auth_identities,login_history,identity_devices,identity_sessions,user_roles,special_permissions,user_bans,device_bans FROM PUBLIC;
+GRANT SELECT,INSERT,UPDATE,DELETE ON TABLE users,auth_identities,login_history,identity_devices,identity_sessions,user_roles,special_permissions,user_bans,device_bans TO funkey_identity_runtime;
+GRANT SELECT,INSERT ON TABLE admin_logs TO funkey_identity_runtime;
 DO $$ DECLARE t text; s text; BEGIN
-FOREACH t IN ARRAY ARRAY['users','auth_identities','login_history','identity_devices','identity_sessions'] LOOP
+FOREACH t IN ARRAY ARRAY['users','auth_identities','login_history','identity_devices','identity_sessions','user_roles','special_permissions','user_bans','device_bans'] LOOP
 s:=pg_get_serial_sequence(t,'id'); IF s IS NOT NULL THEN EXECUTE format('ALTER SEQUENCE %s OWNER TO funkey_identity_owner',s); EXECUTE format('GRANT USAGE, SELECT ON SEQUENCE %s TO funkey_identity_runtime',s); END IF;
 END LOOP; END $$;

@@ -875,6 +875,8 @@ def _validate_identity_profile_social_extraction(errors: list[str]) -> None:
                 errors.append("Chunk 27 compatibility proxy missing: " + token)
         for token in (
             "auth.router",
+            "admin.router",
+            "moderation.router",
             "social.router",
             "love_bonds.router",
             "families.router",
@@ -895,6 +897,19 @@ def _validate_identity_profile_social_extraction(errors: list[str]) -> None:
         if "identity_session_service.is_session_active" in users_text:
             errors.append("Non-Identity request auth must not read Identity session tables directly")
 
+    identity_main = IDENTITY_SERVICE_ROOT / "main.py"
+    if identity_main.exists():
+        identity_text = identity_main.read_text(encoding="utf-8")
+        for token in ("api.include_router(admin.router)", "api.include_router(moderation.router)"):
+            if token not in identity_text:
+                errors.append("Identity privileged route ownership missing: " + token)
+
+    permission_service = ROOT / "backend" / "app" / "services" / "special_permission_service.py"
+    if permission_service.exists():
+        permission_text = permission_service.read_text(encoding="utf-8")
+        if "special_permission.is_active = False" in permission_text:
+            errors.append("Special-permission authorization reads must be side-effect free")
+
     security_path = ROOT / "backend" / "app" / "core" / "security.py"
     if security_path.exists():
         security_text = security_path.read_text(encoding="utf-8")
@@ -909,6 +924,10 @@ def _validate_identity_profile_social_extraction(errors: list[str]) -> None:
             "login_history",
             "identity_devices",
             "identity_sessions",
+            "user_roles",
+            "special_permissions",
+            "user_bans",
+            "device_bans",
         ):
             token = f"ALTER TABLE {table} OWNER TO funkey_identity_owner"
             if token not in identity_sql:
