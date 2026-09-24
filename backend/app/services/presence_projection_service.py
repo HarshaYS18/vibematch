@@ -77,6 +77,37 @@ def room_online_user_ids(room_public_id: str) -> set[int]:
     return result
 
 
+def room_online_user_ids_batch(
+    room_public_ids: list[str] | tuple[str, ...] | set[str],
+) -> dict[str, set[int]]:
+    """Batch live room user IDs from the Go gateway lease projection."""
+    resolved = [room_id.strip() for room_id in dict.fromkeys(room_public_ids) if room_id.strip()]
+    if not resolved:
+        return {}
+    redis_client = get_realtime_redis()
+    now = time.time()
+    try:
+        pipe = redis_client.pipeline(transaction=False)
+        for room_id in resolved:
+            pipe.zrangebyscore(_room_user_key(room_id), now, "+inf")
+        values_by_room = pipe.execute()
+    except Exception:
+        return {room_id: set() for room_id in resolved}
+
+    result: dict[str, set[int]] = {}
+    for room_id, values in zip(resolved, values_by_room, strict=False):
+        user_ids: set[int] = set()
+        for value in values or []:
+            try:
+                user_id = int(_text(value))
+            except (TypeError, ValueError):
+                continue
+            if user_id > 0:
+                user_ids.add(user_id)
+        result[room_id] = user_ids
+    return result
+
+
 def room_online_counts(room_public_ids: list[str] | tuple[str, ...] | set[str]) -> dict[str, int]:
     """Batch Redis room counts without consulting participant heartbeat timestamps."""
     resolved = [room_id.strip() for room_id in dict.fromkeys(room_public_ids) if room_id.strip()]
