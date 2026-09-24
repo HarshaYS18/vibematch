@@ -144,49 +144,43 @@ def preview_lucky_gift(payload: LuckyGiftPreviewRequest, current_user: User = De
 
 
 @router.post("/results/record")
-def record_lucky_gift_result(payload: LuckyGiftResultRecordRequest, current_user: User = Depends(get_current_user), db: Session = Depends(get_db)):
+def record_lucky_gift_result(
+    payload: LuckyGiftResultRecordRequest,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    """Compatibility lookup for results already committed by Economy.
+
+    The client is never allowed to create or mutate Lucky Gift ranking/stat
+    truth. Authoritative settlement records the result before returning to the
+    sender; legacy clients may call this endpoint only to retrieve that row.
+    """
     receiver_id = _receiver_id(db, payload.receiver_public_user_id)
     room_id = _room_id(db, payload.room_public_id)
-    duplicate = _recent_matching_transaction(db, sender_user_id=current_user.id, receiver_user_id=receiver_id, room_id=room_id, payload=payload)
-    if duplicate is not None:
-        stats = db.query(UserLuckyGiftStats).filter(UserLuckyGiftStats.user_id == current_user.id).first()
-        return {
-            "status": "recorded",
-            "transaction_id": duplicate.id,
-            "deduplicated": True,
-            "spent_coins": duplicate.spent_coins,
-            "reward_coins": duplicate.reward_coins,
-            "net_win_coins": duplicate.net_win_coins,
-            "wallet_coin_balance": _wallet_coin_balance(db, current_user.id),
-            "stats": _stats_payload(stats),
-        }
-    try:
-        row, stats = lucky_gift_stats_service.record_lucky_gift_result(
-            db,
-            sender_user_id=current_user.id,
-            receiver_user_id=receiver_id,
-            room_id=room_id,
-            gift_id=payload.gift_id,
-            gift_name=payload.gift_id.replace("_", " ").title(),
-            coin_value=payload.spent_coins // max(payload.quantity, 1),
-            quantity=payload.quantity,
-            spent_coins=payload.spent_coins,
-            multiplier=payload.multiplier,
-            reward_coins=payload.reward_coins,
-            net_win_coins=payload.net_win_coins,
+    authoritative = _recent_matching_transaction(
+        db,
+        sender_user_id=current_user.id,
+        receiver_user_id=receiver_id,
+        room_id=room_id,
+        payload=payload,
+    )
+    if authoritative is None:
+        raise HTTPException(
+            status_code=409,
+            detail="Lucky Gift result is not present in authoritative Economy history",
         )
-        db.commit()
-        db.refresh(row)
-    except Exception:
-        db.rollback()
-        raise
+    stats = (
+        db.query(UserLuckyGiftStats)
+        .filter(UserLuckyGiftStats.user_id == current_user.id)
+        .first()
+    )
     return {
         "status": "recorded",
-        "transaction_id": row.id,
-        "deduplicated": False,
-        "spent_coins": row.spent_coins,
-        "reward_coins": row.reward_coins,
-        "net_win_coins": row.net_win_coins,
+        "transaction_id": authoritative.id,
+        "deduplicated": True,
+        "spent_coins": authoritative.spent_coins,
+        "reward_coins": authoritative.reward_coins,
+        "net_win_coins": authoritative.net_win_coins,
         "wallet_coin_balance": _wallet_coin_balance(db, current_user.id),
         "stats": _stats_payload(stats),
     }
