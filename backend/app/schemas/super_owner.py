@@ -39,6 +39,7 @@ class SuperOwnerSpecialPermissionGrantRequest(SuperOwnerReasonRequest):
 
 
 class SuperOwnerVipAdjustmentRequest(SuperOwnerReasonRequest):
+    request_id: str = Field(..., min_length=8, max_length=80)
     target_user_id: int
     vip_level: int = Field(default=0, ge=0, le=100)
     svip_level: int = Field(default=0, ge=0, le=100)
