@@ -5,10 +5,9 @@ from sqlalchemy.orm import Session
 
 from app.api.routes.users import get_current_user
 from app.database import get_db
-from app.models.economy import EconomyCurrency, EconomyDirection, UserWallet, WalletLedger
 from app.models.user import User
 from app.schemas.room_theme import RoomThemePurchaseRequest, RoomThemeResponse
-from app.services import room_control_service_client
+from app.services import economy_service_client, room_control_service_client
 from app.services.rooms.room_contribution_service import room_contribution_rankings
 
 
@@ -21,22 +20,13 @@ def _service_error(exc: Exception) -> HTTPException:
     return HTTPException(status_code=503, detail="Room Control service unavailable")
 
 
-def _wallet_for_update(db: Session, user_id: int) -> UserWallet:
-    wallet = (
-        db.query(UserWallet)
-        .filter(UserWallet.user_id == user_id)
-        .with_for_update()
-        .first()
-    )
-    if wallet is None:
-        wallet = UserWallet(user_id=user_id)
-        db.add(wallet)
-        db.flush()
-    return wallet
+def _economy_error(exc: Exception) -> HTTPException:
+    if isinstance(exc, economy_service_client.EconomyServiceError):
+        return HTTPException(status_code=exc.status_code, detail=exc.detail)
+    return HTTPException(status_code=503, detail="Economy service unavailable")
 
 
 def _debit_theme_once(
-    db: Session,
     *,
     user: User,
     theme_id: str,
@@ -45,43 +35,23 @@ def _debit_theme_once(
 ) -> None:
     if price <= 0:
         return
-
-    wallet = _wallet_for_update(db, user.id)
-    existing = (
-        db.query(WalletLedger.id)
-        .filter(
-            WalletLedger.user_id == user.id,
-            WalletLedger.source_type == "ROOM_THEME_PURCHASE",
-            WalletLedger.source_id == theme_id,
-        )
-        .first()
-    )
-    if existing is not None:
-        return
-    if int(wallet.coin_balance or 0) < price:
-        raise HTTPException(
-            status_code=400,
-            detail="Insufficient coins to purchase this room background",
-        )
-
-    before = int(wallet.coin_balance or 0)
-    wallet.coin_balance = before - price
-    wallet.lifetime_coins_spent = int(wallet.lifetime_coins_spent or 0) + price
-    db.add(
-        WalletLedger(
+    business_reference = f"room-theme-purchase:{user.id}:{theme_id}"
+    try:
+        economy_service_client.debit_wallet(
             user_id=user.id,
-            currency_type=EconomyCurrency.COIN.value,
-            direction=EconomyDirection.DEBIT.value,
             amount=price,
-            before_balance=before,
-            after_balance=wallet.coin_balance,
             source_type="ROOM_THEME_PURCHASE",
             source_id=theme_id,
-            created_by_user_id=user.id,
             reason=f"Purchased room background {theme_name}",
+            actor_user_id=user.id,
+            business_reference=business_reference,
+            operation="room_theme.purchase",
         )
-    )
-    db.commit()
+    except (
+        economy_service_client.EconomyServiceUnavailable,
+        economy_service_client.EconomyServiceError,
+    ) as exc:
+        raise _economy_error(exc) from exc
 
 
 @router.post("/themes/purchase", response_model=RoomThemeResponse)
@@ -100,7 +70,6 @@ def purchase_room_background_theme(
 
     if not bool(quote.get("is_owned")):
         _debit_theme_once(
-            db,
             user=current_user,
             theme_id=str(quote.get("theme_id") or payload.theme_id),
             theme_name=str(quote.get("name") or "Room background"),
@@ -114,9 +83,8 @@ def purchase_room_background_theme(
             source=str(quote.get("ownership_type") or "purchase"),
         )
     except Exception as exc:
-        # A retry is safe: the wallet debit above is idempotent under the
-        # wallet row lock + ledger lookup, while the room inventory grant is
-        # idempotent inside Room Control.
+        # Retry is safe: Economy reuses the stable room-theme purchase business
+        # reference, while Room Control grants inventory idempotently.
         raise _service_error(exc) from exc
     return RoomThemeResponse(**granted)
 
