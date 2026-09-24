@@ -161,6 +161,9 @@ services:
       ECONOMY_INTERNAL_TOKEN: local-development-economy-internal-token-2026
       GAME_PLATFORM_SERVICE_URL: http://game-platform:8089/api/v1
       GAME_PLATFORM_SERVICE_TIMEOUT_SECONDS: "5"
+      NOTIFICATION_SERVICE_URL: http://notification:8090/api/v1
+      NOTIFICATION_INTERNAL_URL: http://notification:8090/internal/notifications
+      NOTIFICATION_INTERNAL_TOKEN: local-development-notification-internal-token-2026
       NATS_URL: nats://nats:4222
       CORS_ALLOWED_ORIGINS: http://localhost:3000,http://localhost:8080
       ENABLE_DEV_LOGIN: "true"
@@ -275,6 +278,41 @@ services:
       pgbouncer: {condition: service_healthy}
       economy: {condition: service_started}
 
+  notification:
+    profiles: ["app"]
+    build: {context: .., dockerfile: apps/notification-service/Dockerfile}
+    environment:
+      <<: *api_environment
+      DB_APPLICATION_NAME: funkey-notification
+      NOTIFICATION_DATABASE_URL: postgresql://funkey:funkey_dev_only@pgbouncer:6432/funkey
+    ports: ["127.0.0.1:8090:8090"]
+    depends_on:
+      migrate: {condition: service_completed_successfully}
+      pgbouncer: {condition: service_healthy}
+
+  notification-provider:
+    profiles: ["app"]
+    build: {context: .., dockerfile: apps/notification-service/Dockerfile}
+    command: ["python", "/app/apps/notification-service/provider_worker.py"]
+    environment:
+      <<: *api_environment
+      DB_APPLICATION_NAME: funkey-notification-provider
+      NOTIFICATION_DATABASE_URL: postgresql://funkey:funkey_dev_only@pgbouncer:6432/funkey
+      NOTIFICATION_PROVIDER_HEALTH_PORT: "8091"
+    healthcheck:
+      test:
+        - CMD
+        - python
+        - -c
+        - "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8091/ready', timeout=2)"
+      interval: 10s
+      timeout: 3s
+      retries: 10
+      start_period: 5s
+    depends_on:
+      migrate: {condition: service_completed_successfully}
+      pgbouncer: {condition: service_healthy}
+
   economy-bulk-worker:
     profiles: ["app"]
     build:
@@ -336,6 +374,7 @@ services:
       nats: {condition: service_healthy}
       migrate: {condition: service_completed_successfully}
       pgbouncer: {condition: service_healthy}
+      notification: {condition: service_started}
 
 volumes:
   postgres_data:

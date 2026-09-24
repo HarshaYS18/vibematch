@@ -12,6 +12,7 @@ resources:
   - profile-social.yaml
   - economy.yaml
   - game-platform.yaml
+  - notification.yaml
   - realtime.yaml
   - worker.yaml
   - autoscaling.yaml

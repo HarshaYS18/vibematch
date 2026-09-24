@@ -7,6 +7,7 @@ Each guide records ownership, contracts, state, security, scaling, operations, a
 - [core-api](modules/core-api/README.md)
 - [realtime-gateway](modules/realtime-gateway/README.md)
 - [worker](modules/worker/README.md)
+- [notification](modules/notification/README.md)
 - [media](modules/media/README.md)
 
 ## Business domains
@@ -25,6 +26,7 @@ Each guide records ownership, contracts, state, security, scaling, operations, a
 - [store](modules/store/README.md)
 - [games](modules/games/README.md)
 - [vibes](modules/vibes/README.md)
+- [notifications](modules/notification/README.md)
 - [agency](modules/agency/README.md)
 - [admin](modules/admin/README.md)
 

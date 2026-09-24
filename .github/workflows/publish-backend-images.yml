@@ -43,6 +43,12 @@ jobs:
           - name: economy
             dockerfile: apps/economy-service/Dockerfile
             context: .
+          - name: game-platform
+            dockerfile: apps/game-platform-service/Dockerfile
+            context: .
+          - name: notification
+            dockerfile: apps/notification-service/Dockerfile
+            context: .
           - name: worker
             dockerfile: apps/worker/Dockerfile
             context: .

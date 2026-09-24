@@ -20,6 +20,21 @@ on:
       room_control_image:
         description: Immutable Room Control image (name@sha256:digest)
         required: true
+      identity_image:
+        description: Immutable Identity image (name@sha256:digest)
+        required: true
+      profile_social_image:
+        description: Immutable Profile/Social image (name@sha256:digest)
+        required: true
+      economy_image:
+        description: Immutable Economy image (name@sha256:digest)
+        required: true
+      game_platform_image:
+        description: Immutable Game Platform image (name@sha256:digest)
+        required: true
+      notification_image:
+        description: Immutable Notification image (name@sha256:digest)
+        required: true
       worker_image:
         description: Immutable worker image (name@sha256:digest)
         required: true
@@ -50,6 +65,11 @@ jobs:
             --inbox "${{ inputs.inbox_image }}" \
             --vibes "${{ inputs.vibes_image }}" \
             --room-control "${{ inputs.room_control_image }}" \
+            --identity "${{ inputs.identity_image }}" \
+            --profile-social "${{ inputs.profile_social_image }}" \
+            --economy "${{ inputs.economy_image }}" \
+            --game-platform "${{ inputs.game_platform_image }}" \
+            --notification "${{ inputs.notification_image }}" \
             --worker "${{ inputs.worker_image }}" \
             --realtime "${{ inputs.realtime_image }}" \
             --media "${{ inputs.media_image }}"

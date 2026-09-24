@@ -207,3 +207,24 @@ spec:
         target:
           type: Utilization
           averageUtilization: 65
+---
+apiVersion: autoscaling/v2
+kind: HorizontalPodAutoscaler
+metadata:
+  name: funkey-notification
+spec:
+  scaleTargetRef: {apiVersion: apps/v1, kind: Deployment, name: funkey-notification}
+  minReplicas: 3
+  maxReplicas: 20
+  behavior:
+    scaleDown:
+      stabilizationWindowSeconds: 300
+  metrics:
+    - type: Resource
+      resource:
+        name: cpu
+        target: {type: Utilization, averageUtilization: 60}
+    - type: Pods
+      pods:
+        metric: {name: funkey_http_inflight_requests}
+        target: {type: AverageValue, averageValue: "40"}
