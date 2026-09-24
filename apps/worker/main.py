@@ -58,9 +58,9 @@ class WorkerState:
         self.in_flight = 0
         self._lock = Lock()
 
-    def count(self, name: str):
+    def count(self, name: str, amount: int = 1):
         with self._lock:
-            setattr(self, name, getattr(self, name) + 1)
+            setattr(self, name, getattr(self, name) + amount)
 
     def metrics(self) -> str:
         with self._lock:
@@ -143,6 +143,7 @@ async def relay_outbox(js, stop: asyncio.Event):
                             "messaging.system": "nats",
                             "messaging.destination.name": envelope.subject,
                             "funkey.event_type": envelope.event_type,
+                            "funkey.worker_pool": POOL.name,
                         },
                     ):
                         headers = {"Nats-Msg-Id": str(envelope.event_id)}
@@ -167,6 +168,7 @@ async def relay_outbox(js, stop: asyncio.Event):
                     else:
                         _logger.warning(json.dumps({
                             "event": "outbox.publish_mark_lost",
+                            "pool": POOL.name,
                             "event_id": claim.event_id,
                         }))
                 except asyncio.CancelledError:
@@ -183,6 +185,7 @@ async def relay_outbox(js, stop: asyncio.Event):
                     state.count("outbox_retries")
                     _logger.warning(json.dumps({
                         "event": "outbox.retry",
+                        "pool": POOL.name,
                         "event_id": claim.event_id,
                         "attempt": claim.attempt_count,
                         "error": type(exc).__name__,
@@ -192,7 +195,7 @@ async def relay_outbox(js, stop: asyncio.Event):
         except asyncio.CancelledError:
             raise
         except Exception as exc:
-            _logger.error(json.dumps({"event": "outbox.claim_retry", "error": type(exc).__name__}))
+            _logger.error(json.dumps({"event": "outbox.claim_retry", "pool": POOL.name, "error": type(exc).__name__}))
             await asyncio.sleep(3 + random.random() * 2)
 
 
@@ -232,6 +235,7 @@ async def process_message(js, msg):
                 "messaging.system": "nats",
                 "messaging.destination.name": msg.subject,
                 "funkey.event_type": envelope.event_type,
+                "funkey.worker_pool": POOL.name,
             },
         ):
             state.count("in_flight")
@@ -276,7 +280,7 @@ async def consume(js, subscription, stop: asyncio.Event):
         except asyncio.CancelledError:
             raise
         except Exception as exc:
-            _logger.error(json.dumps({"event": "consumer.retry", "error": type(exc).__name__}))
+            _logger.error(json.dumps({"event": "consumer.retry", "pool": POOL.name, "error": type(exc).__name__}))
             await asyncio.sleep(2 + random.random())
 
 
@@ -341,6 +345,7 @@ async def run():
             if pending:
                 _logger.warning(json.dumps({
                     "event": "worker.shutdown_timeout",
+                    "pool": POOL.name,
                     "pending_tasks": len(pending),
                     "grace_seconds": SHUTDOWN_GRACE_SECONDS,
                 }))
