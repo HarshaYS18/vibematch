@@ -99,7 +99,7 @@ def list_pools(db: Session) -> list[dict]:
 
 
 def get_pool_detail(db: Session, game_key: str) -> dict:
-    main_pool, game_pool = ensure_main_and_game_pools(db, game_key, commit=commit)
+    main_pool, game_pool = ensure_main_and_game_pools(db, game_key)
     return {"main_pool": _pool_response(main_pool), "game_pool": _pool_response(game_pool)}
 
 
@@ -207,7 +207,7 @@ def update_pool_settings(
 def allocate_from_main_to_game(db: Session, actor: User, game_key: str, amount: int, reason: str, *, commit: bool = True) -> dict:
     if amount <= 0:
         raise HTTPException(status_code=400, detail="Amount must be positive")
-    main_pool, game_pool = ensure_main_and_game_pools(db, game_key)
+    main_pool, game_pool = ensure_main_and_game_pools(db, game_key, commit=commit)
     if available_balance(main_pool) < amount:
         raise HTTPException(status_code=400, detail="Main game house pool available balance is too low")
     _ledger(db, main_pool, EconomyDirection.DEBIT.value, amount, "POOL_ALLOCATE_TO_GAME", actor, reason, source_id=game_key)
