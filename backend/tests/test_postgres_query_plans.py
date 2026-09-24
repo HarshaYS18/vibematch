@@ -31,10 +31,19 @@ class PostgresHotQueryPlanTests(unittest.TestCase):
         with cls.engine.begin() as db:
             db.execute(text("TRUNCATE TABLE vibe_saves, vibe_posts, inbox_messages, inbox_participants, inbox_conversations, users RESTART IDENTITY CASCADE"))
             db.execute(text("""
-                INSERT INTO users (id, public_user_id, is_active, is_banned, is_protected, created_at, updated_at)
-                VALUES
-                  (1, 6418000000001, TRUE, FALSE, FALSE, NOW(), NOW()),
-                  (2, 6418000000002, TRUE, FALSE, FALSE, NOW(), NOW())
+                INSERT INTO users (
+                    id, public_user_id, is_active, is_banned, is_protected,
+                    created_at, updated_at
+                )
+                SELECT
+                    g,
+                    6418000000000 + g,
+                    TRUE,
+                    FALSE,
+                    FALSE,
+                    NOW(),
+                    NOW()
+                FROM generate_series(1, 101) AS g
             """))
             db.execute(text("""
                 INSERT INTO vibe_posts (
@@ -56,9 +65,11 @@ class PostgresHotQueryPlanTests(unittest.TestCase):
             """))
             db.execute(text("""
                 INSERT INTO vibe_saves (post_id, user_id, created_at)
-                SELECT id, 2, created_at
+                SELECT
+                    id,
+                    2 + ((id - 1) % 100),
+                    created_at
                 FROM vibe_posts
-                WHERE id % 2 = 0
             """))
             db.execute(text("""
                 INSERT INTO inbox_conversations (
@@ -129,17 +140,18 @@ class PostgresHotQueryPlanTests(unittest.TestCase):
         """)
         self.assertIn("ix_vibe_posts_live_feed_cursor", indexes)
 
-    def test_saved_vibes_feed_uses_user_time_cursor_index(self):
+    def test_saved_vibes_feed_uses_selective_user_index_for_actual_query_shape(self):
         indexes = self._explain("""
-            SELECT s.post_id
-            FROM vibe_saves AS s
-            JOIN vibe_posts AS p ON p.id = s.post_id
-            WHERE s.user_id = :user_id
-              AND p.is_deleted IS FALSE
-            ORDER BY s.created_at DESC
+            SELECT p.id
+            FROM vibe_posts AS p
+            JOIN vibe_saves AS s
+              ON s.post_id = p.id
+             AND s.user_id = :user_id
+            WHERE p.is_deleted IS FALSE
+            ORDER BY p.created_at DESC, p.id DESC
             LIMIT 51
-        """, {"user_id": 2})
-        self.assertIn("ix_vibe_saves_user_created_post", indexes)
+        """, {"user_id": 17})
+        self.assertIn("ix_vibe_saves_user_id", indexes)
 
     def test_inbox_history_uses_conversation_cursor_index(self):
         indexes = self._explain("""

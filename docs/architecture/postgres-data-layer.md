@@ -21,10 +21,10 @@ Conversation-list serialization must not execute message-window/read-receipt que
 Migration `20260924_0200` adds only indexes that map to hot cursor queries:
 
 - live Vibes feed: partial `(created_at DESC, id DESC)` for non-deleted posts;
-- saved Vibes feed: `(user_id, created_at DESC, post_id)`;
+- saved Vibes feed: the real join/order shape is plan-tested and reuses the existing selective `vibe_saves.user_id` index rather than adding a redundant save-time index;
 - Inbox history: `(conversation_id, created_at DESC, id DESC)`.
 
-CI seeds PostgreSQL and runs `EXPLAIN (ANALYZE, BUFFERS, FORMAT JSON)`; the test fails unless PostgreSQL uses those indexes.
+CI seeds PostgreSQL and runs `EXPLAIN (ANALYZE, BUFFERS, FORMAT JSON)`; the test fails unless PostgreSQL uses the intended hot-path indexes. The saved-feed fixture uses many users so the user predicate has realistic selectivity and mirrors the actual service query shape.
 
 ## Read replicas
 

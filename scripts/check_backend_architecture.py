@@ -230,7 +230,6 @@ def _validate_database_hardening(errors: list[str]) -> None:
         text = POSTGRES_HOT_PATH_MIGRATION.read_text(encoding="utf-8")
         for index_name in (
             "ix_vibe_posts_live_feed_cursor",
-            "ix_vibe_saves_user_created_post",
             "ix_inbox_messages_conversation_cursor",
         ):
             if index_name not in text:

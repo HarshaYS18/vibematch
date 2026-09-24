@@ -25,12 +25,6 @@ def upgrade() -> None:
         postgresql_where=sa.text("is_deleted IS FALSE"),
     )
     op.create_index(
-        "ix_vibe_saves_user_created_post",
-        "vibe_saves",
-        ["user_id", sa.text("created_at DESC"), "post_id"],
-        unique=False,
-    )
-    op.create_index(
         "ix_inbox_messages_conversation_cursor",
         "inbox_messages",
         ["conversation_id", sa.text("created_at DESC"), sa.text("id DESC")],
@@ -42,10 +36,6 @@ def downgrade() -> None:
     op.drop_index(
         "ix_inbox_messages_conversation_cursor",
         table_name="inbox_messages",
-    )
-    op.drop_index(
-        "ix_vibe_saves_user_created_post",
-        table_name="vibe_saves",
     )
     op.drop_index(
         "ix_vibe_posts_live_feed_cursor",
