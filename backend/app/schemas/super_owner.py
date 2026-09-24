@@ -48,6 +48,7 @@ class SuperOwnerVipAdjustmentRequest(SuperOwnerReasonRequest):
 
 
 class SuperOwnerLevelAdjustmentRequest(SuperOwnerReasonRequest):
+    request_id: str | None = Field(default=None, min_length=8, max_length=80)
     target_user_id: int
     send_exp_total: int | None = Field(default=None, ge=0)
     receive_exp_total: int | None = Field(default=None, ge=0)
