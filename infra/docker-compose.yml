@@ -159,6 +159,8 @@ services:
       ECONOMY_SERVICE_URL: http://economy:8088/api/v1
       ECONOMY_INTERNAL_URL: http://economy:8088/internal/economy
       ECONOMY_INTERNAL_TOKEN: local-development-economy-internal-token-2026
+      GAME_PLATFORM_SERVICE_URL: http://game-platform:8089/api/v1
+      GAME_PLATFORM_SERVICE_TIMEOUT_SECONDS: "5"
       NATS_URL: nats://nats:4222
       CORS_ALLOWED_ORIGINS: http://localhost:3000,http://localhost:8080
       ENABLE_DEV_LOGIN: "true"
@@ -259,6 +261,19 @@ services:
         condition: service_completed_successfully
       pgbouncer:
         condition: service_healthy
+
+  game-platform:
+    profiles: ["app"]
+    build: {context: .., dockerfile: apps/game-platform-service/Dockerfile}
+    environment:
+      <<: *api_environment
+      DB_APPLICATION_NAME: funkey-game-platform
+      GAME_PLATFORM_DATABASE_URL: postgresql://funkey:funkey_dev_only@pgbouncer:6432/funkey
+    ports: ["127.0.0.1:8089:8089"]
+    depends_on:
+      migrate: {condition: service_completed_successfully}
+      pgbouncer: {condition: service_healthy}
+      economy: {condition: service_started}
 
   economy-bulk-worker:
     profiles: ["app"]

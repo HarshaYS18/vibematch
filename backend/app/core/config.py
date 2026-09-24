@@ -135,6 +135,16 @@ class Settings(BaseSettings):
     ECONOMY_BULK_WORKER_MAX_REPLICAS: int = 4
     DB_ECONOMY_BULK_WORKER_CONNECTION_BUDGET: int = 8
 
+    # Chunk 28 Game Platform service boundary.
+    GAME_PLATFORM_SERVICE_URL: str = "http://127.0.0.1:8089/api/v1"
+    GAME_PLATFORM_SERVICE_TIMEOUT_SECONDS: float = 5.0
+    GAME_PLATFORM_DATABASE_URL: str = ""
+    GAME_PLATFORM_DB_POOL_SIZE: int = 4
+    GAME_PLATFORM_DB_MAX_OVERFLOW: int = 0
+    GAME_PLATFORM_DB_POOL_TIMEOUT_SECONDS: int = 3
+    GAME_PLATFORM_MAX_REPLICAS: int = 20
+    DB_GAME_PLATFORM_CONNECTION_BUDGET: int = 80
+
     # Topology budgets. These are planning/validation limits, not capacity claims.
     API_MAX_REPLICAS: int = 20
     DB_API_CONNECTION_BUDGET: int = 100
@@ -253,6 +263,7 @@ class Settings(BaseSettings):
             + self.DB_PROFILE_SOCIAL_CONNECTION_BUDGET
             + self.DB_ECONOMY_CONNECTION_BUDGET
             + self.DB_ECONOMY_BULK_WORKER_CONNECTION_BUDGET
+            + self.DB_GAME_PLATFORM_CONNECTION_BUDGET
             + self.DB_WORKER_CONNECTION_BUDGET
             + self.DB_ROLLOUT_SURGE_CONNECTION_RESERVE
         )
@@ -587,6 +598,25 @@ class Settings(BaseSettings):
             unsafe.append("DB_ECONOMY_CONNECTION_BUDGET")
         if unsafe:
             raise RuntimeError("Unsafe Economy service production configuration: " + ", ".join(unsafe))
+
+    def validate_game_platform_service(self) -> None:
+        """Validate isolated Game Platform service production settings."""
+        if not self.is_production:
+            return
+        unsafe: list[str] = []
+        if not self.GAME_PLATFORM_SERVICE_URL.strip():
+            unsafe.append("GAME_PLATFORM_SERVICE_URL")
+        url = self.GAME_PLATFORM_DATABASE_URL.strip()
+        if not url:
+            unsafe.append("GAME_PLATFORM_DATABASE_URL")
+        elif url == self.database_url.strip():
+            unsafe.append("GAME_PLATFORM_DATABASE_URL(service-isolated credentials required)")
+        if self.GAME_PLATFORM_DB_POOL_SIZE <= 0 or self.GAME_PLATFORM_DB_MAX_OVERFLOW < 0:
+            unsafe.append("GAME_PLATFORM_DB_POOL_SIZE/GAME_PLATFORM_DB_MAX_OVERFLOW")
+        if self.GAME_PLATFORM_MAX_REPLICAS * (self.GAME_PLATFORM_DB_POOL_SIZE + self.GAME_PLATFORM_DB_MAX_OVERFLOW) > self.DB_GAME_PLATFORM_CONNECTION_BUDGET:
+            unsafe.append("DB_GAME_PLATFORM_CONNECTION_BUDGET")
+        if unsafe:
+            raise RuntimeError("Unsafe Game Platform production configuration: " + ", ".join(unsafe))
 
     def validate_economy_bulk_worker(self) -> None:
         """Validate durable Economy bulk-grant worker capacity."""

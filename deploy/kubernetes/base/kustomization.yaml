@@ -11,6 +11,7 @@ resources:
   - identity.yaml
   - profile-social.yaml
   - economy.yaml
+  - game-platform.yaml
   - realtime.yaml
   - worker.yaml
   - autoscaling.yaml
