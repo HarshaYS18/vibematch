@@ -47,6 +47,7 @@ class MintCoinsRequest(BaseModel):
     target_user_id: int | None = None
     amount: int = Field(..., gt=0)
     reason: str = Field(..., min_length=3, max_length=255)
+    request_id: str | None = Field(default=None, min_length=8, max_length=36)
 
 
 class InternalWalletGrantRequest(BaseModel):
@@ -82,6 +83,7 @@ class AllocatePoolCoinsRequest(BaseModel):
     target_user_id: int | None = None
     amount: int = Field(..., gt=0)
     reason: str = Field(..., min_length=3, max_length=255)
+    request_id: str | None = Field(default=None, min_length=8, max_length=36)
 
 
 class SellerSaleRequest(BaseModel):

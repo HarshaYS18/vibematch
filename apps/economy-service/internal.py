@@ -14,6 +14,7 @@ from app.models.economy import EconomyCurrency, GiftTransaction, RubyWithdrawReq
 from app.models.user import User
 from app.services import (
     economy_level_service,
+    economy_service,
     economy_transaction_service,
     house_pool_service,
     lucky_gift_house_service,
@@ -41,6 +42,23 @@ class WalletMutationRequest(MutationContext):
     reason: str | None = Field(default=None, max_length=255)
     actor_user_id: int | None = None
     metadata: dict[str, Any] = Field(default_factory=dict)
+
+
+class SupplyMintRequest(MutationContext):
+    actor_user_id: int
+    target_pool_type: str
+    target_user_id: int | None = None
+    amount: int = Field(gt=0)
+    reason: str = Field(min_length=3, max_length=255)
+
+
+class SupplyAllocateRequest(MutationContext):
+    actor_user_id: int
+    source_pool_id: int
+    target_pool_type: str
+    target_user_id: int | None = None
+    amount: int = Field(gt=0)
+    reason: str = Field(min_length=3, max_length=255)
 
 
 class MissionRewardRequest(MutationContext):
@@ -698,6 +716,86 @@ def settle_lucky_gift(
             "multiplier": multiplier,
         },
     )
+
+@router.post("/supply/mint", dependencies=[Depends(require_internal_token)])
+def mint_supply(payload: SupplyMintRequest, db: Session = Depends(get_db)):
+    actor = db.query(User).filter(User.id == payload.actor_user_id).first()
+    if actor is None:
+        raise HTTPException(status_code=404, detail="Actor user not found")
+    tx, cached = _begin(db, payload, operation="supply.mint", actor_user_id=actor.id)
+    if cached is not None:
+        return cached
+    pool = economy_service.mint_to_pool(
+        db=db,
+        actor=actor,
+        target_pool_type=payload.target_pool_type,
+        target_user_id=payload.target_user_id,
+        amount=payload.amount,
+        reason=payload.reason,
+        commit=False,
+    )
+    result = {
+        "transaction_id": tx.transaction_id,
+        "id": pool.id,
+        "owner_user_id": pool.owner_user_id,
+        "pool_type": pool.pool_type,
+        "balance": int(pool.balance or 0),
+        "reserved_balance": int(pool.reserved_balance or 0),
+        "status": pool.status,
+    }
+    return economy_transaction_service.complete(
+        db,
+        tx=tx,
+        result=result,
+        event_type="economy.supply.minted.v1",
+        event_payload={
+            "pool_id": pool.id,
+            "target_pool_type": payload.target_pool_type,
+            "target_user_id": payload.target_user_id,
+            "amount": payload.amount,
+        },
+    )
+
+
+@router.post("/supply/allocate", dependencies=[Depends(require_internal_token)])
+def allocate_supply(payload: SupplyAllocateRequest, db: Session = Depends(get_db)):
+    actor = db.query(User).filter(User.id == payload.actor_user_id).first()
+    if actor is None:
+        raise HTTPException(status_code=404, detail="Actor user not found")
+    tx, cached = _begin(db, payload, operation="supply.allocate", actor_user_id=actor.id)
+    if cached is not None:
+        return cached
+    pool = economy_service.allocate_pool_to_pool(
+        db=db,
+        actor=actor,
+        source_pool_id=payload.source_pool_id,
+        target_pool_type=payload.target_pool_type,
+        target_user_id=payload.target_user_id,
+        amount=payload.amount,
+        reason=payload.reason,
+        commit=False,
+    )
+    result = {
+        "transaction_id": tx.transaction_id,
+        "id": pool.id,
+        "owner_user_id": pool.owner_user_id,
+        "pool_type": pool.pool_type,
+        "balance": int(pool.balance or 0),
+        "reserved_balance": int(pool.reserved_balance or 0),
+        "status": pool.status,
+    }
+    return economy_transaction_service.complete(
+        db,
+        tx=tx,
+        result=result,
+        event_type="economy.supply.allocated.v1",
+        event_payload={
+            "source_pool_id": payload.source_pool_id,
+            "target_pool_id": pool.id,
+            "amount": payload.amount,
+        },
+    )
+
 
 @router.post("/mission-rewards/claim", dependencies=[Depends(require_internal_token)])
 def claim_mission_reward(

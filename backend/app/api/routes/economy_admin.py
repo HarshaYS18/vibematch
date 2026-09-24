@@ -1,4 +1,6 @@
-from fastapi import APIRouter, BackgroundTasks, Depends
+from uuid import uuid4
+
+from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException
 from sqlalchemy.orm import Session
 
 from app.api.routes.users import get_current_user
@@ -6,7 +8,7 @@ from app.database import get_db
 from app.models.economy import CoinSupplyPool
 from app.models.user import User
 from app.schemas.economy import AllocatePoolCoinsRequest, EconomyPoolResponse, GamePoolCreateRequest, GameRoundCreateRequest, MintCoinsRequest, OfficialRechargeRequest, OfficialRechargeResponse, SellerSaleRequest
-from app.services import economy_level_service, economy_service
+from app.services import economy_level_service, economy_service, economy_service_client
 from app.websocket.inbox_ws import inbox_ws_manager
 
 router = APIRouter(prefix="/admin/economy", tags=["Admin Economy"])
@@ -67,14 +69,41 @@ async def _broadcast_wallet_vip_svip_update(target_user_id: int, wallet_payload:
 
 @router.post("/mint", response_model=EconomyPoolResponse)
 def mint_coins(payload: MintCoinsRequest, current_user: User = Depends(get_current_user), db: Session = Depends(get_db)):
-    pool = economy_service.mint_to_pool(db=db, actor=current_user, target_pool_type=payload.target_pool_type, target_user_id=payload.target_user_id, amount=payload.amount, reason=payload.reason)
-    return _pool_response(pool)
+    request_id = (payload.request_id or str(uuid4())).strip()
+    try:
+        result = economy_service_client.mint_supply(
+            request_id=request_id,
+            actor_user_id=current_user.id,
+            target_pool_type=payload.target_pool_type,
+            target_user_id=payload.target_user_id,
+            amount=payload.amount,
+            reason=payload.reason,
+        )
+    except economy_service_client.EconomyServiceUnavailable as exc:
+        raise HTTPException(status_code=503, detail=str(exc)) from exc
+    except economy_service_client.EconomyServiceError as exc:
+        raise HTTPException(status_code=exc.status_code, detail=exc.detail) from exc
+    return EconomyPoolResponse(**result)
 
 
 @router.post("/allocate", response_model=EconomyPoolResponse)
 def allocate_pool_coins(payload: AllocatePoolCoinsRequest, current_user: User = Depends(get_current_user), db: Session = Depends(get_db)):
-    pool = economy_service.allocate_pool_to_pool(db=db, actor=current_user, source_pool_id=payload.source_pool_id, target_pool_type=payload.target_pool_type, target_user_id=payload.target_user_id, amount=payload.amount, reason=payload.reason)
-    return _pool_response(pool)
+    request_id = (payload.request_id or str(uuid4())).strip()
+    try:
+        result = economy_service_client.allocate_supply(
+            request_id=request_id,
+            actor_user_id=current_user.id,
+            source_pool_id=payload.source_pool_id,
+            target_pool_type=payload.target_pool_type,
+            target_user_id=payload.target_user_id,
+            amount=payload.amount,
+            reason=payload.reason,
+        )
+    except economy_service_client.EconomyServiceUnavailable as exc:
+        raise HTTPException(status_code=503, detail=str(exc)) from exc
+    except economy_service_client.EconomyServiceError as exc:
+        raise HTTPException(status_code=exc.status_code, detail=exc.detail) from exc
+    return EconomyPoolResponse(**result)
 
 
 @router.post("/official-recharge", response_model=OfficialRechargeResponse)

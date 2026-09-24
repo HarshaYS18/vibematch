@@ -126,23 +126,29 @@ def _debit_coin_pool(db: Session, pool: CoinSupplyPool, amount: int, source_type
     db.add(CoinPoolLedger(pool_id=pool.id, direction=EconomyDirection.DEBIT.value, amount=amount, before_balance=before, after_balance=pool.balance, source_type=source_type, target_pool_id=target_pool_id, target_user_id=target_user_id, created_by_user_id=created_by_user_id, reason=reason))
 
 
-def mint_to_pool(db: Session, actor: User, target_pool_type: str, amount: int, reason: str, target_user_id: int | None = None) -> CoinSupplyPool:
+def mint_to_pool(db: Session, actor: User, target_pool_type: str, amount: int, reason: str, target_user_id: int | None = None, *, commit: bool = True) -> CoinSupplyPool:
     pool = get_or_create_coin_pool(db, CoinSupplyPoolType(target_pool_type), target_user_id)
     _credit_coin_pool(db, pool, amount, "FOUNDER_MINT", actor.id, reason, target_user_id=target_user_id)
-    db.commit()
-    db.refresh(pool)
+    if commit:
+        db.commit()
+        db.refresh(pool)
+    else:
+        db.flush()
     return pool
 
 
-def allocate_pool_to_pool(db: Session, actor: User, source_pool_id: int, target_pool_type: str, amount: int, reason: str, target_user_id: int | None) -> CoinSupplyPool:
+def allocate_pool_to_pool(db: Session, actor: User, source_pool_id: int, target_pool_type: str, amount: int, reason: str, target_user_id: int | None, *, commit: bool = True) -> CoinSupplyPool:
     source = db.query(CoinSupplyPool).filter(CoinSupplyPool.id == source_pool_id).first()
     if not source:
         raise HTTPException(status_code=404, detail="Source pool not found")
     target = get_or_create_coin_pool(db, CoinSupplyPoolType(target_pool_type), target_user_id)
     _debit_coin_pool(db, source, amount, "SUPPLY_ALLOCATION", actor.id, reason, target_pool_id=target.id)
     _credit_coin_pool(db, target, amount, "SUPPLY_ALLOCATION", actor.id, reason, source_pool_id=source.id)
-    db.commit()
-    db.refresh(target)
+    if commit:
+        db.commit()
+        db.refresh(target)
+    else:
+        db.flush()
     return target
 
 

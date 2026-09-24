@@ -297,3 +297,51 @@ def withdraw_ruby(
             "payout_account_snapshot": payout_account_snapshot,
         },
     )
+
+
+def mint_supply(
+    *,
+    request_id: str,
+    actor_user_id: int,
+    target_pool_type: str,
+    target_user_id: int | None,
+    amount: int,
+    reason: str,
+) -> dict[str, Any]:
+    business_reference = f"supply-mint:{actor_user_id}:{request_id}"
+    return _request(
+        "supply/mint",
+        {
+            **mutation_context("supply.mint", business_reference),
+            "actor_user_id": actor_user_id,
+            "target_pool_type": target_pool_type,
+            "target_user_id": target_user_id,
+            "amount": amount,
+            "reason": reason,
+        },
+    )
+
+
+def allocate_supply(
+    *,
+    request_id: str,
+    actor_user_id: int,
+    source_pool_id: int,
+    target_pool_type: str,
+    target_user_id: int | None,
+    amount: int,
+    reason: str,
+) -> dict[str, Any]:
+    business_reference = f"supply-allocate:{actor_user_id}:{request_id}"
+    return _request(
+        "supply/allocate",
+        {
+            **mutation_context("supply.allocate", business_reference),
+            "actor_user_id": actor_user_id,
+            "source_pool_id": source_pool_id,
+            "target_pool_type": target_pool_type,
+            "target_user_id": target_user_id,
+            "amount": amount,
+            "reason": reason,
+        },
+    )
