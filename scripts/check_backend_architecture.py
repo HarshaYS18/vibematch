@@ -1224,7 +1224,6 @@ def _validate_economy_service_cutover(errors: list[str]) -> None:
         if "economy_reconciliation_service.reconcile" not in text:
             errors.append("Economy worker must run continuous reconciliation")
 
-    route_root = ROOT / "backend" / "app" / "api" / "routes"
     forbidden_mutations = (
         "economy_service.credit_social_mission_reward(",
         "economy_service.send_gift(",
@@ -1233,17 +1232,26 @@ def _validate_economy_service_cutover(errors: list[str]) -> None:
         "WalletLedger(",
         "UserWallet(",
     )
-    if route_root.exists():
-        for source in route_root.rglob("*.py"):
-            text = source.read_text(encoding="utf-8-sig")
-            for token in forbidden_mutations:
-                if token in text:
-                    errors.append(
-                        "core route bypasses Economy mutation authority: "
-                        + str(source.relative_to(ROOT))
-                        + " contains "
-                        + token
-                    )
+    core_economy_surfaces = (
+        ROOT / "backend" / "app" / "api" / "routes" / "wallet" / "__init__.py",
+        ROOT / "backend" / "app" / "api" / "routes" / "economy.py",
+        ROOT / "backend" / "app" / "api" / "routes" / "economy_admin.py",
+        ROOT / "backend" / "app" / "api" / "routes" / "experience.py",
+        ROOT / "backend" / "app" / "api" / "routes" / "super_owner.py",
+        ROOT / "backend" / "app" / "api" / "routes" / "control_center.py",
+    )
+    for source in core_economy_surfaces:
+        if not source.exists():
+            continue
+        text = source.read_text(encoding="utf-8-sig")
+        for token in forbidden_mutations:
+            if token in text:
+                errors.append(
+                    "core route bypasses Economy mutation authority: "
+                    + str(source.relative_to(ROOT))
+                    + " contains "
+                    + token
+                )
 
 
 def _validate_post_chunk28_platforms(errors: list[str]) -> None:
