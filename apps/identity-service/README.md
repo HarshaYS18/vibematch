@@ -14,7 +14,7 @@ Internal API: /internal/identity/verify and /internal/identity/sessions/revoke.
 Operations: /live, /ready, /metrics.
 
 ## Session compatibility
-New JWTs carry sid and are backed by identity_sessions. Tokens issued before Chunk 27 contain no sid and remain valid only until their original JWT expiration. Do not extend that compatibility window.
+New JWTs carry sid and are backed by identity_sessions. Other services verify sid-bearing tokens through /internal/identity/verify rather than reading Identity tables. Tokens issued before Chunk 27 contain no sid and remain valid only until their original JWT expiration. Do not extend that compatibility window.
 
 ## Database ownership
 Production uses IDENTITY_DATABASE_URL with service-isolated credentials bound to funkey_identity_runtime. Pool size and replica count are bounded by the PostgreSQL connection budget.

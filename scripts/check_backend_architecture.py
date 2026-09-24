@@ -890,8 +890,10 @@ def _validate_identity_profile_social_extraction(errors: list[str]) -> None:
         users_text = users_path.read_text(encoding="utf-8")
         if "profile_social_service_client.update_profile" not in users_text:
             errors.append("Profile mutation must route through Profile/Social service")
-        if "identity_session_service.is_session_active" not in users_text:
-            errors.append("JWT validation must honor durable Identity sessions")
+        if "identity_service_client.verify_access_token" not in users_text:
+            errors.append("JWT validation must delegate durable session verification to Identity")
+        if "identity_session_service.is_session_active" in users_text:
+            errors.append("Non-Identity request auth must not read Identity session tables directly")
 
     security_path = ROOT / "backend" / "app" / "core" / "security.py"
     if security_path.exists():

@@ -21,7 +21,8 @@ class IdentityProfileSocialBoundaryTests(unittest.TestCase):
         users = (ROOT / "backend/app/api/routes/users.py").read_text(encoding="utf-8")
         self.assertIn('payload["sid"] = session_id', security)
         self.assertIn("identity_session_service.open_session", auth)
-        self.assertIn("identity_session_service.is_session_active", users)
+        self.assertIn("identity_service_client.verify_access_token", users)
+        self.assertNotIn("identity_session_service.is_session_active", users)
 
     def test_core_uses_extracted_route_proxies(self):
         router = (ROOT / "backend/app/api/router.py").read_text(encoding="utf-8")

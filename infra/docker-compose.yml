@@ -171,6 +171,7 @@ services:
       migrate: {condition: service_completed_successfully}
       pgbouncer: {condition: service_healthy}
       cache-redis: {condition: service_healthy}
+      identity: {condition: service_started}
 
   inbox:
     profiles: ["app"]

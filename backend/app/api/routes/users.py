@@ -12,7 +12,7 @@ from app.models.follow import UserBlock, UserFollow
 from app.models.user import User
 from app.schemas.profile_visit import ProfileVisitListResponse, ProfileVisitRecordResponse
 from app.schemas.user import PublicUserProfileResponse, UserMeResponse, UserProfileUpdateRequest, UserRelationshipResponse, UserSearchResponse, UserSearchResultResponse
-from app.services import cdn_media_service, profile_service, identity_session_service, profile_social_service_client
+from app.services import cdn_media_service, profile_service, identity_service_client, profile_social_service_client
 from app.services.role_badge_service import get_primary_role_badge, get_role_badges
 from app.services.role_service import get_primary_role, get_user_roles
 from app.services.user_master_state_service import get_user_master_state
@@ -45,15 +45,18 @@ def get_current_user_from_token(db: Session, token: str) -> User:
     if active_device_id and token_device_id != active_device_id:
         raise HTTPException(status_code=401, detail="Session replaced by a newer login")
     session_id = str(payload.get("sid") or "").strip()
-    if session_id and not identity_session_service.is_session_active(
-        db,
-        user_id=user.id,
-        session_id=session_id,
-        device_id=token_device_id or None,
-    ):
-        raise HTTPException(status_code=401, detail="Session is no longer active")
+    if session_id:
+        try:
+            verified = identity_service_client.verify_access_token(token)
+        except identity_service_client.IdentityServiceUnavailable as exc:
+            raise HTTPException(status_code=503, detail=str(exc)) from exc
+        except identity_service_client.IdentityServiceAuthError as exc:
+            raise HTTPException(status_code=exc.status_code, detail=exc.detail) from exc
+        if int(verified.get("user_id") or 0) != user.id:
+            raise HTTPException(status_code=401, detail="Identity verification mismatch")
     # Backward compatibility: pre-Chunk-27 tokens have no sid and remain valid
-    # until their original JWT expiry. New tokens are session-backed.
+    # until their original JWT expiry. New tokens are verified by Identity,
+    # never by directly reading Identity-owned session tables.
     return user
 
 

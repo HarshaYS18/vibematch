@@ -11,7 +11,7 @@ The existing users table mixes account and profile columns. A big-bang copy woul
 This is a migration mechanism. New mixed-purpose columns are forbidden.
 
 ## Durable sessions
-New access tokens contain sid. identity_sessions and identity_devices make revocation and device state durable. Pre-Chunk-27 tokens remain valid only until normal expiry to avoid forcing deployed clients to log in again.
+New access tokens contain sid. identity_sessions and identity_devices make revocation and device state durable. For sid-bearing tokens, non-Identity services verify the session through Identity's internal API; they do not read identity_sessions directly. Pre-Chunk-27 tokens remain valid only until normal expiry to avoid forcing deployed clients to log in again.
 
 ## Routing
 /api/v1/auth/** routes to Identity.
