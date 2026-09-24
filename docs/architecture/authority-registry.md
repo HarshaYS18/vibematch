@@ -1,63 +1,83 @@
 # Architecture Authority Registry
 
 **Owner:** Platform Architecture  
-**Status:** Canonical architecture contract introduced in Chunk 15  
+**Status:** canonical human guide synchronized through Chunk 32 repair  
 **Machine contract:** `contracts/architecture/authorities.yaml`  
 **Guard:** `scripts/check_backend_architecture.py`
 
 ## Purpose
 
-For each important mutable state this registry answers: who owns it, where it lives today, where it may live after migration, who may mutate it, who may copy it, and how copies converge or rebuild.
+For every important mutable state, the machine registry records classification,
+logical owner, current deployable/storage, permitted mutators, rebuild source,
+migration status and change contract. The machine registry is the enforceable
+source; this file explains the current domain map.
 
-The machine registry is enforceable. This document explains policy without duplicating every machine field.
+## Classification rules
 
-## Logical owner versus current deployable
+- **AUTHORITY** — one durable business owner and one mutation boundary.
+- **PROJECTION** — derived from named source states and rebuildable.
+- **CACHE** — disposable acceleration only.
+- **EPHEMERAL** — reconstructable runtime state such as presence/replay leases.
 
-A logical owner is a business boundary. A current deployable is the process containing that boundary today. Chunk 15 does not pretend future microservices are deployed. Most domains still execute in `core-api`; later chunks extract them with expand/mirror/shadow/compare/canary/ramp/cutover.
+Transport, Flutter, Redis, Kafka, OpenSearch, ClickHouse, observability and
+GraphQL never become durable business authorities merely because they store a
+copy or route traffic.
 
-See [state-classification.md](state-classification.md) for AUTHORITY, PROJECTION, CACHE, and EPHEMERAL semantics and [service-boundaries.md](service-boundaries.md) for extraction rules.
+## Current domain map
 
-## Domain map
-
-| Capability | Logical owner | Current runtime | Rule |
+| Capability | Logical owner | Current deployable | Rule |
 |---|---|---|---|
-| Identity/session policy | Identity | core-api | Tokens are credentials, not a second user authority. |
-| Profile/social/families | Profile/Social | core-api | Durable social facts remain PostgreSQL-backed until extraction. |
-| Rooms/membership/permissions/seats/Watch Party/activities | Room Control | core-api | Go realtime transports deltas; it does not own durable room truth. |
-| Online presence/routing | Realtime | compatibility paths + Go gateway | Target presence is Redis/Valkey lease state; membership remains Room Control. |
-| Inbox | Inbox | core-api + compatibility WS | Messages are durable; typing is ephemeral. |
-| Vibes | Vibes | core-api | Feed/index/ranking copies are projections. |
-| Wallet/ledgers/gift/game settlement/mission rewards | Economy | economy-service + compatibility facades | No other domain independently mutates financial truth. |
-| Game catalog/round lifecycle | Game Platform | game-platform-service + CDN bridge | Final value settlement is an Economy command. |
-| Notifications | Notification | core-api/worker | FCM is delivery transport only. |
-| Media metadata/objects | Media Control | core-api + storage | mediasoup owns transport lifecycle only. |
-| Search | Search Projection | direct DB search today | OpenSearch is projection only. |
-| Analytics | Analytics Projection | not deployed | Kafka/ClickHouse/data lake are downstream projections. |
-| Recommendations | Recommendation Projection | not deployed | Ranker output is rebuildable. |
-| Flutter | client cache authority only | Flutter | Backend snapshots/deltas win durable-state conflicts. |
+| Identity/accounts/sessions | Identity | `identity-service` | Tokens/capabilities are credentials, not user authority. |
+| Profile/social/family membership | Profile/Social | `profile-social-service` | Composite profile reads may remain read-only elsewhere. |
+| Rooms/membership/permissions/seats/Watch Party/activity | Room Control | `room-control-service` | Go transports deltas; PostgreSQL owner state wins. |
+| Online presence/routing/replay | Realtime | Go gateway + realtime Redis | EPHEMERAL/rebuildable only. |
+| Inbox + family community chat | Inbox | `inbox-service` | Durable messages/read state are Inbox-owned. |
+| Vibes | Vibes | `vibes-service` | Feed/search/ranking copies are projections. |
+| Wallet/supply/gift/game settlement/mission rewards | Economy | `economy-service` | Exclusive financial writer; balanced journal is audit evidence. |
+| VIP/SVIP materialization | Economy-derived projection | `economy-service` + readers | Rebuildable from Economy value history; not profile authority. |
+| Game catalog/session/round/bet/risk/stats | Game Platform | `game-platform-service` | Never mutates wallet/financial tables. |
+| Notifications + push delivery state | Notification | `notification-service` | FCM/provider is transport only. |
+| Media upload/processing metadata | Media Control | core control + media workers | PostgreSQL is control-plane authority; object storage is bytes only. |
+| Search | Search Projection | direct DB search today | Future OpenSearch remains rebuildable. |
+| Analytics | Analytics Projection | not deployed | Future Kafka/ClickHouse copies are downstream only. |
+| Recommendations | Recommendation Projection | not deployed | Ranking output is rebuildable. |
+| Flutter room/display cache | Flutter client cache | Flutter | Backend snapshot/delta wins durable conflicts. |
 
-## Audit findings fixed
+## Important resolved boundaries
 
-**Games versus Economy:** historical Games docs claimed financial tables. Game Platform now owns catalog/round/risk lifecycle; Economy owns wallets, value pools/ledgers, and final settlement. Physical co-location does not grant ownership.
+### Games vs Economy
+Game Platform owns gameplay lifecycle. Economy owns every value movement,
+including wager debit and final settlement. Physical co-location or a compatibility
+facade never grants Game Platform financial authority.
 
-**Missions:** current progress is computed from room events and gift transactions, so it is a PROJECTION. Reward claims are durable through Economy-owned wallet ledger entries.
+### Missions
+Mission progress is a projection. Reward claims become durable only through the
+Economy ledger/transaction boundary.
 
-**Watch Party/activities:** these are implemented. Current canonical state is persisted in `room_realtime_events`; later current-state tables remain under Room Control.
+### Presence
+Socket liveness is a Redis/Valkey lease and replay is bounded ephemeral state.
+Room membership remains Room Control PostgreSQL authority.
 
-**Presence:** Chunk 20 makes online room socket presence an EPHEMERAL Redis/Valkey lease. Periodic room DB heartbeat is no longer the normal liveness path. Join/leave and durable membership remain PostgreSQL-backed. Chunk 21 completes application-socket convergence.
+### Media
+Media v2 upload sessions, processing status and variants are durable control-plane
+state. Object storage/CDN owns bytes, while `backend_media` owns WebRTC transport.
 
 ## App source registry relationship
 
-The existing `/api/v1/app/source-of-truth/master` and Flutter `AppSourceRegistry` describe screen read/write/realtime contracts. They are not competing architecture authorities.
+`/api/v1/app/source-of-truth/master` and Flutter `AppSourceRegistry` describe
+screen read/write/realtime contracts. They do not compete with this registry.
 
-## Change, migration, rollback, observability
+## Change and rollback rule
 
-Before mutating a state, identify its registry entry and owner. Ownership changes require architecture/migration review before code. Update projections only after authoritative success and publish through the approved transactional event path where applicable.
+An ownership move must update the machine registry, architecture docs, DB roles,
+tests/guards and runbook in the same migration. Do not mark a cutover complete
+while the old writer still has mutation rights.
 
-Chunk 15 has no production data migration; rollback is a Git revert. Later ownership moves use expand, mirror, shadow, compare, canary, ramp, freeze old writes, soak, remove old path, then strengthen the guard.
+Rollback must preserve exactly one durable writer. Never recover by enabling
+dual writes.
 
-The registry itself has no runtime telemetry; CI conformance is its signal. Runtime observability is standardized in Chunk 16.
+## Known future projections
 
-## Known gaps
-
-Identity and Game Platform durable session registries are live; presence remains transitional; OpenSearch/Kafka/ClickHouse/Recommendation are explicitly not deployed; naming a logical owner does not mean physical service extraction is complete.
+OpenSearch, Kafka/ClickHouse, Recommendation Platform and GraphQL read BFF are
+not deployed business authorities. Their future introduction must preserve the
+current owner graph.
