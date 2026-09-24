@@ -116,6 +116,18 @@ class Settings(BaseSettings):
     PROFILE_SOCIAL_MAX_REPLICAS: int = 20
     DB_PROFILE_SOCIAL_CONNECTION_BUDGET: int = 80
 
+    # Restored Chunk 25 Economy service boundary.
+    ECONOMY_SERVICE_URL: str = "http://127.0.0.1:8088/api/v1"
+    ECONOMY_INTERNAL_URL: str = "http://127.0.0.1:8088/internal/economy"
+    ECONOMY_SERVICE_TIMEOUT_SECONDS: float = 5.0
+    ECONOMY_INTERNAL_TOKEN: str = "change-this-economy-internal-token"
+    ECONOMY_DATABASE_URL: str = ""
+    ECONOMY_DB_POOL_SIZE: int = 4
+    ECONOMY_DB_MAX_OVERFLOW: int = 0
+    ECONOMY_DB_POOL_TIMEOUT_SECONDS: int = 3
+    ECONOMY_MAX_REPLICAS: int = 20
+    DB_ECONOMY_CONNECTION_BUDGET: int = 80
+
     # Topology budgets. These are planning/validation limits, not capacity claims.
     API_MAX_REPLICAS: int = 20
     DB_API_CONNECTION_BUDGET: int = 100
@@ -232,6 +244,7 @@ class Settings(BaseSettings):
             + self.DB_ROOM_CONTROL_CONNECTION_BUDGET
             + self.DB_IDENTITY_CONNECTION_BUDGET
             + self.DB_PROFILE_SOCIAL_CONNECTION_BUDGET
+            + self.DB_ECONOMY_CONNECTION_BUDGET
             + self.DB_WORKER_CONNECTION_BUDGET
             + self.DB_ROLLOUT_SURGE_CONNECTION_RESERVE
         )
@@ -249,6 +262,7 @@ class Settings(BaseSettings):
             "ROOM_CONTROL_INTERNAL_TOKEN",
             "IDENTITY_INTERNAL_TOKEN",
             "PROFILE_SOCIAL_INTERNAL_TOKEN",
+            "ECONOMY_INTERNAL_TOKEN",
         ):
             value = getattr(self, name).strip()
             if len(value) < 32 or "change-this" in value.lower():
@@ -546,6 +560,25 @@ class Settings(BaseSettings):
             unsafe.append("DB_PROFILE_SOCIAL_CONNECTION_BUDGET")
         if unsafe:
             raise RuntimeError("Unsafe Profile/Social service production configuration: " + ", ".join(unsafe))
+
+    def validate_economy_service(self) -> None:
+        """Validate Tier-0 Economy service production isolation."""
+        if not self.is_production:
+            return
+        unsafe: list[str] = []
+        if len(self.ECONOMY_INTERNAL_TOKEN.strip()) < 32 or "change-this" in self.ECONOMY_INTERNAL_TOKEN.lower():
+            unsafe.append("ECONOMY_INTERNAL_TOKEN")
+        url = self.ECONOMY_DATABASE_URL.strip()
+        if not url:
+            unsafe.append("ECONOMY_DATABASE_URL")
+        elif url == self.database_url.strip():
+            unsafe.append("ECONOMY_DATABASE_URL(service-isolated credentials required)")
+        if self.ECONOMY_DB_POOL_SIZE <= 0 or self.ECONOMY_DB_MAX_OVERFLOW < 0:
+            unsafe.append("ECONOMY_DB_POOL_SIZE/ECONOMY_DB_MAX_OVERFLOW")
+        if self.ECONOMY_MAX_REPLICAS * (self.ECONOMY_DB_POOL_SIZE + self.ECONOMY_DB_MAX_OVERFLOW) > self.DB_ECONOMY_CONNECTION_BUDGET:
+            unsafe.append("DB_ECONOMY_CONNECTION_BUDGET")
+        if unsafe:
+            raise RuntimeError("Unsafe Economy service production configuration: " + ", ".join(unsafe))
 
     def validate_worker_runtime(self) -> None:
         """Reject worker-only service credentials that are unsafe in production."""
