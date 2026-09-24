@@ -1149,6 +1149,159 @@ def _validate_game_platform_extraction(errors: list[str]) -> None:
             errors.append("games.financial_settlement: current deployable must be economy-service")
 
 
+
+def _validate_economy_service_cutover(errors: list[str]) -> None:
+    required = (
+        ROOT / "apps" / "economy-service" / "main.py",
+        ROOT / "apps" / "economy-service" / "internal.py",
+        ROOT / "apps" / "economy-service" / "database.py",
+        ROOT / "apps" / "economy-service" / "README.md",
+        ROOT / "deploy" / "postgres" / "economy-ownership.sql",
+        ROOT / "backend" / "app" / "models" / "economy_journal.py",
+        ROOT / "backend" / "app" / "services" / "economy_reconciliation_service.py",
+        ROOT / "backend" / "alembic" / "versions" / "20260924_1100_economy_authority_cutover.py",
+        ROOT / "docs" / "architecture" / "economy-service.md",
+        ROOT / "docs" / "runbooks" / "economy-service.md",
+    )
+    for required_path in required:
+        if not required_path.exists():
+            errors.append(
+                "Economy authority cutover path is missing: "
+                + str(required_path.relative_to(ROOT))
+            )
+
+    authority = json.loads(AUTHORITY_REGISTRY.read_text(encoding="utf-8"))
+    states = {str(item.get("id")): item for item in authority.get("states", [])}
+    for state_id in (
+        "economy.wallet_ledger",
+        "economy.supply_ledger",
+        "gifts.catalog",
+        "gifts.settlement",
+        "games.financial_settlement",
+        "missions.reward_claims",
+    ):
+        if states.get(state_id, {}).get("current_deployable") != "economy-service":
+            errors.append(
+                f"{state_id}: Economy authority must be deployed by economy-service"
+            )
+
+    ownership = ROOT / "deploy" / "postgres" / "economy-ownership.sql"
+    if ownership.exists():
+        text = ownership.read_text(encoding="utf-8")
+        for table in (
+            "user_wallets",
+            "wallet_ledger",
+            "coin_supply_pools",
+            "coin_pool_ledger",
+            "game_pools",
+            "game_pool_ledger",
+            "gift_transactions",
+            "economy_transactions",
+            "economy_journal_entries",
+        ):
+            if f"ALTER TABLE {table} OWNER TO funkey_economy_owner" not in text:
+                errors.append("Economy ownership missing table: " + table)
+        if "GRANT funkey_economy_reader TO <production_core_api_login>" not in text:
+            errors.append("Economy ownership must document SELECT-only core reader binding")
+        if "Never grant funkey_economy_runtime to core-api" not in text:
+            errors.append("Economy ownership must explicitly forbid core mutation role")
+
+    tx_service = ROOT / "backend" / "app" / "services" / "economy_transaction_service.py"
+    if tx_service.exists():
+        text = tx_service.read_text(encoding="utf-8")
+        for token in (
+            "EconomyJournalEntry",
+            "record_balanced_transfer",
+            "_assert_journal_balanced",
+            "event_outbox_service.enqueue_event",
+        ):
+            if token not in text:
+                errors.append("Economy transaction invariant missing: " + token)
+
+    bulk_worker = ROOT / "apps" / "economy-service" / "bulk_worker.py"
+    if bulk_worker.exists():
+        text = bulk_worker.read_text(encoding="utf-8")
+        if "economy_reconciliation_service.reconcile" not in text:
+            errors.append("Economy worker must run continuous reconciliation")
+
+    route_root = ROOT / "backend" / "app" / "api" / "routes"
+    forbidden_mutations = (
+        "economy_service.credit_social_mission_reward(",
+        "economy_service.send_gift(",
+        "economy_service.convert_rubies_to_coins(",
+        "economy_service.create_withdraw_request(",
+        "WalletLedger(",
+        "UserWallet(",
+    )
+    if route_root.exists():
+        for source in route_root.rglob("*.py"):
+            text = source.read_text(encoding="utf-8-sig")
+            for token in forbidden_mutations:
+                if token in text:
+                    errors.append(
+                        "core route bypasses Economy mutation authority: "
+                        + str(source.relative_to(ROOT))
+                        + " contains "
+                        + token
+                    )
+
+
+def _validate_post_chunk28_platforms(errors: list[str]) -> None:
+    notification_required = (
+        ROOT / "apps" / "notification-service" / "main.py",
+        ROOT / "apps" / "notification-service" / "provider_worker.py",
+        ROOT / "deploy" / "postgres" / "notification-ownership.sql",
+        ROOT / "docs" / "modules" / "notification" / "README.md",
+        ROOT / "docs" / "runbooks" / "notification-service.md",
+    )
+    for required_path in notification_required:
+        if not required_path.exists():
+            errors.append(
+                "Notification Service path is missing: "
+                + str(required_path.relative_to(ROOT))
+            )
+
+    worker_required = (
+        ROOT / "apps" / "worker" / "pools.py",
+        ROOT / "apps" / "worker" / "handlers.py",
+        ROOT / "apps" / "worker" / "README.md",
+        ROOT / "docs" / "modules" / "worker" / "README.md",
+        ROOT / "docs" / "runbooks" / "worker-platform.md",
+    )
+    for required_path in worker_required:
+        if not required_path.exists():
+            errors.append(
+                "Worker Platform path is missing: "
+                + str(required_path.relative_to(ROOT))
+            )
+
+    media_required = (
+        ROOT / "backend" / "app" / "api" / "routes" / "media_uploads_v2.py",
+        ROOT / "backend" / "app" / "services" / "media_upload_session_service.py",
+        ROOT / "backend" / "alembic" / "versions" / "20260924_1000_media_v2.py",
+        ROOT / "docs" / "architecture" / "media-v2-upload.md",
+        ROOT / "docs" / "modules" / "media-upload-v2" / "README.md",
+        ROOT / "docs" / "runbooks" / "media-v2-upload.md",
+    )
+    for required_path in media_required:
+        if not required_path.exists():
+            errors.append(
+                "Media v2 path is missing: "
+                + str(required_path.relative_to(ROOT))
+            )
+
+    authority = json.loads(AUTHORITY_REGISTRY.read_text(encoding="utf-8"))
+    states = {str(item.get("id")): item for item in authority.get("states", [])}
+    for state_id in ("notifications.in_app", "notifications.delivery"):
+        if states.get(state_id, {}).get("current_deployable") != "notification-service":
+            errors.append(
+                f"{state_id}: Notification authority must be notification-service"
+            )
+    for state_id in ("media.metadata", "media.objects"):
+        if states.get(state_id, {}).get("change_contract", {}).get("status") != "live":
+            errors.append(f"{state_id}: Chunk 31 contract status must be live")
+
+
 def main() -> int:
     errors: list[str] = []
     _validate_authority_registry(errors)
@@ -1160,6 +1313,8 @@ def main() -> int:
     _validate_room_control_extraction(errors)
     _validate_identity_profile_social_extraction(errors)
     _validate_game_platform_extraction(errors)
+    _validate_economy_service_cutover(errors)
+    _validate_post_chunk28_platforms(errors)
 
     for path in REQUIRED_PATHS:
         if not path.exists():
@@ -1262,6 +1417,8 @@ def main() -> int:
     print(" - Room Control owns durable room state behind a core compatibility proxy")
     print(" - Identity and Profile/Social mutation authorities are physically extracted")
     print(" - Game Platform owns game lifecycle while Economy owns all game value movement")
+    print(" - Economy Service is the exclusive financial writer with balanced journal reconciliation")
+    print(" - Notification, Worker Platform and Media v2 post-extraction boundaries are present")
     return 0
 
 
