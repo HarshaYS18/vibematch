@@ -3,10 +3,10 @@ import 'dart:convert';
 import 'dart:math';
 
 import 'package:dio/dio.dart';
-import 'package:shared_preferences/shared_preferences.dart';
 import 'package:uuid/uuid.dart';
 
 import '../../core/constants/app_constants.dart';
+import '../persistence/app_key_value_store.dart';
 import '../../core/network/api_exception.dart';
 import '../../core/network/trace_context.dart';
 import '../../core/network/vm_api_config.dart';
@@ -72,6 +72,10 @@ class NetworkAuthCoordinator {
   static String? _cachedToken;
   static NetworkRefreshHandler? _refreshHandler;
   static Future<String?>? _refreshInFlight;
+  static Future<AppKeyValueStore>? _storeFuture;
+
+  static Future<AppKeyValueStore> _store() =>
+      _storeFuture ??= SharedPreferencesKeyValueStore.create();
 
   static void seedAccessToken(String? token) {
     final value = token?.trim();
@@ -85,8 +89,8 @@ class NetworkAuthCoordinator {
   static Future<String?> accessToken() async {
     final cached = _cachedToken;
     if (cached != null && cached.isNotEmpty) return cached;
-    final prefs = await SharedPreferences.getInstance();
-    final stored = prefs.getString(_tokenKey)?.trim();
+    final store = await _store();
+    final stored = store.readString(_tokenKey)?.trim();
     if (stored != null && stored.isNotEmpty) {
       _cachedToken = stored;
       return stored;

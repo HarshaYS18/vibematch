@@ -19,8 +19,17 @@ void main() {
     expect(transport, contains('X-Request-ID'));
     expect(transport, contains('TraceContext.withTraceparent'));
     expect(transport, contains('NetworkAuthCoordinator.refreshOnce'));
+    expect(transport, contains('AppKeyValueStore'));
+    expect(transport, isNot(contains('SharedPreferences.getInstance')));
     expect(transport, contains('Idempotency-Key'));
     expect(transport, contains('NetworkCancellation'));
+  });
+
+  test('legacy ApiClient cannot own an HTTP transport', () {
+    final legacy = read('lib/core/network/api_client.dart');
+    expect(legacy, contains('extends DioAppNetworkClient'));
+    expect(legacy, isNot(contains("package:http/http.dart")));
+    expect(legacy, isNot(contains('http.Client')));
   });
 
   test('foundation http compatibility facade delegates to shared client', () {
