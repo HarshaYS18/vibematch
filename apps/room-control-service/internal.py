@@ -13,6 +13,16 @@ from app.models.room import Room
 from app.models.user import User
 from app.services import realtime_command_service
 from app.services.permissions.media_room_permission_service import evaluate_media_room_permission
+from app.schemas.rooms.cricket import (
+    CricketBallEventRequest,
+    CricketMatchCreateRequest,
+    CricketMatchLineupRequest,
+    CricketMatchScorePatchRequest,
+    CricketMatchTossRequest,
+    CricketTournamentCreateRequest,
+    CricketTournamentUpdateRequest,
+)
+from app.services.rooms import cricket_service
 from app.services.rooms.room_theme_service import (
     grant_room_theme_inventory,
     room_theme_purchase_quote,
@@ -43,6 +53,16 @@ class RoomRealtimeCommandRequest(BaseModel):
     activity: str | None = None
     payload: dict[str, Any] = Field(default_factory=dict)
     command_id: str | None = None
+
+
+class CricketOperationRequest(BaseModel):
+    user_id: int = Field(ge=1)
+    room_public_id: str = Field(min_length=2, max_length=32)
+    operation: str = Field(min_length=1, max_length=64)
+    resource_id: int | None = Field(default=None, ge=1)
+    payload: dict[str, Any] = Field(default_factory=dict)
+    offset: int = Field(default=0, ge=0)
+    limit: int = Field(default=50, ge=1, le=100)
 
 
 def require_internal_token(
@@ -186,3 +206,121 @@ async def execute_room_command(
         payload=dict(payload.payload or {}),
         command_id=payload.command_id,
     )
+
+
+
+def _active_room_control_user(db: Session, user_id: int) -> User:
+    user = db.query(User).filter(User.id == user_id).first()
+    if user is None or not user.is_active or user.is_banned:
+        raise HTTPException(status_code=401, detail="Room user is not active")
+    return user
+
+
+@router.post(
+    "/cricket/operation",
+    dependencies=[Depends(require_internal_token)],
+)
+def execute_cricket_operation(
+    request: CricketOperationRequest,
+    db: Session = Depends(get_db),
+):
+    """Execute durable Room Cricket state only inside Room Control."""
+    user = _active_room_control_user(db, request.user_id)
+    operation = request.operation.strip().lower()
+    common = {
+        "db": db,
+        "room_public_id": request.room_public_id,
+        "current_user": user,
+    }
+
+    if operation == "list_tournaments":
+        result = cricket_service.list_tournaments(
+            **common,
+            offset=request.offset,
+            limit=request.limit,
+        )
+    elif operation == "get_tournament":
+        if request.resource_id is None:
+            raise HTTPException(status_code=422, detail="Tournament ID is required")
+        result = cricket_service.get_tournament(
+            **common,
+            tournament_id=request.resource_id,
+        )
+    elif operation == "create_tournament":
+        result = cricket_service.create_tournament(
+            **common,
+            payload=CricketTournamentCreateRequest.model_validate(request.payload),
+        )
+    elif operation == "update_tournament":
+        if request.resource_id is None:
+            raise HTTPException(status_code=422, detail="Tournament ID is required")
+        result = cricket_service.update_tournament(
+            **common,
+            tournament_id=request.resource_id,
+            payload=CricketTournamentUpdateRequest.model_validate(request.payload),
+        )
+    elif operation == "delete_tournament":
+        if request.resource_id is None:
+            raise HTTPException(status_code=422, detail="Tournament ID is required")
+        reason = request.payload.get("reason")
+        result = cricket_service.delete_tournament(
+            **common,
+            tournament_id=request.resource_id,
+            reason=str(reason) if reason is not None else None,
+        )
+    elif operation == "create_match":
+        result = cricket_service.create_match(
+            **common,
+            payload=CricketMatchCreateRequest.model_validate(request.payload),
+        )
+    elif operation == "get_match":
+        if request.resource_id is None:
+            raise HTTPException(status_code=422, detail="Match ID is required")
+        result = cricket_service.get_match(
+            **common,
+            match_id=request.resource_id,
+        )
+    elif operation == "update_match_toss":
+        if request.resource_id is None:
+            raise HTTPException(status_code=422, detail="Match ID is required")
+        result = cricket_service.update_match_toss(
+            **common,
+            match_id=request.resource_id,
+            payload=CricketMatchTossRequest.model_validate(request.payload),
+        )
+    elif operation == "update_match_lineup":
+        if request.resource_id is None:
+            raise HTTPException(status_code=422, detail="Match ID is required")
+        result = cricket_service.update_match_lineup(
+            **common,
+            match_id=request.resource_id,
+            payload=CricketMatchLineupRequest.model_validate(request.payload),
+        )
+    elif operation == "append_ball_event":
+        if request.resource_id is None:
+            raise HTTPException(status_code=422, detail="Match ID is required")
+        result = cricket_service.append_ball_event(
+            **common,
+            match_id=request.resource_id,
+            payload=CricketBallEventRequest.model_validate(request.payload),
+        )
+    elif operation == "patch_match_score":
+        if request.resource_id is None:
+            raise HTTPException(status_code=422, detail="Match ID is required")
+        result = cricket_service.patch_match_score(
+            **common,
+            match_id=request.resource_id,
+            payload=CricketMatchScorePatchRequest.model_validate(request.payload),
+        )
+    elif operation == "complete_match":
+        if request.resource_id is None:
+            raise HTTPException(status_code=422, detail="Match ID is required")
+        result = cricket_service.complete_match(
+            **common,
+            match_id=request.resource_id,
+            payload=CricketMatchScorePatchRequest.model_validate(request.payload),
+        )
+    else:
+        raise HTTPException(status_code=400, detail="Unsupported Cricket operation")
+
+    return {"result": result}
