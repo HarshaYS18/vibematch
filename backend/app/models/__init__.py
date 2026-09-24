@@ -15,11 +15,16 @@ from app.models.store import StoreAssetManifest, StoreCategory, StoreItem, Store
 from app.models.home_banner import HomeBanner, HomeBannerPlacement, HomeBannerTarget
 from app.models.cdn_media import (
     CdnMediaAsset,
+    CdnMediaVariant,
     CdnMediaDeletionStatus,
     CdnMediaLinkedEntityType,
     CdnMediaModerationStatus,
     CdnMediaType,
     CdnMediaUploadStatus,
+    MediaProcessingStatus,
+    MediaUploadMode,
+    MediaUploadSession,
+    MediaUploadSessionStatus,
     MediaSafetySetting,
 )
 from app.models.cricket import (

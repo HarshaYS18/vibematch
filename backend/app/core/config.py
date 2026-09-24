@@ -212,7 +212,13 @@ class Settings(BaseSettings):
     MEDIA_S3_ENDPOINT_URL: str = ""
     MEDIA_S3_ACCESS_KEY_ID: str = ""
     MEDIA_S3_SECRET_ACCESS_KEY: str = ""
-    MEDIA_S3_PUBLIC_READ: bool = True
+    MEDIA_S3_PUBLIC_READ: bool = False
+    MEDIA_UPLOAD_SESSION_TTL_SECONDS: int = 900
+    MEDIA_MULTIPART_THRESHOLD_BYTES: int = 8 * 1024 * 1024
+    MEDIA_MULTIPART_PART_SIZE_BYTES: int = 8 * 1024 * 1024
+    MEDIA_DIRECT_UPLOAD_MAX_PARTS: int = 1000
+    MEDIA_PROCESSING_FFMPEG_TIMEOUT_SECONDS: int = 300
+    MEDIA_PROCESSING_MAX_IMAGE_PIXELS: int = 40_000_000
 
     # Google Sign-In OAuth client IDs. Comma-separated for web/android/ios clients.
     GOOGLE_AUTH_CLIENT_IDS: str = ""
@@ -383,6 +389,16 @@ class Settings(BaseSettings):
             unsafe.append("MEDIA_CDN_BASE_URL(https)")
         if self.MEDIA_S3_ENDPOINT_URL and not self.MEDIA_S3_ENDPOINT_URL.startswith("https://"):
             unsafe.append("MEDIA_S3_ENDPOINT_URL(https)")
+        if self.MEDIA_S3_PUBLIC_READ:
+            unsafe.append("MEDIA_S3_PUBLIC_READ(false required)")
+        if not 60 <= self.MEDIA_UPLOAD_SESSION_TTL_SECONDS <= 3600:
+            unsafe.append("MEDIA_UPLOAD_SESSION_TTL_SECONDS")
+        if self.MEDIA_MULTIPART_PART_SIZE_BYTES < 5 * 1024 * 1024:
+            unsafe.append("MEDIA_MULTIPART_PART_SIZE_BYTES")
+        if self.MEDIA_MULTIPART_THRESHOLD_BYTES < self.MEDIA_MULTIPART_PART_SIZE_BYTES:
+            unsafe.append("MEDIA_MULTIPART_THRESHOLD_BYTES")
+        if not 1 <= self.MEDIA_DIRECT_UPLOAD_MAX_PARTS <= 10000:
+            unsafe.append("MEDIA_DIRECT_UPLOAD_MAX_PARTS")
         if not self.RATE_LIMIT_ENABLED:
             unsafe.append("RATE_LIMIT_ENABLED")
 

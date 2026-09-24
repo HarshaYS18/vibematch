@@ -808,6 +808,8 @@
       "current_deployable": "core-api",
       "current_storage": [
         "postgres:cdn_media_assets",
+        "postgres:media_upload_sessions",
+        "postgres:cdn_media_variants",
         "postgres:media_safety_settings"
       ],
       "target_storage": [
@@ -819,33 +821,34 @@
       "source_states": [],
       "rebuild_from": [],
       "change_contract": {
-        "status": "planned",
+        "status": "implementing",
         "name": "media.asset.changed.v1"
       },
-      "migration_status": "Chunk 31"
+      "migration_status": "Chunk 31 Media v2 control plane"
     },
     {
       "id": "media.objects",
       "domain": "media",
       "classification": "AUTHORITY",
       "logical_owner": "media-control",
-      "current_deployable": "configured object-storage path + legacy/local dev paths",
+      "current_deployable": "core media-control + direct object storage + media worker",
       "current_storage": [
-        "object bytes referenced by cdn_media_assets; local/static paths remain migration debt where used"
+        "S3-compatible object storage + CDN; local streaming path for dev/testing only"
       ],
       "target_storage": [
         "versioned object storage + CDN"
       ],
       "mutated_by": [
-        "media upload/storage service"
+        "server-signed direct upload clients",
+        "media worker storage service"
       ],
       "source_states": [],
       "rebuild_from": [],
       "change_contract": {
-        "status": "planned",
+        "status": "implementing",
         "name": "media.uploaded.v1"
       },
-      "migration_status": "Chunk 31"
+      "migration_status": "Chunk 31 Media v2 direct-upload cutover"
     },
     {
       "id": "media.transport",

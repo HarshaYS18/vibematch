@@ -12,7 +12,7 @@ from app.api.routes import (
     experience, families_economy, game_platform_proxy, game_props_admin,
     game_settlements, health, home_banners,
     identity_proxy, inbox_proxy, inbox_stories,
-    lucky_gift_admin, media, media_control, media_realtime_auth, media_safety_admin,
+    lucky_gift_admin, media, media_control, media_realtime_auth, media_safety_admin, media_uploads_v2,
     notification_proxy, presence, profile_social_proxy, rankings,
     relationship_exp, role_badges, room_control_proxy, room_cross_domain,
     room_levels, room_music_media, realtime_gateway_auth, settings, super_owner,
@@ -61,6 +61,7 @@ api_router.include_router(inbox_proxy.router)
 
 # Media storage/upload.
 api_router.include_router(media.router)
+api_router.include_router(media_uploads_v2.router)
 api_router.include_router(room_music_media.router)
 
 # Economy financial route families are extracted behind a compatibility proxy.
