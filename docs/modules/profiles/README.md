@@ -2,96 +2,42 @@
 
 ## Purpose
 
-Exposes profile details, display preferences, visits, and privacy-sensitive profile views.
+Own profile mutation/display state, visits and profile privacy behavior.
 
-## Responsibilities
+## Current deployable
 
-The module owns profile display and visit records; user profile fields. Routes should validate input and delegate business decisions to services.
+`apps/profile-social-service` is the mutation authority. Core may compose
+read-only profile/economy views but does not mutate profile-owned state.
 
-## What this module owns
+## Owns
 
-profile display and visit records; user profile fields.
+- documented profile columns on the legacy users row through scoped grants
+- stealth/profile display state
+- profile audits/visits
+- profile media activation after approved moderation
 
-## What this module does NOT own
+## Does not own
 
-This module does not own SFU transport state, edge routing, or client UI state.
+Account/security state, wallet/Economy value, room authority, realtime transport
+or media bytes.
 
-## Source of truth
+## Database boundary
 
-PostgreSQL is the durable source of truth for users, user_stealth_states, profile_display_audits, profile_visits.
+Identity owns the physical `users` table while Profile/Social receives UPDATE
+rights only for documented profile columns during the safe shared-table
+migration. This is a column-scoped mutation boundary, not shared authority.
 
-## Important files
+## Privacy
 
-`backend/app/services/profile_service.py`, `backend/app/services/profile_display_service.py`, `backend/app/api/routes/profile_display.py`.
+Stealth/visibility/block rules must be applied before profile rendering and
+visits. Read caches must not bypass a newer privacy decision.
 
-## Public API/contracts
+## Operations
 
-profile and display routes under /api/v1. Preserve deployed request and response shapes while migrating implementation.
+See `docs/architecture/identity-profile-social-services.md` and
+`docs/runbooks/identity-profile-social-services.md`.
 
-## Events published
+## Migration status
 
-Current code may emit domain WebSocket updates after committed writes. A versioned broker event for this domain must be added only with a contract and transactional publication path; do not claim every proposed event is live. Consumers must handle duplicates and refetch a snapshot after a gap.
-
-## Events consumed
-
-No durable broker consumer is implied by this ownership guide. Add a consumer only with a versioned contract, idempotency, retry limits, and an integration test.
-
-## Database tables/state owned
-
-Database tables and state: `users, user_stealth_states, profile_display_audits, profile_visits`.
-
-## Redis keys/state owned
-
-Optional cache only; no durable profile authority.
-
-## Dependencies
-
-Depends on FastAPI authentication, SQLAlchemy transaction/session handling, and the relevant domain services.
-
-## Security considerations
-
-Stealth and hidden-presence rules must be enforced before rendering a public profile. Never log tokens, OTPs, or payment secrets.
-
-## Failure modes
-
-Stale cache can disclose private data; invalidate or bypass on permission changes.
-
-## Retry/idempotency behavior
-
-Reads and writes should use bounded timeouts. Retries are safe only for read operations or writes backed by an idempotency key and known commit outcome.
-
-## Scaling behavior
-
-Scale stateless API replicas only within the PostgreSQL connection budget.
-
-## Autoscaling metrics
-
-Track route request rate, p95 latency, error rate, transaction latency, DB pool use, and domain-specific rejection counts. Trace commands through commit and fanout with a request ID; avoid user PII in metric labels.
-
-## Observability
-
-Trace commands through commit and fanout with a request ID; avoid user PII in metric labels.
-
-## Local development
-
-Start dependencies with `.\\scripts\\dev-up.ps1`, then run affected backend tests with `python -m unittest discover -s backend/tests -p test_*.py` from the repository root with the backend import path configured, or use the test command in the root README.
-
-## Testing
-
-Add a regression test for authorization, transaction outcome, and duplicate/reconnect behavior when relevant.
-
-## Deployment notes
-
-Apply Alembic first; roll out compatible API behavior; check readiness and error metrics.
-
-## Change checklist
-
-Before changing this module: identify the owning table and contract, add an additive migration if needed, preserve Flutter compatibility, verify permission checks, and document rollback.
-
-## Known migration status
-
-Existing FastAPI domain; no Go migration started.
-
-
-## Chunk 27 deployed boundary
-Profile mutation and profile-visit side effects now execute in apps/profile-social-service. The legacy users row is intentionally retained during the safe migration: Identity owns the physical row while Profile/Social receives PostgreSQL UPDATE rights only for the documented profile columns. Composite profile reads may remain in core but are read-only.
+Chunk 27 profile mutation and visit side effects are extracted to
+`profile-social-service`.
