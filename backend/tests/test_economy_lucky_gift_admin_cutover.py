@@ -26,6 +26,34 @@ class EconomyLuckyGiftAdminCutoverTests(unittest.TestCase):
         ):
             self.assertNotIn(token, route)
 
+    def test_core_admin_reads_delegate_to_economy(self):
+        route = (ROOT / "backend/app/api/routes/lucky_gift_admin.py").read_text(encoding="utf-8")
+        for token in (
+            "economy_service_client.get_lucky_gift_admin_props",
+            "economy_service_client.get_lucky_gift_admin_moderation",
+            "economy_service_client.get_lucky_gift_admin_house_pool",
+            "economy_service_client.list_lucky_gift_admin_house_pools",
+        ):
+            self.assertIn(token, route)
+        for token in (
+            "LuckyGiftTransaction",
+            "lucky_gift_house_service.get_pool_detail",
+            "lucky_gift_house_service.list_pools",
+            "lucky_gift_props_service.get_props",
+        ):
+            self.assertNotIn(token, route)
+
+    def test_economy_internal_admin_reads_cover_the_legacy_surface(self):
+        internal = (ROOT / "apps/economy-service/internal.py").read_text(encoding="utf-8")
+        for token in (
+            '@router.get("/lucky-gifts/admin/props"',
+            '@router.get("/lucky-gifts/admin/moderation"',
+            '@router.get("/lucky-gifts/admin/house-pool"',
+            '@router.get("/lucky-gifts/admin/house-pool/list"',
+            "db.query(LuckyGiftTransaction)",
+        ):
+            self.assertIn(token, internal)
+
     def test_economy_internal_commands_are_idempotent_and_audited(self):
         internal = (ROOT / "apps/economy-service/internal.py").read_text(encoding="utf-8")
         for token in (

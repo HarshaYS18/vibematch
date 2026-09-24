@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-import json
 from typing import Any
 from uuid import uuid4
 
@@ -10,7 +9,6 @@ from sqlalchemy.orm import Session
 from app.api.routes.super_owner import require_super_owner
 from app.api.routes.users import get_current_user
 from app.database import get_db
-from app.models.economy_stats import LuckyGiftTransaction
 from app.models.user import User
 from app.schemas.game_pools import GamePoolResponse
 from app.schemas.lucky_gifts_admin import (
@@ -22,44 +20,22 @@ from app.schemas.lucky_gifts_admin import (
     LuckyGiftPoolTransferRequest,
     LuckyGiftPropsResponse,
 )
-from app.services import economy_service_client, lucky_gift_house_service, lucky_gift_props_service
+from app.services import economy_service_client
 from app.services.audit_log_service import create_admin_log
 
 router = APIRouter(prefix="/admin/economy/lucky-gifts", tags=["Super Owner Lucky Gifts"])
 
 
-def _metadata(raw: str | None) -> dict[str, Any]:
-    if not raw:
-        return {}
-    try:
-        parsed = json.loads(raw)
-    except Exception:
-        return {}
-    return parsed if isinstance(parsed, dict) else {}
-
-
-def _transaction_payload(row: LuckyGiftTransaction) -> LuckyGiftModerationTransaction:
-    return LuckyGiftModerationTransaction(
-        transaction_id=row.id,
-        sender_user_id=row.sender_user_id,
-        receiver_user_id=row.receiver_user_id,
-        room_id=row.room_id,
-        gift_id=row.gift_id,
-        gift_name=row.gift_name,
-        spent_coins=row.spent_coins,
-        multiplier=row.multiplier,
-        reward_coins=row.reward_coins,
-        net_win_coins=row.net_win_coins,
-        is_big_win=row.is_big_win,
-        metadata=_metadata(row.metadata_json),
-        created_at=row.created_at,
-    )
-
-
 @router.get("/props", response_model=LuckyGiftPropsResponse)
 def get_lucky_gift_props(db: Session = Depends(get_db), current_user: User = Depends(get_current_user)):
     require_super_owner(current_user)
-    return LuckyGiftPropsResponse(**lucky_gift_props_service.get_props(db))
+    try:
+        result = economy_service_client.get_lucky_gift_admin_props()
+    except economy_service_client.EconomyServiceUnavailable as exc:
+        raise HTTPException(status_code=503, detail=str(exc)) from exc
+    except economy_service_client.EconomyServiceError as exc:
+        raise HTTPException(status_code=exc.status_code, detail=exc.detail) from exc
+    return LuckyGiftPropsResponse(**result)
 
 
 @router.post("/props", response_model=LuckyGiftPropsResponse)
@@ -98,34 +74,37 @@ def update_lucky_gift_props(payload: dict[str, Any] = Body(...), db: Session = D
 @router.get("/moderation", response_model=LuckyGiftModerationResponse)
 def get_lucky_gift_moderation(db: Session = Depends(get_db), current_user: User = Depends(get_current_user)):
     require_super_owner(current_user)
-    house = LuckyGiftPoolPairResponse(**lucky_gift_house_service.get_pool_detail(db))
-    props = LuckyGiftPropsResponse(**lucky_gift_props_service.get_props(db))
-    latest = db.query(LuckyGiftTransaction).order_by(LuckyGiftTransaction.id.desc()).limit(30).all()
-    high_risk = (
-        db.query(LuckyGiftTransaction)
-        .filter((LuckyGiftTransaction.multiplier >= 100) | (LuckyGiftTransaction.reward_coins >= props.broadcast_min_reward))
-        .order_by(LuckyGiftTransaction.id.desc())
-        .limit(30)
-        .all()
-    )
-    return LuckyGiftModerationResponse(
-        props=props,
-        house_pools=house,
-        latest_transactions=[_transaction_payload(row) for row in latest],
-        high_risk_transactions=[_transaction_payload(row) for row in high_risk],
-    )
+    try:
+        result = economy_service_client.get_lucky_gift_admin_moderation()
+    except economy_service_client.EconomyServiceUnavailable as exc:
+        raise HTTPException(status_code=503, detail=str(exc)) from exc
+    except economy_service_client.EconomyServiceError as exc:
+        raise HTTPException(status_code=exc.status_code, detail=exc.detail) from exc
+    return LuckyGiftModerationResponse(**result)
 
 
 @router.get("/house-pool", response_model=LuckyGiftPoolPairResponse)
 def get_lucky_gift_house_pool(db: Session = Depends(get_db), current_user: User = Depends(get_current_user)):
     require_super_owner(current_user)
-    return LuckyGiftPoolPairResponse(**lucky_gift_house_service.get_pool_detail(db))
+    try:
+        result = economy_service_client.get_lucky_gift_admin_house_pool()
+    except economy_service_client.EconomyServiceUnavailable as exc:
+        raise HTTPException(status_code=503, detail=str(exc)) from exc
+    except economy_service_client.EconomyServiceError as exc:
+        raise HTTPException(status_code=exc.status_code, detail=exc.detail) from exc
+    return LuckyGiftPoolPairResponse(**result)
 
 
 @router.get("/house-pool/list", response_model=list[GamePoolResponse])
 def list_lucky_gift_house_pools(db: Session = Depends(get_db), current_user: User = Depends(get_current_user)):
     require_super_owner(current_user)
-    return [GamePoolResponse(**item) for item in lucky_gift_house_service.list_pools(db)]
+    try:
+        result = economy_service_client.list_lucky_gift_admin_house_pools()
+    except economy_service_client.EconomyServiceUnavailable as exc:
+        raise HTTPException(status_code=503, detail=str(exc)) from exc
+    except economy_service_client.EconomyServiceError as exc:
+        raise HTTPException(status_code=exc.status_code, detail=exc.detail) from exc
+    return [GamePoolResponse(**item) for item in result.get("pools", [])]
 
 
 @router.post("/house-pool/adjust", response_model=GamePoolResponse)

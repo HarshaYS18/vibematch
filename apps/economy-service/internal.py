@@ -11,6 +11,7 @@ from sqlalchemy.orm import Session
 from app.core.config import settings
 from app.database import get_db
 from app.models.economy import EconomyCurrency, GiftTransaction, RubyWithdrawRequest, WalletLedger
+from app.models.economy_stats import LuckyGiftTransaction
 from app.models.user import User
 from app.services import (
     economy_bulk_grant_service,
@@ -208,6 +209,34 @@ def _begin(
         actor_user_id=actor_user_id,
         request_payload=data,
     )
+
+
+def _lucky_gift_metadata(raw: str | None) -> dict[str, Any]:
+    if not raw:
+        return {}
+    try:
+        parsed = json.loads(raw)
+    except Exception:
+        return {}
+    return parsed if isinstance(parsed, dict) else {}
+
+
+def _lucky_gift_transaction_payload(row: LuckyGiftTransaction) -> dict[str, Any]:
+    return {
+        "transaction_id": row.id,
+        "sender_user_id": row.sender_user_id,
+        "receiver_user_id": row.receiver_user_id,
+        "room_id": row.room_id,
+        "gift_id": row.gift_id,
+        "gift_name": row.gift_name,
+        "spent_coins": int(row.spent_coins or 0),
+        "multiplier": int(row.multiplier or 0),
+        "reward_coins": int(row.reward_coins or 0),
+        "net_win_coins": int(row.net_win_coins or 0),
+        "is_big_win": int(row.is_big_win or 0),
+        "metadata": _lucky_gift_metadata(row.metadata_json),
+        "created_at": row.created_at,
+    }
 
 
 
@@ -790,6 +819,51 @@ def settle_lucky_gift(
             "multiplier": multiplier,
         },
     )
+
+@router.get("/lucky-gifts/admin/props", dependencies=[Depends(require_internal_token)])
+def get_lucky_gift_props_admin(db: Session = Depends(get_db)):
+    return lucky_gift_props_service.get_props(db)
+
+
+@router.get("/lucky-gifts/admin/house-pool", dependencies=[Depends(require_internal_token)])
+def get_lucky_gift_house_pool_admin(db: Session = Depends(get_db)):
+    return lucky_gift_house_service.get_pool_detail(db)
+
+
+@router.get("/lucky-gifts/admin/house-pool/list", dependencies=[Depends(require_internal_token)])
+def list_lucky_gift_house_pools_admin(db: Session = Depends(get_db)):
+    return {"pools": lucky_gift_house_service.list_pools(db)}
+
+
+@router.get("/lucky-gifts/admin/moderation", dependencies=[Depends(require_internal_token)])
+def get_lucky_gift_moderation_admin(db: Session = Depends(get_db)):
+    house = lucky_gift_house_service.get_pool_detail(db)
+    props = lucky_gift_props_service.get_props(db)
+    latest = (
+        db.query(LuckyGiftTransaction)
+        .order_by(LuckyGiftTransaction.id.desc())
+        .limit(30)
+        .all()
+    )
+    high_risk = (
+        db.query(LuckyGiftTransaction)
+        .filter(
+            (LuckyGiftTransaction.multiplier >= 100)
+            | (LuckyGiftTransaction.reward_coins >= int(props["broadcast_min_reward"]))
+        )
+        .order_by(LuckyGiftTransaction.id.desc())
+        .limit(30)
+        .all()
+    )
+    return {
+        "props": props,
+        "house_pools": house,
+        "latest_transactions": [_lucky_gift_transaction_payload(row) for row in latest],
+        "high_risk_transactions": [
+            _lucky_gift_transaction_payload(row) for row in high_risk
+        ],
+    }
+
 
 @router.post("/lucky-gifts/admin/props", dependencies=[Depends(require_internal_token)])
 def update_lucky_gift_props_admin(

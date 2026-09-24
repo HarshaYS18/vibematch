@@ -61,6 +61,37 @@ def _request(path: str, payload: dict[str, Any]) -> dict[str, Any]:
     return decoded
 
 
+def _get(path: str) -> dict[str, Any]:
+    url = settings.ECONOMY_INTERNAL_URL.rstrip("/") + "/" + path.lstrip("/")
+    try:
+        response = requests.get(
+            url,
+            headers={
+                "X-FunKey-Internal-Token": settings.ECONOMY_INTERNAL_TOKEN,
+                "Accept": "application/json",
+            },
+            timeout=settings.ECONOMY_SERVICE_TIMEOUT_SECONDS,
+        )
+    except requests.RequestException as exc:
+        raise EconomyServiceUnavailable("Economy service unavailable") from exc
+
+    if not 200 <= response.status_code < 300:
+        detail = "Economy service request failed"
+        try:
+            decoded = response.json()
+            detail = str(decoded.get("detail") or detail)
+        except Exception:
+            pass
+        if response.status_code >= 500:
+            raise EconomyServiceUnavailable(detail)
+        raise EconomyServiceError(response.status_code, detail)
+
+    decoded = response.json()
+    if not isinstance(decoded, dict):
+        raise EconomyServiceUnavailable("Economy service returned an invalid response")
+    return decoded
+
+
 def debit_wallet(
     *,
     user_id: int,
@@ -451,6 +482,22 @@ def queue_bulk_grant(
             "reason": reason,
         },
     )
+
+def get_lucky_gift_admin_props() -> dict[str, Any]:
+    return _get("lucky-gifts/admin/props")
+
+
+def get_lucky_gift_admin_moderation() -> dict[str, Any]:
+    return _get("lucky-gifts/admin/moderation")
+
+
+def get_lucky_gift_admin_house_pool() -> dict[str, Any]:
+    return _get("lucky-gifts/admin/house-pool")
+
+
+def list_lucky_gift_admin_house_pools() -> dict[str, Any]:
+    return _get("lucky-gifts/admin/house-pool/list")
+
 
 def update_lucky_gift_props(
     *,
