@@ -1,5 +1,6 @@
 from app.models.user import User
 from app.models.auth_identity import AuthIdentity
+from app.models.identity_session import IdentityDevice, IdentitySession
 from app.models.role import UserRole, RoleName
 from app.models.admin_log import AdminLog
 from app.models.special_permission import SpecialPermission, SpecialPermissionName

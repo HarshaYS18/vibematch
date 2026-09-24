@@ -17,6 +17,7 @@ from app.schemas.auth import AuthResponse, DevLoginRequest, GoogleLoginRequest
 from app.services.audit_log_service import AuditAction, create_login_security_log
 from app.services.ban_service import is_device_banned
 from app.services.identity_service import generate_public_user_id
+from app.services import identity_session_service
 from app.services.login_history_service import create_login_history
 from app.services.realtime_revocation_service import publish_session_revoked
 from app.services.role_badge_service import get_primary_role_badge, get_role_badges
@@ -26,15 +27,41 @@ from app.services.role_service import assign_role, get_primary_role, get_user_ro
 router = APIRouter(prefix="/auth", tags=["Auth"])
 
 
-def _auth_response_for_user(db: Session, user: User, device_id: str | None = None) -> AuthResponse:
+def _auth_response_for_user(
+    db: Session,
+    user: User,
+    device_id: str | None = None,
+    session_id: str | None = None,
+) -> AuthResponse:
     user_roles = get_user_roles(user)
     roles = [role.value for role in user_roles]
     primary_role = get_primary_role(user)
-    token = create_access_token(subject=str(user.id), device_id=device_id)
-    return AuthResponse(access_token=token, user_id=user.id, public_user_id=user.public_user_id, username=user.username, display_name=user.display_name, roles=roles, primary_role=primary_role.value, primary_role_badge=get_primary_role_badge(primary_role), role_badges=get_role_badges(user_roles))
+    token = create_access_token(
+        subject=str(user.id),
+        device_id=device_id,
+        session_id=session_id,
+    )
+    return AuthResponse(
+        access_token=token,
+        user_id=user.id,
+        public_user_id=user.public_user_id,
+        username=user.username,
+        display_name=user.display_name,
+        roles=roles,
+        primary_role=primary_role.value,
+        primary_role_badge=get_primary_role_badge(primary_role),
+        role_badges=get_role_badges(user_roles),
+    )
 
-
-def _record_login_success(db: Session, user: User, email: str, provider: str, provider_user_id: str, device_id: str | None, client_ip: str | None) -> None:
+def _record_login_success(
+    db: Session,
+    user: User,
+    email: str,
+    provider: str,
+    provider_user_id: str,
+    device_id: str | None,
+    client_ip: str | None,
+) -> str:
     previous_device_id = (user.last_device_id or "").strip()
     next_device_id = (device_id or "").strip()
     user.last_device_id = device_id
@@ -51,9 +78,40 @@ def _record_login_success(db: Session, user: User, email: str, provider: str, pr
         )
     user_roles = get_user_roles(user)
     roles = [role.value for role in user_roles]
-    create_login_security_log(db=db, action=AuditAction.LOGIN_SUCCESS, email=email, device_id=device_id, target_user_id=user.id, reason="User logged in successfully.", ip_address=client_ip, extra_metadata={"provider": provider, "provider_user_id": provider_user_id, "public_user_id": user.public_user_id, "roles": roles})
-    create_login_history(db=db, user_id=user.id, email=email, provider=provider, provider_user_id=provider_user_id, status=LoginHistoryStatus.SUCCESS, is_success=True, device_id=device_id, ip_address=client_ip, failure_reason=None, failure_detail=None)
-
+    create_login_security_log(
+        db=db,
+        action=AuditAction.LOGIN_SUCCESS,
+        email=email,
+        device_id=device_id,
+        target_user_id=user.id,
+        reason="User logged in successfully.",
+        ip_address=client_ip,
+        extra_metadata={
+            "provider": provider,
+            "provider_user_id": provider_user_id,
+            "public_user_id": user.public_user_id,
+            "roles": roles,
+        },
+    )
+    create_login_history(
+        db=db,
+        user_id=user.id,
+        email=email,
+        provider=provider,
+        provider_user_id=provider_user_id,
+        status=LoginHistoryStatus.SUCCESS,
+        is_success=True,
+        device_id=device_id,
+        ip_address=client_ip,
+        failure_reason=None,
+        failure_detail=None,
+    )
+    session = identity_session_service.open_session(
+        db,
+        user_id=user.id,
+        device_id=device_id,
+    )
+    return session.session_id
 
 def _fail_if_banned_or_inactive(db: Session, user: User, email: str, provider: str, provider_user_id: str, device_id: str | None, client_ip: str | None) -> None:
     if user.is_banned:
@@ -169,8 +227,8 @@ if settings.ENABLE_DEV_LOGIN:
         _fail_if_device_banned(db, email, provider, provider_user_id, device_id, client_ip)
         user = _get_or_create_identity_user(db, provider, provider_user_id, email, payload.username, payload.display_name)
         _fail_if_banned_or_inactive(db, user, email, provider, provider_user_id, device_id, client_ip)
-        _record_login_success(db, user, email, provider, provider_user_id, device_id, client_ip)
-        return _auth_response_for_user(db, user, device_id=device_id)
+        session_id = _record_login_success(db, user, email, provider, provider_user_id, device_id, client_ip)
+        return _auth_response_for_user(db, user, device_id=device_id, session_id=session_id)
 
 
 @router.post("/google-login", response_model=AuthResponse)
@@ -188,5 +246,5 @@ def google_login(payload: GoogleLoginRequest, request: Request, db: Session = De
     _fail_if_device_banned(db, email, provider, provider_user_id, device_id, client_ip)
     user = _get_or_create_identity_user(db=db, provider=provider, provider_user_id=provider_user_id, email=email, username=email.split("@")[0], display_name=str(verified.get("name") or verified.get("given_name") or "Vibe User"), avatar_url=str(verified.get("picture") or "") or None)
     _fail_if_banned_or_inactive(db, user, email, provider, provider_user_id, device_id, client_ip)
-    _record_login_success(db, user, email, provider, provider_user_id, device_id, client_ip)
-    return _auth_response_for_user(db, user, device_id=device_id)
+    session_id = _record_login_success(db, user, email, provider, provider_user_id, device_id, client_ip)
+    return _auth_response_for_user(db, user, device_id=device_id, session_id=session_id)

@@ -93,6 +93,29 @@ class Settings(BaseSettings):
     ROOM_CONTROL_MAX_REPLICAS: int = 20
     DB_ROOM_CONTROL_CONNECTION_BUDGET: int = 60
 
+    # Chunk 27 Identity / Profile-Social service boundaries.
+    IDENTITY_SERVICE_URL: str = "http://127.0.0.1:8086/api/v1"
+    IDENTITY_INTERNAL_URL: str = "http://127.0.0.1:8086/internal/identity"
+    IDENTITY_SERVICE_TIMEOUT_SECONDS: float = 5.0
+    IDENTITY_INTERNAL_TOKEN: str = "change-this-identity-internal-token"
+    IDENTITY_DATABASE_URL: str = ""
+    IDENTITY_DB_POOL_SIZE: int = 3
+    IDENTITY_DB_MAX_OVERFLOW: int = 0
+    IDENTITY_DB_POOL_TIMEOUT_SECONDS: int = 3
+    IDENTITY_MAX_REPLICAS: int = 20
+    DB_IDENTITY_CONNECTION_BUDGET: int = 60
+
+    PROFILE_SOCIAL_SERVICE_URL: str = "http://127.0.0.1:8087/api/v1"
+    PROFILE_SOCIAL_INTERNAL_URL: str = "http://127.0.0.1:8087/internal/profile-social"
+    PROFILE_SOCIAL_SERVICE_TIMEOUT_SECONDS: float = 5.0
+    PROFILE_SOCIAL_INTERNAL_TOKEN: str = "change-this-profile-social-internal-token"
+    PROFILE_SOCIAL_DATABASE_URL: str = ""
+    PROFILE_SOCIAL_DB_POOL_SIZE: int = 4
+    PROFILE_SOCIAL_DB_MAX_OVERFLOW: int = 0
+    PROFILE_SOCIAL_DB_POOL_TIMEOUT_SECONDS: int = 3
+    PROFILE_SOCIAL_MAX_REPLICAS: int = 20
+    DB_PROFILE_SOCIAL_CONNECTION_BUDGET: int = 80
+
     # Topology budgets. These are planning/validation limits, not capacity claims.
     API_MAX_REPLICAS: int = 20
     DB_API_CONNECTION_BUDGET: int = 100
@@ -207,6 +230,8 @@ class Settings(BaseSettings):
             + self.DB_INBOX_CONNECTION_BUDGET
             + self.DB_VIBES_CONNECTION_BUDGET
             + self.DB_ROOM_CONTROL_CONNECTION_BUDGET
+            + self.DB_IDENTITY_CONNECTION_BUDGET
+            + self.DB_PROFILE_SOCIAL_CONNECTION_BUDGET
             + self.DB_WORKER_CONNECTION_BUDGET
             + self.DB_ROLLOUT_SURGE_CONNECTION_RESERVE
         )
@@ -222,6 +247,8 @@ class Settings(BaseSettings):
             "INBOX_BACKUP_ENCRYPTION_KEY",
             "INBOX_INTERNAL_TOKEN",
             "ROOM_CONTROL_INTERNAL_TOKEN",
+            "IDENTITY_INTERNAL_TOKEN",
+            "PROFILE_SOCIAL_INTERNAL_TOKEN",
         ):
             value = getattr(self, name).strip()
             if len(value) < 32 or "change-this" in value.lower():
@@ -481,6 +508,44 @@ class Settings(BaseSettings):
                 "Unsafe Room Control production configuration: "
                 + ", ".join(unsafe)
             )
+
+    def validate_identity_service(self) -> None:
+        """Validate settings owned by the extracted Identity deployable."""
+        if not self.is_production:
+            return
+        unsafe: list[str] = []
+        if len(self.IDENTITY_INTERNAL_TOKEN.strip()) < 32 or "change-this" in self.IDENTITY_INTERNAL_TOKEN.lower():
+            unsafe.append("IDENTITY_INTERNAL_TOKEN")
+        url = self.IDENTITY_DATABASE_URL.strip()
+        if not url:
+            unsafe.append("IDENTITY_DATABASE_URL")
+        elif url == self.database_url.strip():
+            unsafe.append("IDENTITY_DATABASE_URL(service-isolated credentials required)")
+        if self.IDENTITY_DB_POOL_SIZE <= 0 or self.IDENTITY_DB_MAX_OVERFLOW < 0:
+            unsafe.append("IDENTITY_DB_POOL_SIZE/IDENTITY_DB_MAX_OVERFLOW")
+        if self.IDENTITY_MAX_REPLICAS * (self.IDENTITY_DB_POOL_SIZE + self.IDENTITY_DB_MAX_OVERFLOW) > self.DB_IDENTITY_CONNECTION_BUDGET:
+            unsafe.append("DB_IDENTITY_CONNECTION_BUDGET")
+        if unsafe:
+            raise RuntimeError("Unsafe Identity service production configuration: " + ", ".join(unsafe))
+
+    def validate_profile_social_service(self) -> None:
+        """Validate settings owned by the extracted Profile/Social deployable."""
+        if not self.is_production:
+            return
+        unsafe: list[str] = []
+        if len(self.PROFILE_SOCIAL_INTERNAL_TOKEN.strip()) < 32 or "change-this" in self.PROFILE_SOCIAL_INTERNAL_TOKEN.lower():
+            unsafe.append("PROFILE_SOCIAL_INTERNAL_TOKEN")
+        url = self.PROFILE_SOCIAL_DATABASE_URL.strip()
+        if not url:
+            unsafe.append("PROFILE_SOCIAL_DATABASE_URL")
+        elif url == self.database_url.strip():
+            unsafe.append("PROFILE_SOCIAL_DATABASE_URL(service-isolated credentials required)")
+        if self.PROFILE_SOCIAL_DB_POOL_SIZE <= 0 or self.PROFILE_SOCIAL_DB_MAX_OVERFLOW < 0:
+            unsafe.append("PROFILE_SOCIAL_DB_POOL_SIZE/PROFILE_SOCIAL_DB_MAX_OVERFLOW")
+        if self.PROFILE_SOCIAL_MAX_REPLICAS * (self.PROFILE_SOCIAL_DB_POOL_SIZE + self.PROFILE_SOCIAL_DB_MAX_OVERFLOW) > self.DB_PROFILE_SOCIAL_CONNECTION_BUDGET:
+            unsafe.append("DB_PROFILE_SOCIAL_CONNECTION_BUDGET")
+        if unsafe:
+            raise RuntimeError("Unsafe Profile/Social service production configuration: " + ", ".join(unsafe))
 
     def validate_worker_runtime(self) -> None:
         """Reject worker-only service credentials that are unsafe in production."""
