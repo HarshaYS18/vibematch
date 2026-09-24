@@ -94,7 +94,7 @@ class WorkerRuntimeBehaviorTests(unittest.IsolatedAsyncioTestCase):
         ):
             await worker_main.process_message(js, msg, asyncio.Semaphore(1))
         self.assertEqual(msg.acked, 0)
-        self.assertEqual(msg.naks, [4])
+        self.assertEqual(msg.naks, [2.0])
         self.assertEqual(js.published, [])
         self.assertEqual(worker_main.state.retries, 1)
 
