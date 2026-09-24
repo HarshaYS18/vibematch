@@ -1,0 +1,3 @@
+# Exact historical false-positive only.
+# This Kubernetes value is an in-cluster service URL/port, not a credential.
+71d9c78daa2539d63c11b4355bc435f99274ef55:deploy/kubernetes/base/config.yaml:generic-api-key:75
