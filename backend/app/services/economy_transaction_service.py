@@ -21,11 +21,15 @@ def begin(db: Session, *, transaction_id: str, idempotency_key: str, business_re
     request_hash=_hash(request_payload)
     existing=db.query(EconomyTransaction).filter(EconomyTransaction.idempotency_key==idempotency_key).with_for_update().first()
     if existing is not None:
-        if existing.request_hash != request_hash:
+        if existing.request_hash != request_hash or existing.transaction_id != transaction_id:
             raise HTTPException(status_code=409, detail="Idempotency key reused with different request")
         if existing.status=="COMPLETED" and existing.result_json:
             return existing, json.loads(existing.result_json)
         raise HTTPException(status_code=409, detail="Economy transaction is already in progress")
+
+    transaction_reuse=db.query(EconomyTransaction).filter(EconomyTransaction.transaction_id==transaction_id).with_for_update().first()
+    if transaction_reuse is not None:
+        raise HTTPException(status_code=409, detail="transaction_id is already bound to another idempotency key")
     tx=EconomyTransaction(transaction_id=transaction_id,idempotency_key=idempotency_key,business_reference=business_reference,operation_type=operation_type,request_hash=request_hash,status="PENDING",actor_user_id=actor_user_id)
     db.add(tx); db.flush()
     return tx, None
