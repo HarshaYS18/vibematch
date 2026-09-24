@@ -69,9 +69,19 @@ def upgrade() -> None:
                 raw_events = []
         if not isinstance(raw_events, list):
             continue
+        used_sequences: set[int] = set()
+        next_sequence = 1
         for index, raw_event in enumerate(raw_events, start=1):
             event = dict(raw_event) if isinstance(raw_event, dict) else {"value": raw_event}
-            sequence = int(event.get("sequence") or index)
+            requested_sequence = int(event.get("sequence") or index)
+            sequence = requested_sequence
+            if sequence <= 0 or sequence in used_sequences:
+                sequence = next_sequence
+                while sequence in used_sequences:
+                    sequence += 1
+            used_sequences.add(sequence)
+            next_sequence = max(next_sequence, sequence + 1)
+            event["sequence"] = sequence
             created_at = event.get("created_at")
             parsed_created_at = datetime.utcnow()
             if isinstance(created_at, str):
