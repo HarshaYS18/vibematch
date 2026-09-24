@@ -38,17 +38,38 @@ from app.websocket.inbox_ws import inbox_ws_manager
 router = APIRouter(prefix="/economy", tags=["Economy"])
 
 
-def _wallet_response(db: Session, wallet: UserWallet) -> EconomyWalletResponse:
-    levels = economy_level_service.wallet_level_payload(db, wallet)
+def _wallet_response(
+    db: Session,
+    wallet: UserWallet | None,
+    *,
+    user_id: int | None = None,
+) -> EconomyWalletResponse:
+    resolved_user_id = int(wallet.user_id if wallet is not None else user_id or 0)
+    levels = economy_level_service.user_level_payload(db, resolved_user_id)
+    coin_balance = int(wallet.coin_balance or 0) if wallet is not None else 0
+    ruby_balance = int(wallet.ruby_balance or 0) if wallet is not None else 0
+    locked_rubies = int(wallet.locked_ruby_balance or 0) if wallet is not None else 0
+    pending_rubies = int(wallet.pending_withdraw_rubies or 0) if wallet is not None else 0
+    lifetime_spent = int(wallet.lifetime_coins_spent or 0) if wallet is not None else 0
+    lifetime_received = (
+        int(wallet.lifetime_coins_received_as_gifts or 0)
+        if wallet is not None
+        else 0
+    )
+    lifetime_rubies = (
+        int(wallet.lifetime_rubies_earned or 0)
+        if wallet is not None
+        else 0
+    )
     return EconomyWalletResponse(
-        user_id=wallet.user_id,
-        coin_balance=wallet.coin_balance,
-        ruby_balance=wallet.ruby_balance,
-        withdrawable_rubies=max(wallet.ruby_balance - wallet.locked_ruby_balance, 0),
-        pending_withdraw_rubies=wallet.pending_withdraw_rubies,
-        lifetime_coins_spent=wallet.lifetime_coins_spent,
-        lifetime_coins_received_as_gifts=wallet.lifetime_coins_received_as_gifts,
-        lifetime_rubies_earned=wallet.lifetime_rubies_earned,
+        user_id=resolved_user_id,
+        coin_balance=coin_balance,
+        ruby_balance=ruby_balance,
+        withdrawable_rubies=max(ruby_balance - locked_rubies, 0),
+        pending_withdraw_rubies=pending_rubies,
+        lifetime_coins_spent=lifetime_spent,
+        lifetime_coins_received_as_gifts=lifetime_received,
+        lifetime_rubies_earned=lifetime_rubies,
         lifetime_recharge_coin_exp=levels["lifetime_recharge_coin_exp"],
         monthly_recharge_coin_exp=levels["monthly_recharge_coin_exp"],
         monthly_gift_coins_sent=levels["monthly_gift_coins_sent"],
@@ -80,9 +101,7 @@ def _metadata_json(payload: dict) -> str:
 
 
 def _public_wallet_summary(db: Session, user: User) -> dict:
-    wallet = economy_level_service.get_or_create_wallet(db, user.id)
-    levels = economy_level_service.wallet_level_payload(db, wallet)
-    economy_level_service.sync_vip_status(db, user.id, levels)
+    levels = economy_level_service.user_level_payload(db, user.id)
     return {
         "user_id": user.id,
         "public_user_id": user.public_user_id,
@@ -105,8 +124,12 @@ def _public_wallet_summary(db: Session, user: User) -> dict:
 
 
 def _private_wallet_payload(db: Session, user: User) -> dict:
-    wallet = economy_level_service.get_or_create_wallet(db, user.id)
-    payload = _wallet_response(db, wallet)
+    wallet = (
+        db.query(UserWallet)
+        .filter(UserWallet.user_id == user.id)
+        .first()
+    )
+    payload = _wallet_response(db, wallet, user_id=user.id)
     return payload.model_dump(mode="json") if hasattr(payload, "model_dump") else payload.dict()
 
 
@@ -416,7 +439,7 @@ def get_my_economy_dashboard(
 ):
     data = economy_service.dashboard_for_user(db, current_user)
     return EconomyDashboardResponse(
-        wallet=_wallet_response(db, data["wallet"]),
+        wallet=_wallet_response(db, data["wallet"], user_id=current_user.id),
         seller_pool=_pool_response(data["seller_pool"]),
         merchant_pool=_pool_response(data["merchant_pool"]),
         gaming_pool=_pool_response(data["gaming_pool"]),
