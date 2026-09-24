@@ -28,6 +28,9 @@ images:
   - name: funkey-economy
     newName: ghcr.io/harshays18/vibematch/funkey-economy
     digest: sha256:0000000000000000000000000000000000000000000000000000000000000000
+  - name: funkey-game-platform
+    newName: ghcr.io/harshays18/vibematch/funkey-game-platform
+    digest: sha256:0000000000000000000000000000000000000000000000000000000000000000
   - name: funkey-worker
     newName: ghcr.io/harshays18/vibematch/funkey-worker
     digest: sha256:0000000000000000000000000000000000000000000000000000000000000000
