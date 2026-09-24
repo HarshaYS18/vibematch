@@ -343,9 +343,6 @@ def claim_packet(
 
     if packet.claimed_count >= packet.winner_count:
         finalized = _finalize_locked(db, packet, now, tx=tx)
-        if finalized:
-            db.commit()
-            db.refresh(packet)
         return packet, None, None, False, finalized
 
     allocations = _allocations(packet)
@@ -376,10 +373,7 @@ def claim_packet(
     db.flush()
 
     finalized = _finalize_locked(db, packet, now, tx=tx)
-    db.commit()
-    db.refresh(packet)
-    db.refresh(claim)
-    db.refresh(wallet)
+    db.flush()
     return packet, claim, wallet, True, finalized
 
 
@@ -413,19 +407,34 @@ def finalize_expired_packets(db: Session, *, limit: int = 50) -> int:
     """Finalize expired packet escrow through deterministic Economy transactions."""
 
     now = datetime.utcnow()
-    rows = (
-        db.query(LuckyPacket)
-        .filter(
-            LuckyPacket.status == ACTIVE_STATUS,
-            LuckyPacket.closes_at <= now,
+    candidate_ids = [
+        int(row[0])
+        for row in (
+            db.query(LuckyPacket.id)
+            .filter(
+                LuckyPacket.status == ACTIVE_STATUS,
+                LuckyPacket.closes_at <= now,
+            )
+            .order_by(LuckyPacket.closes_at.asc(), LuckyPacket.id.asc())
+            .limit(max(1, min(int(limit), 200)))
+            .all()
         )
-        .order_by(LuckyPacket.closes_at.asc(), LuckyPacket.id.asc())
-        .with_for_update(skip_locked=True)
-        .limit(max(1, min(int(limit), 200)))
-        .all()
-    )
+    ]
     finalized = 0
-    for packet in rows:
+    for packet_id in candidate_ids:
+        packet = (
+            db.query(LuckyPacket)
+            .filter(
+                LuckyPacket.id == packet_id,
+                LuckyPacket.status == ACTIVE_STATUS,
+            )
+            .with_for_update()
+            .first()
+        )
+        if packet is None or packet.closes_at > datetime.utcnow():
+            db.rollback()
+            continue
+
         business_reference = f"lucky-packet-expire:{packet.public_id}"
         context = economy_service_client.mutation_context(
             "lucky_packet.expire",
@@ -441,8 +450,10 @@ def finalize_expired_packets(db: Session, *, limit: int = 50) -> int:
             request_payload={"packet_public_id": packet.public_id},
         )
         if cached is not None:
+            db.rollback()
             continue
-        changed = _finalize_locked(db, packet, now, tx=tx)
+
+        changed = _finalize_locked(db, packet, datetime.utcnow(), tx=tx)
         result = {
             "packet_id": packet.public_id,
             "status": packet.status,
@@ -462,7 +473,6 @@ def finalize_expired_packets(db: Session, *, limit: int = 50) -> int:
         )
         finalized += 1
     return finalized
-
 
 def room_event_payload(
     db: Session,
