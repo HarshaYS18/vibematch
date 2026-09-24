@@ -11,7 +11,7 @@ from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from sqlalchemy import text
 
 from app.core.config import settings
-from app.services import economy_bulk_grant_service
+from app.services import economy_bulk_grant_service, economy_reconciliation_service
 from bulk_database import SessionLocal, engine
 
 
@@ -21,6 +21,10 @@ _stop = threading.Event()
 _ready = False
 _batches = 0
 _failures = 0
+_reconciliation_runs = 0
+_reconciliation_failures = 0
+_reconciliation_wallet_mismatches = 0
+_reconciliation_unbalanced_journals = 0
 
 
 class HealthHandler(BaseHTTPRequestHandler):
@@ -44,6 +48,10 @@ class HealthHandler(BaseHTTPRequestHandler):
                 f"funkey_economy_bulk_worker_ready {1 if _ready else 0}\n"
                 f"funkey_economy_bulk_worker_batches_total {_batches}\n"
                 f"funkey_economy_bulk_worker_failures_total {_failures}\n"
+                f"funkey_economy_reconciliation_runs_total {_reconciliation_runs}\n"
+                f"funkey_economy_reconciliation_failures_total {_reconciliation_failures}\n"
+                f"funkey_economy_reconciliation_wallet_mismatches {_reconciliation_wallet_mismatches}\n"
+                f"funkey_economy_reconciliation_unbalanced_journals {_reconciliation_unbalanced_journals}\n"
             ).encode()
             self.send_response(200)
             self.send_header("Content-Type", "text/plain; version=0.0.4")
@@ -70,6 +78,8 @@ def _handle_signal(_signum, _frame):
 
 def main() -> None:
     global _ready, _batches, _failures
+    global _reconciliation_runs, _reconciliation_failures
+    global _reconciliation_wallet_mismatches, _reconciliation_unbalanced_journals
     settings.validate_economy_service()
     settings.validate_economy_bulk_worker()
 
@@ -80,9 +90,30 @@ def main() -> None:
     health_thread = threading.Thread(target=health.serve_forever, daemon=True)
     health_thread.start()
     _ready = True
+    next_reconciliation_at = 0.0
 
     try:
         while not _stop.is_set():
+            now = time.monotonic()
+            if now >= next_reconciliation_at:
+                try:
+                    with SessionLocal() as db:
+                        report = economy_reconciliation_service.reconcile(
+                            db,
+                            wallet_limit=settings.ECONOMY_RECONCILIATION_WALLET_BATCH_SIZE,
+                            journal_transaction_limit=settings.ECONOMY_RECONCILIATION_JOURNAL_BATCH_SIZE,
+                        )
+                    _reconciliation_runs += 1
+                    _reconciliation_wallet_mismatches = report.wallet_mismatches
+                    _reconciliation_unbalanced_journals = report.unbalanced_journal_transactions
+                    if not report.healthy:
+                        _reconciliation_failures += 1
+                except Exception:
+                    _reconciliation_failures += 1
+                next_reconciliation_at = (
+                    time.monotonic()
+                    + settings.ECONOMY_RECONCILIATION_INTERVAL_SECONDS
+                )
             with SessionLocal() as db:
                 job_id = economy_bulk_grant_service.claim_next_job(
                     db,
