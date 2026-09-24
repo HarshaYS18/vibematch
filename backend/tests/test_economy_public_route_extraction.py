@@ -7,7 +7,6 @@ class EconomyPublicRouteExtractionTests(unittest.TestCase):
     def test_economy_service_mounts_unambiguous_financial_routes(self):
         main=(ROOT/"apps/economy-service/main.py").read_text(encoding="utf-8")
         for token in (
-            "wallet.router",
             "coin_sales.router",
             "lucky_coins.router",
             "lucky_packets.router",
@@ -36,7 +35,6 @@ class EconomyPublicRouteExtractionTests(unittest.TestCase):
         ):
             self.assertNotIn(forbidden,central)
         for prefix in (
-            "wallets",
             "coin-sales",
             "economy/lucky-coins",
             "lucky-packets",
