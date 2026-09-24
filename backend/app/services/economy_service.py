@@ -22,7 +22,7 @@ from app.models.economy import (
 )
 from app.models.room import Room
 from app.models.user import User
-from app.services import experience_service
+from app.services import economy_transaction_service, experience_service
 from app.services.get_or_create_service import get_or_create_unique
 
 RUBY_EARNING_BASIS_POINTS = 3000
@@ -152,7 +152,7 @@ def allocate_pool_to_pool(db: Session, actor: User, source_pool_id: int, target_
     return target
 
 
-def sell_pool_coins_to_user(db: Session, seller: User, buyer_user_id: int, source_pool_id: int, coin_amount: int, payment_amount: int, payment_currency: str, proof_url: str | None, *, commit: bool = True) -> CoinSaleOrder:
+def sell_pool_coins_to_user(db: Session, seller: User, buyer_user_id: int, source_pool_id: int, coin_amount: int, payment_amount: int, payment_currency: str, proof_url: str | None, *, tx=None, commit: bool = True) -> CoinSaleOrder:
     source = db.query(CoinSupplyPool).filter(CoinSupplyPool.id == source_pool_id).first()
     if not source:
         raise HTTPException(status_code=404, detail="Seller pool not found")
@@ -167,8 +167,30 @@ def sell_pool_coins_to_user(db: Session, seller: User, buyer_user_id: int, sourc
     db.add(order)
     db.flush()
     _debit_coin_pool(db, source, coin_amount, "SELLER_COIN_SALE", seller.id, "Coins sold to user", target_user_id=buyer_user_id)
-    wallet = get_or_create_wallet(db, buyer_user_id)
-    _credit_wallet(db, wallet, EconomyCurrency.COIN, coin_amount, "SELLER_COIN_SALE", str(order.id), seller.id, "Coins delivered from seller pool")
+    if tx is None:
+        wallet = get_or_create_wallet(db, buyer_user_id)
+        _credit_wallet(
+            db,
+            wallet,
+            EconomyCurrency.COIN,
+            coin_amount,
+            "SELLER_COIN_SALE",
+            str(order.id),
+            seller.id,
+            "Coins delivered from seller pool",
+        )
+    else:
+        wallet = economy_transaction_service.credit(
+            db,
+            user_id=buyer_user_id,
+            amount=coin_amount,
+            currency=EconomyCurrency.COIN.value,
+            source_type="SELLER_COIN_SALE",
+            source_id=str(order.id),
+            reason="Coins delivered from seller pool",
+            tx=tx,
+            actor_user_id=seller.id,
+        )
     db.flush()
     from app.services import economy_level_service
 
