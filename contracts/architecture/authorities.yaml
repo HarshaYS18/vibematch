@@ -575,25 +575,28 @@
       "logical_owner": "economy",
       "current_deployable": "economy-service + read-only client/profile projections",
       "current_storage": [
-        "postgres:user_vip_statuses"
+        "postgres:user_vip_statuses",
+        "postgres:user_vip_overrides"
       ],
       "target_storage": [
-        "economy-derived VIP/SVIP projection"
+        "economy-derived VIP/SVIP projection with explicit manual override layer"
       ],
       "mutated_by": [
-        "economy-service projection updater"
+        "economy-service projection updater",
+        "economy-service VIP override command"
       ],
       "source_states": [
-        "economy.wallet_ledger"
+        "economy.wallet_ledger",
+        "economy.vip_manual_override"
       ],
       "rebuild_from": [
-        "economy.wallet_ledger recharge/value history"
+        "economy.wallet_ledger recharge/value history + active user_vip_overrides"
       ],
       "change_contract": {
         "status": "live",
         "name": "economy.vip_projection.updated.v1"
       },
-      "migration_status": "Derived status only; wallet/ledger remains authority"
+      "migration_status": "Post-Chunk-32 repair: Economy is sole VIP writer; manual overrides survive derived sync and projection-change events are emitted"
     },
     {
       "id": "economy.house_liability",
