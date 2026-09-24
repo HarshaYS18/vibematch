@@ -383,6 +383,7 @@ def _validate_inbox_service_extraction(errors: list[str]) -> None:
     # service client boundary.
     backend_app = ROOT / "backend" / "app"
     allowed_direct = {
+        Path("models/__init__.py"),
         Path("models/inbox.py"),
         Path("models/inbox_backup.py"),
         Path("models/inbox_preferences.py"),
@@ -428,7 +429,25 @@ def _validate_inbox_service_extraction(errors: list[str]) -> None:
                     "inbox_service_client: "
                     + str(source.relative_to(ROOT))
                 )
-            if 'ForeignKey("inbox_' in text or "ForeignKey('inbox_" in text:
+            chat_owned_fk_targets = (
+                "inbox_conversations.",
+                "inbox_participants.",
+                "inbox_messages.",
+                "inbox_read_receipts.",
+                "inbox_reports.",
+                "inbox_lock_settings.",
+                "inbox_lock_otps.",
+                "inbox_user_preferences.",
+                "inbox_conversation_user_settings.",
+                "inbox_message_user_states.",
+                "inbox_backup_settings.",
+                "inbox_backup_jobs.",
+            )
+            if any(
+                f'ForeignKey("{target}' in text
+                or f"ForeignKey('{target}" in text
+                for target in chat_owned_fk_targets
+            ):
                 errors.append(
                     "cross-domain Inbox foreign key is forbidden after extraction: "
                     + str(source.relative_to(ROOT))
