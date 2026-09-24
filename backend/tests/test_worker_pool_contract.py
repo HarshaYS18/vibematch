@@ -20,9 +20,24 @@ class WorkerPoolContractTests(unittest.TestCase):
         self.assertIn("unsupported_pool_event",source)
         self.assertIn("missing_handler",source)
         self.assertIn("funkey.dlq.",source)
-    def test_pool_concurrency_is_bounded(self):
+    def test_pool_concurrency_is_bounded_across_all_subscriptions(self):
         source=(ROOT/"apps/worker/main.py").read_text(encoding="utf-8")
-        self.assertIn("POOL.max_in_flight",source)
+        self.assertIn(
+            "slots = asyncio.Semaphore(max(1, POOL.max_in_flight))",
+            source,
+        )
+        self.assertIn("async with slots:",source)
+        self.assertIn("consume(js, subscription, stop, slots)",source)
         self.assertIn("max_ack_pending",source)
+
+    def test_dormant_pool_fails_closed(self):
+        source=(ROOT/"apps/worker/main.py").read_text(encoding="utf-8")
+        self.assertIn("if not POOL.active:",source)
+        self.assertIn("intentionally inactive",source)
+
+    def test_shutdown_grace_is_bounded(self):
+        source=(ROOT/"apps/worker/main.py").read_text(encoding="utf-8")
+        self.assertIn("300.0",source)
+        self.assertIn("5.0",source)
 
 if __name__=="__main__": unittest.main()

@@ -39,7 +39,10 @@ POOL = get_pool(os.getenv("WORKER_POOL", "general"))
 MAX_ATTEMPTS = max(1, min(int(os.getenv("WORKER_MAX_ATTEMPTS", "5")), 20))
 OUTBOX_BATCH_SIZE = max(1, min(int(os.getenv("OUTBOX_BATCH_SIZE", "25")), 500))
 OUTBOX_LEASE_SECONDS = max(30, min(int(os.getenv("OUTBOX_LEASE_SECONDS", "120")), 900))
-SHUTDOWN_GRACE_SECONDS = float(os.getenv("WORKER_SHUTDOWN_GRACE_SECONDS", "30"))
+SHUTDOWN_GRACE_SECONDS = max(
+    5.0,
+    min(float(os.getenv("WORKER_SHUTDOWN_GRACE_SECONDS", "30")), 300.0),
+)
 WORKER_INSTANCE_ID = os.getenv("WORKER_INSTANCE_ID") or f"{socket.gethostname()}-{os.getpid()}"
 _logger = logging.getLogger("funkey.worker")
 
@@ -210,7 +213,7 @@ async def _dead_letter(js, msg, *, event_id: str, event_type: str | None, reason
     state.count("dead_lettered")
 
 
-async def process_message(js, msg):
+async def process_message(js, msg, slots: asyncio.Semaphore):
     event_id = "unknown"
     event_type = None
     try:
@@ -227,23 +230,24 @@ async def process_message(js, msg):
         incoming_traceparent = None
         if msg.headers:
             incoming_traceparent = msg.headers.get("traceparent")
-        with traced(
-            "worker.message.consume",
-            traceparent=incoming_traceparent or envelope.traceparent,
-            kind=SpanKind.CONSUMER,
-            attributes={
-                "messaging.system": "nats",
-                "messaging.destination.name": msg.subject,
-                "funkey.event_type": envelope.event_type,
-                "funkey.worker_pool": POOL.name,
-            },
-        ):
-            state.count("in_flight")
-            try:
-                result = await asyncio.to_thread(handler, envelope)
-                await msg.ack()
-            finally:
-                state.count("in_flight", -1)
+        async with slots:
+            with traced(
+                "worker.message.consume",
+                traceparent=incoming_traceparent or envelope.traceparent,
+                kind=SpanKind.CONSUMER,
+                attributes={
+                    "messaging.system": "nats",
+                    "messaging.destination.name": msg.subject,
+                    "funkey.event_type": envelope.event_type,
+                    "funkey.worker_pool": POOL.name,
+                },
+            ):
+                state.count("in_flight")
+                try:
+                    result = await asyncio.to_thread(handler, envelope)
+                    await msg.ack()
+                finally:
+                    state.count("in_flight", -1)
         state.count("duplicates" if result == "duplicate" else "processed")
         _logger.info(json.dumps({"event": "job.completed", "pool": POOL.name,
                                 "event_id": event_id, "event_type": event_type, "result": result}))
@@ -266,12 +270,17 @@ async def process_message(js, msg):
                                     "attempt": attempts, "error": type(exc).__name__}))
 
 
-async def consume(js, subscription, stop: asyncio.Event):
+async def consume(
+    js,
+    subscription,
+    stop: asyncio.Event,
+    slots: asyncio.Semaphore,
+):
     while not stop.is_set():
         try:
             messages = await subscription.fetch(batch=max(1, min(POOL.max_in_flight, 50)), timeout=2)
             await asyncio.gather(*[
-                process_message(js, msg)
+                process_message(js, msg, slots)
                 for msg in messages
                 if not stop.is_set()
             ])
@@ -286,9 +295,14 @@ async def consume(js, subscription, stop: asyncio.Event):
 
 async def run():
     settings.validate_worker_runtime()
+    if not POOL.active:
+        raise RuntimeError(
+            f"WORKER_POOL={POOL.name} is intentionally inactive until its transport is configured"
+        )
     logging.basicConfig(level=logging.INFO, format="%(message)s")
     configure_telemetry(f"funkey-worker-{POOL.name}", engine=engine)
     stop = asyncio.Event()
+    slots = asyncio.Semaphore(max(1, POOL.max_in_flight))
     loop = asyncio.get_running_loop()
     for sig in (signal.SIGINT, signal.SIGTERM):
         try:
@@ -324,7 +338,9 @@ async def run():
                     max_deliver=MAX_ATTEMPTS, max_ack_pending=spec.max_ack_pending,
                 ),
             )
-            tasks.append(asyncio.create_task(consume(js, subscription, stop)))
+            tasks.append(
+                asyncio.create_task(consume(js, subscription, stop, slots))
+            )
         state.ready = True
         _logger.info(json.dumps({"event": "worker.ready", "pool": POOL.name,
                                 "subscriptions": [s.subject for s in POOL.subscriptions],
