@@ -241,3 +241,59 @@ def settle_lucky_gift(
             "is_relationship_gift": bool(is_relationship_gift),
         },
     )
+
+
+def recharge_wallet(
+    *,
+    user_id: int,
+    amount_inr: int,
+    provider_reference: str,
+) -> dict[str, Any]:
+    business_reference = f"recharge:{user_id}:{provider_reference}"
+    return _request(
+        "wallet/recharge",
+        {
+            **mutation_context("wallet.recharge", business_reference),
+            "user_id": int(user_id),
+            "amount_inr": int(amount_inr),
+            "provider_reference": provider_reference,
+        },
+    )
+
+
+def convert_ruby(
+    *,
+    user_id: int,
+    ruby_amount: int,
+    request_id: str,
+) -> dict[str, Any]:
+    business_reference = f"ruby-convert:{user_id}:{request_id}"
+    return _request(
+        "wallet/convert-ruby",
+        {
+            **mutation_context("wallet.convert_ruby", business_reference),
+            "user_id": int(user_id),
+            "ruby_amount": int(ruby_amount),
+        },
+    )
+
+
+def withdraw_ruby(
+    *,
+    user_id: int,
+    ruby_amount: int,
+    payout_method: str | None,
+    payout_account_snapshot: str | None,
+    request_id: str,
+) -> dict[str, Any]:
+    business_reference = f"ruby-withdraw:{user_id}:{request_id}"
+    return _request(
+        "wallet/withdraw-ruby",
+        {
+            **mutation_context("wallet.withdraw_ruby", business_reference),
+            "user_id": int(user_id),
+            "ruby_amount": int(ruby_amount),
+            "payout_method": payout_method,
+            "payout_account_snapshot": payout_account_snapshot,
+        },
+    )

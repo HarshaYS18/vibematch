@@ -10,9 +10,10 @@ from sqlalchemy.orm import Session
 
 from app.core.config import settings
 from app.database import get_db
-from app.models.economy import EconomyCurrency, GiftTransaction, WalletLedger
+from app.models.economy import EconomyCurrency, GiftTransaction, RubyWithdrawRequest, WalletLedger
 from app.models.user import User
 from app.services import (
+    economy_level_service,
     economy_transaction_service,
     house_pool_service,
     lucky_gift_house_service,
@@ -47,6 +48,24 @@ class MissionRewardRequest(MutationContext):
     mission_id: str = Field(min_length=1, max_length=120)
     cycle_key: str = Field(min_length=1, max_length=120)
     reward_coin_amount: int = Field(gt=0)
+
+
+class WalletRechargeRequest(MutationContext):
+    user_id: int
+    amount_inr: int = Field(gt=0, le=10_000_000)
+    provider_reference: str = Field(min_length=1, max_length=120)
+
+
+class WalletConvertRequest(MutationContext):
+    user_id: int
+    ruby_amount: int = Field(gt=0, le=10_000_000)
+
+
+class WalletWithdrawRequest(MutationContext):
+    user_id: int
+    ruby_amount: int = Field(gt=0)
+    payout_method: str | None = None
+    payout_account_snapshot: str | None = None
 
 
 class GiftFinancialRequest(MutationContext):
@@ -98,6 +117,166 @@ def _begin(
         request_payload=data,
     )
 
+
+
+
+@router.post("/wallet/recharge", dependencies=[Depends(require_internal_token)])
+def recharge_wallet(
+    payload: WalletRechargeRequest,
+    db: Session = Depends(get_db),
+):
+    tx, cached = _begin(
+        db,
+        payload,
+        operation="wallet.recharge",
+        actor_user_id=payload.user_id,
+    )
+    if cached is not None:
+        return cached
+
+    coin_amount = int(payload.amount_inr) * 1000
+    wallet = economy_transaction_service.credit(
+        db,
+        user_id=payload.user_id,
+        amount=coin_amount,
+        currency=EconomyCurrency.COIN.value,
+        source_type="RECHARGE",
+        source_id=payload.provider_reference,
+        reason=f"Recharge Rs {payload.amount_inr}",
+        tx=tx,
+        actor_user_id=payload.user_id,
+    )
+    levels = economy_level_service.wallet_level_payload(db, wallet)
+    economy_level_service.sync_vip_status(db, payload.user_id, levels)
+    result = {
+        "transaction_id": tx.transaction_id,
+        "user_id": payload.user_id,
+        "coin_balance": int(wallet.coin_balance or 0),
+        "ruby_balance": int(wallet.ruby_balance or 0),
+        "coin_amount": coin_amount,
+    }
+    return economy_transaction_service.complete(
+        db,
+        tx=tx,
+        result=result,
+        event_type="economy.wallet.recharged.v1",
+        event_payload={
+            "user_id": payload.user_id,
+            "coin_amount": coin_amount,
+            "provider_reference": payload.provider_reference,
+        },
+    )
+
+
+@router.post("/wallet/convert-ruby", dependencies=[Depends(require_internal_token)])
+def convert_ruby(
+    payload: WalletConvertRequest,
+    db: Session = Depends(get_db),
+):
+    tx, cached = _begin(
+        db,
+        payload,
+        operation="wallet.convert_ruby",
+        actor_user_id=payload.user_id,
+    )
+    if cached is not None:
+        return cached
+
+    wallet = economy_transaction_service.debit(
+        db,
+        user_id=payload.user_id,
+        amount=payload.ruby_amount,
+        currency=EconomyCurrency.RUBY.value,
+        source_type="RUBY_TO_COIN_CONVERSION",
+        source_id=tx.transaction_id,
+        reason="Ruby to coin conversion",
+        tx=tx,
+        actor_user_id=payload.user_id,
+    )
+    wallet = economy_transaction_service.credit(
+        db,
+        user_id=payload.user_id,
+        amount=payload.ruby_amount,
+        currency=EconomyCurrency.COIN.value,
+        source_type="RUBY_TO_COIN_CONVERSION",
+        source_id=tx.transaction_id,
+        reason="Ruby to coin conversion",
+        tx=tx,
+        actor_user_id=payload.user_id,
+    )
+    result = {
+        "transaction_id": tx.transaction_id,
+        "user_id": payload.user_id,
+        "coin_balance": int(wallet.coin_balance or 0),
+        "ruby_balance": int(wallet.ruby_balance or 0),
+    }
+    return economy_transaction_service.complete(
+        db,
+        tx=tx,
+        result=result,
+        event_type="economy.wallet.ruby_converted.v1",
+        event_payload={
+            "user_id": payload.user_id,
+            "ruby_amount": payload.ruby_amount,
+        },
+    )
+
+
+@router.post("/wallet/withdraw-ruby", dependencies=[Depends(require_internal_token)])
+def withdraw_ruby(
+    payload: WalletWithdrawRequest,
+    db: Session = Depends(get_db),
+):
+    tx, cached = _begin(
+        db,
+        payload,
+        operation="wallet.withdraw_ruby",
+        actor_user_id=payload.user_id,
+    )
+    if cached is not None:
+        return cached
+
+    wallet = economy_transaction_service.debit(
+        db,
+        user_id=payload.user_id,
+        amount=payload.ruby_amount,
+        currency=EconomyCurrency.RUBY.value,
+        source_type="RUBY_WITHDRAW_REQUEST",
+        source_id=tx.transaction_id,
+        reason="Rubies locked for withdrawal review",
+        tx=tx,
+        actor_user_id=payload.user_id,
+    )
+    wallet.pending_withdraw_rubies += int(payload.ruby_amount)
+    request = RubyWithdrawRequest(
+        user_id=payload.user_id,
+        ruby_amount=payload.ruby_amount,
+        payout_method=payload.payout_method,
+        payout_account_snapshot=payload.payout_account_snapshot,
+    )
+    db.add(request)
+    db.flush()
+
+    result = {
+        "transaction_id": tx.transaction_id,
+        "request_id": request.id,
+        "user_id": payload.user_id,
+        "ruby_amount": payload.ruby_amount,
+        "status": request.status,
+        "ruby_balance": int(wallet.ruby_balance or 0),
+        "pending_withdraw_rubies": int(wallet.pending_withdraw_rubies or 0),
+    }
+    return economy_transaction_service.complete(
+        db,
+        tx=tx,
+        result=result,
+        event_type="economy.wallet.withdrawal_requested.v1",
+        event_payload={
+            "user_id": payload.user_id,
+            "withdraw_request_id": request.id,
+            "ruby_amount": payload.ruby_amount,
+        },
+    )
 
 @router.post("/wallet/debit", dependencies=[Depends(require_internal_token)])
 def debit_wallet(payload: WalletMutationRequest, db: Session = Depends(get_db)):

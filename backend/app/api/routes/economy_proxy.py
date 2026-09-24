@@ -89,7 +89,6 @@ def _register_prefix(prefix: str) -> None:
 
 
 for _prefix in (
-    "wallets",
     "coin-sales",
     "economy/lucky-coins",
     "lucky-packets",

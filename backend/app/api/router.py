@@ -16,7 +16,7 @@ from app.api.routes import (
     notifications, presence, profile_social_proxy, push, rankings,
     relationship_exp, role_badges, room_control_proxy, room_cross_domain,
     room_levels, room_music_media, realtime_gateway_auth, settings, super_owner,
-    support, users, vibes_proxy, vip_admin,
+    support, users, vibes_proxy, vip_admin, wallet,
 )
 from app.api.routes.rooms import cricket
 from app.api.routes.store import router as store_router
@@ -64,10 +64,10 @@ api_router.include_router(media.router)
 api_router.include_router(room_music_media.router)
 
 # Economy financial route families are extracted behind a compatibility proxy.
-# Core keeps only the /economy read + gift orchestration facade.
+# Core keeps /wallets and /economy as read/orchestration facades.
 api_router.include_router(economy_proxy.router)
 for router in (
-    economy.router, economy_master.router, games.router, games_master.router,
+    wallet.router, economy.router, economy_master.router, games.router, games_master.router,
     game_settlements.router, store_router, experience.router,
 ):
     api_router.include_router(router)

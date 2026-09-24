@@ -187,6 +187,7 @@ class RubyWithdrawRequestCreate(BaseModel):
     ruby_amount: int = Field(..., gt=0)
     payout_method: str | None = None
     payout_account_snapshot: str | None = None
+    request_id: str | None = Field(default=None, min_length=8, max_length=36)
 
 
 class GamePoolCreateRequest(BaseModel):

@@ -9,7 +9,6 @@ from app.api.routes import (
     lucky_coins,
     lucky_gifts,
     lucky_packets,
-    wallet,
 )
 from app.core.config import settings
 from app.core.operational import install_query_counter, operational_middleware, render_metrics
@@ -32,7 +31,6 @@ app.dependency_overrides[get_db] = get_economy_db
 
 api = APIRouter(prefix="/api/v1")
 for public_router in (
-    wallet.router,
     coin_sales.router,
     lucky_coins.router,
     lucky_packets.router,
