@@ -21,8 +21,12 @@ Check, in order:
 5. bulk-worker readiness and retry state.
 6. reconciliation metrics:
    - `funkey_economy_reconciliation_wallet_mismatches`
+   - `funkey_economy_reconciliation_supply_pool_mismatches`
+   - `funkey_economy_reconciliation_game_pool_mismatches`
+   - `funkey_economy_reconciliation_reservation_mismatches`
    - `funkey_economy_reconciliation_unbalanced_journals`
    - `funkey_economy_reconciliation_failures_total`
+   - `funkey_economy_lucky_packet_finalize_failures_total`
 
 Do not clear a mismatch by editing a wallet row.
 
@@ -37,7 +41,7 @@ create a new transaction ID until commit outcome is known.
 
 ## Balanced journal
 
-Every transaction-layer wallet debit/credit writes two opposite
+Every financial wallet or pool value movement writes balanced
 `economy_journal_entries` legs in the same DB transaction. Completion flushes and
 verifies per-currency debit == credit before committing.
 
@@ -47,8 +51,9 @@ remain operational balance truth.
 ## Reconciliation
 
 Reconciliation is read-only and periodic in the Economy bulk-worker runtime.
-It compares current wallet balances with the latest ledger `after_balance` and
-checks journal balancing.
+It compares wallet, supply-pool and game-pool materializations with their latest ledgers,
+checks `game_pools.reserved_balance` against active durable house reservations, and verifies
+journal balancing.
 
 If mismatches appear:
 
