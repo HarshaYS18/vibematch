@@ -218,7 +218,7 @@ class MediaUploadApiService {
         body: <String, Object>{'parts': receipts},
       );
       final initial = MediaUploadResult.fromJson(completed);
-      return _waitUntilUsable(
+      return await _waitUntilUsable(
         network,
         headers: authHeaders,
         initial: initial,
