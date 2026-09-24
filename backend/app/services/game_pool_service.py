@@ -47,7 +47,7 @@ def _pool_response(pool: GamePool) -> dict:
     }
 
 
-def get_or_create_pool(db: Session, game_key: str, pool_type: str = GAME_POOL_TYPE) -> GamePool:
+def get_or_create_pool(db: Session, game_key: str, pool_type: str = GAME_POOL_TYPE, *, commit: bool = True) -> GamePool:
     pool = db.query(GamePool).filter(GamePool.game_key == game_key, GamePool.pool_type == pool_type).first()
     if pool:
         return pool
@@ -64,14 +64,32 @@ def get_or_create_pool(db: Session, game_key: str, pool_type: str = GAME_POOL_TY
         rtp_target_basis_points=DEFAULT_RTP_TARGET_BPS,
     )
     db.add(pool)
-    db.commit()
-    db.refresh(pool)
+    if commit:
+        db.commit()
+        db.refresh(pool)
+    else:
+        db.flush()
     return pool
 
 
-def ensure_main_and_game_pools(db: Session, game_key: str) -> tuple[GamePool, GamePool]:
-    main_pool = get_or_create_pool(db, GLOBAL_GAME_KEY, MAIN_POOL_TYPE)
-    game_pool = get_or_create_pool(db, game_key, GAME_POOL_TYPE)
+def ensure_main_and_game_pools(
+    db: Session,
+    game_key: str,
+    *,
+    commit: bool = True,
+) -> tuple[GamePool, GamePool]:
+    main_pool = get_or_create_pool(
+        db,
+        GLOBAL_GAME_KEY,
+        MAIN_POOL_TYPE,
+        commit=commit,
+    )
+    game_pool = get_or_create_pool(
+        db,
+        game_key,
+        GAME_POOL_TYPE,
+        commit=commit,
+    )
     return main_pool, game_pool
 
 
@@ -81,7 +99,7 @@ def list_pools(db: Session) -> list[dict]:
 
 
 def get_pool_detail(db: Session, game_key: str) -> dict:
-    main_pool, game_pool = ensure_main_and_game_pools(db, game_key)
+    main_pool, game_pool = ensure_main_and_game_pools(db, game_key, commit=commit)
     return {"main_pool": _pool_response(main_pool), "game_pool": _pool_response(game_pool)}
 
 
@@ -127,10 +145,12 @@ def adjust_pool(
     direction: str,
     reason: str,
     pool_type: str = GAME_POOL_TYPE,
+    *,
+    commit: bool = True,
 ) -> GamePool:
     if amount <= 0:
         raise HTTPException(status_code=400, detail="Amount must be positive")
-    pool = get_or_create_pool(db, game_key, pool_type)
+    pool = get_or_create_pool(db, game_key, pool_type, commit=commit)
     if direction not in {EconomyDirection.CREDIT.value, EconomyDirection.DEBIT.value}:
         raise HTTPException(status_code=400, detail="Invalid direction")
     if direction == EconomyDirection.DEBIT.value and available_balance(pool) < amount:
@@ -140,8 +160,11 @@ def adjust_pool(
         pool.balance += amount
     else:
         pool.balance -= amount
-    db.commit()
-    db.refresh(pool)
+    if commit:
+        db.commit()
+        db.refresh(pool)
+    else:
+        db.flush()
     return pool
 
 
@@ -156,8 +179,10 @@ def update_pool_settings(
     max_single_payout: int | None,
     rtp_target_basis_points: int | None,
     reason: str,
+    *,
+    commit: bool = True,
 ) -> GamePool:
-    pool = get_or_create_pool(db, game_key, pool_type)
+    pool = get_or_create_pool(db, game_key, pool_type, commit=commit)
     if status is not None:
         if status not in {item.value for item in EconomyPoolStatus}:
             raise HTTPException(status_code=400, detail="Invalid pool status")
@@ -171,12 +196,15 @@ def update_pool_settings(
     if rtp_target_basis_points is not None:
         pool.rtp_target_basis_points = rtp_target_basis_points
     _ledger(db, pool, EconomyDirection.CREDIT.value, 0, "SUPER_OWNER_POOL_SETTINGS", actor, reason)
-    db.commit()
-    db.refresh(pool)
+    if commit:
+        db.commit()
+        db.refresh(pool)
+    else:
+        db.flush()
     return pool
 
 
-def allocate_from_main_to_game(db: Session, actor: User, game_key: str, amount: int, reason: str) -> dict:
+def allocate_from_main_to_game(db: Session, actor: User, game_key: str, amount: int, reason: str, *, commit: bool = True) -> dict:
     if amount <= 0:
         raise HTTPException(status_code=400, detail="Amount must be positive")
     main_pool, game_pool = ensure_main_and_game_pools(db, game_key)
@@ -186,25 +214,31 @@ def allocate_from_main_to_game(db: Session, actor: User, game_key: str, amount: 
     _ledger(db, game_pool, EconomyDirection.CREDIT.value, amount, "POOL_ALLOCATE_FROM_MAIN", actor, reason, source_id=GLOBAL_GAME_KEY)
     main_pool.balance -= amount
     game_pool.balance += amount
-    db.commit()
-    db.refresh(main_pool)
-    db.refresh(game_pool)
+    if commit:
+        db.commit()
+        db.refresh(main_pool)
+        db.refresh(game_pool)
+    else:
+        db.flush()
     return {"main_pool": _pool_response(main_pool), "game_pool": _pool_response(game_pool)}
 
 
-def withdraw_from_game_to_main(db: Session, actor: User, game_key: str, amount: int, reason: str) -> dict:
+def withdraw_from_game_to_main(db: Session, actor: User, game_key: str, amount: int, reason: str, *, commit: bool = True) -> dict:
     if amount <= 0:
         raise HTTPException(status_code=400, detail="Amount must be positive")
-    main_pool, game_pool = ensure_main_and_game_pools(db, game_key)
+    main_pool, game_pool = ensure_main_and_game_pools(db, game_key, commit=commit)
     if available_balance(game_pool) < amount:
         raise HTTPException(status_code=400, detail="Game pool available balance is too low")
     _ledger(db, game_pool, EconomyDirection.DEBIT.value, amount, "POOL_WITHDRAW_TO_MAIN", actor, reason, source_id=GLOBAL_GAME_KEY)
     _ledger(db, main_pool, EconomyDirection.CREDIT.value, amount, "POOL_WITHDRAW_FROM_GAME", actor, reason, source_id=game_key)
     game_pool.balance -= amount
     main_pool.balance += amount
-    db.commit()
-    db.refresh(main_pool)
-    db.refresh(game_pool)
+    if commit:
+        db.commit()
+        db.refresh(main_pool)
+        db.refresh(game_pool)
+    else:
+        db.flush()
     return {"main_pool": _pool_response(main_pool), "game_pool": _pool_response(game_pool)}
 
 
