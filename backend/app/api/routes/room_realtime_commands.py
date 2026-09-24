@@ -796,38 +796,17 @@ async def join(room_public_id: str, command: RoomJoinCommand, db: Session = Depe
     return {"room_id": room_public_id, "room": data}
 
 
-@router.post("/heartbeat")
-def heartbeat(
-    room_public_id: str,
-    db: Session = Depends(get_db),
-    current_user: User = Depends(get_current_user),
-):
-    """Compatibility heartbeat: validate access without rebuilding room state.
+@router.post("/heartbeat", deprecated=True)
+def heartbeat(room_public_id: str):
+    """Retired REST heartbeat.
 
-    Normal connected presence is refreshed by the realtime socket lease. This
-    endpoint intentionally performs no participant/room writes and returns no
-    room snapshot.
+    Room liveness is refreshed by the authenticated realtime socket lease; this
+    endpoint intentionally performs no PostgreSQL reads or writes.
     """
-    room = room_or_404(db, room_public_id)
-    room_permission_service.require_room_view(db, room, current_user)
-    participant = (
-        db.query(RoomParticipant.id)
-        .filter(
-            RoomParticipant.room_id == room.id,
-            RoomParticipant.user_id == current_user.id,
-            RoomParticipant.is_active.is_(True),
-        )
-        .first()
+    raise HTTPException(
+        status_code=410,
+        detail="Room REST heartbeat retired; realtime socket lease owns liveness",
     )
-    if participant is None:
-        raise HTTPException(status_code=409, detail="Room session is not active")
-    return {
-        "room_id": room_public_id,
-        "state_version": int(room.realtime_version or 0),
-        "event_sequence": int(room.realtime_event_sequence or 0),
-        "heartbeat_mode": "socket_lease",
-        "snapshot_mode": "none",
-    }
 
 
 @router.post("/leave")
