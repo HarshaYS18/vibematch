@@ -1,14 +1,14 @@
-import '../../../core/network/api_client.dart';
+import '../../../foundation/networking/app_network_client.dart';
 import '../../../core/network/api_endpoints.dart';
 import '../../auth/data/auth_api_service.dart';
 import '../models/banner_manager_models.dart';
 
 class BannerManagerRepository {
-  BannerManagerRepository({ApiClient? apiClient, AuthApiService? authApiService})
-      : _apiClient = apiClient ?? ApiClient(),
+  BannerManagerRepository({AppNetworkClient? apiClient, AuthApiService? authApiService})
+      : _apiClient = apiClient ?? AppNetworkRuntime.shared,
         _authApiService = authApiService ?? const AuthApiService();
 
-  final ApiClient _apiClient;
+  final AppNetworkClient _apiClient;
   final AuthApiService _authApiService;
 
   Map<String, String> _authHeaders() {

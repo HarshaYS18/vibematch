@@ -1,12 +1,12 @@
-import '../../../core/network/api_client.dart';
+import '../../../foundation/networking/app_network_client.dart';
 import '../../auth/data/auth_local_storage.dart';
 
 class RoomSettingsRepository {
-  RoomSettingsRepository({ApiClient? apiClient, AuthLocalStorage? authStorage})
-    : _apiClient = apiClient ?? ApiClient(),
+  RoomSettingsRepository({AppNetworkClient? apiClient, AuthLocalStorage? authStorage})
+    : _apiClient = apiClient ?? AppNetworkRuntime.shared,
       _authStorage = authStorage ?? AuthLocalStorage();
 
-  final ApiClient _apiClient;
+  final AppNetworkClient _apiClient;
   final AuthLocalStorage _authStorage;
 
   Future<RoomSettingsDto> fetchRoomSettings(String roomPublicId) async {

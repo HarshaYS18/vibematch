@@ -4,17 +4,17 @@ import 'package:crypto/crypto.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:uuid/uuid.dart';
 
-import '../../../core/network/api_client.dart';
+import '../../../foundation/networking/app_network_client.dart';
 import '../../auth/data/auth_api_service.dart';
 
 class ControlCenterApiService {
   ControlCenterApiService({
-    ApiClient? apiClient,
+    AppNetworkClient? apiClient,
     AuthApiService? authApiService,
-  }) : _apiClient = apiClient ?? ApiClient(),
+  }) : _apiClient = apiClient ?? AppNetworkRuntime.shared,
        _authApiService = authApiService ?? const AuthApiService();
 
-  final ApiClient _apiClient;
+  final AppNetworkClient _apiClient;
   final AuthApiService _authApiService;
 
   Future<AdminControlSummary> loadSummary() async {

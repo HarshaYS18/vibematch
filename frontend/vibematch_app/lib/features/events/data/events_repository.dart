@@ -1,15 +1,15 @@
 import 'package:flutter/material.dart';
 
-import '../../../core/network/api_client.dart';
+import '../../../foundation/networking/app_network_client.dart';
 import '../../auth/data/auth_api_service.dart';
 import '../models/event_item.dart';
 
 class EventsRepository {
-  EventsRepository({ApiClient? apiClient, AuthApiService? authApiService})
-      : _apiClient = apiClient ?? ApiClient(),
+  EventsRepository({AppNetworkClient? apiClient, AuthApiService? authApiService})
+      : _apiClient = apiClient ?? AppNetworkRuntime.shared,
         _authApiService = authApiService ?? const AuthApiService();
 
-  final ApiClient _apiClient;
+  final AppNetworkClient _apiClient;
   final AuthApiService _authApiService;
   CommunityEventsData? _cache;
   DateTime? _cacheAt;
