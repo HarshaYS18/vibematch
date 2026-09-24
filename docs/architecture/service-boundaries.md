@@ -15,7 +15,7 @@ database roles for bounded composite reads.
 | Room Control | `room-control-service` | Owns room definition/membership/permissions/seats/Watch Party/activity truth. |
 | Inbox | `inbox-service` | Owns conversations/messages/read state/Inbox preferences and family community chat. |
 | Vibes | `vibes-service` | Owns Vibes content/reactions/feed source state; ranking copies remain projections. |
-| Economy | `economy-service` | Exclusive writer for wallet/ledger, supply, gift settlement, mission rewards and game financial settlement. |
+| Economy | `economy-service` | Exclusive writer for wallet/ledger, supply/game pools, durable house liability, gift/Lucky Packet settlement, mission rewards and game financial settlement. |
 | Game Platform | `game-platform-service` + CDN runtime bridge | Owns game catalog/session/round/bet/risk/stats lifecycle. Calls Economy for value. |
 | Notification | `notification-service` + provider worker | Owns in-app notification truth, device tokens/preferences/templates and delivery state. FCM is transport. |
 | Media Control | core media control + direct object storage + media worker | PostgreSQL owns media metadata/upload/processing truth; object storage owns bytes only. |
