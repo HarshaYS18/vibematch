@@ -263,6 +263,7 @@ async def consume(js, subscription, stop: asyncio.Event):
 
 
 async def run():
+    settings.validate_worker_runtime()
     logging.basicConfig(level=logging.INFO, format="%(message)s")
     configure_telemetry("funkey-worker", engine=engine)
     stop = asyncio.Event()

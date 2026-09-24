@@ -74,6 +74,11 @@ async def _proxy(request: Request, relative_path: str) -> Response:
     )
 
 
+@router.get("/vibes/feed")
+async def proxy_vibes_feed(request: Request) -> Response:
+    return await _proxy(request, "vibes/feed")
+
+
 @router.api_route(
     "/vibes",
     methods=["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],

@@ -204,7 +204,6 @@ class Settings(BaseSettings):
             "MEDIA_INTERNAL_TOKEN",
             "INBOX_BACKUP_ENCRYPTION_KEY",
             "INBOX_INTERNAL_TOKEN",
-            "VIBES_INTERNAL_TOKEN",
         ):
             value = getattr(self, name).strip()
             if len(value) < 32 or "change-this" in value.lower():
@@ -410,6 +409,22 @@ class Settings(BaseSettings):
             raise RuntimeError(
                 "Unsafe Vibes service production configuration: "
                 + ", ".join(unsafe)
+            )
+
+    def validate_worker_runtime(self) -> None:
+        """Reject worker-only service credentials that are unsafe in production."""
+
+        if not self.is_production:
+            return
+        unsafe: list[str] = []
+        if (
+            len(self.VIBES_INTERNAL_TOKEN.strip()) < 32
+            or "change-this" in self.VIBES_INTERNAL_TOKEN.lower()
+        ):
+            unsafe.append("VIBES_INTERNAL_TOKEN")
+        if unsafe:
+            raise RuntimeError(
+                "Unsafe worker runtime configuration: " + ", ".join(unsafe)
             )
 
     model_config = SettingsConfigDict(
