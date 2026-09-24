@@ -20,6 +20,12 @@ class GamePlatformRuntimeBoundaryTests(unittest.TestCase):
         self.assertIn("request_id: Mapped[str | None]",model)
         self.assertIn('"financial_status":"PENDING"',source)
         self.assertIn("game-bet:{round_id}:{user.id}:{rid}",source)
+    def test_session_retry_identity_cannot_change_context(self):
+        source=(ROOT/"backend/app/services/game_platform_runtime_service.py").read_text(encoding="utf-8")
+        self.assertIn("existing.room_id != room_id",source)
+        self.assertIn("existing.bridge_version",source)
+        self.assertIn("session.room_id != room_id",source)
+        self.assertIn("Game session belongs to another room context",source)
     def test_economy_records_wager_income_and_final_settlement(self):
         internal=(ROOT/"apps/economy-service/internal.py").read_text(encoding="utf-8")
         self.assertIn("COIN_GAME_WAGER_INCOME",internal)

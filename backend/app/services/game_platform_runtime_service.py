@@ -89,8 +89,16 @@ def open_session(db: Session, *, game_key: str, user: User, request_id: str, roo
     definition = get_definition(db, game_key)
     existing = db.query(GameSession).filter(GameSession.request_id == request_id).first()
     if existing is not None:
-        if existing.user_id != user.id or existing.game_key != definition.game_key:
-            raise HTTPException(status_code=409, detail="Game session request_id is already bound to another session")
+        if (
+            existing.user_id != user.id
+            or existing.game_key != definition.game_key
+            or existing.room_id != room_id
+            or int(existing.bridge_version or 1) != int(bridge_version)
+        ):
+            raise HTTPException(
+                status_code=409,
+                detail="Game session request_id is already bound to another session",
+            )
         return _session_payload(existing)
     row = GameSession(session_id=str(uuid4()), request_id=request_id, user_id=user.id, game_key=definition.game_key, room_id=room_id, bridge_version=bridge_version, status="ACTIVE", metadata_json=_save_json({"config_version": definition.config_version}))
     db.add(row)
@@ -120,6 +128,8 @@ def create_round(db: Session, game_key: str, user: User, room_id: int | None = N
         if session is None: raise HTTPException(status_code=409, detail="Active game session not found")
         definition = get_definition(db, game_key)
         if session.game_key != definition.game_key: raise HTTPException(status_code=409, detail="Game session belongs to another game")
+        if session.room_id != room_id:
+            raise HTTPException(status_code=409, detail="Game session belongs to another room context")
     round_obj = jungle.create_round(db, game_key, user, room_id)
     metadata=_json(round_obj.metadata_json)
     if session_id and metadata.get("session_id") != session_id:

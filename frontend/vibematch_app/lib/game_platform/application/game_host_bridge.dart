@@ -52,7 +52,8 @@ class GameHostBridge {
       },
     );
     final sessionId = response['session_id']?.toString().trim();
-    if (sessionId == null || sessionId.isEmpty) {
+    final status = response['status']?.toString().trim().toUpperCase();
+    if (sessionId == null || sessionId.isEmpty || status != 'ACTIVE') {
       throw const GameBridgeException('Game session could not be opened.');
     }
     _sessionId = sessionId;
