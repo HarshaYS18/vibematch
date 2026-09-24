@@ -615,7 +615,8 @@
         "postgres:game_rounds",
         "postgres:game_round_players",
         "postgres:game_bets",
-        "postgres:game_risk_audits"
+        "postgres:game_risk_audits",
+        "postgres:user_game_stats"
       ],
       "target_storage": [
         "game-platform-service PostgreSQL authority"
@@ -629,7 +630,7 @@
         "status": "service boundary live",
         "name": "game.round.changed.v1"
       },
-      "migration_status": "Chunk 28 extracted behind the core /api/v1/games compatibility proxy; CDN HTML delivery remains client-side"
+      "migration_status": "Chunk 28 extracted behind the core /api/v1/games compatibility proxy; Game Platform owns durable sessions/rounds/bets/risk/stats while CDN HTML delivery remains client-side"
     },
     {
       "id": "games.financial_settlement",

@@ -28,6 +28,7 @@ class GamePlatformCutoverTests(unittest.TestCase):
         payload=json.loads((ROOT/"contracts/architecture/authorities.yaml").read_text(encoding="utf-8"))
         states={item["id"]:item for item in payload["states"]}
         self.assertEqual("game-platform-service",states["games.catalog_rounds"]["current_deployable"])
+        self.assertIn("postgres:user_game_stats",states["games.catalog_rounds"]["current_storage"])
         self.assertEqual("economy-service",states["games.financial_settlement"]["current_deployable"])
         self.assertEqual("economy",states["games.financial_settlement"]["logical_owner"])
 

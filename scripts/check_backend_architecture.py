@@ -1143,6 +1143,8 @@ def _validate_game_platform_extraction(errors: list[str]) -> None:
         states = {str(item.get("id")): item for item in payload.get("states", [])}
         if states.get("games.catalog_rounds", {}).get("current_deployable") != "game-platform-service":
             errors.append("games.catalog_rounds: Chunk 28 deployable must be game-platform-service")
+        if "postgres:user_game_stats" not in states.get("games.catalog_rounds", {}).get("current_storage", []):
+            errors.append("games.catalog_rounds: user_game_stats must be declared as Game Platform storage")
         if states.get("games.financial_settlement", {}).get("current_deployable") != "economy-service":
             errors.append("games.financial_settlement: current deployable must be economy-service")
 
