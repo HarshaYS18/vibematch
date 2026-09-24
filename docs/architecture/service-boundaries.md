@@ -1,38 +1,63 @@
 # Service Boundaries
 
 **Owner:** Platform Architecture  
-**Status:** Logical boundaries established in Chunk 15; physical extraction occurs later
+**Status:** current repository reality through Chunk 32 plus the post-audit repair pass
 
-A boundary is a coherent business capability, not a reason to create more processes. After extraction only the owning service may mutate its database; other services use APIs or versioned events.
+A boundary is a coherent business capability, not a reason to create duplicate
+truth. After extraction, only the owning service may mutate its durable tables;
+other services use authenticated APIs, versioned events, or explicitly read-only
+database roles for bounded composite reads.
 
-| Logical owner | Current deployable | Target |
+| Logical owner | Current deployable | Durable / operational rule |
 |---|---|---|
-| Identity | core-api | Identity Service |
-| Profile/Social | core-api | Profile/Social Service |
-| Room Control | core-api | Room Control Service |
-| Inbox | core-api | Inbox Service |
-| Vibes | core-api | Vibes/Feed Service |
-| Economy | core-api | Economy Service |
-| Game Platform | core-api + CDN bridge | Game Platform Service |
-| Notification | core-api + worker | Notification Service |
-| Media Control | core-api + backend_media | Media Platform |
-| Realtime | Go gateway + compatibility FastAPI sockets | one Go application WebSocket |
-| Worker Platform | worker | specialized worker pools |
-| Search Projection | direct DB search | OpenSearch projection workers |
-| Recommendation | not deployed | Recommendation Platform |
-| Analytics | outbox/NATS operational path | Kafka + ClickHouse/data lake |
-| GraphQL Read BFF | not deployed | composite-read BFF only |
+| Identity | `identity-service` | Owns account/security/session/device truth. Core is a compatibility facade/read composer only. |
+| Profile/Social | `profile-social-service` | Owns profile mutation, social graph, relationships and family membership. |
+| Room Control | `room-control-service` | Owns room definition/membership/permissions/seats/Watch Party/activity truth. |
+| Inbox | `inbox-service` | Owns conversations/messages/read state/Inbox preferences and family community chat. |
+| Vibes | `vibes-service` | Owns Vibes content/reactions/feed source state; ranking copies remain projections. |
+| Economy | `economy-service` | Exclusive writer for wallet/ledger, supply, gift settlement, mission rewards and game financial settlement. |
+| Game Platform | `game-platform-service` + CDN runtime bridge | Owns game catalog/session/round/bet/risk/stats lifecycle. Calls Economy for value. |
+| Notification | `notification-service` + provider worker | Owns in-app notification truth, device tokens/preferences/templates and delivery state. FCM is transport. |
+| Media Control | core media control + direct object storage + media worker | PostgreSQL owns media metadata/upload/processing truth; object storage owns bytes only. |
+| Realtime | Go realtime gateway | Owns application WebSocket transport/routing/presence/replay only; never durable business truth. |
+| Worker Platform | specialized Python worker pools | Owns execution/retry/backpressure/DLQ mechanics, not domain truth. |
+| Media plane | `backend_media` | Owns mediasoup/WebRTC transport lifecycle only. |
+| Search Projection | direct DB search today | OpenSearch remains a future rebuildable projection. |
+| Recommendation | not deployed | Future ranking platform; output is rebuildable. |
+| Analytics | NATS/outbox operational path today | Kafka/ClickHouse/data lake remain future downstream projections. |
+| GraphQL Read BFF | not deployed | Future composite-read surface only; never a mutation authority. |
 
 ## Communication
 
-Immediate answer: REST now and gRPC/Protobuf for extracted internal services after Chunk 17. Operational async: NATS JetStream through transactional outbox. Long-retained analytics/ML: Kafka after Chunk 37. Composite reads: GraphQL BFF after service boundaries; never business authority.
+- Public/mobile compatibility: stable REST paths through core where needed.
+- Extracted synchronous service calls: authenticated internal HTTP today; versioned protobuf contracts define the approved gRPC direction.
+- Application realtime: one Go `funkey.v2` WebSocket plus Redis/Valkey routing/replay.
+- Operational async work: NATS JetStream through the transactional outbox.
+- Long-retained analytics/ML: Kafka only when the analytics chunk is implemented.
+- Composite reads: direct owner APIs/read-only roles today; GraphQL BFF is a later read-only option.
 
 ## Database ownership
 
-Shared PostgreSQL today does not mean shared ownership. After extraction, Game Platform calls Economy for settlement, Inbox uses Profile APIs/events for display metadata, and Go realtime never writes wallet/room business truth.
+PostgreSQL remains the durable database platform, but shared physical PostgreSQL
+does not imply shared mutation authority. Extracted domains use isolated owner/
+runtime roles. Core may receive documented reader roles for composite reads.
 
-Economy exclusively owns wallet balances/ledger, coin supply/pool ledger, gift settlement, game financial settlement, mission rewards, purchases/refunds and other value movement. Game Platform owns round lifecycle but asks Economy to settle.
+Economy is Tier-0: other deployables must not receive the Economy runtime role.
+Game Platform calls Economy for wager/settlement. Go realtime never writes room,
+Inbox or wallet business tables. Redis is CACHE/EPHEMERAL only.
 
-Go realtime owns connections, subscriptions, fanout, typing, routing and reconstructable presence leases. `backend_media` owns mediasoup transport lifecycle. Flutter repositories own displayed client state only; `RoomSessionRepository` remains the one room client authority.
+## Client boundary
 
-Do not physically extract a service until authority, contracts, isolated writes, observability, runbook, backward-compatible migration, shadow/compare/canary and rollback are ready. This is why Chunks 15–19 precede extraction.
+Flutter repositories own displayed/cache state only. Durable conflicts resolve
+to backend snapshots/events. REST/control-plane traffic follows:
+
+`Repository / feature service -> AppNetworkClient -> CanonicalNetworkTransport -> Dio`
+
+`RoomSessionRepository` remains the single Flutter room-state authority. Media
+engines own transport/producer/consumer lifecycle, not room business state.
+
+## Extraction standard
+
+No service boundary is considered complete without authority registration,
+isolated writes, stable compatibility contracts, observability, regression and
+architecture guards, runbooks, rollback procedure, and a no-dual-write cutover.
