@@ -65,6 +65,18 @@ class Settings(BaseSettings):
     INBOX_NATS_SUBJECT: str = "funkey.events.inbox.realtime"
     NATS_URL: str = "nats://127.0.0.1:4222"
 
+    # Chunk 24 Vibes service boundary.
+    VIBES_SERVICE_URL: str = "http://127.0.0.1:8084/api/v1"
+    VIBES_INTERNAL_URL: str = "http://127.0.0.1:8084/internal/vibes"
+    VIBES_SERVICE_TIMEOUT_SECONDS: float = 5.0
+    VIBES_INTERNAL_TOKEN: str = "change-this-vibes-internal-token"
+    VIBES_DATABASE_URL: str = ""
+    VIBES_DB_POOL_SIZE: int = 5
+    VIBES_DB_MAX_OVERFLOW: int = 0
+    VIBES_DB_POOL_TIMEOUT_SECONDS: int = 3
+    VIBES_MAX_REPLICAS: int = 20
+    DB_VIBES_CONNECTION_BUDGET: int = 100
+
     # Topology budgets. These are planning/validation limits, not capacity claims.
     API_MAX_REPLICAS: int = 20
     DB_API_CONNECTION_BUDGET: int = 100
@@ -73,7 +85,7 @@ class Settings(BaseSettings):
     DB_WORKER_MAX_OVERFLOW: int = 0
     DB_WORKER_CONNECTION_BUDGET: int = 60
     DB_ROLLOUT_SURGE_CONNECTION_RESERVE: int = 20
-    DB_POOLER_MAX_CLIENT_CONNECTIONS: int = 400
+    DB_POOLER_MAX_CLIENT_CONNECTIONS: int = 500
     DB_SERVER_CONNECTION_LIMIT: int = 160
     DB_POOLER_MAX_SERVER_CONNECTIONS: int = 120
     DB_DIRECT_CONNECTION_RESERVE: int = 40
@@ -177,6 +189,7 @@ class Settings(BaseSettings):
         return (
             self.DB_API_CONNECTION_BUDGET
             + self.DB_INBOX_CONNECTION_BUDGET
+            + self.DB_VIBES_CONNECTION_BUDGET
             + self.DB_WORKER_CONNECTION_BUDGET
             + self.DB_ROLLOUT_SURGE_CONNECTION_RESERVE
         )
@@ -191,6 +204,7 @@ class Settings(BaseSettings):
             "MEDIA_INTERNAL_TOKEN",
             "INBOX_BACKUP_ENCRYPTION_KEY",
             "INBOX_INTERNAL_TOKEN",
+            "VIBES_INTERNAL_TOKEN",
         ):
             value = getattr(self, name).strip()
             if len(value) < 32 or "change-this" in value.lower():
@@ -289,6 +303,18 @@ class Settings(BaseSettings):
             > self.DB_INBOX_CONNECTION_BUDGET
         ):
             unsafe.append("DB_INBOX_CONNECTION_BUDGET")
+        if not self.VIBES_SERVICE_URL.strip():
+            unsafe.append("VIBES_SERVICE_URL")
+        if not self.VIBES_INTERNAL_URL.strip():
+            unsafe.append("VIBES_INTERNAL_URL")
+        if self.VIBES_DB_POOL_SIZE <= 0 or self.VIBES_DB_MAX_OVERFLOW < 0:
+            unsafe.append("VIBES_DB_POOL_SIZE/VIBES_DB_MAX_OVERFLOW")
+        if (
+            self.VIBES_MAX_REPLICAS
+            * (self.VIBES_DB_POOL_SIZE + self.VIBES_DB_MAX_OVERFLOW)
+            > self.DB_VIBES_CONNECTION_BUDGET
+        ):
+            unsafe.append("DB_VIBES_CONNECTION_BUDGET")
         if self.WORKER_MAX_REPLICAS * (
             self.DB_WORKER_POOL_SIZE + self.DB_WORKER_MAX_OVERFLOW
         ) > self.DB_WORKER_CONNECTION_BUDGET:
@@ -353,6 +379,36 @@ class Settings(BaseSettings):
         if unsafe:
             raise RuntimeError(
                 "Unsafe Inbox service production configuration: "
+                + ", ".join(unsafe)
+            )
+
+    def validate_vibes_service(self) -> None:
+        """Validate settings owned by the extracted Vibes deployable."""
+
+        if not self.is_production:
+            return
+        unsafe: list[str] = []
+        if (
+            len(self.VIBES_INTERNAL_TOKEN.strip()) < 32
+            or "change-this" in self.VIBES_INTERNAL_TOKEN.lower()
+        ):
+            unsafe.append("VIBES_INTERNAL_TOKEN")
+        vibes_url = self.VIBES_DATABASE_URL.strip()
+        if not vibes_url:
+            unsafe.append("VIBES_DATABASE_URL")
+        elif vibes_url == self.database_url.strip():
+            unsafe.append("VIBES_DATABASE_URL(service-isolated credentials required)")
+        if self.VIBES_DB_POOL_SIZE <= 0 or self.VIBES_DB_MAX_OVERFLOW < 0:
+            unsafe.append("VIBES_DB_POOL_SIZE/VIBES_DB_MAX_OVERFLOW")
+        if (
+            self.VIBES_MAX_REPLICAS
+            * (self.VIBES_DB_POOL_SIZE + self.VIBES_DB_MAX_OVERFLOW)
+            > self.DB_VIBES_CONNECTION_BUDGET
+        ):
+            unsafe.append("DB_VIBES_CONNECTION_BUDGET")
+        if unsafe:
+            raise RuntimeError(
+                "Unsafe Vibes service production configuration: "
                 + ", ".join(unsafe)
             )
 

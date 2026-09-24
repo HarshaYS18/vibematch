@@ -17,6 +17,7 @@ resource "terraform_data" "deployment_contract" {
       condition = (
         var.connection_budget.api_max_pods * var.connection_budget.api_pool_per_pod +
         var.connection_budget.inbox_max_pods * var.connection_budget.inbox_pool_per_pod +
+        var.connection_budget.vibes_max_pods * var.connection_budget.vibes_pool_per_pod +
         var.connection_budget.worker_max_pods * var.connection_budget.worker_pool_per_pod +
         var.connection_budget.reserved_connections
       ) <= var.connection_budget.database_max_connections

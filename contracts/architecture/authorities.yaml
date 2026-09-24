@@ -455,9 +455,9 @@
       "domain": "vibes",
       "classification": "AUTHORITY",
       "logical_owner": "vibes",
-      "current_deployable": "core-api",
+      "current_deployable": "vibes-service",
       "current_storage": [
-        "postgres:vibe_posts/comments/comment_reactions/reactions/shares/saves/reports"
+        "vibes-service PostgreSQL authority: vibe_posts/comments/comment_reactions/reactions/shares/saves/reports"
       ],
       "target_storage": [
         "vibes-service postgres"
@@ -468,19 +468,19 @@
       "source_states": [],
       "rebuild_from": [],
       "change_contract": {
-        "status": "planned",
-        "name": "vibe.changed.v1"
+        "status": "live",
+        "name": "vibes.post.published.v1 via transactional outbox/NATS"
       },
-      "migration_status": "Chunk 24"
+      "migration_status": "Chunk 24 extracted; engagement counters, cursor reads and async fanout live"
     },
     {
       "id": "vibes.feed_projection",
       "domain": "vibes",
       "classification": "PROJECTION",
       "logical_owner": "vibes",
-      "current_deployable": "core-api direct-query feed",
+      "current_deployable": "vibes-service",
       "current_storage": [
-        "database query result; no separate durable projection yet"
+        "bounded PostgreSQL read model with denormalized counters and set-based viewer state"
       ],
       "target_storage": [
         "feed read model + recommendation candidate inputs"
@@ -497,7 +497,7 @@
         "status": "planned",
         "name": "vibe.feed.invalidated.v1"
       },
-      "migration_status": "Chunk 24/39"
+      "migration_status": "Chunk 24 bounded chronological seam live; recommendation projection deferred to Chunk 39"
     },
     {
       "id": "economy.wallet_ledger",

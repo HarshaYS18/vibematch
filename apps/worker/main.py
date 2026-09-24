@@ -35,6 +35,7 @@ NATS_URL = os.getenv("NATS_URL", "nats://127.0.0.1:4222")
 STREAM = os.getenv("NATS_STREAM", "FUNKEY_EVENTS")
 DLQ_STREAM = os.getenv("NATS_DLQ_STREAM", "FUNKEY_DLQ")
 CONSUMER = os.getenv("NATS_CONSUMER", "funkey-worker")
+VIBES_CONSUMER = os.getenv("NATS_VIBES_CONSUMER", "funkey-worker-vibes")
 MAX_ATTEMPTS = int(os.getenv("WORKER_MAX_ATTEMPTS", "5"))
 OUTBOX_BATCH_SIZE = int(os.getenv("OUTBOX_BATCH_SIZE", "25"))
 OUTBOX_LEASE_SECONDS = int(os.getenv("OUTBOX_LEASE_SECONDS", "120"))
@@ -289,7 +290,7 @@ async def run():
             await js.stream_info(DLQ_STREAM)
         except NotFoundError:
             await js.add_stream(name=DLQ_STREAM, subjects=["funkey.dlq.>"], max_age=30 * 86400)
-        subscription = await js.pull_subscribe(
+        notification_subscription = await js.pull_subscribe(
             "funkey.events.notification.requested", durable=CONSUMER, stream=STREAM,
             config=js_api.ConsumerConfig(
                 durable_name=CONSUMER, filter_subject="funkey.events.notification.requested",
@@ -297,7 +298,19 @@ async def run():
                 max_deliver=MAX_ATTEMPTS, max_ack_pending=100,
             ),
         )
-        tasks = [asyncio.create_task(relay_outbox(js, stop)), asyncio.create_task(consume(js, subscription, stop))]
+        vibes_subscription = await js.pull_subscribe(
+            "funkey.events.vibes.>", durable=VIBES_CONSUMER, stream=STREAM,
+            config=js_api.ConsumerConfig(
+                durable_name=VIBES_CONSUMER, filter_subject="funkey.events.vibes.>",
+                ack_policy=js_api.AckPolicy.EXPLICIT, ack_wait=90,
+                max_deliver=MAX_ATTEMPTS, max_ack_pending=100,
+            ),
+        )
+        tasks = [
+            asyncio.create_task(relay_outbox(js, stop)),
+            asyncio.create_task(consume(js, notification_subscription, stop)),
+            asyncio.create_task(consume(js, vibes_subscription, stop)),
+        ]
         state.ready = True
         stop_waiter = asyncio.create_task(stop.wait())
         done, _ = await asyncio.wait([stop_waiter, *tasks], return_when=asyncio.FIRST_COMPLETED)

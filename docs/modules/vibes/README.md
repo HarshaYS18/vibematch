@@ -2,92 +2,44 @@
 
 ## Purpose
 
-Stores social posts, comments, reactions, and moderation-facing content operations.
+Owns FunKey short-form social content and the bounded feed read model.
 
 ## Responsibilities
 
-The module owns vibe_posts, vibe_comments, vibe_reactions. Routes should validate input and delegate business decisions to services.
+The Vibes service owns posts, comments, reactions, saves, shares, reports, engagement counters, feed candidate retrieval and the current chronological ranking policy.
 
-## What this module owns
+## Authority
 
-vibe_posts, vibe_comments, vibe_reactions.
+PostgreSQL in the Vibes service is durable authority for `vibe_posts`, `vibe_comments`, `vibe_comment_reactions`, `vibe_reactions`, `vibe_shares`, `vibe_saves`, and `vibe_reports`.
 
-## What this module does NOT own
+Redis, Flutter caches, OpenSearch, Kafka/ClickHouse and recommendation outputs are never Vibes content authority.
 
-This module does not own SFU transport state, edge routing, or client UI state.
+## Does not own
 
-## Source of truth
+Identity/social relationships, notifications, Inbox conversations/messages, media objects, realtime transport, search indexes, analytics or recommendation models.
 
-PostgreSQL is the durable source of truth for vibe_posts, vibe_comments, vibe_reactions.
+## Public API
 
-## Important files
+Existing `/api/v1/vibes/**` and `/api/v1/admin/moderation/vibes/**` paths are preserved. Production ingress routes them to `funkey-vibes`; the core API has a compatibility proxy only.
 
-`backend/app/api/routes/vibes.py`, `backend/app/models/vibe.py`.
+Feed responses expose `posts`, `next_cursor`, and `has_more`. Cursors are opaque and ordered by `created_at DESC, id DESC`.
 
-## Public API/contracts
+## Internal API
 
-vibes routes under /api/v1. Preserve deployed request and response shapes while migrating implementation.
+`GET /internal/vibes/posts/{post_id}/fanout` is authenticated by `VIBES_INTERNAL_TOKEN` and used by worker-side publication fanout.
 
-## Events published
+## Events
 
-Current code may emit domain WebSocket updates after committed writes. A versioned broker event for this domain must be added only with a contract and transactional publication path; do not claim every proposed event is live. Consumers must handle duplicates and refetch a snapshot after a gap.
+Published transactionally: `vibes.post.published` and `vibes.media.requested`. The worker consumes them through NATS JetStream.
 
-## Events consumed
+## Scaling
 
-No durable broker consumer is implied by this ownership guide. Add a consumer only with a versioned contract, idempotency, retry limits, and an integration test.
+Feed reads are keyset bounded, eager-load authors, and use set-based viewer like/save queries. Per-post aggregate queries in feed serialization are forbidden by the architecture guard.
 
-## Database tables/state owned
+## Security
 
-Database tables and state: `vibe_posts, vibe_comments, vibe_reactions`.
+The production Vibes database login receives DML only on Vibes tables, bounded SELECT on identity/social context, and INSERT on the event outbox. Secrets are externally provisioned.
 
-## Redis keys/state owned
+## Observability / rollback
 
-Feed cache only; published content remains in PostgreSQL.
-
-## Dependencies
-
-Depends on FastAPI authentication, SQLAlchemy transaction/session handling, and the relevant domain services.
-
-## Security considerations
-
-Apply block, privacy, upload, and moderation rules on reads and writes. Never log tokens, OTPs, or payment secrets.
-
-## Failure modes
-
-On cache outage, fall back to bounded database reads; do not expose hidden posts.
-
-## Retry/idempotency behavior
-
-Reads and writes should use bounded timeouts. Retries are safe only for read operations or writes backed by an idempotency key and known commit outcome.
-
-## Scaling behavior
-
-Scale stateless API replicas only within the PostgreSQL connection budget.
-
-## Autoscaling metrics
-
-Track route request rate, p95 latency, error rate, transaction latency, DB pool use, and domain-specific rejection counts. Trace commands through commit and fanout with a request ID; avoid user PII in metric labels.
-
-## Observability
-
-Trace commands through commit and fanout with a request ID; avoid user PII in metric labels.
-
-## Local development
-
-Start dependencies with `.\\scripts\\dev-up.ps1`, then run affected backend tests with `python -m unittest discover -s backend/tests -p test_*.py` from the repository root with the backend import path configured, or use the test command in the root README.
-
-## Testing
-
-Add a regression test for authorization, transaction outcome, and duplicate/reconnect behavior when relevant.
-
-## Deployment notes
-
-Apply Alembic first; roll out compatible API behavior; check readiness and error metrics.
-
-## Change checklist
-
-Before changing this module: identify the owning table and contract, add an additive migration if needed, preserve Flutter compatibility, verify permission checks, and document rollback.
-
-## Known migration status
-
-Existing FastAPI domain; no Go migration started.
+See `docs/runbooks/vibes-service.md`. Chunk 24 migration `20260924_0100` is additive; roll back routing/application code before any schema downgrade.

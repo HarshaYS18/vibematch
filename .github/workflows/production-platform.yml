@@ -78,7 +78,7 @@ jobs:
           python - <<'PY'
           from pathlib import Path
           manifest = Path("/tmp/funkey-production.yaml").read_text()
-          for image in ("funkey-api", "funkey-inbox", "funkey-worker", "funkey-realtime", "funkey-media"):
+          for image in ("funkey-api", "funkey-inbox", "funkey-vibes", "funkey-worker", "funkey-realtime", "funkey-media"):
               if f"{image}:dev" in manifest:
                   raise SystemExit(f"production render still contains mutable dev image: {image}")
           if manifest.count("@sha256:") < 5:

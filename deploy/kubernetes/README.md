@@ -25,3 +25,8 @@ The included base ingress sends HTTP and WebSocket traffic to distinct services 
 ## Connection budget
 
 Use the Terraform preflight contract to enforce `api_max_pods × api_pool_per_pod + inbox_max_pods × inbox_pool_per_pod + worker_max_pods × worker_pool_per_pod + reserved_connections <= database_max_connections`. Reserve migrations, admin, monitoring, and failover capacity. Match actual Python pool settings and HPA maxima before deployment; PgBouncer or a managed pooler is recommended at scale.
+
+
+## Chunk 24 Vibes service
+
+`funkey-vibes` is independently deployable on port 8084. Production ingress routes Vibes public/moderation paths directly to it while the core API keeps a rollback proxy. Bind `funkey-vibes-secrets` externally with the service-local database login, JWT validation secret, and `VIBES_INTERNAL_TOKEN`.

@@ -6,6 +6,7 @@ resources:
   - config.yaml
   - api.yaml
   - inbox.yaml
+  - vibes.yaml
   - realtime.yaml
   - worker.yaml
   - autoscaling.yaml

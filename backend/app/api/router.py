@@ -16,7 +16,7 @@ from app.api.routes import (
     moderation, notifications, presence, profile_display, push, rankings,
     relationship_exp, role_badges, room_levels, room_music_media,
     room_realtime_commands, realtime_gateway_auth, settings, social, super_owner,
-    support, users, vibes, vip_admin, wallet,
+    support, users, vibes_proxy, vip_admin, wallet,
 )
 from app.api.routes.rooms import cricket, rooms
 from app.api.routes.store import router as store_router
@@ -32,7 +32,7 @@ for router in (
 
 # Social/content.
 for router in (
-    social.router, vibes.router, presence.router, notifications.router,
+    social.router, vibes_proxy.router, presence.router, notifications.router,
     push.router, love_bonds.router, relationship_exp.router, families.router,
     families_economy.router, home_banners.router, rankings.router,
 ):
@@ -73,6 +73,6 @@ for router in (
     control_center.router, game_pool_admin.router, game_props_admin.router,
     economy_admin.router, games.admin_router, gift_catalog.admin_router,
     rooms.admin_router, coin_sales.admin_router, lucky_gift_admin.router,
-    home_banners.admin_router, vibes.admin_router,
+    home_banners.admin_router, vibes_proxy.admin_router,
 ):
     api_router.include_router(router)

@@ -34,3 +34,9 @@ After Alembic reaches the Chunk 23 head, run `deploy/postgres/inbox-ownership.sq
 Provision the actual production Inbox LOGIN externally, grant it membership in `funkey_inbox_runtime`, and store its PgBouncer URL as `INBOX_DATABASE_URL` in `funkey-inbox-secrets`. Do not grant `funkey_inbox_runtime` to the core API login. The migration/admin role must retain the ability to SET ROLE to `funkey_inbox_owner` for later Alembic changes.
 
 Stories are intentionally excluded from the Inbox ownership script in Chunk 23.
+
+## Vibes service role boundary
+
+After Alembic reaches the Chunk 24 head, run `deploy/postgres/vibes-ownership.sql` with a provider/admin or migration role. It creates NOLOGIN `funkey_vibes_owner` and `funkey_vibes_runtime` roles, transfers Vibes tables to the Vibes owner, grants Vibes DML only to the runtime group, and grants bounded reads of identity/social context plus insert-only access to the transactional event outbox.
+
+Provision the production Vibes LOGIN externally, grant it membership in `funkey_vibes_runtime`, and store its PgBouncer URL as `VIBES_DATABASE_URL` in `funkey-vibes-secrets`. Do not grant `funkey_vibes_runtime` to the core API login after cutover.

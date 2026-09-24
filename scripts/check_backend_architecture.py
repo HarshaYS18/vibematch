@@ -58,6 +58,12 @@ INBOX_SERVICE_MIGRATION = (
 )
 INBOX_OWNERSHIP_SQL = ROOT / "deploy" / "postgres" / "inbox-ownership.sql"
 INBOX_SERVICE_ROOT = ROOT / "apps" / "inbox-service"
+VIBES_SERVICE_MIGRATION = (
+    ROOT / "backend" / "alembic" / "versions" /
+    "20260924_0100_vibes_feed_service.py"
+)
+VIBES_OWNERSHIP_SQL = ROOT / "deploy" / "postgres" / "vibes-ownership.sql"
+VIBES_SERVICE_ROOT = ROOT / "apps" / "vibes-service"
 ALLOWED_STATE_CLASSES = {"AUTHORITY", "PROJECTION", "CACHE", "EPHEMERAL"}
 REQUIRED_AUTHORITY_STATE_IDS = {
     "identity.accounts", "identity.sessions", "profiles.public", "rooms.definition",
@@ -472,6 +478,87 @@ def _validate_inbox_service_extraction(errors: list[str]) -> None:
                 errors.append("Go realtime missing Inbox NATS fanout: " + token)
 
 
+def _validate_vibes_service_extraction(errors: list[str]) -> None:
+    required = (
+        VIBES_SERVICE_ROOT / "main.py",
+        VIBES_SERVICE_ROOT / "database.py",
+        VIBES_SERVICE_ROOT / "internal.py",
+        VIBES_SERVICE_ROOT / "Dockerfile",
+        VIBES_SERVICE_MIGRATION,
+        VIBES_OWNERSHIP_SQL,
+        ROOT / "backend" / "app" / "services" / "vibes_feed_service.py",
+    )
+    for path in required:
+        if not path.exists():
+            errors.append(
+                "Chunk 24 Vibes extraction path is missing: "
+                + str(path.relative_to(ROOT))
+            )
+
+    router_path = ROOT / "backend" / "app" / "api" / "router.py"
+    if router_path.exists():
+        text = router_path.read_text(encoding="utf-8")
+        if "vibes_proxy.router" not in text or "vibes_proxy.admin_router" not in text:
+            errors.append("core API must use the Vibes service compatibility proxy")
+        for forbidden in (
+            "api_router.include_router(vibes.router)",
+            "vibes.admin_router",
+        ):
+            if forbidden in text:
+                errors.append(
+                    "core API must not mount Vibes write authority: " + forbidden
+                )
+
+    model_path = ROOT / "backend" / "app" / "models" / "vibe.py"
+    if model_path.exists():
+        text = model_path.read_text(encoding="utf-8")
+        for counter in (
+            "likes_count", "comments_count", "shares_count",
+            "saves_count", "reports_count",
+        ):
+            if counter not in text:
+                errors.append("VibePost missing denormalized counter: " + counter)
+
+    route_path = ROOT / "backend" / "app" / "api" / "routes" / "vibes.py"
+    if route_path.exists():
+        text = route_path.read_text(encoding="utf-8")
+        post_response = _function_source(text, "_post_response")
+        if "func.count(" in post_response or ".query(" in post_response:
+            errors.append("Vibes _post_response must not execute per-post SQL")
+        for token in (
+            "cursor: str | None",
+            'mode="global"',
+            'mode="friends"',
+            'event_type="vibes.post.published"',
+        ):
+            if token not in text:
+                errors.append("Vibes Chunk 24 route contract missing: " + token)
+        for forbidden in ("_send_vibe_notifications(", "notification_service.create_notification("):
+            if forbidden in text:
+                errors.append("Vibes request path must not synchronously fan out: " + forbidden)
+
+    feed_path = ROOT / "backend" / "app" / "services" / "vibes_feed_service.py"
+    if feed_path.exists():
+        text = feed_path.read_text(encoding="utf-8")
+        for token in (
+            "class FeedCandidateProvider", "class FeedRanker",
+            "class FeedPolicy", "class FeedRepository",
+            "VibeReaction.post_id.in_(post_ids)",
+            "VibeSave.post_id.in_(post_ids)",
+        ):
+            if token not in text:
+                errors.append("Vibes feed seam missing: " + token)
+
+    authority = json.loads(AUTHORITY_REGISTRY.read_text(encoding="utf-8"))
+    vibes = next(
+        (state for state in authority.get("states", [])
+         if state.get("id") == "vibes.content"),
+        None,
+    )
+    if not vibes or vibes.get("current_deployable") != "vibes-service":
+        errors.append("authority registry must declare vibes-service as current Vibes deployable")
+
+
 def _has_tracked_content(path: Path) -> bool:
     return path.exists() and any(item.is_file() for item in path.rglob("*"))
 
@@ -482,6 +569,7 @@ def main() -> int:
     _validate_redis_topology(errors)
     _validate_room_state_engine(errors)
     _validate_inbox_service_extraction(errors)
+    _validate_vibes_service_extraction(errors)
 
     for path in REQUIRED_PATHS:
         if not path.exists():
@@ -579,6 +667,7 @@ def main() -> int:
     print(" - Room State Engine v2 heartbeat/snapshot/current-state invariants hold")
     print(" - legacy FastAPI application websocket routes are not mounted")
     print(" - Inbox chat authority is isolated, bounded, and routed through NATS/Go")
+    print(" - Vibes authority is isolated with bounded cursor feeds and async fanout")
     return 0
 
 

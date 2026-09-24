@@ -34,6 +34,7 @@ class ProductionConfigTests(TestCase):
         safe = dict(
             APP_ENV="production", JWT_SECRET_KEY="j" * 40,
             MEDIA_INTERNAL_TOKEN="m" * 40, INBOX_INTERNAL_TOKEN="i" * 40,
+            VIBES_INTERNAL_TOKEN="v" * 40,
             INBOX_BACKUP_ENCRYPTION_KEY="b" * 40,
             GOOGLE_AUTH_CLIENT_IDS="client.apps.googleusercontent.com",
             REALTIME_CAPABILITY_PRIVATE_KEY_B64="AAECAwQFBgcICQoLDA0ODxAREhMUFRYXGBkaGxwdHh8",
@@ -63,6 +64,7 @@ class ProductionConfigTests(TestCase):
         safe = dict(
             APP_ENV="production", JWT_SECRET_KEY="j" * 40,
             MEDIA_INTERNAL_TOKEN="m" * 40, INBOX_INTERNAL_TOKEN="i" * 40,
+            VIBES_INTERNAL_TOKEN="v" * 40,
             INBOX_BACKUP_ENCRYPTION_KEY="b" * 40,
             GOOGLE_AUTH_CLIENT_IDS="client.apps.googleusercontent.com",
             REALTIME_CAPABILITY_PRIVATE_KEY_B64="AAECAwQFBgcICQoLDA0ODxAREhMUFRYXGBkaGxwdHh8",
@@ -83,7 +85,7 @@ class ProductionConfigTests(TestCase):
             "postgresql://funkey_migrate:strong-secret@postgres.internal:5432/funkey",
             settings_obj.migration_database_url,
         )
-        self.assertEqual(280, settings_obj.expected_pooler_client_connections)
+        self.assertEqual(380, settings_obj.expected_pooler_client_connections)
 
         with self.assertRaisesRegex(RuntimeError, "MIGRATION_DATABASE_URL"):
             Settings(

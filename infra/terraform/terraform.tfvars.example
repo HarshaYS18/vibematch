@@ -36,9 +36,13 @@ services = {
 }
 
 connection_budget = {
-  database_max_connections = 300
+  database_max_connections = 500
   api_max_pods             = 30
   api_pool_per_pod         = 5
+  inbox_max_pods           = 20
+  inbox_pool_per_pod       = 5
+  vibes_max_pods           = 20
+  vibes_pool_per_pod       = 5
   worker_max_pods          = 20
   worker_pool_per_pod      = 3
   reserved_connections    = 60
