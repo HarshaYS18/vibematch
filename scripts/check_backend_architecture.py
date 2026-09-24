@@ -1494,6 +1494,11 @@ def main() -> int:
         text = source.read_text(encoding="utf-8")
         if any(path in text for path in retired_paths):
             errors.append(f"retired API consumer: {source.relative_to(ROOT)}")
+        if "/lucky-gifts/results/record" in text:
+            errors.append(
+                "client-authored Lucky Gift ranking truth is forbidden: "
+                + str(source.relative_to(ROOT))
+            )
         if re.search(r"https?://[^\s'\"]+:(4000|4100|9000)", text):
             errors.append(f"hard-coded media host: {source.relative_to(ROOT)}")
 
