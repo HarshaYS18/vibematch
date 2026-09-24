@@ -713,46 +713,46 @@
       "domain": "notifications",
       "classification": "AUTHORITY",
       "logical_owner": "notification",
-      "current_deployable": "core-api",
+      "current_deployable": "notification-service",
       "current_storage": [
         "postgres:user_notifications"
       ],
       "target_storage": [
-        "notification-service postgres"
+        "notification-service PostgreSQL authority"
       ],
       "mutated_by": [
-        "notification service"
+        "notification-service only"
       ],
       "source_states": [],
       "rebuild_from": [],
       "change_contract": {
-        "status": "planned",
-        "name": "notification.created.v1"
+        "status": "live",
+        "name": "notification.created v1"
       },
-      "migration_status": "Chunk 29"
+      "migration_status": "Chunk 29 extracted; core API proxies stable public routes"
     },
     {
       "id": "notifications.device_tokens",
       "domain": "notifications",
       "classification": "AUTHORITY",
       "logical_owner": "notification",
-      "current_deployable": "core-api",
+      "current_deployable": "notification-service",
       "current_storage": [
         "postgres:push_device_tokens"
       ],
       "target_storage": [
-        "notification-service postgres"
+        "notification-service PostgreSQL authority"
       ],
       "mutated_by": [
-        "push token service"
+        "notification-service only"
       ],
       "source_states": [],
       "rebuild_from": [],
       "change_contract": {
-        "status": "planned",
-        "name": "notification.device_token.changed.v1"
+        "status": "live",
+        "name": "notification.device_token.changed v1"
       },
-      "migration_status": "FCM is transport"
+      "migration_status": "Chunk 29 extracted; core API proxies stable public routes"
     },
     {
       "id": "store.catalog",
@@ -1067,6 +1067,82 @@
         "name": "room snapshot + deltas"
       },
       "migration_status": "no competing room authority"
+    },
+    {
+      "id": "notifications.preferences",
+      "domain": "notifications",
+      "classification": "AUTHORITY",
+      "logical_owner": "notification",
+      "current_deployable": "notification-service",
+      "current_storage": [
+        "postgres:notification_preferences"
+      ],
+      "target_storage": [
+        "notification-service PostgreSQL authority"
+      ],
+      "mutated_by": [
+        "notification-service only"
+      ],
+      "source_states": [
+        "identity.accounts"
+      ],
+      "rebuild_from": [],
+      "change_contract": {
+        "status": "live",
+        "name": "notification.preference.changed v1"
+      },
+      "migration_status": "Chunk 29"
+    },
+    {
+      "id": "notifications.templates",
+      "domain": "notifications",
+      "classification": "AUTHORITY",
+      "logical_owner": "notification",
+      "current_deployable": "notification-service",
+      "current_storage": [
+        "postgres:notification_templates"
+      ],
+      "target_storage": [
+        "notification-service PostgreSQL authority"
+      ],
+      "mutated_by": [
+        "notification-service only"
+      ],
+      "source_states": [],
+      "rebuild_from": [],
+      "change_contract": {
+        "status": "live",
+        "name": "notification.template.changed v1"
+      },
+      "migration_status": "Chunk 29"
+    },
+    {
+      "id": "notifications.delivery",
+      "domain": "notifications",
+      "classification": "AUTHORITY",
+      "logical_owner": "notification",
+      "current_deployable": "notification-service + notification-provider worker",
+      "current_storage": [
+        "postgres:notification_deliveries"
+      ],
+      "target_storage": [
+        "notification-service PostgreSQL authority"
+      ],
+      "mutated_by": [
+        "notification-service/provider worker only"
+      ],
+      "source_states": [
+        "notifications.in_app",
+        "notifications.device_tokens",
+        "notifications.preferences",
+        "notifications.templates"
+      ],
+      "rebuild_from": [],
+      "change_contract": {
+        "status": "live",
+        "name": "provider delivery lifecycle"
+      },
+      "migration_status": "Chunk 29; leased retryable provider delivery with invalid-token cleanup"
     }
   ]
 }

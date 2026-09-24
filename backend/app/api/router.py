@@ -13,7 +13,7 @@ from app.api.routes import (
     game_settlements, health, home_banners,
     identity_proxy, inbox_proxy, inbox_stories,
     lucky_gift_admin, media, media_control, media_realtime_auth, media_safety_admin,
-    notifications, presence, profile_social_proxy, push, rankings,
+    notification_proxy, presence, profile_social_proxy, rankings,
     relationship_exp, role_badges, room_control_proxy, room_cross_domain,
     room_levels, room_music_media, realtime_gateway_auth, settings, super_owner,
     support, users, vibes_proxy, vip_admin, wallet,
@@ -32,8 +32,8 @@ for router in (
 
 # Social/content.
 for router in (
-    vibes_proxy.router, presence.router, notifications.router,
-    push.router, relationship_exp.router, families_economy.router,
+    vibes_proxy.router, presence.router, notification_proxy.router,
+    relationship_exp.router, families_economy.router,
     home_banners.router, rankings.router,
 ):
     api_router.include_router(router)

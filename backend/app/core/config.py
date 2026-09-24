@@ -145,6 +145,23 @@ class Settings(BaseSettings):
     GAME_PLATFORM_MAX_REPLICAS: int = 20
     DB_GAME_PLATFORM_CONNECTION_BUDGET: int = 80
 
+    # Chunk 29 Notification service boundary.
+    NOTIFICATION_SERVICE_URL: str = "http://127.0.0.1:8090/api/v1"
+    NOTIFICATION_INTERNAL_URL: str = "http://127.0.0.1:8090/internal/notifications"
+    NOTIFICATION_SERVICE_TIMEOUT_SECONDS: float = 5.0
+    NOTIFICATION_INTERNAL_TOKEN: str = "change-this-notification-internal-token"
+    NOTIFICATION_DATABASE_URL: str = ""
+    NOTIFICATION_DB_POOL_SIZE: int = 4
+    NOTIFICATION_DB_MAX_OVERFLOW: int = 0
+    NOTIFICATION_DB_POOL_TIMEOUT_SECONDS: int = 3
+    NOTIFICATION_MAX_REPLICAS: int = 20
+    NOTIFICATION_PROVIDER_MAX_REPLICAS: int = 4
+    DB_NOTIFICATION_CONNECTION_BUDGET: int = 100
+    NOTIFICATION_PROVIDER_BATCH_SIZE: int = 100
+    NOTIFICATION_PROVIDER_POLL_SECONDS: float = 1.0
+    NOTIFICATION_PROVIDER_LEASE_SECONDS: int = 60
+    NOTIFICATION_PROVIDER_MAX_ATTEMPTS: int = 8
+
     # Topology budgets. These are planning/validation limits, not capacity claims.
     API_MAX_REPLICAS: int = 20
     DB_API_CONNECTION_BUDGET: int = 100
@@ -264,6 +281,7 @@ class Settings(BaseSettings):
             + self.DB_ECONOMY_CONNECTION_BUDGET
             + self.DB_ECONOMY_BULK_WORKER_CONNECTION_BUDGET
             + self.DB_GAME_PLATFORM_CONNECTION_BUDGET
+            + self.DB_NOTIFICATION_CONNECTION_BUDGET
             + self.DB_WORKER_CONNECTION_BUDGET
             + self.DB_ROLLOUT_SURGE_CONNECTION_RESERVE
         )
@@ -282,6 +300,7 @@ class Settings(BaseSettings):
             "IDENTITY_INTERNAL_TOKEN",
             "PROFILE_SOCIAL_INTERNAL_TOKEN",
             "ECONOMY_INTERNAL_TOKEN",
+            "NOTIFICATION_INTERNAL_TOKEN",
         ):
             value = getattr(self, name).strip()
             if len(value) < 32 or "change-this" in value.lower():
@@ -415,6 +434,18 @@ class Settings(BaseSettings):
             > self.DB_ROOM_CONTROL_CONNECTION_BUDGET
         ):
             unsafe.append("DB_ROOM_CONTROL_CONNECTION_BUDGET")
+        if not self.NOTIFICATION_SERVICE_URL.strip():
+            unsafe.append("NOTIFICATION_SERVICE_URL")
+        if not self.NOTIFICATION_INTERNAL_URL.strip():
+            unsafe.append("NOTIFICATION_INTERNAL_URL")
+        if self.NOTIFICATION_DB_POOL_SIZE <= 0 or self.NOTIFICATION_DB_MAX_OVERFLOW < 0:
+            unsafe.append("NOTIFICATION_DB_POOL_SIZE/NOTIFICATION_DB_MAX_OVERFLOW")
+        if (
+            (self.NOTIFICATION_MAX_REPLICAS + self.NOTIFICATION_PROVIDER_MAX_REPLICAS)
+            * (self.NOTIFICATION_DB_POOL_SIZE + self.NOTIFICATION_DB_MAX_OVERFLOW)
+            > self.DB_NOTIFICATION_CONNECTION_BUDGET
+        ):
+            unsafe.append("DB_NOTIFICATION_CONNECTION_BUDGET")
         if self.WORKER_MAX_REPLICAS * (
             self.DB_WORKER_POOL_SIZE + self.DB_WORKER_MAX_OVERFLOW
         ) > self.DB_WORKER_CONNECTION_BUDGET:
@@ -618,6 +649,41 @@ class Settings(BaseSettings):
         if unsafe:
             raise RuntimeError("Unsafe Game Platform production configuration: " + ", ".join(unsafe))
 
+    def validate_notification_service(self) -> None:
+        """Validate isolated Notification service production settings."""
+        if not self.is_production:
+            return
+        unsafe: list[str] = []
+        if (
+            len(self.NOTIFICATION_INTERNAL_TOKEN.strip()) < 32
+            or "change-this" in self.NOTIFICATION_INTERNAL_TOKEN.lower()
+        ):
+            unsafe.append("NOTIFICATION_INTERNAL_TOKEN")
+        if not self.NOTIFICATION_SERVICE_URL.strip():
+            unsafe.append("NOTIFICATION_SERVICE_URL")
+        if not self.NOTIFICATION_INTERNAL_URL.strip():
+            unsafe.append("NOTIFICATION_INTERNAL_URL")
+        url = self.NOTIFICATION_DATABASE_URL.strip()
+        if not url:
+            unsafe.append("NOTIFICATION_DATABASE_URL")
+        elif url == self.database_url.strip():
+            unsafe.append("NOTIFICATION_DATABASE_URL(service-isolated credentials required)")
+        if self.NOTIFICATION_DB_POOL_SIZE <= 0 or self.NOTIFICATION_DB_MAX_OVERFLOW < 0:
+            unsafe.append("NOTIFICATION_DB_POOL_SIZE/NOTIFICATION_DB_MAX_OVERFLOW")
+        if (
+            (self.NOTIFICATION_MAX_REPLICAS + self.NOTIFICATION_PROVIDER_MAX_REPLICAS)
+            * (self.NOTIFICATION_DB_POOL_SIZE + self.NOTIFICATION_DB_MAX_OVERFLOW)
+            > self.DB_NOTIFICATION_CONNECTION_BUDGET
+        ):
+            unsafe.append("DB_NOTIFICATION_CONNECTION_BUDGET")
+        if not self.FCM_PROJECT_ID.strip() or not self.FIREBASE_SERVICE_ACCOUNT_PATH.strip():
+            unsafe.append("FCM_PROJECT_ID/FIREBASE_SERVICE_ACCOUNT_PATH")
+        if unsafe:
+            raise RuntimeError(
+                "Unsafe Notification service production configuration: "
+                + ", ".join(unsafe)
+            )
+
     def validate_economy_bulk_worker(self) -> None:
         """Validate durable Economy bulk-grant worker capacity."""
         if self.ECONOMY_BULK_BATCH_SIZE < 50 or self.ECONOMY_BULK_BATCH_SIZE > 5000:
@@ -655,6 +721,13 @@ class Settings(BaseSettings):
             or "change-this" in self.VIBES_INTERNAL_TOKEN.lower()
         ):
             unsafe.append("VIBES_INTERNAL_TOKEN")
+        if (
+            len(self.NOTIFICATION_INTERNAL_TOKEN.strip()) < 32
+            or "change-this" in self.NOTIFICATION_INTERNAL_TOKEN.lower()
+        ):
+            unsafe.append("NOTIFICATION_INTERNAL_TOKEN")
+        if not self.NOTIFICATION_INTERNAL_URL.strip():
+            unsafe.append("NOTIFICATION_INTERNAL_URL")
         if unsafe:
             raise RuntimeError(
                 "Unsafe worker runtime configuration: " + ", ".join(unsafe)
