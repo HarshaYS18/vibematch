@@ -1,3 +1,5 @@
+import 'package:uuid/uuid.dart';
+
 import '../../foundation/networking/app_network_client.dart';
 
 typedef GameHostClose = void Function();
@@ -10,12 +12,14 @@ class GameHostBridge {
     required int bridgeVersion,
     required GameHostClose onClose,
     String? roomId,
+    Uuid? uuid,
   }) : _api = api,
        _accessToken = accessToken,
        _gameId = gameId,
        _bridgeVersion = bridgeVersion,
        _roomId = roomId,
-       _onClose = onClose;
+       _onClose = onClose,
+       _uuid = uuid ?? const Uuid();
 
   final AppNetworkClient _api;
   final String _accessToken;
@@ -23,7 +27,54 @@ class GameHostBridge {
   final int _bridgeVersion;
   final String? _roomId;
   final GameHostClose _onClose;
+  final Uuid _uuid;
   final Set<int> _authorizedRoundIds = <int>{};
+  final Map<String, String> _pendingBetRequestIds = <String, String>{};
+
+  String? _sessionId;
+  String? _sessionRequestId;
+  bool _closed = false;
+
+  Future<void> initialize() async {
+    if (_closed) {
+      throw const GameBridgeException('Game session is closed.');
+    }
+    if (_sessionId != null) return;
+
+    final requestId = _sessionRequestId ??= _uuid.v4();
+    final response = await _api.postMap(
+      '/games/${Uri.encodeComponent(_gameId)}/sessions',
+      headers: _authHeaders,
+      body: <String, dynamic>{
+        'request_id': requestId,
+        'room_id': int.tryParse(_roomId ?? ''),
+        'bridge_version': _bridgeVersion,
+      },
+    );
+    final sessionId = response['session_id']?.toString().trim();
+    if (sessionId == null || sessionId.isEmpty) {
+      throw const GameBridgeException('Game session could not be opened.');
+    }
+    _sessionId = sessionId;
+  }
+
+  Future<void> dispose() async {
+    if (_closed) return;
+    _closed = true;
+    final sessionId = _sessionId;
+    _sessionId = null;
+    _authorizedRoundIds.clear();
+    _pendingBetRequestIds.clear();
+    if (sessionId == null || sessionId.isEmpty) return;
+    try {
+      await _api.postMap(
+        '/games/sessions/${Uri.encodeComponent(sessionId)}/close',
+        headers: _authHeaders,
+      );
+    } catch (_) {
+      // Closing a page must not be blocked by best-effort session cleanup.
+    }
+  }
 
   Future<Map<String, dynamic>> handle(dynamic rawRequest) async {
     try {
@@ -33,7 +84,7 @@ class GameHostBridge {
 
       final data = switch (method) {
         'host.context' => _context(),
-        'host.close' => _close(),
+        'host.close' => await _close(),
         'game.round.create' => await _createRound(),
         'game.round.get' => await _getRound(params),
         'game.bet.place' => await _placeBet(params),
@@ -59,16 +110,27 @@ class GameHostBridge {
     'bridgeVersion': _bridgeVersion,
   };
 
-  Map<String, dynamic> _close() {
+  Future<Map<String, dynamic>> _close() async {
+    await dispose();
     _onClose();
     return const <String, dynamic>{'closed': true};
   }
 
+  Future<void> _ensureInitialized() => initialize();
+
   Future<Map<String, dynamic>> _createRound() async {
+    await _ensureInitialized();
+    final sessionId = _sessionId;
+    if (sessionId == null) {
+      throw const GameBridgeException('Game session is unavailable.');
+    }
     final response = await _api.postMap(
       '/games/${Uri.encodeComponent(_gameId)}/rounds',
       headers: _authHeaders,
-      body: <String, dynamic>{'room_id': int.tryParse(_roomId ?? '')},
+      body: <String, dynamic>{
+        'room_id': int.tryParse(_roomId ?? ''),
+        'session_id': sessionId,
+      },
     );
     final roundId = _positiveInt(response['id'], 'round id');
     _authorizedRoundIds.add(roundId);
@@ -87,14 +149,24 @@ class GameHostBridge {
     final roundId = _authorizedRoundId(params);
     final targetId = _int(params['targetId'], 'targetId');
     final amount = _positiveInt(params['amount'], 'amount');
-    return _api.postMap(
+    final retryKey = '$roundId:$targetId:$amount';
+    final requestId = _pendingBetRequestIds.putIfAbsent(
+      retryKey,
+      _uuid.v4,
+    );
+    final response = await _api.postMap(
       '/games/rounds/$roundId/bets',
       headers: _authHeaders,
       body: <String, dynamic>{
         'target_id': targetId,
         'amount': amount,
+        'request_id': requestId,
       },
     );
+    if (_pendingBetRequestIds[retryKey] == requestId) {
+      _pendingBetRequestIds.remove(retryKey);
+    }
+    return response;
   }
 
   Future<Map<String, dynamic>> _settleRound(

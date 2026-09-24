@@ -31,6 +31,7 @@ class RemoteGamePlayerPage extends ConsumerStatefulWidget {
 class _RemoteGamePlayerPageState extends ConsumerState<RemoteGamePlayerPage> {
   VerifiedGameBundle? _bundle;
   GameRuntime? _runtime;
+  GameHostBridge? _bridge;
   String? _error;
   bool _loading = true;
 
@@ -44,6 +45,8 @@ class _RemoteGamePlayerPageState extends ConsumerState<RemoteGamePlayerPage> {
   void dispose() {
     final runtime = _runtime;
     if (runtime != null) unawaited(runtime.dispose());
+    final bridge = _bridge;
+    if (bridge != null) unawaited(bridge.dispose());
     super.dispose();
   }
 
@@ -52,10 +55,15 @@ class _RemoteGamePlayerPageState extends ConsumerState<RemoteGamePlayerPage> {
     if (previous != null) {
       await previous.dispose();
     }
+    final previousBridge = _bridge;
+    if (previousBridge != null) {
+      await previousBridge.dispose();
+    }
     if (!mounted) return;
 
     setState(() {
       _runtime = null;
+      _bridge = null;
       _bundle = null;
       _error = null;
       _loading = true;
@@ -83,6 +91,12 @@ class _RemoteGamePlayerPageState extends ConsumerState<RemoteGamePlayerPage> {
         roomId: widget.roomId,
         onClose: _close,
       );
+      await bridge.initialize();
+      if (!mounted) {
+        await bridge.dispose();
+        return;
+      }
+
       final runtime = InAppWebViewGameRuntime(
         bundle: bundle,
         bridge: bridge,
@@ -91,6 +105,7 @@ class _RemoteGamePlayerPageState extends ConsumerState<RemoteGamePlayerPage> {
 
       setState(() {
         _bundle = bundle;
+        _bridge = bridge;
         _runtime = runtime;
         _loading = false;
       });
