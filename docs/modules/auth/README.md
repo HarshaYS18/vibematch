@@ -1,97 +1,49 @@
-# Authentication
+# Authentication / Identity
 
 ## Purpose
 
-Authenticates users, records login history, and issues the existing JWT contract.
+Authenticate users and own durable account/security/session/device state.
 
-## Responsibilities
+## Current deployable
 
-The module owns users and auth_identities; login_history. Routes should validate input and delegate business decisions to services.
+`apps/identity-service` is the Chunk 27 mutation authority. Core preserves stable
+`/api/v1/auth` compatibility routes and bounded composite reads.
 
-## What this module owns
+## Owns
 
-users and auth_identities; login_history.
+- account/security columns and auth identities
+- login history
+- durable identity sessions and devices
+- roles/special permissions
+- user/device bans
+- access-token issuance bound to durable session IDs
 
-## What this module does NOT own
+## Does not own
 
-This module does not own SFU transport state, edge routing, or client UI state.
+Profile display/social graph, rooms, Economy value, realtime routing or media
+transport.
 
-## Source of truth
+## Realtime relationship
 
-PostgreSQL is the durable source of truth for users, auth_identities, login_history.
+Identity/API issues short-lived signed realtime capabilities. Go verifies them
+locally; the gateway does not become session/account authority.
 
-## Important files
+## Database ownership
 
-`backend/app/api/routes/auth.py`, `backend/app/services/identity_service.py`, `backend/app/core/security.py`.
+`deploy/postgres/identity-ownership.sql` grants mutation rights to Identity.
+Core receives reader privileges only where required.
 
-## Public API/contracts
+## Security
 
-/api/v1/auth routes. Preserve deployed request and response shapes while migrating implementation.
+Signing keys, Google OAuth audience validation, bans, session revocation and
+dev-login gating are security-critical. Fail closed on ambiguous protected auth.
 
-## Events published
+## Operations
 
-Current code may emit domain WebSocket updates after committed writes. A versioned broker event for this domain must be added only with a contract and transactional publication path; do not claim every proposed event is live. Consumers must handle duplicates and refetch a snapshot after a gap.
+See `docs/architecture/identity-profile-social-services.md` and
+`docs/runbooks/identity-profile-social-services.md`.
 
-## Events consumed
+## Migration status
 
-No durable broker consumer is implied by this ownership guide. Add a consumer only with a versioned contract, idempotency, retry limits, and an integration test.
-
-## Database tables/state owned
-
-Database tables and state: `users, auth_identities, login_history`.
-
-## Redis keys/state owned
-
-No authoritative Redis state today; future rate-limit/session metadata only.
-
-## Dependencies
-
-Depends on FastAPI authentication, SQLAlchemy transaction/session handling, and the relevant domain services.
-
-## Security considerations
-
-Token signing, Google OAuth client validation, device bans, and dev-login gating are security-critical. Never log tokens, OTPs, or payment secrets.
-
-## Failure modes
-
-Invalid signing configuration, OAuth outage, or ban-check failure must deny protected actions.
-
-## Retry/idempotency behavior
-
-Reads and writes should use bounded timeouts. Retries are safe only for read operations or writes backed by an idempotency key and known commit outcome.
-
-## Scaling behavior
-
-Scale stateless API replicas only within the PostgreSQL connection budget.
-
-## Autoscaling metrics
-
-Track route request rate, p95 latency, error rate, transaction latency, DB pool use, and domain-specific rejection counts. Trace commands through commit and fanout with a request ID; avoid user PII in metric labels.
-
-## Observability
-
-Trace commands through commit and fanout with a request ID; avoid user PII in metric labels.
-
-## Local development
-
-Start dependencies with `.\\scripts\\dev-up.ps1`, then run affected backend tests with `python -m unittest discover -s backend/tests -p test_*.py` from the repository root with the backend import path configured, or use the test command in the root README.
-
-## Testing
-
-Add a regression test for authorization, transaction outcome, and duplicate/reconnect behavior when relevant.
-
-## Deployment notes
-
-Apply Alembic first; roll out compatible API behavior; check readiness and error metrics.
-
-## Change checklist
-
-Before changing this module: identify the owning table and contract, add an additive migration if needed, preserve Flutter compatibility, verify permission checks, and document rollback.
-
-## Known migration status
-
-Existing FastAPI domain; no Go migration started.
-
-
-## Chunk 27 deployed boundary
-Public /api/v1/auth traffic now reaches apps/identity-service through the stable core facade. Identity owns account/authentication mutation plus durable identity_sessions and identity_devices. New access tokens contain a session id and support durable revocation; older tokens are a finite compatibility window until normal expiry.
+Chunk 27 extraction is complete. New access tokens carry durable session IDs;
+the finite legacy-token compatibility window ends by normal expiry.
