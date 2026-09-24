@@ -11,7 +11,6 @@ from app.models.admin_log import AdminLog
 from app.models.economy import CoinSupplyPool
 from app.models.special_permission import SpecialPermission, SpecialPermissionName
 from app.models.user import User
-from app.models.vip_status import UserVipStatus
 from app.schemas.super_owner import (
     SuperOwnerActionResponse,
     SuperOwnerCustomIdRequest,
@@ -221,25 +220,57 @@ def list_special_permission_options(current_user: User = Depends(get_current_use
 
 
 @router.post("/admin/users/vip-adjust", response_model=SuperOwnerVipResponse)
-def adjust_vip(payload: SuperOwnerVipAdjustmentRequest, db: Session = Depends(get_db), current_user: User = Depends(get_current_user)):
+def adjust_vip(
+    payload: SuperOwnerVipAdjustmentRequest,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
     require_super_owner(current_user)
     target = _target_user(db, payload.target_user_id)
-    status = db.query(UserVipStatus).filter(UserVipStatus.user_id == target.id).first()
-    if status is None:
-        status = UserVipStatus(user_id=target.id)
-        db.add(status)
-        db.flush()
-    status.vip_level = payload.vip_level
-    status.svip_level = payload.svip_level
-    status.vip_is_active = payload.vip_is_active
-    status.svip_is_active = payload.svip_is_active
-    status.svip_expires_at = payload.svip_expires_at
-    status.updated_by_user_id = current_user.id
-    status.update_reason = payload.reason
-    db.commit()
-    db.refresh(status)
-    create_admin_log(db=db, actor_user_id=current_user.id, target_user_id=target.id, action="SUPER_OWNER_VIP_ADJUSTED", resource_type="user_vip_status", resource_id=str(status.id), reason=payload.reason, metadata_json={"vip_level": payload.vip_level, "svip_level": payload.svip_level})
-    return SuperOwnerVipResponse(user_id=target.id, vip_level=status.vip_level, svip_level=status.svip_level, vip_is_active=status.vip_is_active, svip_is_active=status.svip_is_active, svip_expires_at=status.svip_expires_at)
+    try:
+        result = economy_service_client.adjust_vip_override(
+            request_id=payload.request_id.strip(),
+            actor_user_id=current_user.id,
+            target_user_id=target.id,
+            vip_level=payload.vip_level,
+            svip_level=payload.svip_level,
+            vip_is_active=payload.vip_is_active,
+            svip_is_active=payload.svip_is_active,
+            svip_expires_at=(
+                payload.svip_expires_at.isoformat()
+                if payload.svip_expires_at is not None
+                else None
+            ),
+            reason=payload.reason,
+        )
+    except economy_service_client.EconomyServiceUnavailable as exc:
+        raise HTTPException(status_code=503, detail=str(exc)) from exc
+    except economy_service_client.EconomyServiceError as exc:
+        raise HTTPException(status_code=exc.status_code, detail=exc.detail) from exc
+
+    create_admin_log(
+        db=db,
+        actor_user_id=current_user.id,
+        target_user_id=target.id,
+        action="SUPER_OWNER_VIP_ADJUSTED",
+        resource_type="user_vip_override",
+        resource_id=str(target.id),
+        reason=payload.reason,
+        metadata_json={
+            "vip_level": payload.vip_level,
+            "svip_level": payload.svip_level,
+            "economy_transaction_id": result.get("transaction_id"),
+            "request_id": payload.request_id,
+        },
+    )
+    return SuperOwnerVipResponse(
+        user_id=target.id,
+        vip_level=int(result["vip_level"]),
+        svip_level=int(result["svip_level"]),
+        vip_is_active=bool(result["vip_is_active"]),
+        svip_is_active=bool(result["svip_is_active"]),
+        svip_expires_at=result.get("svip_expires_at"),
+    )
 
 
 @router.post("/admin/users/levels-adjust", response_model=SuperOwnerWalletResponse)
