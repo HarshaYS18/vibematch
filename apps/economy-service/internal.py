@@ -774,7 +774,7 @@ def settle_lucky_gift(
         user_id=payload.sender_user_id,
         spend_amount=total_coin_value,
     )
-    lucky_gift_house_service.record_spend_income(
+    spend_income = lucky_gift_house_service.record_spend_income(
         db,
         amount=total_coin_value,
         actor=sender,
@@ -785,6 +785,16 @@ def settle_lucky_gift(
             "receiver_user_id": payload.receiver_user_id,
         },
     )
+    if int(spend_income.get("amount") or 0) > 0:
+        economy_transaction_service.record_balanced_transfer(
+            db,
+            tx=tx,
+            currency=EconomyCurrency.COIN.value,
+            amount=int(spend_income["amount"]),
+            debit_account="SYSTEM_CLEARING:LUCKY_GIFT_SPEND_INCOME:COIN",
+            credit_account="GAME_POOL:" + str(spend_income["pool_id"]) + ":COIN",
+            source_type="LUCKY_GIFT_SPEND_INCOME",
+        )
     capacity = lucky_gift_house_service.safe_payout_capacity(db)
     lucky_result = lucky_gift_props_service.roll_lucky_gift(
         db,
