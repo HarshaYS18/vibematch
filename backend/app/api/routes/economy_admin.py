@@ -3,6 +3,7 @@ from uuid import uuid4
 from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException
 from sqlalchemy.orm import Session
 
+from app.api.routes.super_owner import require_super_owner
 from app.api.routes.users import get_current_user
 from app.database import get_db
 from app.models.economy import CoinSupplyPool
@@ -154,9 +155,35 @@ def seller_sell_coins(payload: SellerSaleRequest, current_user: User = Depends(g
 
 
 @router.post("/gaming/pools")
-def create_game_pool(payload: GamePoolCreateRequest, db: Session = Depends(get_db)):
-    pool = economy_service.create_game_pool(db=db, game_key=payload.game_key, pool_type=payload.pool_type, opening_balance=payload.opening_balance, daily_payout_cap=payload.daily_payout_cap, daily_loss_limit=payload.daily_loss_limit, max_single_payout=payload.max_single_payout, rtp_target_basis_points=payload.rtp_target_basis_points)
-    return {"id": pool.id, "game_key": pool.game_key, "pool_type": pool.pool_type, "balance": pool.balance}
+def create_game_pool(
+    payload: GamePoolCreateRequest,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    require_super_owner(current_user)
+    request_id = (payload.request_id or str(uuid4())).strip()
+    try:
+        result = economy_service_client.configure_game_pool(
+            request_id=request_id,
+            actor_user_id=current_user.id,
+            game_key=payload.game_key,
+            pool_type=payload.pool_type,
+            opening_balance=payload.opening_balance,
+            daily_payout_cap=payload.daily_payout_cap,
+            daily_loss_limit=payload.daily_loss_limit,
+            max_single_payout=payload.max_single_payout,
+            rtp_target_basis_points=payload.rtp_target_basis_points,
+        )
+    except economy_service_client.EconomyServiceUnavailable as exc:
+        raise HTTPException(status_code=503, detail=str(exc)) from exc
+    except economy_service_client.EconomyServiceError as exc:
+        raise HTTPException(status_code=exc.status_code, detail=exc.detail) from exc
+    return {
+        "id": int(result["id"]),
+        "game_key": str(result["game_key"]),
+        "pool_type": str(result["pool_type"]),
+        "balance": int(result["balance"]),
+    }
 
 
 @router.post("/gaming/rounds")

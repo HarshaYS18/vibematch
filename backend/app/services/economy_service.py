@@ -254,7 +254,7 @@ def create_withdraw_request(db: Session, user: User, ruby_amount: int, payout_me
     return request
 
 
-def create_game_pool(db: Session, game_key: str, pool_type: str, opening_balance: int, daily_payout_cap: int, daily_loss_limit: int, max_single_payout: int, rtp_target_basis_points: int) -> GamePool:
+def create_game_pool(db: Session, game_key: str, pool_type: str, opening_balance: int, daily_payout_cap: int, daily_loss_limit: int, max_single_payout: int, rtp_target_basis_points: int, *, commit: bool = True) -> GamePool:
     pool = get_or_create_game_pool(db, game_key, GamePoolType(pool_type))
     pool.daily_payout_cap = daily_payout_cap
     pool.daily_loss_limit = daily_loss_limit
@@ -262,8 +262,11 @@ def create_game_pool(db: Session, game_key: str, pool_type: str, opening_balance
     pool.rtp_target_basis_points = rtp_target_basis_points
     if opening_balance > 0:
         pool.balance += opening_balance
-    db.commit()
-    db.refresh(pool)
+    if commit:
+        db.commit()
+        db.refresh(pool)
+    else:
+        db.flush()
     return pool
 
 

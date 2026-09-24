@@ -83,6 +83,17 @@ class OfficialRechargeCommandRequest(MutationContext):
     proof_url: str | None = None
 
 
+class GamePoolConfigureCommandRequest(MutationContext):
+    actor_user_id: int
+    game_key: str = Field(min_length=2, max_length=80)
+    pool_type: str
+    opening_balance: int = Field(default=0, ge=0)
+    daily_payout_cap: int = Field(default=0, ge=0)
+    daily_loss_limit: int = Field(default=0, ge=0)
+    max_single_payout: int = Field(default=0, ge=0)
+    rtp_target_basis_points: int = Field(default=8000, ge=0, le=10000)
+
+
 class MissionRewardRequest(MutationContext):
     user_id: int
     mission_id: str = Field(min_length=1, max_length=120)
@@ -967,6 +978,55 @@ def official_recharge(
             "coin_amount": payload.coin_amount,
             "payment_amount": payload.payment_amount,
             "payment_currency": payload.payment_currency,
+        },
+    )
+
+
+@router.post("/game-pools/configure", dependencies=[Depends(require_internal_token)])
+def configure_game_pool(
+    payload: GamePoolConfigureCommandRequest,
+    db: Session = Depends(get_db),
+):
+    actor = db.query(User).filter(User.id == payload.actor_user_id).first()
+    if actor is None:
+        raise HTTPException(status_code=404, detail="Actor user not found")
+    tx, cached = _begin(
+        db,
+        payload,
+        operation="game_pool.configure",
+        actor_user_id=actor.id,
+    )
+    if cached is not None:
+        return cached
+
+    pool = economy_service.create_game_pool(
+        db=db,
+        game_key=payload.game_key,
+        pool_type=payload.pool_type,
+        opening_balance=payload.opening_balance,
+        daily_payout_cap=payload.daily_payout_cap,
+        daily_loss_limit=payload.daily_loss_limit,
+        max_single_payout=payload.max_single_payout,
+        rtp_target_basis_points=payload.rtp_target_basis_points,
+        commit=False,
+    )
+    result = {
+        "transaction_id": tx.transaction_id,
+        "id": pool.id,
+        "game_key": pool.game_key,
+        "pool_type": pool.pool_type,
+        "balance": int(pool.balance or 0),
+    }
+    return economy_transaction_service.complete(
+        db,
+        tx=tx,
+        result=result,
+        event_type="economy.game_pool.configured.v1",
+        event_payload={
+            "pool_id": pool.id,
+            "game_key": pool.game_key,
+            "pool_type": pool.pool_type,
+            "opening_balance": payload.opening_balance,
         },
     )
 

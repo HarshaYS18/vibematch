@@ -202,6 +202,7 @@ class GamePoolCreateRequest(BaseModel):
     daily_loss_limit: int = Field(default=0, ge=0)
     max_single_payout: int = Field(default=0, ge=0)
     rtp_target_basis_points: int = Field(default=8000, ge=0, le=10000)
+    request_id: str | None = Field(default=None, min_length=8, max_length=36)
 
 
 class GameRoundCreateRequest(BaseModel):

@@ -401,3 +401,32 @@ def official_recharge(
             "proof_url": proof_url,
         },
     )
+
+
+def configure_game_pool(
+    *,
+    request_id: str,
+    actor_user_id: int,
+    game_key: str,
+    pool_type: str,
+    opening_balance: int,
+    daily_payout_cap: int,
+    daily_loss_limit: int,
+    max_single_payout: int,
+    rtp_target_basis_points: int,
+) -> dict[str, Any]:
+    business_reference = f"game-pool-configure:{actor_user_id}:{request_id}"
+    return _request(
+        "game-pools/configure",
+        {
+            **mutation_context("game_pool.configure", business_reference),
+            "actor_user_id": actor_user_id,
+            "game_key": game_key,
+            "pool_type": pool_type,
+            "opening_balance": opening_balance,
+            "daily_payout_cap": daily_payout_cap,
+            "daily_loss_limit": daily_loss_limit,
+            "max_single_payout": max_single_payout,
+            "rtp_target_basis_points": rtp_target_basis_points,
+        },
+    )
