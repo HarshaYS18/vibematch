@@ -127,6 +127,13 @@ class Settings(BaseSettings):
     ECONOMY_DB_POOL_TIMEOUT_SECONDS: int = 3
     ECONOMY_MAX_REPLICAS: int = 20
     DB_ECONOMY_CONNECTION_BUDGET: int = 80
+    ECONOMY_BULK_BATCH_SIZE: int = 500
+    ECONOMY_BULK_LEASE_SECONDS: int = 120
+    ECONOMY_BULK_POLL_SECONDS: float = 1.0
+    ECONOMY_BULK_WORKER_DB_POOL_SIZE: int = 2
+    ECONOMY_BULK_WORKER_DB_MAX_OVERFLOW: int = 0
+    ECONOMY_BULK_WORKER_MAX_REPLICAS: int = 4
+    DB_ECONOMY_BULK_WORKER_CONNECTION_BUDGET: int = 8
 
     # Topology budgets. These are planning/validation limits, not capacity claims.
     API_MAX_REPLICAS: int = 20
@@ -245,6 +252,7 @@ class Settings(BaseSettings):
             + self.DB_IDENTITY_CONNECTION_BUDGET
             + self.DB_PROFILE_SOCIAL_CONNECTION_BUDGET
             + self.DB_ECONOMY_CONNECTION_BUDGET
+            + self.DB_ECONOMY_BULK_WORKER_CONNECTION_BUDGET
             + self.DB_WORKER_CONNECTION_BUDGET
             + self.DB_ROLLOUT_SURGE_CONNECTION_RESERVE
         )
@@ -579,6 +587,32 @@ class Settings(BaseSettings):
             unsafe.append("DB_ECONOMY_CONNECTION_BUDGET")
         if unsafe:
             raise RuntimeError("Unsafe Economy service production configuration: " + ", ".join(unsafe))
+
+    def validate_economy_bulk_worker(self) -> None:
+        """Validate durable Economy bulk-grant worker capacity."""
+        if self.ECONOMY_BULK_BATCH_SIZE < 50 or self.ECONOMY_BULK_BATCH_SIZE > 5000:
+            raise RuntimeError("Unsafe ECONOMY_BULK_BATCH_SIZE")
+        if self.ECONOMY_BULK_LEASE_SECONDS < 30:
+            raise RuntimeError("Unsafe ECONOMY_BULK_LEASE_SECONDS")
+        if self.ECONOMY_BULK_POLL_SECONDS < 0.1:
+            raise RuntimeError("Unsafe ECONOMY_BULK_POLL_SECONDS")
+        if (
+            self.ECONOMY_BULK_WORKER_MAX_REPLICAS
+            * (
+                self.ECONOMY_BULK_WORKER_DB_POOL_SIZE
+                + self.ECONOMY_BULK_WORKER_DB_MAX_OVERFLOW
+            )
+            > self.DB_ECONOMY_BULK_WORKER_CONNECTION_BUDGET
+        ):
+            raise RuntimeError(
+                "Unsafe DB_ECONOMY_BULK_WORKER_CONNECTION_BUDGET"
+            )
+        if self.is_production:
+            url = self.ECONOMY_DATABASE_URL.strip()
+            if not url or url == self.database_url.strip():
+                raise RuntimeError(
+                    "Unsafe Economy bulk worker database credentials"
+                )
 
     def validate_worker_runtime(self) -> None:
         """Reject worker-only service credentials that are unsafe in production."""

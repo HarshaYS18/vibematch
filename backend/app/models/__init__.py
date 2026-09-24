@@ -72,6 +72,7 @@ from app.models.call_session import (
 from app.models.experience import ExperienceMutationReceipt, RoomExperienceStatus, UserExperienceStatus
 from app.models.mvp_feature import MvpFeatureState
 from app.models.economy_transaction import EconomyTransaction
+from app.models.economy_bulk_grant import EconomyBulkGrant, EconomyBulkGrantRecipient
 from app.models.economy import (
     CoinPoolLedger,
     CoinSaleOrder,
