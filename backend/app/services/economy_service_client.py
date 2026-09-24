@@ -175,6 +175,35 @@ def adjust_wallet_levels(
         },
     )
 
+def adjust_vip_override(
+    *,
+    request_id: str,
+    actor_user_id: int,
+    target_user_id: int,
+    vip_level: int,
+    svip_level: int,
+    vip_is_active: bool,
+    svip_is_active: bool,
+    svip_expires_at: str | None,
+    reason: str,
+) -> dict[str, Any]:
+    business_reference = f"vip-override:{target_user_id}:{request_id}"
+    return _request(
+        "vip/admin-override",
+        {
+            **mutation_context("vip.admin_override", business_reference),
+            "actor_user_id": int(actor_user_id),
+            "target_user_id": int(target_user_id),
+            "vip_level": int(vip_level),
+            "svip_level": int(svip_level),
+            "vip_is_active": bool(vip_is_active),
+            "svip_is_active": bool(svip_is_active),
+            "svip_expires_at": svip_expires_at,
+            "reason": reason,
+        },
+    )
+
+
 def claim_mission_reward(
     *,
     user_id: int,
