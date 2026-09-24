@@ -1256,6 +1256,7 @@ def _validate_economy_service_cutover(errors: list[str]) -> None:
         ROOT / "backend" / "app" / "api" / "routes" / "super_owner.py",
         ROOT / "backend" / "app" / "api" / "routes" / "control_center.py",
         ROOT / "backend" / "app" / "api" / "routes" / "lucky_gift_admin.py",
+        ROOT / "backend" / "app" / "api" / "routes" / "room_cross_domain.py",
     )
     for source in core_economy_surfaces:
         if not source.exists():
