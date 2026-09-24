@@ -147,18 +147,21 @@ def validate_payout_exposure(db: Session, *, payout_amount: int) -> dict:
     return {"allowed": True, "reason": "ALLOW", **capacity}
 
 
-def record_spend_income(db: Session, *, amount: int, actor: User, source_id: str, user_id: int, metadata: dict | None = None) -> None:
+def record_spend_income(db: Session, *, amount: int, actor: User, source_id: str, user_id: int, metadata: dict | None = None) -> dict:
     if amount <= 0:
-        return
+        return {"pool_id": None, "amount": 0}
     _, lucky_pool = ensure_house_pools(db)
     _assert_active(lucky_pool, "Lucky")
     _ledger(db, lucky_pool, EconomyDirection.CREDIT.value, amount, "LUCKY_GIFT_SPEND_INCOME", actor, "Lucky gift spend income", user_id=user_id, source_id=source_id, metadata=metadata)
     lucky_pool.balance += amount
+    db.flush()
+    return {"pool_id": lucky_pool.id, "amount": int(amount)}
 
 
-def record_payout(db: Session, *, amount: int, actor: User, source_id: str, user_id: int, metadata: dict | None = None) -> None:
+def record_payout(db: Session, *, amount: int, actor: User, source_id: str, user_id: int, metadata: dict | None = None) -> dict:
+    movements: list[dict[str, int | str]] = []
     if amount <= 0:
-        return
+        return {"movements": movements}
     main_pool, lucky_pool = ensure_house_pools(db)
     _assert_active(main_pool, "Main")
     _assert_active(lucky_pool, "Lucky")
@@ -167,13 +170,16 @@ def record_payout(db: Session, *, amount: int, actor: User, source_id: str, user
     if lucky_part > 0:
         _ledger(db, lucky_pool, EconomyDirection.DEBIT.value, lucky_part, "LUCKY_GIFT_PAYOUT", actor, "Lucky gift payout", user_id=user_id, source_id=source_id, metadata=metadata)
         lucky_pool.balance -= lucky_part
+        movements.append({"pool_id": int(lucky_pool.id), "amount": int(lucky_part), "source_type": "LUCKY_GIFT_PAYOUT"})
         remaining -= lucky_part
-    if remaining <= 0:
-        return
-    if available_balance(main_pool) < remaining:
-        raise HTTPException(status_code=409, detail="Insufficient lucky gift house pool reserve")
-    _ledger(db, main_pool, EconomyDirection.DEBIT.value, remaining, "LUCKY_GIFT_BACKSTOP_PAYOUT", actor, "Main pool lucky gift backstop payout", user_id=user_id, source_id=source_id, metadata=metadata)
-    main_pool.balance -= remaining
+    if remaining > 0:
+        if available_balance(main_pool) < remaining:
+            raise HTTPException(status_code=409, detail="Insufficient lucky gift house pool reserve")
+        _ledger(db, main_pool, EconomyDirection.DEBIT.value, remaining, "LUCKY_GIFT_BACKSTOP_PAYOUT", actor, "Main pool lucky gift backstop payout", user_id=user_id, source_id=source_id, metadata=metadata)
+        main_pool.balance -= remaining
+        movements.append({"pool_id": int(main_pool.id), "amount": int(remaining), "source_type": "LUCKY_GIFT_BACKSTOP_PAYOUT"})
+    db.flush()
+    return {"movements": movements}
 
 
 def adjust_pool(db: Session, *, actor: User, game_key: str, pool_type: str, direction: str, amount: int, reason: str, commit: bool = True) -> GamePool:
