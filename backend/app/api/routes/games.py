@@ -14,8 +14,10 @@ from app.schemas.games import (
     GameRoundCreateRequest,
     GameRoundResponse,
     GameRoundResultResponse,
+    GameSessionOpenRequest,
+    GameSessionResponse,
 )
-from app.services import global_jungle_game_service_v2 as game_service
+from app.services import game_platform_runtime_service as game_service
 from app.services import role_service
 
 router = APIRouter(prefix="/games", tags=["Games"])
@@ -36,6 +38,23 @@ def get_game_catalog(db: Session = Depends(get_db)):
 @router.get("/catalog/{game_key}", response_model=GameDefinitionResponse)
 def get_game_definition(game_key: str, db: Session = Depends(get_db)):
     return GameDefinitionResponse(**game_service._definition_payload(game_service.get_definition(db, game_key)))
+
+
+@router.post("/{game_key}/sessions", response_model=GameSessionResponse)
+def open_game_session(game_key: str, payload: GameSessionOpenRequest, db: Session = Depends(get_db), current_user: User = Depends(get_current_user)):
+    return GameSessionResponse(**game_service.open_session(
+        db,
+        game_key=game_key,
+        user=current_user,
+        request_id=payload.request_id,
+        room_id=payload.room_id,
+        bridge_version=payload.bridge_version,
+    ))
+
+
+@router.post("/sessions/{session_id}/close", response_model=GameSessionResponse)
+def close_game_session(session_id: str, db: Session = Depends(get_db), current_user: User = Depends(get_current_user)):
+    return GameSessionResponse(**game_service.close_session(db, session_id=session_id, user=current_user))
 
 
 @router.get("/global/jungle-hunt/history", response_model=GameRoundHistoryResponse)
@@ -59,7 +78,7 @@ def upsert_game_definition(game_key: str, payload: GameAdminUpsertRequest, db: S
 
 @router.post("/{game_key}/rounds", response_model=GameRoundResponse)
 def create_game_round(game_key: str, payload: GameRoundCreateRequest, db: Session = Depends(get_db), current_user: User = Depends(get_current_user)):
-    round_obj = game_service.create_round(db, game_key, current_user, payload.room_id)
+    round_obj = game_service.create_round(db, game_key, current_user, payload.room_id, session_id=payload.session_id)
     return GameRoundResponse(**game_service.get_round_payload(db, round_obj.id, current_user))
 
 
@@ -70,7 +89,7 @@ def get_game_round(round_id: int, db: Session = Depends(get_db), current_user: U
 
 @router.post("/rounds/{round_id}/bets", response_model=GameBetResponse)
 def place_game_bet(round_id: int, payload: GameBetRequest, db: Session = Depends(get_db), current_user: User = Depends(get_current_user)):
-    return GameBetResponse(**game_service.place_bet(db, round_id, current_user, payload.target_id, payload.amount))
+    return GameBetResponse(**game_service.place_bet(db, round_id, current_user, payload.target_id, payload.amount, request_id=payload.request_id))
 
 
 @router.post("/rounds/{round_id}/settle-test", response_model=GameRoundResultResponse)

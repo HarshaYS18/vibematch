@@ -319,6 +319,18 @@ def _lucky_gift_control_pool_payload(db: Session, pool: GamePool) -> dict[str, A
 
 
 
+@router.get("/wallet/snapshot/{user_id}", dependencies=[Depends(require_internal_token)])
+def wallet_snapshot(user_id: int, db: Session = Depends(get_db)):
+    wallet = economy_transaction_service.wallet_for_update(db, user_id)
+    db.commit()
+    return {
+        "user_id": int(user_id),
+        "coin_balance": int(wallet.coin_balance or 0),
+        "ruby_balance": int(wallet.ruby_balance or 0),
+        "pending_withdraw_rubies": int(wallet.pending_withdraw_rubies or 0),
+    }
+
+
 @router.post("/wallet/recharge", dependencies=[Depends(require_internal_token)])
 def recharge_wallet(
     payload: WalletRechargeRequest,
@@ -1621,6 +1633,13 @@ def game_wager(payload: GameFinancialRequest, db: Session = Depends(get_db)):
         tx=tx,
         actor_user_id=payload.user_id,
     )
+    house_income = house_pool_service.record_house_profit_or_loss(
+        db,
+        pool_type="GAME_HOUSE_POOL",
+        amount=payload.wager_amount,
+        reference_type="COIN_GAME_WAGER_INCOME",
+        reference_id=payload.round_id or payload.business_reference,
+    )
     reserve = house_pool_service.reserve_house_liability(
         db,
         pool_type="GAME_HOUSE_POOL",
@@ -1635,6 +1654,7 @@ def game_wager(payload: GameFinancialRequest, db: Session = Depends(get_db)):
         "wager_amount": payload.wager_amount,
         "wallet_coin_balance": int(wallet.coin_balance or 0),
         "house_reservation": reserve,
+        "house_income": house_income,
     }
     return economy_transaction_service.complete(
         db,

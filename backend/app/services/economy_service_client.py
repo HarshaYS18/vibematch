@@ -92,6 +92,10 @@ def _get(path: str) -> dict[str, Any]:
     return decoded
 
 
+def wallet_snapshot(*, user_id: int) -> dict[str, Any]:
+    return _get(f"wallet/snapshot/{int(user_id)}")
+
+
 def debit_wallet(
     *,
     user_id: int,
