@@ -24,10 +24,15 @@ class EconomyGamePropsLuckyGiftCutoverTests(unittest.TestCase):
         ):
             self.assertNotIn(token, route)
 
-    def test_jungle_hunt_remains_on_existing_core_boundary(self):
-        route = (ROOT / "backend/app/api/routes/game_props_admin.py").read_text(encoding="utf-8")
-        self.assertIn("jungle_hunt_props_runtime_service.get_props", route)
-        self.assertIn("jungle_hunt_props_runtime_service.update_props", route)
+    def test_jungle_hunt_props_move_to_game_platform_authority(self):
+        core = (ROOT / "backend/app/api/routes/game_props_admin.py").read_text(encoding="utf-8")
+        game_admin = (ROOT / "apps/game-platform-service/admin_props.py").read_text(encoding="utf-8")
+        proxy = (ROOT / "backend/app/api/routes/game_platform_proxy.py").read_text(encoding="utf-8")
+        self.assertNotIn("jungle_hunt_props_runtime_service", core)
+        self.assertIn("jungle_hunt_props_runtime_service.get_props", game_admin)
+        self.assertIn("jungle_hunt_props_runtime_service.update_props", game_admin)
+        self.assertIn("game.props.updated.v1", game_admin)
+        self.assertIn("/admin/games/props/jungle-hunt", proxy)
 
     def test_control_house_pool_command_is_idempotent_economy_work(self):
         internal = (ROOT / "apps/economy-service/internal.py").read_text(encoding="utf-8")

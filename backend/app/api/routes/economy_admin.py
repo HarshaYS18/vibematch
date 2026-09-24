@@ -1,6 +1,6 @@
 from uuid import uuid4
 
-from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException
+from fastapi import APIRouter, BackgroundTasks, Depends, Header, HTTPException
 from sqlalchemy.orm import Session
 
 from app.api.routes.super_owner import require_super_owner
@@ -9,7 +9,7 @@ from app.database import get_db
 from app.models.economy import CoinSupplyPool
 from app.models.user import User
 from app.schemas.economy import AllocatePoolCoinsRequest, EconomyPoolResponse, GamePoolCreateRequest, GameRoundCreateRequest, MintCoinsRequest, OfficialRechargeRequest, OfficialRechargeResponse, SellerSaleRequest
-from app.services import economy_service, economy_service_client
+from app.services import economy_service_client, game_platform_service_client
 from app.websocket.inbox_ws import inbox_ws_manager
 
 router = APIRouter(prefix="/admin/economy", tags=["Admin Economy"])
@@ -187,6 +187,30 @@ def create_game_pool(
 
 
 @router.post("/gaming/rounds")
-def create_game_round(payload: GameRoundCreateRequest, db: Session = Depends(get_db)):
-    game_round = economy_service.create_game_round(db=db, game_key=payload.game_key, entry_fee=payload.entry_fee, max_players=payload.max_players, room_id=payload.room_id)
-    return {"id": game_round.id, "game_key": game_round.game_key, "entry_fee": game_round.entry_fee, "status": game_round.status}
+def create_game_round(
+    payload: GameRoundCreateRequest,
+    current_user: User = Depends(get_current_user),
+    authorization: str | None = Header(default=None),
+):
+    require_super_owner(current_user)
+    if not authorization:
+        raise HTTPException(status_code=401, detail="Authorization header is required")
+    try:
+        result = game_platform_service_client.create_round(
+            authorization=authorization,
+            game_key=payload.game_key,
+            room_id=payload.room_id,
+        )
+    except game_platform_service_client.GamePlatformServiceUnavailable as exc:
+        raise HTTPException(status_code=503, detail=str(exc)) from exc
+    except game_platform_service_client.GamePlatformServiceError as exc:
+        raise HTTPException(status_code=exc.status_code, detail=exc.detail) from exc
+    return {
+        "id": int(result["id"]),
+        "game_key": str(result["game_key"]),
+        "entry_fee": int(result.get("entry_fee") or 0),
+        "max_players": int(result.get("max_players") or payload.max_players),
+        "room_id": result.get("room_id"),
+        "status": str(result["status"]),
+        "note": "Round lifecycle is owned by Game Platform; legacy entry_fee/max_players inputs do not override authoritative game configuration.",
+    }

@@ -7,6 +7,7 @@ from app.core.operational import install_query_counter, operational_middleware, 
 from app.core.telemetry import configure_telemetry
 from app.database import get_db
 from database import engine, get_game_platform_db
+from admin_props import router as admin_props_router
 
 settings.validate_game_platform_service()
 app=FastAPI(title="FunKey Game Platform Service",version="1.0.0",docs_url=None,redoc_url=None)
@@ -16,6 +17,7 @@ api=APIRouter(prefix="/api/v1")
 api.include_router(games.router)
 api.include_router(games_master.router)
 api.include_router(games.admin_router)
+api.include_router(admin_props_router)
 app.include_router(api)
 @app.get("/live",include_in_schema=False)
 def live(): return {"status":"live"}

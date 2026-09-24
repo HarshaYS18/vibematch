@@ -38,6 +38,19 @@ class GamePlatformCutoverTests(unittest.TestCase):
         for forbidden in ("ALTER TABLE user_wallets","ALTER TABLE wallet_ledger","ALTER TABLE game_pools","ALTER TABLE game_pool_ledger"):
             self.assertNotIn(forbidden,sql)
 
+    def test_game_config_and_legacy_round_writers_are_service_owned(self):
+        core_props=(ROOT/"backend/app/api/routes/game_props_admin.py").read_text(encoding="utf-8")
+        game_admin=(ROOT/"apps/game-platform-service/admin_props.py").read_text(encoding="utf-8")
+        economy_admin=(ROOT/"backend/app/api/routes/economy_admin.py").read_text(encoding="utf-8")
+        self.assertNotIn("jungle_hunt_props_runtime_service",core_props)
+        self.assertIn("jungle_hunt_props_runtime_service.update_props",game_admin)
+        self.assertIn("game_platform_service_client.create_round",economy_admin)
+        self.assertNotIn("economy_service.create_game_round",economy_admin)
+
+    def test_game_platform_runtime_can_write_admin_audit_only(self):
+        sql=(ROOT/"deploy/postgres/game-platform-ownership.sql").read_text(encoding="utf-8")
+        self.assertIn("GRANT SELECT,INSERT ON TABLE admin_logs TO funkey_game_platform_runtime",sql)
+
 
 if __name__=="__main__":
     unittest.main()

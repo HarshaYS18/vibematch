@@ -19,9 +19,12 @@ class EconomyLegacyGamePoolCutoverTests(unittest.TestCase):
         self.assertIn('operation="game_pool.configure"',internal)
         self.assertIn("economy.game_pool.configured.v1",internal)
 
-    def test_round_lifecycle_remains_outside_economy_command(self):
+    def test_legacy_round_lifecycle_facade_delegates_to_game_platform(self):
         route=(ROOT/"backend/app/api/routes/economy_admin.py").read_text(encoding="utf-8")
         self.assertIn('@router.post("/gaming/rounds")',route)
+        self.assertIn("require_super_owner(current_user)",route)
+        self.assertIn("game_platform_service_client.create_round",route)
+        self.assertNotIn("economy_service.create_game_round",route)
 
 if __name__=="__main__":
     unittest.main()

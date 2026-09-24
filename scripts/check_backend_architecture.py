@@ -1025,6 +1025,8 @@ def _validate_game_platform_extraction(errors: list[str]) -> None:
         GAME_PLATFORM_RUNTIME_MIGRATION,
         ROOT / "backend" / "app" / "api" / "routes" / "game_platform_proxy.py",
         ROOT / "backend" / "app" / "services" / "game_platform_runtime_service.py",
+        ROOT / "backend" / "app" / "services" / "game_platform_service_client.py",
+        GAME_PLATFORM_SERVICE_ROOT / "admin_props.py",
     )
     for path in required:
         if not path.exists():
@@ -1066,6 +1068,33 @@ def _validate_game_platform_extraction(errors: list[str]) -> None:
         if "game_settlement_service" in text:
             errors.append("core legacy game facade must not use direct game_settlement_service")
 
+    core_props = ROOT / "backend" / "app" / "api" / "routes" / "game_props_admin.py"
+    platform_props = GAME_PLATFORM_SERVICE_ROOT / "admin_props.py"
+    proxy_path = ROOT / "backend" / "app" / "api" / "routes" / "game_platform_proxy.py"
+    if core_props.exists() and "jungle_hunt_props_runtime_service" in core_props.read_text(encoding="utf-8"):
+        errors.append("core must not mutate Game Platform Jungle Hunt configuration")
+    if platform_props.exists():
+        text = platform_props.read_text(encoding="utf-8")
+        for required_token in (
+            "jungle_hunt_props_runtime_service.get_props",
+            "jungle_hunt_props_runtime_service.update_props",
+            "game.props.updated.v1",
+        ):
+            if required_token not in text:
+                errors.append("Game Platform Jungle Hunt props authority missing: " + required_token)
+    if proxy_path.exists() and "/admin/games/props/jungle-hunt" not in proxy_path.read_text(encoding="utf-8"):
+        errors.append("Game Platform proxy must preserve canonical Jungle Hunt props path")
+
+    economy_admin = ROOT / "backend" / "app" / "api" / "routes" / "economy_admin.py"
+    if economy_admin.exists():
+        text = economy_admin.read_text(encoding="utf-8")
+        start = text.find('@router.post("/gaming/rounds")')
+        block = text[start:] if start >= 0 else ""
+        if "game_platform_service_client.create_round" not in block:
+            errors.append("legacy admin round facade must delegate lifecycle to Game Platform")
+        if "economy_service.create_game_round" in block:
+            errors.append("core/Economy admin must not create Game Platform round rows directly")
+
     runtime = ROOT / "backend" / "app" / "services" / "game_platform_runtime_service.py"
     if runtime.exists():
         text = runtime.read_text(encoding="utf-8")
@@ -1098,6 +1127,8 @@ def _validate_game_platform_extraction(errors: list[str]) -> None:
         for forbidden in ("ALTER TABLE user_wallets", "ALTER TABLE wallet_ledger", "ALTER TABLE game_pools", "ALTER TABLE game_pool_ledger"):
             if forbidden in sql:
                 errors.append("Game Platform ownership must exclude financial table: " + forbidden)
+        if "GRANT SELECT,INSERT ON TABLE admin_logs TO funkey_game_platform_runtime" not in sql:
+            errors.append("Game Platform admin audit grant is missing")
 
     if AUTHORITY_REGISTRY.exists():
         payload = json.loads(AUTHORITY_REGISTRY.read_text(encoding="utf-8"))

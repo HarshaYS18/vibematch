@@ -109,6 +109,10 @@ async def jungle_history(request: Request) -> Response:
     return await _proxy(request, "games/global/jungle-hunt/history")
 
 
+async def jungle_hunt_props(request: Request) -> Response:
+    return await _proxy(request, "admin/games/props/jungle-hunt")
+
+
 async def seed_defaults(request: Request) -> Response:
     return await _proxy(request, "admin/games/seed-defaults")
 
@@ -139,6 +143,11 @@ router.add_api_route(
     methods=["GET"],
 )
 
+admin_router.add_api_route(
+    "/admin/games/props/jungle-hunt",
+    jungle_hunt_props,
+    methods=["GET", "POST"],
+)
 admin_router.add_api_route(
     "/admin/games/seed-defaults",
     seed_defaults,

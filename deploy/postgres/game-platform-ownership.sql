@@ -17,8 +17,11 @@ REVOKE ALL ON TABLE game_definitions,game_sessions,game_rounds,game_round_player
 GRANT SELECT,INSERT,UPDATE,DELETE ON TABLE game_definitions,game_sessions,game_rounds,game_round_players,game_bets,game_risk_audits,user_game_stats TO funkey_game_platform_runtime;
 GRANT SELECT ON TABLE users,user_roles,rooms TO funkey_game_platform_runtime;
 GRANT INSERT ON TABLE event_outbox TO funkey_game_platform_runtime;
+GRANT SELECT,INSERT ON TABLE admin_logs TO funkey_game_platform_runtime;
 GRANT SELECT ON TABLE game_definitions,game_sessions,game_rounds,game_round_players,game_bets,game_risk_audits,user_game_stats TO funkey_game_platform_reader;
 DO $$ DECLARE t text; s text; BEGIN
 FOREACH t IN ARRAY ARRAY['game_definitions','game_sessions','game_rounds','game_round_players','game_bets','game_risk_audits','user_game_stats'] LOOP
 s:=pg_get_serial_sequence(t,'id'); IF s IS NOT NULL THEN EXECUTE format('ALTER SEQUENCE %s OWNER TO funkey_game_platform_owner',s); EXECUTE format('GRANT USAGE, SELECT ON SEQUENCE %s TO funkey_game_platform_runtime',s); END IF;
-END LOOP; END $$;
+END LOOP;
+s:=pg_get_serial_sequence('admin_logs','id'); IF s IS NOT NULL THEN EXECUTE format('GRANT USAGE, SELECT ON SEQUENCE %s TO funkey_game_platform_runtime',s); END IF;
+END $$;
