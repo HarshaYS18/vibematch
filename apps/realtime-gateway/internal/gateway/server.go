@@ -31,16 +31,16 @@ return count
 `
 
 type Server struct {
-	Config       Config
-	Auth         Authorizer
-	Commands     CommandExecutor
-	Redis        *redis.Client
-	Hub          *Hub
-	Logger       *slog.Logger
+	Config         Config
+	Auth           Authorizer
+	Commands       CommandExecutor
+	Redis          *redis.Client
+	Hub            *Hub
+	Logger         *slog.Logger
 	subscribed     atomic.Bool
 	natsSubscribed atomic.Bool
 	authSlots      chan struct{}
-	commandSlots chan struct{}
+	commandSlots   chan struct{}
 }
 
 func NewServer(
