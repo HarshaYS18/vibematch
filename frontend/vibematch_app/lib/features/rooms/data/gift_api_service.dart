@@ -152,6 +152,76 @@ class GiftApiService {
     throw StateError('Unreachable lucky gift send response');
   }
 
+
+  Future<String> _pendingGiftRequestId({
+    required int receiverPublicUserId,
+    required String giftId,
+    required int quantity,
+    required String? roomPublicId,
+    required int? relationshipId,
+    required bool isRelationshipGift,
+    required bool lucky,
+  }) async {
+    final prefs = await SharedPreferences.getInstance();
+    final key = _giftPendingKey(
+      receiverPublicUserId: receiverPublicUserId,
+      giftId: giftId,
+      quantity: quantity,
+      roomPublicId: roomPublicId,
+      relationshipId: relationshipId,
+      isRelationshipGift: isRelationshipGift,
+      lucky: lucky,
+    );
+    var requestId = prefs.getString(key);
+    if (requestId == null || requestId.trim().isEmpty) {
+      requestId = const Uuid().v4();
+      await prefs.setString(key, requestId);
+    }
+    return requestId;
+  }
+
+  String _giftPendingKey({
+    required int receiverPublicUserId,
+    required String giftId,
+    required int quantity,
+    required String? roomPublicId,
+    required int? relationshipId,
+    required bool isRelationshipGift,
+    required bool lucky,
+  }) {
+    return [
+      'gift_send_pending',
+      lucky ? 'lucky' : 'regular',
+      receiverPublicUserId,
+      giftId,
+      quantity,
+      roomPublicId ?? 'wallet',
+      relationshipId ?? 0,
+      isRelationshipGift ? 1 : 0,
+    ].join('_');
+  }
+
+  Future<void> _clearPendingGiftRequest({
+    required int receiverPublicUserId,
+    required String giftId,
+    required int quantity,
+    required String? roomPublicId,
+    required int? relationshipId,
+    required bool isRelationshipGift,
+    required bool lucky,
+  }) async {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.remove(_giftPendingKey(
+      receiverPublicUserId: receiverPublicUserId,
+      giftId: giftId,
+      quantity: quantity,
+      roomPublicId: roomPublicId,
+      relationshipId: relationshipId,
+      isRelationshipGift: isRelationshipGift,
+      lucky: lucky,
+    ));
+  }
+
   Map<String, String> _headers() {
     final token = authApiService.cachedAccessToken;
     if (token == null || token.trim().isEmpty) {
