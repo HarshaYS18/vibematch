@@ -31,6 +31,25 @@ class GamePlatformRuntimeBoundaryTests(unittest.TestCase):
         self.assertIn("COIN_GAME_WAGER_INCOME",internal)
         self.assertIn("house_pool_service.record_house_profit_or_loss",internal)
         self.assertIn('@router.get("/wallet/snapshot/{user_id}"',internal)
+    def test_user_game_stats_has_single_game_platform_writer(self):
+        internal=(ROOT/"apps/economy-service/internal.py").read_text(encoding="utf-8")
+        runtime=(ROOT/"backend/app/services/game_platform_runtime_service.py").read_text(encoding="utf-8")
+        ownership=(ROOT/"deploy/postgres/game-platform-ownership.sql").read_text(encoding="utf-8")
+        self.assertNotIn("UserGameStats",internal)
+        self.assertNotIn("record_game_settlement",internal)
+        self.assertIn("game_stats_service.record_game_bet",runtime)
+        self.assertIn("game_stats_service.record_game_settlement",runtime)
+        self.assertIn("user_game_stats",ownership)
+
+    def test_live_runtime_never_calls_legacy_financial_game_paths(self):
+        runtime=(ROOT/"backend/app/services/game_platform_runtime_service.py").read_text(encoding="utf-8")
+        router=(ROOT/"backend/app/api/router.py").read_text(encoding="utf-8")
+        self.assertNotIn("jungle.place_bet(",runtime)
+        self.assertNotIn("jungle.settle_round(",runtime)
+        self.assertNotIn("global_jungle_game_service_v2",runtime)
+        self.assertIn("game_platform_proxy.router",router)
+        self.assertNotIn("games.router",router)
+        self.assertNotIn("games_master.router",router)
     def test_game_sessions_have_migration_and_authority_grant(self):
         migration=(ROOT/"backend/alembic/versions/20260924_0800_game_platform_runtime.py").read_text(encoding="utf-8")
         ownership=(ROOT/"deploy/postgres/game-platform-ownership.sql").read_text(encoding="utf-8")
