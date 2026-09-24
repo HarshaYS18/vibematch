@@ -372,3 +372,32 @@ def seller_sale(
             "proof_url": proof_url,
         },
     )
+
+
+def official_recharge(
+    *,
+    request_id: str,
+    actor_user_id: int,
+    target_user_id: int | None,
+    target_public_user_id: int | None,
+    coin_amount: int,
+    payment_amount: int,
+    payment_currency: str,
+    reason: str,
+    proof_url: str | None,
+) -> dict[str, Any]:
+    business_reference = f"official-recharge:{actor_user_id}:{request_id}"
+    return _request(
+        "recharge/official",
+        {
+            **mutation_context("recharge.official", business_reference),
+            "actor_user_id": actor_user_id,
+            "target_user_id": target_user_id,
+            "target_public_user_id": target_public_user_id,
+            "coin_amount": coin_amount,
+            "payment_amount": payment_amount,
+            "payment_currency": payment_currency,
+            "reason": reason,
+            "proof_url": proof_url,
+        },
+    )

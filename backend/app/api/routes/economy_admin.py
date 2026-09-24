@@ -8,7 +8,7 @@ from app.database import get_db
 from app.models.economy import CoinSupplyPool
 from app.models.user import User
 from app.schemas.economy import AllocatePoolCoinsRequest, EconomyPoolResponse, GamePoolCreateRequest, GameRoundCreateRequest, MintCoinsRequest, OfficialRechargeRequest, OfficialRechargeResponse, SellerSaleRequest
-from app.services import economy_level_service, economy_service, economy_service_client
+from app.services import economy_service, economy_service_client
 from app.websocket.inbox_ws import inbox_ws_manager
 
 router = APIRouter(prefix="/admin/economy", tags=["Admin Economy"])
@@ -23,31 +23,6 @@ def _pool_response(pool: CoinSupplyPool) -> EconomyPoolResponse:
         reserved_balance=pool.reserved_balance,
         status=pool.status,
     )
-
-
-def _wallet_response(db: Session, wallet):
-    levels = economy_level_service.wallet_level_payload(db, wallet)
-    economy_level_service.sync_vip_status(db, wallet.user_id, levels)
-    return {
-        "user_id": wallet.user_id,
-        "coin_balance": wallet.coin_balance,
-        "ruby_balance": wallet.ruby_balance,
-        "withdrawable_rubies": max(wallet.ruby_balance - wallet.locked_ruby_balance, 0),
-        "pending_withdraw_rubies": wallet.pending_withdraw_rubies,
-        "lifetime_coins_spent": wallet.lifetime_coins_spent,
-        "lifetime_coins_received_as_gifts": wallet.lifetime_coins_received_as_gifts,
-        "lifetime_rubies_earned": wallet.lifetime_rubies_earned,
-        "lifetime_recharge_coin_exp": levels["lifetime_recharge_coin_exp"],
-        "monthly_recharge_coin_exp": levels["monthly_recharge_coin_exp"],
-        "monthly_gift_coins_sent": levels["monthly_gift_coins_sent"],
-        "monthly_gift_coins_received": levels["monthly_gift_coins_received"],
-        "lifetime_send_exp": levels["lifetime_send_exp"],
-        "lifetime_receive_exp": levels["lifetime_receive_exp"],
-        "vip": levels["vip"],
-        "svip": levels["svip"],
-        "sent": levels["sent"],
-        "received": levels["received"],
-    }
 
 
 async def _broadcast_wallet_vip_svip_update(target_user_id: int, wallet_payload: dict) -> None:
@@ -113,35 +88,41 @@ def official_recharge_wallet(
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db),
 ):
-    result = economy_level_service.credit_official_recharge(
-        db=db,
-        actor=current_user,
-        target_user_id=payload.target_user_id,
-        target_public_user_id=payload.target_public_user_id,
-        coin_amount=payload.coin_amount,
-        payment_amount=payload.payment_amount,
-        payment_currency=payload.payment_currency,
-        reason=payload.reason,
-        proof_url=payload.proof_url,
-    )
-    target = result["target"]
-    wallet_payload = _wallet_response(db, result["wallet"])
+    request_id = (payload.request_id or str(uuid4())).strip()
+    try:
+        result = economy_service_client.official_recharge(
+            request_id=request_id,
+            actor_user_id=current_user.id,
+            target_user_id=payload.target_user_id,
+            target_public_user_id=payload.target_public_user_id,
+            coin_amount=payload.coin_amount,
+            payment_amount=payload.payment_amount,
+            payment_currency=payload.payment_currency,
+            reason=payload.reason,
+            proof_url=payload.proof_url,
+        )
+    except economy_service_client.EconomyServiceUnavailable as exc:
+        raise HTTPException(status_code=503, detail=str(exc)) from exc
+    except economy_service_client.EconomyServiceError as exc:
+        raise HTTPException(status_code=exc.status_code, detail=exc.detail) from exc
+
+    wallet_payload = dict(result["wallet"])
+    target_user_id = int(result["target_user_id"])
     background_tasks.add_task(
         _broadcast_wallet_vip_svip_update,
-        target.id,
+        target_user_id,
         wallet_payload,
     )
     return OfficialRechargeResponse(
         order_id=None,
-        target_user_id=target.id,
-        target_public_user_id=target.public_user_id,
-        coin_amount=payload.coin_amount,
-        payment_amount=payload.payment_amount,
-        payment_currency=payload.payment_currency,
+        target_user_id=target_user_id,
+        target_public_user_id=int(result["target_public_user_id"]),
+        coin_amount=int(result["coin_amount"]),
+        payment_amount=int(result["payment_amount"]),
+        payment_currency=str(result["payment_currency"]),
         wallet=wallet_payload,
         rule="Official recharge credited to wallet, counted toward VIP lifetime EXP + SVIP monthly EXP, and broadcast instantly to the user session.",
     )
-
 
 @router.post("/seller-sale")
 def seller_sell_coins(payload: SellerSaleRequest, current_user: User = Depends(get_current_user), db: Session = Depends(get_db)):

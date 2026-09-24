@@ -64,6 +64,7 @@ class OfficialRechargeRequest(BaseModel):
     payment_currency: str = "INR"
     reason: str = Field(..., min_length=3, max_length=255)
     proof_url: str | None = None
+    request_id: str | None = Field(default=None, min_length=8, max_length=36)
 
 
 class OfficialRechargeResponse(BaseModel):

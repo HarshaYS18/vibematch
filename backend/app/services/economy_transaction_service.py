@@ -56,7 +56,7 @@ def debit(db: Session, *, user_id:int, amount:int, currency:str, source_type:str
     db.add(WalletLedger(user_id=user_id,currency_type=currency,direction=EconomyDirection.DEBIT.value,amount=amount,before_balance=before,after_balance=after,source_type=source_type,source_id=source_id,transaction_id=tx.transaction_id,idempotency_key=tx.idempotency_key,business_reference=tx.business_reference,created_by_user_id=actor_user_id,reason=reason))
     return wallet
 
-def credit(db: Session, *, user_id:int, amount:int, currency:str, source_type:str, source_id:str|None, reason:str|None, tx:EconomyTransaction, actor_user_id:int|None) -> UserWallet:
+def credit(db: Session, *, user_id:int, amount:int, currency:str, source_type:str, source_id:str|None, reason:str|None, tx:EconomyTransaction, actor_user_id:int|None, metadata_json:str|None=None) -> UserWallet:
     amount=int(amount or 0)
     if amount<0: raise HTTPException(status_code=400, detail="amount cannot be negative")
     wallet=wallet_for_update(db,user_id)
@@ -66,7 +66,7 @@ def credit(db: Session, *, user_id:int, amount:int, currency:str, source_type:st
     elif currency==EconomyCurrency.RUBY.value:
         before=int(wallet.ruby_balance or 0); wallet.ruby_balance=before+amount; wallet.lifetime_rubies_earned+=amount; after=wallet.ruby_balance
     else: raise HTTPException(status_code=400, detail="Unsupported currency")
-    db.add(WalletLedger(user_id=user_id,currency_type=currency,direction=EconomyDirection.CREDIT.value,amount=amount,before_balance=before,after_balance=after,source_type=source_type,source_id=source_id,transaction_id=tx.transaction_id,idempotency_key=tx.idempotency_key,business_reference=tx.business_reference,created_by_user_id=actor_user_id,reason=reason))
+    db.add(WalletLedger(user_id=user_id,currency_type=currency,direction=EconomyDirection.CREDIT.value,amount=amount,before_balance=before,after_balance=after,source_type=source_type,source_id=source_id,transaction_id=tx.transaction_id,idempotency_key=tx.idempotency_key,business_reference=tx.business_reference,created_by_user_id=actor_user_id,reason=reason,metadata_json=metadata_json))
     return wallet
 
 def complete(db: Session, *, tx:EconomyTransaction, result:dict[str,Any], event_type:str, event_payload:dict[str,Any]):

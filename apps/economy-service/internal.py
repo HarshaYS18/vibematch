@@ -14,6 +14,7 @@ from app.models.economy import EconomyCurrency, GiftTransaction, RubyWithdrawReq
 from app.models.user import User
 from app.services import (
     economy_level_service,
+    economy_level_service,
     economy_service,
     economy_transaction_service,
     house_pool_service,
@@ -68,6 +69,17 @@ class SellerSaleCommandRequest(MutationContext):
     coin_amount: int = Field(gt=0)
     payment_amount: int = Field(default=0, ge=0)
     payment_currency: str = "INR"
+    proof_url: str | None = None
+
+
+class OfficialRechargeCommandRequest(MutationContext):
+    actor_user_id: int
+    target_user_id: int | None = None
+    target_public_user_id: int | None = None
+    coin_amount: int = Field(gt=0)
+    payment_amount: int = Field(default=0, ge=0)
+    payment_currency: str = "INR"
+    reason: str = Field(min_length=3, max_length=255)
     proof_url: str | None = None
 
 
@@ -851,6 +863,110 @@ def seller_sale(payload: SellerSaleCommandRequest, db: Session = Depends(get_db)
             "buyer_user_id": order.buyer_user_id,
             "source_pool_id": order.source_pool_id,
             "coin_amount": int(order.coin_amount or 0),
+        },
+    )
+
+
+@router.post("/recharge/official", dependencies=[Depends(require_internal_token)])
+def official_recharge(
+    payload: OfficialRechargeCommandRequest,
+    db: Session = Depends(get_db),
+):
+    actor = db.query(User).filter(User.id == payload.actor_user_id).first()
+    if actor is None:
+        raise HTTPException(status_code=404, detail="Actor user not found")
+    if payload.target_user_id is None and payload.target_public_user_id is None:
+        raise HTTPException(
+            status_code=400,
+            detail="target_user_id or target_public_user_id is required",
+        )
+    query = db.query(User)
+    target = (
+        query.filter(User.id == payload.target_user_id).first()
+        if payload.target_user_id is not None
+        else query.filter(User.public_user_id == payload.target_public_user_id).first()
+    )
+    if target is None:
+        raise HTTPException(status_code=404, detail="Target user not found")
+
+    tx, cached = _begin(
+        db,
+        payload,
+        operation="recharge.official",
+        actor_user_id=actor.id,
+    )
+    if cached is not None:
+        return cached
+
+    wallet = economy_transaction_service.credit(
+        db,
+        user_id=target.id,
+        amount=payload.coin_amount,
+        currency=EconomyCurrency.COIN.value,
+        source_type="OFFICIAL_RECHARGE",
+        source_id=tx.transaction_id,
+        reason=payload.reason,
+        tx=tx,
+        actor_user_id=actor.id,
+        metadata_json=json.dumps(
+            {
+                "payment_amount": payload.payment_amount,
+                "payment_currency": payload.payment_currency,
+                "proof_url": payload.proof_url or "",
+            },
+            separators=(",", ":"),
+        ),
+    )
+    levels = economy_level_service.wallet_level_payload(db, wallet)
+    status = economy_level_service.sync_vip_status(db, target.id, levels)
+
+    wallet_payload = {
+        "user_id": target.id,
+        "coin_balance": int(wallet.coin_balance or 0),
+        "ruby_balance": int(wallet.ruby_balance or 0),
+        "withdrawable_rubies": max(
+            int(wallet.ruby_balance or 0) - int(wallet.locked_ruby_balance or 0),
+            0,
+        ),
+        "pending_withdraw_rubies": int(wallet.pending_withdraw_rubies or 0),
+        "lifetime_coins_spent": int(wallet.lifetime_coins_spent or 0),
+        "lifetime_coins_received_as_gifts": int(
+            wallet.lifetime_coins_received_as_gifts or 0
+        ),
+        "lifetime_rubies_earned": int(wallet.lifetime_rubies_earned or 0),
+        "lifetime_recharge_coin_exp": levels["lifetime_recharge_coin_exp"],
+        "monthly_recharge_coin_exp": levels["monthly_recharge_coin_exp"],
+        "monthly_gift_coins_sent": levels["monthly_gift_coins_sent"],
+        "monthly_gift_coins_received": levels["monthly_gift_coins_received"],
+        "lifetime_send_exp": levels["lifetime_send_exp"],
+        "lifetime_receive_exp": levels["lifetime_receive_exp"],
+        "vip": levels["vip"],
+        "svip": levels["svip"],
+        "sent": levels["sent"],
+        "received": levels["received"],
+        "vip_level": int(status.vip_level or 0),
+        "svip_level": int(status.svip_level or 0),
+    }
+    result = {
+        "transaction_id": tx.transaction_id,
+        "target_user_id": target.id,
+        "target_public_user_id": target.public_user_id,
+        "coin_amount": payload.coin_amount,
+        "payment_amount": payload.payment_amount,
+        "payment_currency": payload.payment_currency,
+        "wallet": wallet_payload,
+    }
+    return economy_transaction_service.complete(
+        db,
+        tx=tx,
+        result=result,
+        event_type="economy.official_recharge.completed.v1",
+        event_payload={
+            "target_user_id": target.id,
+            "target_public_user_id": target.public_user_id,
+            "coin_amount": payload.coin_amount,
+            "payment_amount": payload.payment_amount,
+            "payment_currency": payload.payment_currency,
         },
     )
 
