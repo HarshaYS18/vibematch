@@ -16,65 +16,6 @@ class PresenceApiService {
 
   final AuthApiService authApiService;
 
-  Future<PresenceDto> heartbeat({
-    String? roomPublicId,
-    String? roomName,
-    String? roomMode,
-    bool isSecret = false,
-  }) async {
-    final response = await http.post(
-      Uri.parse(VmApiConfig.endpoint('/presence/heartbeat')),
-      headers: _authHeaders(),
-      body: jsonEncode({
-        if (roomPublicId != null && roomPublicId.trim().isNotEmpty)
-          'room_public_id': roomPublicId.trim(),
-        if (roomName != null && roomName.trim().isNotEmpty)
-          'room_name': roomName.trim(),
-        if (roomMode != null && roomMode.trim().isNotEmpty)
-          'room_mode': roomMode.trim(),
-        'is_secret': isSecret,
-      }),
-    );
-    _throwIfFailed(response, 'send presence heartbeat');
-    return PresenceDto.fromJson(
-      jsonDecode(response.body) as Map<String, dynamic>,
-    );
-  }
-
-  Future<PresenceDto> enterRoom({
-    required String roomPublicId,
-    required String roomName,
-    String? roomMode,
-    bool isSecret = false,
-  }) async {
-    final response = await http.post(
-      Uri.parse(VmApiConfig.endpoint('/presence/room/enter')),
-      headers: _authHeaders(),
-      body: jsonEncode({
-        'room_public_id': roomPublicId.trim(),
-        'room_name': roomName.trim(),
-        if (roomMode != null && roomMode.trim().isNotEmpty)
-          'room_mode': roomMode.trim(),
-        'is_secret': isSecret,
-      }),
-    );
-    _throwIfFailed(response, 'enter room presence');
-    return PresenceDto.fromJson(
-      jsonDecode(response.body) as Map<String, dynamic>,
-    );
-  }
-
-  Future<PresenceDto> leaveRoom() async {
-    final response = await http.post(
-      Uri.parse(VmApiConfig.endpoint('/presence/room/leave')),
-      headers: _authHeaders(),
-    );
-    _throwIfFailed(response, 'leave room presence');
-    return PresenceDto.fromJson(
-      jsonDecode(response.body) as Map<String, dynamic>,
-    );
-  }
-
   Future<PresenceDto> getPublicPresence(int publicUserId) async {
     final response = await http.get(
       Uri.parse(VmApiConfig.endpoint('/presence/public/$publicUserId')),
