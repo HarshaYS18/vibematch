@@ -3,15 +3,9 @@ from __future__ import annotations
 import json
 from pathlib import Path
 from unittest import TestCase
+from unittest.mock import patch
 
-from sqlalchemy import create_engine
-from sqlalchemy.orm import sessionmaker
-from sqlalchemy.pool import StaticPool
-
-import app.models  # register relationship targets
 from app.api.routes.room_cross_domain import _debit_theme_once
-from app.database import Base
-from app.models.economy import UserWallet, WalletLedger
 from app.models.user import User
 
 
@@ -58,67 +52,36 @@ class RoomControlServiceContractTests(TestCase):
         self.assertIn("room_theme_purchase_quote", source)
         self.assertIn("grant_room_theme_inventory", source)
 
-    def test_theme_debit_is_idempotent_under_wallet_lock(self):
-        engine = create_engine(
-            "sqlite://",
-            connect_args={"check_same_thread": False},
-            poolclass=StaticPool,
-        )
-        Base.metadata.create_all(
-            engine,
-            tables=[
-                User.__table__,
-                UserWallet.__table__,
-                WalletLedger.__table__,
-            ],
-        )
-        factory = sessionmaker(bind=engine)
-        with factory.begin() as db:
-            db.add(
-                User(
-                    id=1,
-                    public_user_id=6418000000001,
-                    username="buyer",
-                )
+    def test_theme_debit_uses_stable_economy_business_reference(self):
+        user = User(id=1, public_user_id=6418000000001, username="buyer")
+        with patch(
+            "app.api.routes.room_cross_domain.economy_service_client.debit_wallet"
+        ) as debit:
+            _debit_theme_once(
+                user=user,
+                theme_id="royal_stage",
+                theme_name="Royal Stage",
+                price=250,
             )
-            db.add(
-                UserWallet(
-                    user_id=1,
-                    coin_balance=1000,
-                    lifetime_coins_spent=0,
-                )
+            _debit_theme_once(
+                user=user,
+                theme_id="royal_stage",
+                theme_name="Royal Stage",
+                price=250,
             )
 
-        with factory() as db:
-            user = db.get(User, 1)
-            _debit_theme_once(
-                db,
-                user=user,
-                theme_id="royal_stage",
-                theme_name="Royal Stage",
-                price=250,
+        self.assertEqual(2, debit.call_count)
+        for call in debit.call_args_list:
+            self.assertEqual(1, call.kwargs["user_id"])
+            self.assertEqual(250, call.kwargs["amount"])
+            self.assertEqual("ROOM_THEME_PURCHASE", call.kwargs["source_type"])
+            self.assertEqual("royal_stage", call.kwargs["source_id"])
+            self.assertEqual("room_theme.purchase", call.kwargs["operation"])
+            self.assertEqual(
+                "room-theme-purchase:1:royal_stage",
+                call.kwargs["business_reference"],
             )
-            _debit_theme_once(
-                db,
-                user=user,
-                theme_id="royal_stage",
-                theme_name="Royal Stage",
-                price=250,
-            )
-            wallet = db.query(UserWallet).filter(UserWallet.user_id == 1).one()
-            ledgers = (
-                db.query(WalletLedger)
-                .filter(
-                    WalletLedger.user_id == 1,
-                    WalletLedger.source_type == "ROOM_THEME_PURCHASE",
-                    WalletLedger.source_id == "royal_stage",
-                )
-                .all()
-            )
-            self.assertEqual(750, wallet.coin_balance)
-            self.assertEqual(250, wallet.lifetime_coins_spent)
-            self.assertEqual(1, len(ledgers))
-        engine.dispose()
+
 
     def test_room_owned_tables_have_isolated_runtime_role(self):
         sql = (
