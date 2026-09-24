@@ -1,0 +1,55 @@
+from __future__ import annotations
+
+from dataclasses import dataclass
+
+
+@dataclass(frozen=True)
+class SubscriptionSpec:
+    subject: str
+    durable_name: str
+    ack_wait_seconds: int = 90
+    max_ack_pending: int = 100
+
+
+@dataclass(frozen=True)
+class PoolSpec:
+    name: str
+    subscriptions: tuple[SubscriptionSpec, ...]
+    allowed_handlers: frozenset[str]
+    relay_outbox: bool = False
+    max_in_flight: int = 10
+    active: bool = True
+
+
+POOLS: dict[str, PoolSpec] = {
+    "general": PoolSpec("general", (), frozenset(), relay_outbox=True, max_in_flight=1),
+    "notification": PoolSpec(
+        "notification",
+        (SubscriptionSpec("funkey.events.notification.requested", "funkey-worker-notification"),),
+        frozenset({"notification.requested"}),
+        max_in_flight=20,
+    ),
+    "media": PoolSpec(
+        "media",
+        (SubscriptionSpec("funkey.events.vibes.media.requested", "funkey-worker-media-vibes"),),
+        frozenset({"vibes.media.requested"}),
+        max_in_flight=8,
+    ),
+    "fanout": PoolSpec(
+        "fanout",
+        (SubscriptionSpec("funkey.events.vibes.post.published", "funkey-worker-fanout"),),
+        frozenset({"vibes.post.published"}),
+        max_in_flight=12,
+    ),
+    "maintenance": PoolSpec("maintenance", (), frozenset(), max_in_flight=4),
+    # Chunk 37 activates the Kafka analytics bridge. It is intentionally
+    # unsubscribed now so analytics events cannot be acknowledged and lost.
+    "analytics": PoolSpec("analytics", (), frozenset(), max_in_flight=8, active=False),
+}
+
+
+def get_pool(name: str) -> PoolSpec:
+    normalized = (name or "general").strip().lower()
+    if normalized not in POOLS:
+        raise RuntimeError("Unknown WORKER_POOL: " + normalized)
+    return POOLS[normalized]

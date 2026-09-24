@@ -29,16 +29,16 @@ from app.database import SessionLocal, engine
 from app.services import outbox_relay_service
 from apps.worker.events import EventEnvelope
 from apps.worker.handlers import HANDLERS
+from apps.worker.pools import get_pool
 
 
 NATS_URL = os.getenv("NATS_URL", "nats://127.0.0.1:4222")
 STREAM = os.getenv("NATS_STREAM", "FUNKEY_EVENTS")
 DLQ_STREAM = os.getenv("NATS_DLQ_STREAM", "FUNKEY_DLQ")
-CONSUMER = os.getenv("NATS_CONSUMER", "funkey-worker")
-VIBES_CONSUMER = os.getenv("NATS_VIBES_CONSUMER", "funkey-worker-vibes")
-MAX_ATTEMPTS = int(os.getenv("WORKER_MAX_ATTEMPTS", "5"))
-OUTBOX_BATCH_SIZE = int(os.getenv("OUTBOX_BATCH_SIZE", "25"))
-OUTBOX_LEASE_SECONDS = int(os.getenv("OUTBOX_LEASE_SECONDS", "120"))
+POOL = get_pool(os.getenv("WORKER_POOL", "general"))
+MAX_ATTEMPTS = max(1, min(int(os.getenv("WORKER_MAX_ATTEMPTS", "5")), 20))
+OUTBOX_BATCH_SIZE = max(1, min(int(os.getenv("OUTBOX_BATCH_SIZE", "25")), 500))
+OUTBOX_LEASE_SECONDS = max(30, min(int(os.getenv("OUTBOX_LEASE_SECONDS", "120")), 900))
 SHUTDOWN_GRACE_SECONDS = float(os.getenv("WORKER_SHUTDOWN_GRACE_SECONDS", "30"))
 WORKER_INSTANCE_ID = os.getenv("WORKER_INSTANCE_ID") or f"{socket.gethostname()}-{os.getpid()}"
 _logger = logging.getLogger("funkey.worker")
@@ -55,6 +55,7 @@ class WorkerState:
         self.dead_lettered = 0
         self.outbox_published = 0
         self.outbox_retries = 0
+        self.in_flight = 0
         self._lock = Lock()
 
     def count(self, name: str):
@@ -66,8 +67,11 @@ class WorkerState:
             values = {name: getattr(self, name) for name in (
                 "processed", "duplicates", "retries", "dead_lettered",
                 "outbox_published", "outbox_retries")}
-        lines = [f"funkey_worker_{name}_total {value}" for name, value in values.items()]
-        lines.append(f"funkey_worker_ready {1 if self.is_ready() else 0}")
+            in_flight = self.in_flight
+        lines = [f'funkey_worker_pool_info{{pool="{POOL.name}"}} 1']
+        lines.extend(f'funkey_worker_{name}_total{{pool="{POOL.name}"}} {value}' for name, value in values.items())
+        lines.append(f'funkey_worker_in_flight{{pool="{POOL.name}"}} {in_flight}')
+        lines.append(f'funkey_worker_ready{{pool="{POOL.name}"}} {1 if self.is_ready() else 0}')
         return "\n".join(lines) + "\n"
 
     def is_ready(self) -> bool:
@@ -192,24 +196,30 @@ async def relay_outbox(js, stop: asyncio.Event):
             await asyncio.sleep(3 + random.random() * 2)
 
 
-async def _dead_letter(js, msg, *, event_id: str, reason: str):
+async def _dead_letter(js, msg, *, event_id: str, event_type: str | None, reason: str):
     # The dead-letter stream is durable; ack the source only after publish ack.
-    body = json.dumps({"event_id": event_id, "reason": reason,
-                       "source_subject": msg.subject,
+    suffix = event_type if event_type and "." in event_type else "invalid"
+    body = json.dumps({"event_id": event_id, "event_type": event_type, "pool": POOL.name,
+                       "reason": reason, "source_subject": msg.subject,
                        "attempts": msg.metadata.num_delivered if msg.metadata else None}).encode()
-    await js.publish("funkey.dlq.notification.requested", body, timeout=3)
+    await js.publish(f"funkey.dlq.{suffix}", body, timeout=3)
     await msg.ack()
     state.count("dead_lettered")
 
 
 async def process_message(js, msg):
     event_id = "unknown"
+    event_type = None
     try:
         envelope = EventEnvelope.model_validate_json(msg.data)
         event_id = str(envelope.event_id)
+        event_type = envelope.event_type
+        if envelope.event_type not in POOL.allowed_handlers:
+            await _dead_letter(js, msg, event_id=event_id, event_type=event_type, reason="unsupported_pool_event")
+            return
         handler = HANDLERS.get(envelope.event_type)
         if handler is None:
-            await msg.ack()
+            await _dead_letter(js, msg, event_id=event_id, event_type=event_type, reason="missing_handler")
             return
         incoming_traceparent = None
         if msg.headers:
@@ -224,16 +234,22 @@ async def process_message(js, msg):
                 "funkey.event_type": envelope.event_type,
             },
         ):
-            result = await asyncio.to_thread(handler, envelope)
-            await msg.ack()
+            state.count("in_flight")
+            try:
+                result = await asyncio.to_thread(handler, envelope)
+                await msg.ack()
+            finally:
+                state.count("in_flight", -1)
         state.count("duplicates" if result == "duplicate" else "processed")
+        _logger.info(json.dumps({"event": "job.completed", "pool": POOL.name,
+                                "event_id": event_id, "event_type": event_type, "result": result}))
     except (ValidationError, ValueError) as exc:
-        await _dead_letter(js, msg, event_id=event_id, reason=type(exc).__name__)
+        await _dead_letter(js, msg, event_id=event_id, event_type=event_type, reason=type(exc).__name__)
     except Exception as exc:
         attempts = msg.metadata.num_delivered if msg.metadata else 1
         if attempts >= MAX_ATTEMPTS:
             try:
-                await _dead_letter(js, msg, event_id=event_id, reason=type(exc).__name__)
+                await _dead_letter(js, msg, event_id=event_id, event_type=event_type, reason=type(exc).__name__)
             except Exception:
                 # Never ack before the durable dead-letter publish succeeds.
                 await msg.nak(delay=30)
@@ -241,18 +257,20 @@ async def process_message(js, msg):
             delay = min(60, 2 ** attempts + random.random())
             await msg.nak(delay=delay)
             state.count("retries")
-        _logger.warning(json.dumps({"event": "job.retry_or_dlq", "event_id": event_id,
+        _logger.warning(json.dumps({"event": "job.retry_or_dlq", "pool": POOL.name,
+                                    "event_id": event_id, "event_type": event_type,
                                     "attempt": attempts, "error": type(exc).__name__}))
 
 
 async def consume(js, subscription, stop: asyncio.Event):
     while not stop.is_set():
         try:
-            messages = await subscription.fetch(batch=10, timeout=2)
-            for msg in messages:
-                if stop.is_set():
-                    break
-                await process_message(js, msg)
+            messages = await subscription.fetch(batch=max(1, min(POOL.max_in_flight, 50)), timeout=2)
+            await asyncio.gather(*[
+                process_message(js, msg)
+                for msg in messages
+                if not stop.is_set()
+            ])
         except NatsTimeoutError:
             continue
         except asyncio.CancelledError:
@@ -265,7 +283,7 @@ async def consume(js, subscription, stop: asyncio.Event):
 async def run():
     settings.validate_worker_runtime()
     logging.basicConfig(level=logging.INFO, format="%(message)s")
-    configure_telemetry("funkey-worker", engine=engine)
+    configure_telemetry(f"funkey-worker-{POOL.name}", engine=engine)
     stop = asyncio.Event()
     loop = asyncio.get_running_loop()
     for sig in (signal.SIGINT, signal.SIGTERM):
@@ -291,32 +309,29 @@ async def run():
             await js.stream_info(DLQ_STREAM)
         except NotFoundError:
             await js.add_stream(name=DLQ_STREAM, subjects=["funkey.dlq.>"], max_age=30 * 86400)
-        notification_subscription = await js.pull_subscribe(
-            "funkey.events.notification.requested", durable=CONSUMER, stream=STREAM,
-            config=js_api.ConsumerConfig(
-                durable_name=CONSUMER, filter_subject="funkey.events.notification.requested",
-                ack_policy=js_api.AckPolicy.EXPLICIT, ack_wait=90,
-                max_deliver=MAX_ATTEMPTS, max_ack_pending=100,
-            ),
-        )
-        vibes_subscription = await js.pull_subscribe(
-            "funkey.events.vibes.>", durable=VIBES_CONSUMER, stream=STREAM,
-            config=js_api.ConsumerConfig(
-                durable_name=VIBES_CONSUMER, filter_subject="funkey.events.vibes.>",
-                ack_policy=js_api.AckPolicy.EXPLICIT, ack_wait=90,
-                max_deliver=MAX_ATTEMPTS, max_ack_pending=100,
-            ),
-        )
-        tasks = [
-            asyncio.create_task(relay_outbox(js, stop)),
-            asyncio.create_task(consume(js, notification_subscription, stop)),
-            asyncio.create_task(consume(js, vibes_subscription, stop)),
-        ]
+        if POOL.relay_outbox:
+            tasks.append(asyncio.create_task(relay_outbox(js, stop)))
+        for spec in POOL.subscriptions:
+            subscription = await js.pull_subscribe(
+                spec.subject, durable=spec.durable_name, stream=STREAM,
+                config=js_api.ConsumerConfig(
+                    durable_name=spec.durable_name, filter_subject=spec.subject,
+                    ack_policy=js_api.AckPolicy.EXPLICIT, ack_wait=spec.ack_wait_seconds,
+                    max_deliver=MAX_ATTEMPTS, max_ack_pending=spec.max_ack_pending,
+                ),
+            )
+            tasks.append(asyncio.create_task(consume(js, subscription, stop)))
         state.ready = True
-        stop_waiter = asyncio.create_task(stop.wait())
-        done, _ = await asyncio.wait([stop_waiter, *tasks], return_when=asyncio.FIRST_COMPLETED)
-        if stop_waiter not in done:
-            raise RuntimeError("worker task exited unexpectedly")
+        _logger.info(json.dumps({"event": "worker.ready", "pool": POOL.name,
+                                "subscriptions": [s.subject for s in POOL.subscriptions],
+                                "relay_outbox": POOL.relay_outbox}))
+        if tasks:
+            stop_waiter = asyncio.create_task(stop.wait())
+            done, _ = await asyncio.wait([stop_waiter, *tasks], return_when=asyncio.FIRST_COMPLETED)
+            if stop_waiter not in done:
+                raise RuntimeError("worker task exited unexpectedly")
+        else:
+            await stop.wait()
     finally:
         state.ready = False
         state.draining = True
