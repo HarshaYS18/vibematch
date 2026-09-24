@@ -37,6 +37,38 @@ def upgrade() -> None:
         sa.PrimaryKeyConstraint("id"),
         sa.UniqueConstraint("reservation_key", name="uq_economy_house_reservation_key"),
     )
+    op.execute(
+        """
+        INSERT INTO economy_house_reservations (
+            reservation_key,
+            release_scope,
+            pool_id,
+            user_id,
+            amount,
+            status,
+            reference_type,
+            reference_id,
+            transaction_id,
+            created_at,
+            released_at
+        )
+        SELECT
+            'legacy-reserved:' || id::text,
+            'legacy-reserved:' || id::text,
+            id,
+            NULL,
+            reserved_balance,
+            'ACTIVE',
+            'LEGACY_RESERVED_BALANCE',
+            id::text,
+            NULL,
+            CURRENT_TIMESTAMP,
+            NULL
+        FROM game_pools
+        WHERE reserved_balance > 0
+        """
+    )
+
     for column in (
         "reservation_key",
         "release_scope",
