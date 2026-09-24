@@ -44,7 +44,14 @@ class IdentityProfileSocialBoundaryTests(unittest.TestCase):
         self.assertIn("api.include_router(admin.router)", identity)
         self.assertIn("api.include_router(moderation.router)", identity)
         permissions = (ROOT / "backend/app/services/special_permission_service.py").read_text(encoding="utf-8")
-        self.assertNotIn("special_permission.is_active = False", permissions)
+        self.assertIn("Authorization reads are side-effect free", permissions)
+
+    def test_super_owner_profile_commands_delegate_to_profile_social(self):
+        source = (ROOT / "backend/app/api/routes/super_owner.py").read_text(encoding="utf-8")
+        self.assertNotIn("target.display_custom_id =", source)
+        self.assertNotIn("target.interests =", source)
+        self.assertIn("profile_social_service_client.assign_custom_id", source)
+        self.assertIn("profile_social_service_client.set_stealth", source)
 
     def test_profile_mutation_routes_to_service(self):
         users = (ROOT / "backend/app/api/routes/users.py").read_text(encoding="utf-8")

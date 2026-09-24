@@ -16,7 +16,7 @@ ALTER TABLE family_member_stats OWNER TO funkey_profile_social_owner;
 REVOKE ALL ON TABLE user_follows,user_blocks,love_bonds,love_bond_requests,profile_visits,user_stealth_states,profile_display_audits,family_economy_stats,family_member_stats FROM PUBLIC;
 GRANT SELECT,INSERT,UPDATE,DELETE ON TABLE user_follows,user_blocks,love_bonds,love_bond_requests,profile_visits,user_stealth_states,profile_display_audits,family_economy_stats,family_member_stats TO funkey_profile_social_runtime;
 GRANT SELECT ON TABLE users TO funkey_profile_social_runtime;
-GRANT UPDATE (display_name,avatar_url,bio,cover_photo_urls,date_of_birth,gender,profession,marital_status,friend_gender_preference,friend_marital_preference,interests,updated_at) ON TABLE users TO funkey_profile_social_runtime;
+GRANT UPDATE (display_custom_id,display_name,avatar_url,bio,cover_photo_urls,date_of_birth,gender,profession,marital_status,friend_gender_preference,friend_marital_preference,interests,updated_at) ON TABLE users TO funkey_profile_social_runtime;
 GRANT SELECT,INSERT,UPDATE ON TABLE love_bond_inventory TO funkey_profile_social_runtime;
 GRANT SELECT ON TABLE cdn_media_assets,user_roles,special_permissions,user_vip_statuses,user_experience_statuses,user_store_inventory,store_items TO funkey_profile_social_runtime;
 GRANT INSERT ON TABLE event_outbox TO funkey_profile_social_runtime;

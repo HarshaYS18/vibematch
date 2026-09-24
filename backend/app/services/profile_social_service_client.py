@@ -44,3 +44,29 @@ def record_profile_visit(*, profile_owner_user_id: int, visitor_user_id: int, so
         "visitor_user_id": int(visitor_user_id),
         "source": source,
     })
+
+
+def assign_custom_id(*, user_id: int, display_custom_id: int | None) -> dict[str, Any]:
+    return _request(
+        "POST",
+        f"admin/users/{int(user_id)}/custom-id",
+        json_body={"display_custom_id": display_custom_id},
+    )
+
+
+def set_stealth(
+    *,
+    user_id: int,
+    enabled: bool,
+    actor_user_id: int,
+    reason: str,
+) -> dict[str, Any]:
+    return _request(
+        "POST",
+        f"admin/users/{int(user_id)}/stealth",
+        json_body={
+            "enabled": bool(enabled),
+            "actor_user_id": int(actor_user_id),
+            "reason": reason,
+        },
+    )

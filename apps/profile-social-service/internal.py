@@ -3,11 +3,14 @@ import hmac
 from typing import Any
 from fastapi import APIRouter, Depends, Header, HTTPException
 from pydantic import BaseModel, Field
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 from app.api.routes import users
 from app.core.config import settings
 from app.database import get_db
 from app.models.profile_visit import ProfileVisit
+from app.models.profile_display import ProfileDisplayAudit
+from app.services import profile_display_service
 from app.models.user import User
 from app.schemas.user import UserProfileUpdateRequest
 
@@ -17,6 +20,14 @@ class ProfileVisitRequest(BaseModel):
     profile_owner_user_id:int
     visitor_user_id:int
     source:str="public_profile"
+
+class CustomIdRequest(BaseModel):
+    display_custom_id: int | None = None
+
+class StealthRequest(BaseModel):
+    enabled: bool
+    actor_user_id: int
+    reason: str = Field(min_length=3, max_length=255)
 
 def require_internal_token(x_funkey_internal_token: str | None=Header(default=None))->None:
     if not settings.PROFILE_SOCIAL_INTERNAL_TOKEN.strip() or not hmac.compare_digest((x_funkey_internal_token or "").strip(),settings.PROFILE_SOCIAL_INTERNAL_TOKEN.strip()):
@@ -56,3 +67,59 @@ def record_profile_visit(payload:ProfileVisitRequest,db:Session=Depends(get_db))
         visit.visit_count+=1; visit.source=payload.source; visit.last_visited_at=now
     db.commit()
     return {"recorded":True}
+
+
+@router.post("/admin/users/{user_id}/custom-id", dependencies=[Depends(require_internal_token)])
+def assign_custom_id(user_id: int, payload: CustomIdRequest, db: Session = Depends(get_db)):
+    user = db.query(User).filter(User.id == user_id).first()
+    if user is None:
+        raise HTTPException(status_code=404, detail="User not found")
+    if payload.display_custom_id is not None:
+        existing = db.query(User).filter(
+            User.display_custom_id == payload.display_custom_id,
+            User.id != user_id,
+        ).first()
+        if existing is not None:
+            raise HTTPException(status_code=409, detail="Custom ID is already assigned")
+    previous = user.display_custom_id
+    user.display_custom_id = payload.display_custom_id
+    audit = ProfileDisplayAudit(
+        actor_user_id=None,
+        target_user_id=user_id,
+        action="CUSTOM_ID_UPDATED",
+        previous_value=str(previous) if previous is not None else None,
+        new_value=str(payload.display_custom_id) if payload.display_custom_id is not None else None,
+        reason="super_owner_command",
+    )
+    db.add(user)
+    db.add(audit)
+    try:
+        db.commit()
+    except IntegrityError as exc:
+        db.rollback()
+        raise HTTPException(status_code=409, detail="Custom ID is already assigned") from exc
+    return {"user_id": user_id, "display_custom_id": payload.display_custom_id}
+
+
+@router.post("/admin/users/{user_id}/stealth", dependencies=[Depends(require_internal_token)])
+def set_stealth(user_id: int, payload: StealthRequest, db: Session = Depends(get_db)):
+    user = db.query(User).filter(User.id == user_id).first()
+    if user is None:
+        raise HTTPException(status_code=404, detail="User not found")
+    state = profile_display_service.get_or_create_stealth_state(db, user_id)
+    previous = bool(state.is_enabled)
+    state.is_enabled = bool(payload.enabled)
+    state.granted_by_user_id = payload.actor_user_id
+    state.grant_reason = payload.reason
+    state.toggle_reason = payload.reason
+    db.add(state)
+    db.add(ProfileDisplayAudit(
+        actor_user_id=payload.actor_user_id,
+        target_user_id=user_id,
+        action="STEALTH_UPDATED",
+        previous_value=str(previous).lower(),
+        new_value=str(bool(payload.enabled)).lower(),
+        reason=payload.reason,
+    ))
+    db.commit()
+    return {"user_id": user_id, "enabled": bool(state.is_enabled)}

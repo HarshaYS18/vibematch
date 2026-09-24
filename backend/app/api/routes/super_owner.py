@@ -27,7 +27,7 @@ from app.schemas.super_owner import (
     SuperOwnerVipResponse,
     SuperOwnerWalletResponse,
 )
-from app.services import inbox_lock_service
+from app.services import inbox_lock_service, profile_social_service_client
 from app.services.audit_log_service import create_admin_log
 from app.services.economy_service import get_or_create_coin_pool, get_or_create_wallet, mint_to_pool
 from app.services.role_service import get_primary_role
@@ -115,8 +115,15 @@ def assign_custom_id(payload: SuperOwnerCustomIdRequest, db: Session = Depends(g
         existing = db.query(User).filter(User.display_custom_id == payload.display_custom_id, User.id != target.id).first()
         if existing:
             raise HTTPException(status_code=409, detail="Custom ID is already assigned")
-    target.display_custom_id = payload.display_custom_id
-    db.commit()
+    try:
+        profile_social_service_client.assign_custom_id(
+            user_id=target.id,
+            display_custom_id=payload.display_custom_id,
+        )
+    except profile_social_service_client.ProfileSocialServiceUnavailable as exc:
+        raise HTTPException(status_code=503, detail=str(exc)) from exc
+    except profile_social_service_client.ProfileSocialServiceError as exc:
+        raise HTTPException(status_code=exc.status_code, detail=exc.detail) from exc
     create_admin_log(db=db, actor_user_id=current_user.id, target_user_id=target.id, action="SUPER_OWNER_CUSTOM_ID_ASSIGNED", resource_type="user", resource_id=str(target.id), reason=payload.reason, metadata_json={"display_custom_id": payload.display_custom_id})
     return SuperOwnerActionResponse(message="Custom ID updated", resource_id=str(target.id))
 
@@ -134,15 +141,18 @@ def set_inbox_lock_code(payload: SuperOwnerInboxLockCodeRequest, db: Session = D
 def set_stealth(payload: SuperOwnerStealthRequest, db: Session = Depends(get_db), current_user: User = Depends(get_current_user)):
     require_super_owner(current_user)
     target = _target_user(db, payload.target_user_id)
-    permissions = target.interests or []
-    marker = "STEALTH_ENABLED"
-    if payload.enabled and marker not in permissions:
-        permissions.append(marker)
-    if not payload.enabled and marker in permissions:
-        permissions.remove(marker)
-    target.interests = permissions
-    db.commit()
-    create_admin_log(db=db, actor_user_id=current_user.id, target_user_id=target.id, action="SUPER_OWNER_STEALTH_UPDATED", resource_type="user", resource_id=str(target.id), reason=payload.reason, metadata_json={"enabled": payload.enabled})
+    try:
+        profile_social_service_client.set_stealth(
+            user_id=target.id,
+            enabled=payload.enabled,
+            actor_user_id=current_user.id,
+            reason=payload.reason,
+        )
+    except profile_social_service_client.ProfileSocialServiceUnavailable as exc:
+        raise HTTPException(status_code=503, detail=str(exc)) from exc
+    except profile_social_service_client.ProfileSocialServiceError as exc:
+        raise HTTPException(status_code=exc.status_code, detail=exc.detail) from exc
+    create_admin_log(db=db, actor_user_id=current_user.id, target_user_id=target.id, action="SUPER_OWNER_STEALTH_UPDATED", resource_type="user_stealth_state", resource_id=str(target.id), reason=payload.reason, metadata_json={"enabled": payload.enabled})
     return SuperOwnerActionResponse(message="Stealth updated", resource_id=str(target.id))
 
 

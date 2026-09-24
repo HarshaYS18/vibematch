@@ -10,7 +10,7 @@ Account/login/security state belongs to Identity. Wallet/economy, Inbox persiste
 
 ## Interfaces
 Public API: /social/**, /love-bonds/**, /families/** and /profile-display/** behind the core facade.
-Internal API: profile mutation and profile-visit recording used by the /users composite read facade. Authenticated public handlers delegate sid/session validation to Identity and never read identity_sessions directly.
+Internal API: profile mutation, profile-visit recording, custom-ID assignment and canonical stealth updates used by compatibility/admin facades. Authenticated public handlers delegate sid/session validation to Identity and never read identity_sessions directly.
 Operations: /live, /ready, /metrics.
 
 ## Cross-domain seams

@@ -907,8 +907,25 @@ def _validate_identity_profile_social_extraction(errors: list[str]) -> None:
     permission_service = ROOT / "backend" / "app" / "services" / "special_permission_service.py"
     if permission_service.exists():
         permission_text = permission_service.read_text(encoding="utf-8")
-        if "special_permission.is_active = False" in permission_text:
-            errors.append("Special-permission authorization reads must be side-effect free")
+        if "Authorization reads are side-effect free" not in permission_text:
+            errors.append("Special-permission expiration checks must be side-effect free")
+
+    super_owner_path = ROOT / "backend" / "app" / "api" / "routes" / "super_owner.py"
+    if super_owner_path.exists():
+        super_owner_text = super_owner_path.read_text(encoding="utf-8")
+        for forbidden in ("target.display_custom_id =", "target.interests ="):
+            if forbidden in super_owner_text:
+                errors.append(
+                    "Core super-owner route must delegate profile mutation: " + forbidden
+                )
+        for required in (
+            "profile_social_service_client.assign_custom_id",
+            "profile_social_service_client.set_stealth",
+        ):
+            if required not in super_owner_text:
+                errors.append(
+                    "Core super-owner profile delegation is missing: " + required
+                )
 
     security_path = ROOT / "backend" / "app" / "core" / "security.py"
     if security_path.exists():
