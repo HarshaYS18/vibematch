@@ -61,6 +61,16 @@ class SupplyAllocateRequest(MutationContext):
     reason: str = Field(min_length=3, max_length=255)
 
 
+class SellerSaleCommandRequest(MutationContext):
+    seller_user_id: int
+    buyer_user_id: int
+    source_pool_id: int
+    coin_amount: int = Field(gt=0)
+    payment_amount: int = Field(default=0, ge=0)
+    payment_currency: str = "INR"
+    proof_url: str | None = None
+
+
 class MissionRewardRequest(MutationContext):
     user_id: int
     mission_id: str = Field(min_length=1, max_length=120)
@@ -793,6 +803,54 @@ def allocate_supply(payload: SupplyAllocateRequest, db: Session = Depends(get_db
             "source_pool_id": payload.source_pool_id,
             "target_pool_id": pool.id,
             "amount": payload.amount,
+        },
+    )
+
+
+@router.post("/supply/seller-sale", dependencies=[Depends(require_internal_token)])
+def seller_sale(payload: SellerSaleCommandRequest, db: Session = Depends(get_db)):
+    seller = db.query(User).filter(User.id == payload.seller_user_id).first()
+    if seller is None:
+        raise HTTPException(status_code=404, detail="Seller user not found")
+    tx, cached = _begin(
+        db,
+        payload,
+        operation="supply.seller_sale",
+        actor_user_id=seller.id,
+    )
+    if cached is not None:
+        return cached
+    order = economy_service.sell_pool_coins_to_user(
+        db=db,
+        seller=seller,
+        buyer_user_id=payload.buyer_user_id,
+        source_pool_id=payload.source_pool_id,
+        coin_amount=payload.coin_amount,
+        payment_amount=payload.payment_amount,
+        payment_currency=payload.payment_currency,
+        proof_url=payload.proof_url,
+        commit=False,
+    )
+    result = {
+        "transaction_id": tx.transaction_id,
+        "id": order.id,
+        "seller_user_id": order.seller_user_id,
+        "buyer_user_id": order.buyer_user_id,
+        "source_pool_id": order.source_pool_id,
+        "coin_amount": int(order.coin_amount or 0),
+        "delivery_status": order.delivery_status,
+    }
+    return economy_transaction_service.complete(
+        db,
+        tx=tx,
+        result=result,
+        event_type="economy.seller_sale.completed.v1",
+        event_payload={
+            "order_id": order.id,
+            "seller_user_id": order.seller_user_id,
+            "buyer_user_id": order.buyer_user_id,
+            "source_pool_id": order.source_pool_id,
+            "coin_amount": int(order.coin_amount or 0),
         },
     )
 

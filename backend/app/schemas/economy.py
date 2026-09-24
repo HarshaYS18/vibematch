@@ -93,6 +93,7 @@ class SellerSaleRequest(BaseModel):
     payment_amount: int = Field(default=0, ge=0)
     payment_currency: str = "INR"
     proof_url: str | None = None
+    request_id: str | None = Field(default=None, min_length=8, max_length=36)
 
 
 class GiftEconomyPreviewRequest(BaseModel):

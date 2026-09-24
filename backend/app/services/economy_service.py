@@ -152,7 +152,7 @@ def allocate_pool_to_pool(db: Session, actor: User, source_pool_id: int, target_
     return target
 
 
-def sell_pool_coins_to_user(db: Session, seller: User, buyer_user_id: int, source_pool_id: int, coin_amount: int, payment_amount: int, payment_currency: str, proof_url: str | None) -> CoinSaleOrder:
+def sell_pool_coins_to_user(db: Session, seller: User, buyer_user_id: int, source_pool_id: int, coin_amount: int, payment_amount: int, payment_currency: str, proof_url: str | None, *, commit: bool = True) -> CoinSaleOrder:
     source = db.query(CoinSupplyPool).filter(CoinSupplyPool.id == source_pool_id).first()
     if not source:
         raise HTTPException(status_code=404, detail="Seller pool not found")
@@ -174,8 +174,11 @@ def sell_pool_coins_to_user(db: Session, seller: User, buyer_user_id: int, sourc
 
     levels = economy_level_service.wallet_level_payload(db, wallet)
     economy_level_service.sync_vip_status(db, buyer_user_id, levels)
-    db.commit()
-    db.refresh(order)
+    if commit:
+        db.commit()
+        db.refresh(order)
+    else:
+        db.flush()
     return order
 
 

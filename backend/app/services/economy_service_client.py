@@ -345,3 +345,30 @@ def allocate_supply(
             "reason": reason,
         },
     )
+
+
+def seller_sale(
+    *,
+    request_id: str,
+    seller_user_id: int,
+    buyer_user_id: int,
+    source_pool_id: int,
+    coin_amount: int,
+    payment_amount: int,
+    payment_currency: str,
+    proof_url: str | None,
+) -> dict[str, Any]:
+    business_reference = f"seller-sale:{seller_user_id}:{request_id}"
+    return _request(
+        "supply/seller-sale",
+        {
+            **mutation_context("supply.seller_sale", business_reference),
+            "seller_user_id": seller_user_id,
+            "buyer_user_id": buyer_user_id,
+            "source_pool_id": source_pool_id,
+            "coin_amount": coin_amount,
+            "payment_amount": payment_amount,
+            "payment_currency": payment_currency,
+            "proof_url": proof_url,
+        },
+    )

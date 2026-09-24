@@ -145,8 +145,31 @@ def official_recharge_wallet(
 
 @router.post("/seller-sale")
 def seller_sell_coins(payload: SellerSaleRequest, current_user: User = Depends(get_current_user), db: Session = Depends(get_db)):
-    order = economy_service.sell_pool_coins_to_user(db=db, seller=current_user, buyer_user_id=payload.buyer_user_id, source_pool_id=payload.source_pool_id, coin_amount=payload.coin_amount, payment_amount=payload.payment_amount, payment_currency=payload.payment_currency, proof_url=payload.proof_url)
-    return {"id": order.id, "seller_user_id": order.seller_user_id, "buyer_user_id": order.buyer_user_id, "source_pool_id": order.source_pool_id, "coin_amount": order.coin_amount, "delivery_status": order.delivery_status, "note": "Supply pool coins are inventory only and never part of personal coin balance. Seller sale coin credits count toward VIP/SVIP via recharge ledger source type."}
+    request_id = (payload.request_id or str(uuid4())).strip()
+    try:
+        result = economy_service_client.seller_sale(
+            request_id=request_id,
+            seller_user_id=current_user.id,
+            buyer_user_id=payload.buyer_user_id,
+            source_pool_id=payload.source_pool_id,
+            coin_amount=payload.coin_amount,
+            payment_amount=payload.payment_amount,
+            payment_currency=payload.payment_currency,
+            proof_url=payload.proof_url,
+        )
+    except economy_service_client.EconomyServiceUnavailable as exc:
+        raise HTTPException(status_code=503, detail=str(exc)) from exc
+    except economy_service_client.EconomyServiceError as exc:
+        raise HTTPException(status_code=exc.status_code, detail=exc.detail) from exc
+    return {
+        "id": int(result["id"]),
+        "seller_user_id": int(result["seller_user_id"]),
+        "buyer_user_id": int(result["buyer_user_id"]),
+        "source_pool_id": int(result["source_pool_id"]),
+        "coin_amount": int(result["coin_amount"]),
+        "delivery_status": str(result["delivery_status"]),
+        "note": "Supply pool coins are inventory only and never part of personal coin balance. Seller sale coin credits count toward VIP/SVIP via recharge ledger source type.",
+    }
 
 
 @router.post("/gaming/pools")
