@@ -127,3 +127,30 @@ def execute_realtime_command(
             "command_id": command_id,
         },
     )
+
+
+
+def execute_cricket_operation(
+    *,
+    user_id: int,
+    room_public_id: str,
+    operation: str,
+    resource_id: int | None = None,
+    payload: dict[str, Any] | None = None,
+    offset: int = 0,
+    limit: int = 50,
+) -> Any:
+    response = _request(
+        "POST",
+        "cricket/operation",
+        json_body={
+            "user_id": int(user_id),
+            "room_public_id": room_public_id,
+            "operation": operation,
+            "resource_id": resource_id,
+            "payload": dict(payload or {}),
+            "offset": max(0, int(offset)),
+            "limit": min(max(1, int(limit)), 100),
+        },
+    )
+    return response.get("result")
