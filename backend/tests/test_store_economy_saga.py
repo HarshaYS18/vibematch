@@ -17,6 +17,9 @@ class StoreEconomySagaTests(unittest.TestCase):
         self.assertIn("purchase_id is required for repeatable store purchases", source)
         self.assertIn("StorePurchaseOperation", source)
         self.assertIn("COMPENSATION_PENDING", source)
+        self.assertIn("_resume_store_compensation", source)
+        self.assertIn("status_code=409", source)
+        self.assertIn("uuid5", source)
 
     def test_flutter_reuses_pending_purchase_id(self):
         source = (

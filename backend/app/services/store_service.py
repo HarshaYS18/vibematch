@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from datetime import datetime, timedelta
 from typing import Any
+from uuid import NAMESPACE_URL, uuid5
 
 from fastapi import HTTPException
 from sqlalchemy import and_, or_
@@ -373,7 +374,8 @@ def _purchase_id_for_request(
             detail="purchase_id is required for repeatable store purchases",
         )
     # Backward-compatible idempotency for old clients buying one-time items.
-    return f"legacy-{user_id}-{item.item_id}"[:36]
+    canonical = f"funkey:store:legacy:{user_id}:{item.item_id}"
+    return str(uuid5(NAMESPACE_URL, canonical))
 
 
 def _acquire_purchase_operation(
@@ -411,6 +413,8 @@ def _acquire_purchase_operation(
         )
     if operation.status == "COMPLETED":
         return operation
+    if operation.status in {"COMPENSATING", "COMPENSATION_PENDING"}:
+        return operation
     if operation.status in {"REFUNDED", "FAILED"}:
         raise HTTPException(
             status_code=409,
@@ -433,25 +437,29 @@ def _acquire_purchase_operation(
     return operation
 
 
-def _compensate_store_debit(
+def _resume_store_compensation(
     db: Session,
     *,
     operation: StorePurchaseOperation,
     user: User,
     item: StoreItem,
-    failure: Exception,
+    failure_detail: str,
 ) -> None:
     price = int(item.price_coins or 0)
     if price <= 0:
         operation.status = "FAILED"
-        operation.error_detail = str(failure)[:700]
+        operation.error_detail = failure_detail[:700]
         operation.lease_until = None
         db.add(operation)
         db.commit()
-        return
+        raise HTTPException(
+            status_code=500,
+            detail="Store grant failed for a free item",
+        )
 
     operation.status = "COMPENSATING"
-    operation.error_detail = str(failure)[:700]
+    operation.error_detail = failure_detail[:700]
+    operation.lease_until = None
     db.add(operation)
     db.commit()
 
@@ -470,13 +478,15 @@ def _compensate_store_debit(
         economy_service_client.EconomyServiceUnavailable,
         economy_service_client.EconomyServiceError,
     ) as refund_error:
-        operation = db.query(StorePurchaseOperation).filter(
-            StorePurchaseOperation.purchase_id == operation.purchase_id
-        ).first()
+        operation = (
+            db.query(StorePurchaseOperation)
+            .filter(StorePurchaseOperation.purchase_id == operation.purchase_id)
+            .first()
+        )
         if operation is not None:
             operation.status = "COMPENSATION_PENDING"
             operation.error_detail = (
-                f"grant={failure}; refund={refund_error}"
+                f"{failure_detail}; refund={refund_error}"
             )[:700]
             operation.lease_until = None
             db.add(operation)
@@ -486,9 +496,11 @@ def _compensate_store_debit(
             detail="Purchase could not complete; refund reconciliation is pending",
         ) from refund_error
 
-    operation = db.query(StorePurchaseOperation).filter(
-        StorePurchaseOperation.purchase_id == operation.purchase_id
-    ).first()
+    operation = (
+        db.query(StorePurchaseOperation)
+        .filter(StorePurchaseOperation.purchase_id == operation.purchase_id)
+        .first()
+    )
     if operation is not None:
         operation.status = "REFUNDED"
         operation.compensation_transaction_id = str(
@@ -497,10 +509,30 @@ def _compensate_store_debit(
         operation.lease_until = None
         db.add(operation)
         db.commit()
+
+    # 409 is deliberate: the original purchase identity is closed/refunded.
+    # The client clears its pending ID and a future user action starts a new saga.
     raise HTTPException(
-        status_code=503,
+        status_code=409,
         detail="Purchase could not complete; payment was refunded",
-    ) from failure
+    )
+
+
+def _compensate_store_debit(
+    db: Session,
+    *,
+    operation: StorePurchaseOperation,
+    user: User,
+    item: StoreItem,
+    failure: Exception,
+) -> None:
+    _resume_store_compensation(
+        db,
+        operation=operation,
+        user=user,
+        item=item,
+        failure_detail=f"grant={failure}",
+    )
 
 
 def purchase(
@@ -537,6 +569,14 @@ def purchase(
     )
     if operation.status == "COMPLETED":
         return _item_payload(db, item, user.id)
+    if operation.status in {"COMPENSATING", "COMPENSATION_PENDING"}:
+        _resume_store_compensation(
+            db,
+            operation=operation,
+            user=user,
+            item=item,
+            failure_detail=operation.error_detail or "prior store grant failure",
+        )
 
     price = int(item.price_coins or 0)
     if price > 0:
