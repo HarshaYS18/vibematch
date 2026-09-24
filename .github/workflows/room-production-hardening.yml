@@ -84,8 +84,12 @@ jobs:
         run: python check_migrations.py
       - name: Validate PostgreSQL hot-query plans
         env:
+          database_url: postgresql://postgres:postgres@localhost:5432/vibematch_test
+          MIGRATION_DATABASE_URL: postgresql://postgres:postgres@localhost:5432/vibematch_test
           MIGRATION_TEST_DATABASE_URL: postgresql://postgres:postgres@localhost:5432/vibematch_test
-        run: python -m unittest tests.test_postgres_query_plans -v
+        run: |
+          alembic upgrade head
+          python -m unittest tests.test_postgres_query_plans -v
       - name: Run backend regression tests
         run: python -m unittest discover -s tests -p 'test_*.py' -v
 
