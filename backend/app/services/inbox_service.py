@@ -3,9 +3,9 @@ import json
 from datetime import datetime, timedelta
 from uuid import uuid4
 
-from sqlalchemy import and_, case, exists, or_
+from sqlalchemy import and_, case, exists, func, or_
 from sqlalchemy.exc import IntegrityError
-from sqlalchemy.orm import Session
+from sqlalchemy.orm import Session, joinedload, selectinload
 
 from app.models.inbox import InboxConversation, InboxConversationType, InboxMessage, InboxMessageStatus, InboxMessageType, InboxParticipant, InboxReadReceipt, InboxReport, InboxReportStatus
 from app.models.inbox_preferences import InboxMessageUserState
@@ -269,6 +269,10 @@ def list_conversations_page(
     pin_rank = case((InboxParticipant.is_pinned.is_(True), 1), else_=0)
     query = (
         db.query(InboxConversation, InboxParticipant)
+        .options(
+            selectinload(InboxConversation.participants)
+            .joinedload(InboxParticipant.user)
+        )
         .join(
             InboxParticipant,
             InboxParticipant.conversation_id == InboxConversation.id,
@@ -364,6 +368,96 @@ def _dedupe_conversations_for_user(conversations: list[InboxConversation]) -> li
     return visible
 
 
+
+
+def conversation_message_windows(
+    db: Session,
+    conversations: list[InboxConversation],
+    user: User,
+    *,
+    limit: int = ACTIVE_MESSAGE_WINDOW,
+) -> tuple[
+    dict[int, list[InboxMessage]],
+    dict[int, str | None],
+    dict[int, bool],
+    dict[int, str],
+]:
+    """Batch the active message window for a conversation list page.
+
+    The window function keeps work bounded per conversation while avoiding the
+    historical 2-query-per-conversation message/read-receipt N+1.
+    """
+
+    page_size = max(1, min(int(limit or ACTIVE_MESSAGE_WINDOW), MAX_MESSAGE_PAGE_SIZE))
+    conversation_ids = [conversation.id for conversation in conversations]
+    if not conversation_ids:
+        return {}, {}, {}, {}
+
+    ranked = (
+        db.query(
+            InboxMessage.id.label("message_id"),
+            InboxMessage.conversation_id.label("conversation_id"),
+            func.row_number().over(
+                partition_by=InboxMessage.conversation_id,
+                order_by=(InboxMessage.created_at.desc(), InboxMessage.id.desc()),
+            ).label("row_number"),
+        )
+        .filter(
+            InboxMessage.conversation_id.in_(conversation_ids),
+            ~exists().where(
+                and_(
+                    InboxMessageUserState.message_id == InboxMessage.id,
+                    InboxMessageUserState.user_id == user.id,
+                    InboxMessageUserState.is_deleted_for_user.is_(True),
+                )
+            ),
+        )
+        .subquery()
+    )
+
+    rows = (
+        db.query(InboxMessage, ranked.c.row_number)
+        .options(joinedload(InboxMessage.conversation))
+        .join(ranked, ranked.c.message_id == InboxMessage.id)
+        .filter(ranked.c.row_number <= page_size + 1)
+        .order_by(
+            InboxMessage.conversation_id.asc(),
+            InboxMessage.created_at.desc(),
+            InboxMessage.id.desc(),
+        )
+        .all()
+    )
+
+    newest_first: dict[int, list[InboxMessage]] = {
+        conversation_id: [] for conversation_id in conversation_ids
+    }
+    for message, _row_number in rows:
+        newest_first.setdefault(message.conversation_id, []).append(message)
+
+    windows: dict[int, list[InboxMessage]] = {}
+    cursors: dict[int, str | None] = {}
+    has_more: dict[int, bool] = {}
+    all_visible_messages: list[InboxMessage] = []
+    for conversation_id in conversation_ids:
+        candidates = newest_first.get(conversation_id, [])
+        more = len(candidates) > page_size
+        page = candidates[:page_size]
+        page.reverse()
+        windows[conversation_id] = page
+        has_more[conversation_id] = more
+        cursors[conversation_id] = None
+        if more and page:
+            oldest = page[0]
+            cursors[conversation_id] = _encode_cursor(
+                {
+                    "created_at": oldest.created_at.isoformat(),
+                    "id": int(oldest.id),
+                }
+            )
+        all_visible_messages.extend(page)
+
+    statuses = message_statuses_for_user(db, all_visible_messages, user)
+    return windows, cursors, has_more, statuses
 
 
 def list_messages_page(
@@ -1172,6 +1266,7 @@ def conversation_to_dict(
     messages: list[InboxMessage] | None = None,
     messages_next_cursor: str | None = None,
     has_older_messages: bool | None = None,
+    status_overrides: dict[int, str] | None = None,
 ) -> dict:
     participant = participant or next(
         (item for item in conversation.participants if item.user_id == current_user.id),
@@ -1194,9 +1289,13 @@ def conversation_to_dict(
     messages = _visible_messages(list(messages))
     last_message = messages[-1] if messages else None
     statuses = (
-        message_statuses_for_user(db, messages, current_user)
-        if db is not None
-        else {}
+        status_overrides
+        if status_overrides is not None
+        else (
+            message_statuses_for_user(db, messages, current_user)
+            if db is not None
+            else {}
+        )
     )
     metadata = conversation.metadata_json or {}
     other_user = _other_participant_user(conversation, current_user)

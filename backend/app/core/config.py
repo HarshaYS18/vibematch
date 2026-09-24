@@ -49,6 +49,10 @@ class Settings(BaseSettings):
     DB_POOL_TIMEOUT_SECONDS: int = 3
     DB_POOL_RECYCLE_SECONDS: int = 1800
     DB_POOL_USE_LIFO: bool = True
+    # Read replicas remain opt-in. No route is approved until measured,
+    # stale-tolerant routing is documented in the database storage policy.
+    DB_READ_REPLICA_ENABLED: bool = False
+    READ_REPLICA_DATABASE_URL: str = ""
 
     # Chunk 23 Inbox service boundary.
     INBOX_SERVICE_URL: str = "http://127.0.0.1:8083/api/v1"
@@ -232,6 +236,17 @@ class Settings(BaseSettings):
             unsafe.append("database_url(default)")
         if self.DB_POOLER_MODE not in {"direct", "transaction"}:
             unsafe.append("DB_POOLER_MODE")
+        if self.DB_READ_REPLICA_ENABLED:
+            replica_url = self.READ_REPLICA_DATABASE_URL.strip()
+            if not replica_url or replica_url == self.database_url:
+                unsafe.append("READ_REPLICA_DATABASE_URL")
+            else:
+                parsed_replica = urlsplit(replica_url)
+                if (
+                    not parsed_replica.scheme.startswith("postgresql")
+                    or not parsed_replica.hostname
+                ):
+                    unsafe.append("READ_REPLICA_DATABASE_URL")
         if self.DB_POOLER_MODE == "transaction":
             migration_url = self.MIGRATION_DATABASE_URL.strip()
             if not migration_url or migration_url == self.database_url:

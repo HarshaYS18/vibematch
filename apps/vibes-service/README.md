@@ -31,3 +31,8 @@ Production ingress routes `/api/v1/vibes/**` and `/api/v1/admin/moderation/vibes
 ## Required production settings
 
 `VIBES_DATABASE_URL`, `VIBES_INTERNAL_TOKEN`, JWT/auth settings, and normal database/pooler settings are provided externally. No production credential belongs in this repository.
+
+
+## Chunk 25 data-path budget
+
+Vibes installs the shared SQL query counter and exposes `/metrics`. Feed query ceilings are enforced in CI, while production reports budget breaches without failing otherwise-correct requests. PostgreSQL plan tests prove the live-feed and saved-feed indexes are usable by the planner.

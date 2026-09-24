@@ -19,6 +19,7 @@ from opentelemetry import trace
 from sqlalchemy import event
 
 from app.core.config import settings
+from app.core.query_budget import query_budget_for
 from app.core.telemetry import current_trace_id
 
 
@@ -29,6 +30,7 @@ _latency: dict[tuple[str, str, str], int] = defaultdict(int)
 _latency_count: dict[tuple[str, str], int] = defaultdict(int)
 _latency_sum: dict[tuple[str, str], float] = defaultdict(float)
 _db_query_sum: dict[tuple[str, str], int] = defaultdict(int)
+_db_query_budget_breaches: dict[tuple[str, str], int] = defaultdict(int)
 _db_slow_queries_total = 0
 _inflight = 0
 _buckets = (0.01, 0.05, 0.1, 0.25, 0.5, 1.0, 2.5, 5.0, 10.0)
@@ -166,7 +168,12 @@ async def operational_middleware(request: Request, call_next):
         response.headers["Referrer-Policy"] = "strict-origin-when-cross-origin"
         response.headers["X-Frame-Options"] = "DENY"
         if settings.DB_QUERY_COUNT_RESPONSE_HEADER and not settings.is_production:
+            route = request.scope.get("route")
+            route_path = getattr(route, "path", "unmatched")
             response.headers["X-FunKey-DB-Query-Count"] = str(current_query_count())
+            budget = query_budget_for(request.method, route_path)
+            if budget is not None:
+                response.headers["X-FunKey-DB-Query-Budget"] = str(budget)
         if settings.is_production:
             response.headers["Strict-Transport-Security"] = "max-age=31536000; includeSubDomains"
         return response
@@ -177,12 +184,16 @@ async def operational_middleware(request: Request, call_next):
         path = getattr(route, "path", "unmatched")
         method = request.method
         status = getattr(locals().get("response"), "status_code", 500)
+        budget = query_budget_for(method, path)
+        budget_exceeded = budget is not None and query_count > budget
         with _lock:
             _inflight -= 1
             _requests[(method, path, status)] += 1
             _latency_count[(method, path)] += 1
             _latency_sum[(method, path)] += elapsed
             _db_query_sum[(method, path)] += query_count
+            if budget_exceeded:
+                _db_query_budget_breaches[(method, path)] += 1
             for bucket in _buckets:
                 if elapsed <= bucket:
                     _latency[(method, path, str(bucket))] += 1
@@ -192,6 +203,19 @@ async def operational_middleware(request: Request, call_next):
         if flow and active_span.is_recording():
             active_span.update_name(flow)
             active_span.set_attribute("funkey.flow", flow)
+        if budget_exceeded:
+            _logger.warning(json.dumps({
+                "event": "db.query_budget_exceeded",
+                "request_id": request_id,
+                "trace_id": current_trace_id(),
+                "method": method,
+                "route": path,
+                "db_query_count": query_count,
+                "db_query_budget": budget,
+            }, separators=(",", ":")))
+            if active_span.is_recording():
+                active_span.set_attribute("funkey.db.query_budget_exceeded", True)
+                active_span.set_attribute("funkey.db.query_budget", int(budget))
         payload = {
             "event": "http.request",
             "request_id": request_id,
@@ -202,6 +226,7 @@ async def operational_middleware(request: Request, call_next):
             "status": status,
             "duration_ms": round(elapsed * 1000, 2),
             "db_query_count": query_count,
+            "db_query_budget": budget,
         }
         _logger.info(json.dumps(payload, separators=(",", ":")))
         end_query_count(query_token)
@@ -214,6 +239,7 @@ def render_metrics(pool=None) -> str:
         latency_count = dict(_latency_count)
         latency_sum = dict(_latency_sum)
         db_query_sum = dict(_db_query_sum)
+        db_query_budget_breaches = dict(_db_query_budget_breaches)
         db_slow_queries_total = _db_slow_queries_total
         inflight = _inflight
     lines = [
@@ -241,6 +267,11 @@ def render_metrics(pool=None) -> str:
     for (method, path), count in sorted(db_query_sum.items()):
         lines.append(
             f'funkey_http_db_queries_total{{method={json.dumps(method)},route={json.dumps(path)}}} {count}'
+        )
+    lines.append("# TYPE funkey_http_db_query_budget_exceeded_total counter")
+    for (method, path), count in sorted(db_query_budget_breaches.items()):
+        lines.append(
+            f'funkey_http_db_query_budget_exceeded_total{{method={json.dumps(method)},route={json.dumps(path)}}} {count}'
         )
     lines.extend([
         "# TYPE funkey_db_slow_queries_total counter",

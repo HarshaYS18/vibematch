@@ -305,14 +305,26 @@ def list_conversations(
         )
     except ValueError as error:
         raise HTTPException(status_code=400, detail=str(error)) from error
+    conversations = [conversation for conversation, _participant in rows]
+    message_windows, message_cursors, has_older, statuses = (
+        inbox_service.conversation_message_windows(
+            db,
+            conversations,
+            current_user,
+            limit=inbox_service.ACTIVE_MESSAGE_WINDOW,
+        )
+    )
     return InboxConversationListResponse(
         conversations=[
             InboxConversationResponse(
-                **_conversation_payload(
+                **inbox_service.conversation_to_dict(
                     conversation,
                     current_user,
-                    db,
                     participant=participant,
+                    messages=message_windows.get(conversation.id, []),
+                    messages_next_cursor=message_cursors.get(conversation.id),
+                    has_older_messages=has_older.get(conversation.id, False),
+                    status_overrides=statuses,
                 )
             )
             for conversation, participant in rows

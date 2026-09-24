@@ -43,6 +43,12 @@ STARTUP_FORBIDDEN = (
 
 AUTHORITY_REGISTRY = ROOT / "contracts" / "architecture" / "authorities.yaml"
 REDIS_TOPOLOGY = ROOT / "contracts" / "redis" / "topology.json"
+DATABASE_STORAGE_POLICY = ROOT / "contracts" / "database" / "storage-policy.json"
+QUERY_BUDGET_MODULE = ROOT / "backend" / "app" / "core" / "query_budget.py"
+POSTGRES_HOT_PATH_MIGRATION = (
+    ROOT / "backend" / "alembic" / "versions" /
+    "20260924_0200_postgres_hot_path_indexes.py"
+)
 REQUIRED_REDIS_ROLES = {
     "app_cache_rate_limit",
     "realtime_presence",
@@ -148,6 +154,87 @@ def _validate_authority_registry(errors: list[str]) -> None:
         if item and (item.get("classification") != "AUTHORITY" or item.get("logical_owner") != "economy"):
             errors.append(f"{state_id}: financial truth must be AUTHORITY owned by economy")
 
+
+
+def _validate_database_hardening(errors: list[str]) -> None:
+    required = (
+        DATABASE_STORAGE_POLICY,
+        QUERY_BUDGET_MODULE,
+        POSTGRES_HOT_PATH_MIGRATION,
+        ROOT / "backend" / "tests" / "test_postgres_query_plans.py",
+        ROOT / "backend" / "tests" / "test_query_budget_contract.py",
+    )
+    for path in required:
+        if not path.exists():
+            errors.append(
+                "Chunk 25 database hardening path is missing: "
+                + str(path.relative_to(ROOT))
+            )
+
+    if DATABASE_STORAGE_POLICY.exists():
+        try:
+            policy = json.loads(DATABASE_STORAGE_POLICY.read_text(encoding="utf-8"))
+        except (OSError, json.JSONDecodeError) as exc:
+            errors.append(f"database storage policy is invalid JSON: {exc}")
+            policy = {}
+        if policy.get("schema_version") != 1:
+            errors.append("database storage policy schema_version must be 1")
+        if policy.get("durable_business_authority") != "postgresql":
+            errors.append("PostgreSQL must remain durable business authority")
+        replica = policy.get("read_replicas") or {}
+        if replica.get("enabled") is not False:
+            approved = replica.get("approved_stale_tolerant_routes") or []
+            if not approved:
+                errors.append(
+                    "read replicas cannot be enabled without approved stale-tolerant routes"
+                )
+        partitioning = policy.get("partitioning") or {}
+        enabled_tables = partitioning.get("enabled_tables")
+        if not isinstance(enabled_tables, list):
+            errors.append("partitioning.enabled_tables must be a list")
+            enabled_tables = []
+        cache = policy.get("redis_cache_policy") or {}
+        for key in (
+            "ttl_required_for_business_projection_keys",
+            "version_required_for_business_projection_payloads",
+            "loss_must_preserve_postgres_correctness",
+        ):
+            if cache.get(key) is not True:
+                errors.append("database cache policy must require " + key)
+        if cache.get("durable_authority") is not False:
+            errors.append("Redis/cache must never be durable business authority")
+
+        versions = ROOT / "backend" / "alembic" / "versions"
+        if versions.exists() and not enabled_tables:
+            for migration in versions.glob("*.py"):
+                text = migration.read_text(encoding="utf-8-sig").upper()
+                if "PARTITION BY" in text:
+                    errors.append(
+                        "table partitioning requires storage-policy evidence: "
+                        + str(migration.relative_to(ROOT))
+                    )
+
+    if QUERY_BUDGET_MODULE.exists():
+        text = QUERY_BUDGET_MODULE.read_text(encoding="utf-8")
+        for route in (
+            "/api/v1/vibes/feed",
+            "/api/v1/vibes/friends",
+            "/api/v1/vibes/saved",
+            "/api/v1/inbox/conversations",
+            "/api/v1/inbox/conversations/{conversation_id}/messages",
+        ):
+            if route not in text:
+                errors.append("hot route is missing a DB query budget: " + route)
+
+    if POSTGRES_HOT_PATH_MIGRATION.exists():
+        text = POSTGRES_HOT_PATH_MIGRATION.read_text(encoding="utf-8")
+        for index_name in (
+            "ix_vibe_posts_live_feed_cursor",
+            "ix_vibe_saves_user_created_post",
+            "ix_inbox_messages_conversation_cursor",
+        ):
+            if index_name not in text:
+                errors.append("Chunk 25 hot-path index missing: " + index_name)
 
 
 def _validate_redis_topology(errors: list[str]) -> None:
@@ -566,6 +653,7 @@ def _has_tracked_content(path: Path) -> bool:
 def main() -> int:
     errors: list[str] = []
     _validate_authority_registry(errors)
+    _validate_database_hardening(errors)
     _validate_redis_topology(errors)
     _validate_room_state_engine(errors)
     _validate_inbox_service_extraction(errors)
@@ -664,6 +752,7 @@ def main() -> int:
     print(" - /api/v1 is owned by the canonical router")
     print(" - mutable state ownership conforms to contracts/architecture/authorities.yaml")
     print(" - Redis roles conform to contracts/redis/topology.json")
+    print(" - PostgreSQL query budgets, plan-backed indexes and storage policy are enforced")
     print(" - Room State Engine v2 heartbeat/snapshot/current-state invariants hold")
     print(" - legacy FastAPI application websocket routes are not mounted")
     print(" - Inbox chat authority is isolated, bounded, and routed through NATS/Go")

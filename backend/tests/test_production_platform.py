@@ -59,6 +59,20 @@ class ProductionConfigTests(TestCase):
             ).validate_production()
         with self.assertRaisesRegex(RuntimeError, "DB_API_CONNECTION_BUDGET"):
             Settings(**safe, DB_POOL_SIZE=10, DB_API_CONNECTION_BUDGET=100, _env_file=None).validate_production()
+        with self.assertRaisesRegex(RuntimeError, "READ_REPLICA_DATABASE_URL"):
+            Settings(
+                **safe,
+                DB_READ_REPLICA_ENABLED=True,
+                READ_REPLICA_DATABASE_URL="",
+                _env_file=None,
+            ).validate_production()
+        with self.assertRaisesRegex(RuntimeError, "READ_REPLICA_DATABASE_URL"):
+            Settings(
+                **safe,
+                DB_READ_REPLICA_ENABLED=True,
+                READ_REPLICA_DATABASE_URL=safe["database_url"],
+                _env_file=None,
+            ).validate_production()
 
     def test_transaction_pooling_requires_direct_migration_url_and_bounded_topology(self):
         safe = dict(

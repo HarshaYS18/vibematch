@@ -30,3 +30,8 @@ Inbox business state commits here. Realtime delivery is published to NATS on fun
 ## Required production settings
 
 INBOX_DATABASE_URL, INBOX_SERVICE_URL, INBOX_REALTIME_TRANSPORT=nats, NATS_URL, and INBOX_NATS_SUBJECT are supplied externally. No production credential belongs in this repository.
+
+
+## Chunk 25 data-path budget
+
+Inbox installs the shared SQL query counter and exposes `/metrics`. Conversation-list reads batch participant hydration, bounded per-conversation message windows and read receipts across the page; they must remain within the route query budget instead of scaling SQL count with conversation count.

@@ -40,3 +40,10 @@ Stories are intentionally excluded from the Inbox ownership script in Chunk 23.
 After Alembic reaches the Chunk 24 head, run `deploy/postgres/vibes-ownership.sql` with a provider/admin or migration role. It creates NOLOGIN `funkey_vibes_owner` and `funkey_vibes_runtime` roles, transfers Vibes tables to the Vibes owner, grants Vibes DML only to the runtime group, and grants bounded reads of identity/social context plus insert-only access to the transactional event outbox.
 
 Provision the production Vibes LOGIN externally, grant it membership in `funkey_vibes_runtime`, and store its PgBouncer URL as `VIBES_DATABASE_URL` in `funkey-vibes-secrets`. Do not grant `funkey_vibes_runtime` to the core API login after cutover.
+
+
+## Chunk 25 query and storage policy
+
+Hot route query ceilings live in `backend/app/core/query_budget.py` and are emitted by the core API plus the extracted Inbox and Vibes services. CI runs PostgreSQL `EXPLAIN (ANALYZE, BUFFERS, FORMAT JSON)` against seeded hot-query shapes and verifies the Chunk 25 indexes are actually used.
+
+`contracts/database/storage-policy.json` deliberately keeps read replicas and table partitioning disabled until measured evidence and stale-read/partition-pruning semantics are documented. Redis remains non-authoritative and must preserve correctness when lost.

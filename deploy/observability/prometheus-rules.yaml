@@ -46,6 +46,12 @@ spec:
           labels: {severity: ticket}
           annotations:
             summary: FunKey API average database queries per request is above 40
+        - alert: FunKeyDbQueryBudgetExceeded
+          expr: increase(funkey_http_db_query_budget_exceeded_total[10m]) > 0
+          for: 5m
+          labels: {severity: ticket}
+          annotations:
+            summary: A protected FunKey route exceeded its database query budget
         - alert: FunKeySlowQueryBurst
           expr: increase(funkey_db_slow_queries_total[10m]) > 20
           for: 5m
