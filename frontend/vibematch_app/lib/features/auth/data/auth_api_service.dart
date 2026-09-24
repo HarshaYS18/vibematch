@@ -1,10 +1,11 @@
 import 'dart:async';
 import 'dart:convert';
 
-import 'package:http/http.dart' as http;
+import 'package:vibematch_app/foundation/networking/feature_http_compat.dart' as http;
 import 'package:shared_preferences/shared_preferences.dart';
 
 import '../../../core/network/vm_api_config.dart';
+import '../../../foundation/networking/app_network_client.dart';
 import '../../../core/notifications/vm_push_notification_service.dart';
 import '../../../core/session/vm_session_cleanup_service.dart';
 import '../models/current_user.dart';
@@ -46,6 +47,7 @@ class AuthApiService {
     final prefs = await SharedPreferences.getInstance();
 
     _cachedAccessToken = prefs.getString(_tokenKey);
+    NetworkAuthCoordinator.seedAccessToken(_cachedAccessToken);
     _cachedDeviceId = prefs.getString(_deviceIdKey);
     _cachedUser = null;
 
@@ -111,6 +113,7 @@ class AuthApiService {
     required String deviceId,
   }) async {
     _cachedAccessToken = accessToken;
+    NetworkAuthCoordinator.seedAccessToken(accessToken);
     _cachedUser = user;
     _cachedDeviceId = deviceId;
 
@@ -298,6 +301,7 @@ class AuthApiService {
   }) async {
     await VmSessionCleanupService.clearUserScopedState(reason: reason);
     _cachedAccessToken = null;
+    NetworkAuthCoordinator.clear();
     _cachedUser = null;
 
     final prefs = await SharedPreferences.getInstance();
