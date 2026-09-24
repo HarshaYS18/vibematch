@@ -358,7 +358,9 @@
       "logical_owner": "realtime",
       "current_deployable": "realtime-gateway",
       "current_storage": [
-        "redis/valkey TTL socket/presence leases",
+        "redis/valkey TTL global user leases",
+        "redis/valkey TTL user-to-room leases",
+        "redis/valkey TTL room-to-user leases",
         "bounded realtime replay/routing state"
       ],
       "target_storage": [
@@ -377,7 +379,7 @@
         "status": "live",
         "name": "presence/realtime lease v2"
       },
-      "migration_status": "Chunk 20 lease/replay foundation and Chunk 21 one-Go-socket convergence are live"
+      "migration_status": "Post-Chunk-32 repair retired Flutter/REST/PostgreSQL heartbeat authority; Go realtime is the sole connected-liveness writer"
     },
     {
       "id": "realtime.connection_routing",
