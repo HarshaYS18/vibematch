@@ -1,6 +1,6 @@
 {
   "schema_version": 1,
-  "updated_for_chunk": 27,
+  "updated_for_chunk": 32,
   "status": "architecture contract; current fields describe repository reality and target fields describe approved migration direction",
   "classifications": [
     "AUTHORITY",
@@ -510,16 +510,18 @@
       "domain": "economy",
       "classification": "AUTHORITY",
       "logical_owner": "economy",
-      "current_deployable": "core-api",
+      "current_deployable": "economy-service",
       "current_storage": [
         "postgres:user_wallets",
-        "postgres:wallet_ledger"
+        "postgres:wallet_ledger",
+        "postgres:economy_transactions",
+        "postgres:economy_journal_entries"
       ],
       "target_storage": [
         "economy-service postgres"
       ],
       "mutated_by": [
-        "wallet/economy transaction services"
+        "economy-service transaction authority"
       ],
       "source_states": [],
       "rebuild_from": [],
@@ -527,14 +529,14 @@
         "status": "planned",
         "name": "economy.wallet.changed.v1"
       },
-      "migration_status": "Tier-0; Chunk 25"
+      "migration_status": "Chunk 25 authority cutover completed after Chunk 32 audit repair; core retains SELECT-only compatibility reads"
     },
     {
       "id": "economy.supply_ledger",
       "domain": "economy",
       "classification": "AUTHORITY",
       "logical_owner": "economy",
-      "current_deployable": "core-api",
+      "current_deployable": "economy-service",
       "current_storage": [
         "postgres:coin_supply_pools",
         "postgres:coin_pool_ledger",
@@ -545,7 +547,7 @@
         "economy-service postgres"
       ],
       "mutated_by": [
-        "economy/coin-sale services"
+        "economy-service supply and settlement authority"
       ],
       "source_states": [],
       "rebuild_from": [],
@@ -553,14 +555,41 @@
         "status": "planned",
         "name": "economy.supply.changed.v1"
       },
-      "migration_status": "Tier-0; Chunk 25"
+      "migration_status": "Chunk 25 authority cutover completed after Chunk 32 audit repair; exclusive PostgreSQL writer role enforced"
+    },
+    {
+      "id": "economy.vip_projection",
+      "domain": "economy",
+      "classification": "PROJECTION",
+      "logical_owner": "economy",
+      "current_deployable": "economy-service + read-only client/profile projections",
+      "current_storage": [
+        "postgres:user_vip_statuses"
+      ],
+      "target_storage": [
+        "economy-derived VIP/SVIP projection"
+      ],
+      "mutated_by": [
+        "economy-service projection updater"
+      ],
+      "source_states": [
+        "economy.wallet_ledger"
+      ],
+      "rebuild_from": [
+        "economy.wallet_ledger recharge/value history"
+      ],
+      "change_contract": {
+        "status": "live",
+        "name": "economy.vip_projection.updated.v1"
+      },
+      "migration_status": "Derived status only; wallet/ledger remains authority"
     },
     {
       "id": "gifts.catalog",
       "domain": "gifts",
       "classification": "AUTHORITY",
       "logical_owner": "economy",
-      "current_deployable": "core-api",
+      "current_deployable": "economy-service",
       "current_storage": [
         "postgres:gift_catalog_categories",
         "postgres:gift_catalog_items"
@@ -569,7 +598,7 @@
         "economy-compatible catalog store"
       ],
       "mutated_by": [
-        "gift catalog services"
+        "economy-service gift catalog authority"
       ],
       "source_states": [],
       "rebuild_from": [],
@@ -577,14 +606,14 @@
         "status": "planned",
         "name": "gift.catalog.updated.v1"
       },
-      "migration_status": "configuration authority"
+      "migration_status": "Economy Service owns gift configuration; core exposes compatibility routes only"
     },
     {
       "id": "gifts.settlement",
       "domain": "gifts",
       "classification": "AUTHORITY",
       "logical_owner": "economy",
-      "current_deployable": "core-api",
+      "current_deployable": "economy-service",
       "current_storage": [
         "postgres:gift_transactions",
         "postgres:wallet_ledger"
@@ -593,7 +622,7 @@
         "economy-service postgres"
       ],
       "mutated_by": [
-        "gift settlement + economy transaction services"
+        "economy-service gift settlement authority"
       ],
       "source_states": [],
       "rebuild_from": [],
@@ -601,7 +630,7 @@
         "status": "planned",
         "name": "gift.settled.v1"
       },
-      "migration_status": "financial truth is Economy"
+      "migration_status": "Chunk 25 authority cutover completed; gift value movement executes only through Economy transaction APIs"
     },
     {
       "id": "games.catalog_rounds",
@@ -690,7 +719,7 @@
       "domain": "missions",
       "classification": "AUTHORITY",
       "logical_owner": "economy",
-      "current_deployable": "core-api",
+      "current_deployable": "economy-service",
       "current_storage": [
         "postgres:wallet_ledger source_type=SOCIAL_MISSION_REWARD"
       ],
@@ -698,7 +727,7 @@
         "economy-service ledger"
       ],
       "mutated_by": [
-        "mission reward claim through Economy"
+        "economy-service mission reward transaction authority"
       ],
       "source_states": [],
       "rebuild_from": [],
@@ -706,7 +735,7 @@
         "status": "planned",
         "name": "economy.mission_rewarded.v1"
       },
-      "migration_status": "reward truth is ledger"
+      "migration_status": "Reward claims are idempotent Economy transactions backed by wallet ledger and balanced journal evidence"
     },
     {
       "id": "notifications.in_app",
@@ -821,7 +850,7 @@
       "source_states": [],
       "rebuild_from": [],
       "change_contract": {
-        "status": "implementing",
+        "status": "live",
         "name": "media.asset.changed.v1"
       },
       "migration_status": "Chunk 31 Media v2 control plane"
@@ -845,7 +874,7 @@
       "source_states": [],
       "rebuild_from": [],
       "change_contract": {
-        "status": "implementing",
+        "status": "live",
         "name": "media.uploaded.v1"
       },
       "migration_status": "Chunk 31 Media v2 direct-upload cutover"
