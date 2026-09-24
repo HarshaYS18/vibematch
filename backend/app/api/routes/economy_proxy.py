@@ -88,6 +88,21 @@ def _register_prefix(prefix: str) -> None:
     )
 
 
+
+async def _gift_catalog(request: Request) -> Response:
+    return await _proxy(request, "gifts/catalog")
+
+
+async def _active_lucky_packet(request: Request) -> Response:
+    return await _proxy(request, "lucky-packets/active")
+
+
+# Keep concrete canonical paths visible in FastAPI/OpenAPI and register them
+# before the broader catch-all prefixes so they win route matching.
+router.add_api_route("/gifts/catalog", _gift_catalog, methods=["GET"])
+router.add_api_route("/lucky-packets/active", _active_lucky_packet, methods=["GET"])
+
+
 for _prefix in (
     "coin-sales",
     "economy/lucky-coins",
