@@ -301,8 +301,28 @@ def create_game_round(db: Session, game_key: str, entry_fee: int, max_players: i
 
 
 def dashboard_for_user(db: Session, user: User) -> dict:
-    wallet = get_or_create_wallet(db, user.id)
-    return {"wallet": wallet, "seller_pool": get_pool_for_user(db, user.id, CoinSupplyPoolType.SELLER_SUPPLY_POOL), "merchant_pool": get_pool_for_user(db, user.id, CoinSupplyPoolType.MERCHANT_SUPPLY_POOL), "gaming_pool": get_pool_for_user(db, user.id, CoinSupplyPoolType.FRIENDS_GAMING_POOL)}
+    """Read-only Economy dashboard projection.
+
+    Missing wallet rows are represented as a zero wallet by the API serializer;
+    GET requests must never create Economy-owned state.
+    """
+    wallet = (
+        db.query(UserWallet)
+        .filter(UserWallet.user_id == user.id)
+        .first()
+    )
+    return {
+        "wallet": wallet,
+        "seller_pool": get_pool_for_user(
+            db, user.id, CoinSupplyPoolType.SELLER_SUPPLY_POOL
+        ),
+        "merchant_pool": get_pool_for_user(
+            db, user.id, CoinSupplyPoolType.MERCHANT_SUPPLY_POOL
+        ),
+        "gaming_pool": get_pool_for_user(
+            db, user.id, CoinSupplyPoolType.FRIENDS_GAMING_POOL
+        ),
+    }
 
 
 def credit_social_mission_reward(
