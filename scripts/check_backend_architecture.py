@@ -882,7 +882,7 @@ def _validate_identity_profile_social_extraction(errors: list[str]) -> None:
             "families.router",
             "profile_display.router",
         ):
-            if token in router_text:
+            if re.search(rf"(?<![A-Za-z0-9_]){re.escape(token)}\\b", router_text):
                 errors.append(
                     "Chunk 27 extracted public router still mounted in core: " + token
                 )

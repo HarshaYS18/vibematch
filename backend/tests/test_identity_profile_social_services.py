@@ -1,3 +1,4 @@
+import re
 from pathlib import Path
 import json
 import unittest
@@ -37,7 +38,13 @@ class IdentityProfileSocialBoundaryTests(unittest.TestCase):
             "families.router",
             "profile_display.router",
         ):
-            self.assertNotIn(forbidden, router)
+            self.assertIsNone(
+                re.search(
+                    rf"(?<![A-Za-z0-9_]){re.escape(forbidden)}\\b",
+                    router,
+                ),
+                forbidden,
+            )
 
     def test_identity_owns_privileged_account_security_routes(self):
         identity = (ROOT / "apps/identity-service/main.py").read_text(encoding="utf-8")

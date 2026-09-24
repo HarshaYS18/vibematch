@@ -10,37 +10,38 @@ from app.services.rooms import room_state_service
 
 class ChunkOneSourceOfTruthTests(TestCase):
     def test_profile_patch_preserves_unspecified_canonical_fields(self):
-        current_user = SimpleNamespace(
-            display_name="Old Name",
-            bio="existing bio",
-            avatar_url="https://cdn.example/avatar.jpg",
-            cover_photo_urls=["https://cdn.example/cover.jpg"],
-            date_of_birth=date(2000, 1, 2),
-            gender="other",
-            profession="Creator",
-            marital_status="single",
-            friend_gender_preference="both",
-            friend_marital_preference="any",
-            interests=["music", "games"],
-        )
+        current_user = SimpleNamespace(id=7)
         db = Mock()
         payload = UserProfileUpdateRequest(display_name="New Name")
 
-        with patch.object(users_route, "_user_me_response", return_value={"ok": True}):
-            result = users_route.update_my_profile(payload, db=db, current_user=current_user)
+        remote_payload = {
+            "id": 7,
+            "public_user_id": 6418000007,
+            "username": "user-7",
+            "display_name": "New Name",
+            "roles": [],
+            "primary_role": "user",
+            "role_badges": [],
+        }
+        with (
+            patch.object(
+                users_route.profile_social_service_client,
+                "update_profile",
+                return_value=remote_payload,
+            ) as update_profile,
+            patch.object(users_route, "UserMeResponse", side_effect=lambda **kwargs: kwargs),
+        ):
+            result = users_route.update_my_profile(
+                payload,
+                db=db,
+                current_user=current_user,
+            )
 
-        self.assertEqual({"ok": True}, result)
-        self.assertEqual("New Name", current_user.display_name)
-        self.assertEqual("existing bio", current_user.bio)
-        self.assertEqual("https://cdn.example/avatar.jpg", current_user.avatar_url)
-        self.assertEqual(["https://cdn.example/cover.jpg"], current_user.cover_photo_urls)
-        self.assertEqual(date(2000, 1, 2), current_user.date_of_birth)
-        self.assertEqual("other", current_user.gender)
-        self.assertEqual("Creator", current_user.profession)
-        self.assertEqual("single", current_user.marital_status)
-        self.assertEqual("both", current_user.friend_gender_preference)
-        self.assertEqual("any", current_user.friend_marital_preference)
-        self.assertEqual(["music", "games"], current_user.interests)
+        self.assertEqual(remote_payload, result)
+        update_profile.assert_called_once_with(
+            user_id=7,
+            profile={"display_name": "New Name"},
+        )
 
     def test_membership_roster_keeps_offline_saved_member(self):
         user = SimpleNamespace(public_user_id=6418001001)
