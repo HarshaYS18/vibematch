@@ -1640,12 +1640,21 @@ def game_wager(payload: GameFinancialRequest, db: Session = Depends(get_db)):
         reference_type="COIN_GAME_WAGER_INCOME",
         reference_id=payload.round_id or payload.business_reference,
     )
+    reservation_scope = (
+        f"game-round:{payload.round_id}:{payload.user_id}"
+        if payload.round_id
+        else f"game-business:{payload.business_reference}:{payload.user_id}"
+    )
     reserve = house_pool_service.reserve_house_liability(
         db,
         pool_type="GAME_HOUSE_POOL",
         amount=payload.wager_amount,
         reference_type="COIN_GAME_WAGER",
         reference_id=payload.round_id or payload.business_reference,
+        reservation_key=payload.business_reference,
+        release_scope=reservation_scope,
+        transaction_id=tx.transaction_id,
+        user_id=payload.user_id,
     )
     result = {
         "transaction_id": tx.transaction_id,
@@ -1726,9 +1735,14 @@ def game_settle(payload: GameFinancialRequest, db: Session = Depends(get_db)):
         reference_type="COIN_GAME_SETTLEMENT",
         reference_id=payload.round_id or payload.business_reference,
     )
+    reservation_scope = (
+        f"game-round:{payload.round_id}:{payload.user_id}"
+        if payload.round_id
+        else f"game-business:{payload.business_reference}:{payload.user_id}"
+    )
     house_pool_service.release_house_liability(
         db,
-        payload.round_id or payload.business_reference,
+        reservation_scope,
     )
     risk = whale_risk_service.calculate_whale_risk_score(db, payload.user_id)
 
