@@ -455,15 +455,6 @@ class LiveRoomGiftController {
             0;
         coinBalance = result.senderCoinBalance;
         unawaited(
-          _recordLuckyGiftResultSilently(
-            gift: gift,
-            quantity: effectiveCombo,
-            receiverPublicUserId: receiverPublicUserId,
-            multiplier: multiplier,
-            rewardCoinAmount: rewardCoinAmount,
-          ),
-        );
-        unawaited(
           _recordRelationshipGiftExpSilently(
             gift: gift,
             quantity: effectiveCombo,
@@ -644,15 +635,6 @@ class LiveRoomGiftController {
           0;
       coinBalance = result.senderCoinBalance;
       unawaited(
-        _recordLuckyGiftResultSilently(
-          gift: context.gift,
-          quantity: context.baseCombo,
-          receiverPublicUserId: context.receiverPublicUserId,
-          multiplier: multiplier,
-          rewardCoinAmount: rewardCoinAmount,
-        ),
-      );
-      unawaited(
         _recordRelationshipGiftExpSilently(
           gift: context.gift,
           quantity: context.baseCombo,
@@ -789,30 +771,6 @@ class LiveRoomGiftController {
       remaining -= reward;
     }
     return result;
-  }
-
-  Future<void> _recordLuckyGiftResultSilently({
-    required GiftItem gift,
-    required int quantity,
-    required int receiverPublicUserId,
-    required int multiplier,
-    required int rewardCoinAmount,
-  }) async {
-    try {
-      final spentCoins = gift.coins * quantity;
-      await _luckyGiftsApi.recordResult(
-        giftId: gift.id,
-        quantity: quantity,
-        receiverPublicUserId: receiverPublicUserId,
-        roomPublicId: ActiveRoomContext.roomPublicId,
-        spentCoins: spentCoins,
-        multiplier: multiplier,
-        rewardCoins: rewardCoinAmount,
-        netWinCoins: rewardCoinAmount - spentCoins,
-      );
-    } catch (_) {
-      // Lucky gift stats should never block the live room send flow.
-    }
   }
 
   Future<void> _recordRelationshipGiftExpSilently({
