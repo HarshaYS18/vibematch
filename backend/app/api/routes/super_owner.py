@@ -126,21 +126,49 @@ def mint_coins(payload: SuperOwnerMintCoinsRequest, db: Session = Depends(get_db
 
 
 @router.post("/admin/economy/coins/send-all", response_model=SuperOwnerActionResponse)
-def send_coins_to_all(payload: SuperOwnerSendCoinsAllRequest, db: Session = Depends(get_db), current_user: User = Depends(get_current_user)):
+def send_coins_to_all(
+    payload: SuperOwnerSendCoinsAllRequest,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
     require_super_owner(current_user)
-    query = db.query(User)
-    if payload.active_only:
-        query = query.filter(User.is_active.is_(True), User.is_banned.is_(False))
-    users = query.all()
-    for user in users:
-        wallet = get_or_create_wallet(db, user.id)
-        before = wallet.coin_balance
-        wallet.coin_balance += payload.coin_amount
-        from app.models.economy import WalletLedger, EconomyDirection
-        db.add(WalletLedger(user_id=user.id, currency_type=EconomyCurrency.COIN.value, direction=EconomyDirection.CREDIT.value, amount=payload.coin_amount, before_balance=before, after_balance=wallet.coin_balance, source_type="SUPER_OWNER_SEND_ALL", created_by_user_id=current_user.id, reason=payload.reason))
-    db.commit()
-    create_admin_log(db=db, actor_user_id=current_user.id, action="SUPER_OWNER_COINS_SENT_TO_ALL", resource_type="wallet", reason=payload.reason, metadata_json={"coin_amount": payload.coin_amount, "users_count": len(users), "active_only": payload.active_only})
-    return SuperOwnerActionResponse(message=f"Sent {payload.coin_amount} coins to {len(users)} users")
+    request_id = (payload.request_id or str(uuid4())).strip()
+    try:
+        result = economy_service_client.queue_bulk_grant(
+            request_id=request_id,
+            actor_user_id=current_user.id,
+            coin_amount=payload.coin_amount,
+            active_only=payload.active_only,
+            reason=payload.reason,
+        )
+    except economy_service_client.EconomyServiceUnavailable as exc:
+        raise HTTPException(status_code=503, detail=str(exc)) from exc
+    except economy_service_client.EconomyServiceError as exc:
+        raise HTTPException(
+            status_code=exc.status_code,
+            detail=exc.detail,
+        ) from exc
+
+    create_admin_log(
+        db=db,
+        actor_user_id=current_user.id,
+        action="SUPER_OWNER_COINS_SEND_ALL_QUEUED",
+        resource_type="economy_bulk_grant",
+        resource_id=str(result["grant_id"]),
+        reason=payload.reason,
+        metadata_json={
+            "coin_amount": payload.coin_amount,
+            "eligible_count": int(result["eligible_count"]),
+            "active_only": payload.active_only,
+            "grant_status": result["status"],
+        },
+    )
+    return SuperOwnerActionResponse(
+        message=(
+            f"Queued {payload.coin_amount} coins for "
+            f"{int(result['eligible_count'])} users"
+        )
+    )
 
 
 @router.post("/admin/users/custom-id", response_model=SuperOwnerActionResponse)

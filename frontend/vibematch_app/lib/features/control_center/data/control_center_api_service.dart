@@ -158,15 +158,22 @@ class ControlCenterApiService {
     required bool activeOnly,
     required String reason,
   }) async {
+    final body = <String, dynamic>{
+      'coin_amount': coinAmount,
+      'active_only': activeOnly,
+      'reason': reason,
+    };
+    final pending = await _pendingMutationIdentity(
+      'super_owner_send_all',
+      body,
+    );
+    body['request_id'] = pending.id;
     await _apiClient.postMap(
       '/admin/economy/coins/send-all',
       headers: _headers(),
-      body: {
-        'coin_amount': coinAmount,
-        'active_only': activeOnly,
-        'reason': reason,
-      },
+      body: body,
     );
+    await _clearPendingMutation(pending.key);
   }
 
   Future<void> assignCustomId({

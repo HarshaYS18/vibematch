@@ -19,6 +19,7 @@ class SuperOwnerMintCoinsRequest(SuperOwnerReasonRequest):
 class SuperOwnerSendCoinsAllRequest(SuperOwnerReasonRequest):
     coin_amount: int = Field(..., gt=0, le=10_000_000)
     active_only: bool = True
+    request_id: str | None = Field(default=None, min_length=8, max_length=36)
 
 
 class SuperOwnerCustomIdRequest(SuperOwnerReasonRequest):
