@@ -4,39 +4,67 @@ FunKey is a social live-room application with a Flutter client, a FastAPI applic
 
 ## Architecture
 
-```text
-Flutter clients
-  | HTTPS / WebSocket                    | WebRTC media
-  v                                      v
-Edge TLS and load balancer          TURN / SFU network path
-  |                                      |
-  +--> FastAPI core control plane        +--> backend_media (mediasoup)
-  |      |                                      ^
-  |      +--> PostgreSQL (durable truth)        | internal authorization
-  |      +--> Redis/Valkey roles (cache / realtime / media registry) ---+
-  |      +--> object storage / CDN
-  |
-  +--> Go realtime gateway (incremental migration target)
-         +--> distributed events / Redis coordination
+FunKey is a social/live-room platform built as an evolutionary service architecture.
+PostgreSQL remains durable truth, while each extracted domain has one mutation
+owner and isolated production credentials.
 
-Workers, Kubernetes autoscaling and infrastructure automation are introduced
-incrementally; see the completion report for the implemented state of this branch.
+```text
+Flutter apps
+  | REST/control plane                       | WebRTC
+  v                                          v
+Core compatibility API :8000            TURN / backend_media :4100
+  |
+  +--> Identity :8086
+  +--> Profile/Social :8087
+  +--> Inbox :8083
+  +--> Vibes :8084
+  +--> Room Control :8085
+  +--> Economy :8088  <---- Game Platform :8089
+  +--> Notification :8090 + provider worker
+  |
+  +--> Go realtime gateway :8081  (single application WebSocket)
+  +--> Worker pools :8082
+
+PostgreSQL/PgBouncer -> durable authority
+Redis/Valkey roles     -> cache / realtime presence+replay / media registry
+NATS JetStream         -> durable operational async work
+Object storage/CDN     -> media/game bytes, never business authority
 ```
 
-The backend is authoritative for identity, bans, memberships, rooms, seats, roles, permissions, moderation, calls, and value movement. PostgreSQL holds durable truth. Redis coordinates transient presence, fanout, and media placement; it must not become the only record of a wallet balance or ban. `backend_media` owns only SFU transport state. Clients resolve a media node through the backend and never choose one directly. See [the media architecture](docs/production_realtime_media_architecture.md) and [source-of-truth rules](docs/master-source-of-truth-architecture.md).
+### Authority rules
+
+- Identity, Profile/Social, Inbox, Vibes, Room Control, Economy, Game Platform
+  and Notification are separately deployed mutation boundaries.
+- Economy is the exclusive financial writer. Game Platform owns gameplay
+  lifecycle but calls Economy for wager/settlement.
+- Go realtime owns transport/routing/presence/replay only.
+- `backend_media` owns mediasoup/WebRTC transport only.
+- Redis, NATS, Flutter caches and future search/analytics systems are never
+  durable business truth.
+- Media v2 uses direct object-store uploads while PostgreSQL owns control state.
+- Flutter REST traffic converges on `AppNetworkClient -> CanonicalNetworkTransport -> Dio`.
+
+See `docs/architecture/authority-registry.md`,
+`contracts/architecture/authorities.yaml`, and
+`docs/architecture/service-boundaries.md` before moving any domain boundary.
 
 ## Repository map
 
 | Path | Responsibility |
 | --- | --- |
-| `backend/` | Current Python/FastAPI API, domain services, models, tests, and canonical Alembic migration graph |
-| `backend_media/` | The sole Node.js/TypeScript mediasoup signaling and SFU implementation |
-| `frontend/vibematch_app/` | Flutter client; the directory name is retained for compatibility |
-| `infra/` | Local services, TURN, and infrastructure definitions |
-| `scripts/` | Local and validation workflows |
-| `docs/` | Architecture decisions, module ownership, operations, and deployment guides |
+| `backend/` | Shared Python domain code, core compatibility API, canonical models/migrations/tests |
+| `apps/` | Extracted domain services, Go realtime gateway and worker platform |
+| `backend_media/` | Sole Node/TypeScript mediasoup signaling/SFU implementation |
+| `frontend/vibematch_app/` | Flutter client (directory name retained for compatibility) |
+| `contracts/` | Authority, Redis and versioned service/event contracts |
+| `deploy/` | Kubernetes, PostgreSQL ownership, observability and GitOps desired state |
+| `infra/` | Local/runtime infrastructure definitions |
+| `scripts/` | Validation, developer and release workflows |
+| `docs/` | Architecture, ADRs, module ownership and operations |
 
-Go is the preferred language for new high-concurrency backend components. FastAPI remains operational during the strangler migration; Python remains appropriate for existing domain logic and selected jobs. Node.js/TypeScript remains the canonical mediasoup runtime. Do not move durable authority simply because a new process exists. [ADR-001](docs/adr/ADR-001-go-target-language.md) and [ADR-002](docs/adr/ADR-002-strangler-migration.md) explain the transition.
+Go remains preferred for high-concurrency transport components; Python remains
+appropriate for existing business/domain services and workers; Node/TypeScript
+remains canonical for mediasoup. Language choice never changes state authority.
 
 ## Local development
 
