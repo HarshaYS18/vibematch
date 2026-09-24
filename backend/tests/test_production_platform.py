@@ -103,7 +103,7 @@ class ProductionConfigTests(TestCase):
             "postgresql://funkey_migrate:strong-secret@postgres.internal:5432/funkey",
             settings_obj.migration_database_url,
         )
-        self.assertEqual(668, settings_obj.expected_pooler_client_connections)
+        self.assertEqual(748, settings_obj.expected_pooler_client_connections)
 
         with self.assertRaisesRegex(RuntimeError, "MIGRATION_DATABASE_URL"):
             Settings(
