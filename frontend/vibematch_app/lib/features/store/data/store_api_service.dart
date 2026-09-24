@@ -1,6 +1,8 @@
 import 'dart:convert';
 
 import 'package:http/http.dart' as http;
+import 'package:shared_preferences/shared_preferences.dart';
+import 'package:uuid/uuid.dart';
 
 import '../../../core/network/vm_api_config.dart';
 import '../../auth/data/auth_api_service.dart';
@@ -20,15 +22,30 @@ class StoreApiService {
   }
 
   Future<StoreItem> purchase(String itemId) async {
+    final prefs = await SharedPreferences.getInstance();
+    final pendingKey = 'store_purchase_pending_$itemId';
+    var purchaseId = prefs.getString(pendingKey);
+    if (purchaseId == null || purchaseId.trim().isEmpty) {
+      purchaseId = const Uuid().v4();
+      await prefs.setString(pendingKey, purchaseId);
+    }
+
     final response = await http.post(
       Uri.parse(VmApiConfig.endpoint('/store/purchase')),
       headers: _authHeaders(),
-      body: jsonEncode({'item_id': itemId}),
+      body: jsonEncode({'item_id': itemId, 'purchase_id': purchaseId}),
     );
-    if (response.statusCode < 200 || response.statusCode >= 300) {
-      throw Exception(_errorMessage(response, fallback: 'Failed to purchase item'));
+    if (response.statusCode >= 200 && response.statusCode < 300) {
+      await prefs.remove(pendingKey);
+      return StoreItem.fromJson(jsonDecode(response.body) as Map<String, dynamic>);
     }
-    return StoreItem.fromJson(jsonDecode(response.body) as Map<String, dynamic>);
+
+    // Definite client rejection means Economy did not accept an uncertain
+    // transport outcome; a future user action may start a fresh purchase.
+    if (response.statusCode >= 400 && response.statusCode < 500) {
+      await prefs.remove(pendingKey);
+    }
+    throw Exception(_errorMessage(response, fallback: 'Failed to purchase item'));
   }
 
   Future<UserInventory> fetchInventory() async {

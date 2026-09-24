@@ -7,9 +7,8 @@ from fastapi import HTTPException
 from sqlalchemy import and_, or_
 from sqlalchemy.orm import Session
 
-from app.models.economy import EconomyCurrency, EconomyDirection, UserWallet, WalletLedger
 from app.models.room_theme import UserRoomThemeInventory
-from app.models.store import StoreCategory, StoreItem, StoreItemCategory, UserStoreInventory
+from app.models.store import StoreCategory, StoreItem, StoreItemCategory, StorePurchaseOperation, UserStoreInventory
 from app.models.user import User
 from app.schemas.store import (
     EquippedStoreItemResponse,
@@ -19,7 +18,7 @@ from app.schemas.store import (
     StoreCatalogResponse,
     StoreItemResponse,
 )
-from app.services import love_bond_service
+from app.services import economy_service_client, love_bond_service
 from app.services.rooms import room_theme_service
 
 # Avatar frames and chat bubbles are 30-day ownership items by default.
@@ -275,16 +274,6 @@ def _is_inventory_active(row: UserStoreInventory, now: datetime | None = None) -
     return row.expires_at is None or row.expires_at > current
 
 
-def _wallet_for_update(db: Session, user_id: int) -> UserWallet:
-    wallet = db.query(UserWallet).filter(UserWallet.user_id == user_id).with_for_update().first()
-    if wallet is not None:
-        return wallet
-    wallet = UserWallet(user_id=user_id)
-    db.add(wallet)
-    db.flush()
-    return wallet
-
-
 def _inventory_for_item(db: Session, user_id: int, item_id: str, *, active_only: bool = True) -> UserStoreInventory | None:
     row = db.query(UserStoreInventory).filter(UserStoreInventory.user_id == user_id, UserStoreInventory.item_id == item_id).first()
     if row is None:
@@ -314,32 +303,6 @@ def _love_bond_card_type(item: StoreItem) -> str:
         return str(metadata["card_type"])
     item_suffix = item.item_id.replace("bond_card_", "", 1)
     return item_suffix if item_suffix != item.item_id else "love"
-
-
-def _debit_wallet_for_item(db: Session, user: User, item: StoreItem) -> None:
-    wallet = _wallet_for_update(db, user.id)
-    price = int(item.price_coins or 0)
-    if price <= 0:
-        return
-    if wallet.coin_balance < price:
-        raise HTTPException(status_code=400, detail="Insufficient coins to purchase this item")
-    before = wallet.coin_balance
-    wallet.coin_balance -= price
-    wallet.lifetime_coins_spent += price
-    db.add(
-        WalletLedger(
-            user_id=user.id,
-            currency_type=EconomyCurrency.COIN.value,
-            direction=EconomyDirection.DEBIT.value,
-            amount=price,
-            before_balance=before,
-            after_balance=wallet.coin_balance,
-            source_type="STORE_PURCHASE",
-            source_id=item.item_id,
-            created_by_user_id=user.id,
-            reason=f"Purchased store item {item.name}",
-        )
-    )
 
 
 def _item_payload(db: Session, item: StoreItem, user_id: int) -> StoreItemResponse:
@@ -395,38 +358,277 @@ def catalog(db: Session, user: User) -> StoreCatalogResponse:
     return StoreCatalogResponse(categories=ordered_categories, sections=sections)
 
 
-def purchase(db: Session, user: User, item_id: str) -> StoreItemResponse:
+def _purchase_id_for_request(
+    *,
+    user_id: int,
+    item: StoreItem,
+    purchase_id: str | None,
+) -> str:
+    supplied = (purchase_id or "").strip()
+    if supplied:
+        return supplied
+    if _is_love_bond_card(item):
+        raise HTTPException(
+            status_code=400,
+            detail="purchase_id is required for repeatable store purchases",
+        )
+    # Backward-compatible idempotency for old clients buying one-time items.
+    return f"legacy-{user_id}-{item.item_id}"[:36]
+
+
+def _acquire_purchase_operation(
+    db: Session,
+    *,
+    purchase_id: str,
+    user_id: int,
+    item_id: str,
+) -> StorePurchaseOperation:
+    now = datetime.utcnow()
+    operation = (
+        db.query(StorePurchaseOperation)
+        .filter(StorePurchaseOperation.purchase_id == purchase_id)
+        .with_for_update()
+        .first()
+    )
+    if operation is None:
+        operation = StorePurchaseOperation(
+            purchase_id=purchase_id,
+            user_id=user_id,
+            item_id=item_id,
+            status="PROCESSING",
+            attempt_count=1,
+            lease_until=now + timedelta(minutes=2),
+        )
+        db.add(operation)
+        db.commit()
+        db.refresh(operation)
+        return operation
+
+    if operation.user_id != user_id or operation.item_id != item_id:
+        raise HTTPException(
+            status_code=409,
+            detail="purchase_id is already bound to another purchase",
+        )
+    if operation.status == "COMPLETED":
+        return operation
+    if operation.status in {"REFUNDED", "FAILED"}:
+        raise HTTPException(
+            status_code=409,
+            detail="Previous purchase attempt is closed; use a new purchase_id",
+        )
+    if (
+        operation.status == "PROCESSING"
+        and operation.lease_until is not None
+        and operation.lease_until > now
+    ):
+        raise HTTPException(status_code=409, detail="Purchase is already processing")
+
+    operation.status = "PROCESSING"
+    operation.attempt_count += 1
+    operation.lease_until = now + timedelta(minutes=2)
+    operation.error_detail = None
+    db.add(operation)
+    db.commit()
+    db.refresh(operation)
+    return operation
+
+
+def _compensate_store_debit(
+    db: Session,
+    *,
+    operation: StorePurchaseOperation,
+    user: User,
+    item: StoreItem,
+    failure: Exception,
+) -> None:
+    price = int(item.price_coins or 0)
+    if price <= 0:
+        operation.status = "FAILED"
+        operation.error_detail = str(failure)[:700]
+        operation.lease_until = None
+        db.add(operation)
+        db.commit()
+        return
+
+    operation.status = "COMPENSATING"
+    operation.error_detail = str(failure)[:700]
+    db.add(operation)
+    db.commit()
+
+    try:
+        refund = economy_service_client.credit_wallet(
+            user_id=user.id,
+            amount=price,
+            source_type="STORE_PURCHASE_COMPENSATION",
+            source_id=item.item_id,
+            reason=f"Store purchase compensation for {item.name}",
+            actor_user_id=user.id,
+            business_reference=f"store-refund:{operation.purchase_id}",
+            operation="store.refund",
+        )
+    except (
+        economy_service_client.EconomyServiceUnavailable,
+        economy_service_client.EconomyServiceError,
+    ) as refund_error:
+        operation = db.query(StorePurchaseOperation).filter(
+            StorePurchaseOperation.purchase_id == operation.purchase_id
+        ).first()
+        if operation is not None:
+            operation.status = "COMPENSATION_PENDING"
+            operation.error_detail = (
+                f"grant={failure}; refund={refund_error}"
+            )[:700]
+            operation.lease_until = None
+            db.add(operation)
+            db.commit()
+        raise HTTPException(
+            status_code=503,
+            detail="Purchase could not complete; refund reconciliation is pending",
+        ) from refund_error
+
+    operation = db.query(StorePurchaseOperation).filter(
+        StorePurchaseOperation.purchase_id == operation.purchase_id
+    ).first()
+    if operation is not None:
+        operation.status = "REFUNDED"
+        operation.compensation_transaction_id = str(
+            refund.get("transaction_id") or ""
+        ) or None
+        operation.lease_until = None
+        db.add(operation)
+        db.commit()
+    raise HTTPException(
+        status_code=503,
+        detail="Purchase could not complete; payment was refunded",
+    ) from failure
+
+
+def purchase(
+    db: Session,
+    user: User,
+    item_id: str,
+    *,
+    purchase_id: str | None = None,
+) -> StoreItemResponse:
     seed_default_store_items(db)
-    item = db.query(StoreItem).filter(StoreItem.item_id == item_id, StoreItem.is_active.is_(True)).first()
+    item = (
+        db.query(StoreItem)
+        .filter(StoreItem.item_id == item_id, StoreItem.is_active.is_(True))
+        .first()
+    )
     if item is None:
         raise HTTPException(status_code=404, detail="Store item not found")
-    if _is_love_bond_card(item):
-        _debit_wallet_for_item(db, user, item)
-        love_bond_service.grant_inventory_card(
-            db,
-            user=user,
-            card_type=_love_bond_card_type(item),
-            quantity=1,
-            source="store_purchase",
-        )
+
+    if not _is_love_bond_card(item):
+        existing = _inventory_for_item(db, user.id, item.item_id)
+        if existing is not None:
+            return _item_payload(db, item, user.id)
+
+    resolved_purchase_id = _purchase_id_for_request(
+        user_id=user.id,
+        item=item,
+        purchase_id=purchase_id,
+    )
+    operation = _acquire_purchase_operation(
+        db,
+        purchase_id=resolved_purchase_id,
+        user_id=user.id,
+        item_id=item.item_id,
+    )
+    if operation.status == "COMPLETED":
+        return _item_payload(db, item, user.id)
+
+    price = int(item.price_coins or 0)
+    if price > 0:
+        try:
+            debit = economy_service_client.debit_wallet(
+                user_id=user.id,
+                amount=price,
+                source_type="STORE_PURCHASE",
+                source_id=item.item_id,
+                reason=f"Purchased store item {item.name}",
+                actor_user_id=user.id,
+                business_reference=f"store-purchase:{resolved_purchase_id}",
+                operation="store.purchase",
+            )
+        except economy_service_client.EconomyServiceUnavailable as exc:
+            operation.status = "PENDING"
+            operation.lease_until = None
+            operation.error_detail = str(exc)[:700]
+            db.add(operation)
+            db.commit()
+            raise HTTPException(status_code=503, detail=str(exc)) from exc
+        except economy_service_client.EconomyServiceError as exc:
+            operation.status = "FAILED"
+            operation.lease_until = None
+            operation.error_detail = exc.detail[:700]
+            db.add(operation)
+            db.commit()
+            raise HTTPException(status_code=exc.status_code, detail=exc.detail) from exc
+
+        operation.status = "DEBITED"
+        operation.economy_transaction_id = str(
+            debit.get("transaction_id") or ""
+        ) or None
+        db.add(operation)
+        db.commit()
+
+    try:
+        if _is_love_bond_card(item):
+            love_bond_service.grant_inventory_card(
+                db,
+                user=user,
+                card_type=_love_bond_card_type(item),
+                quantity=1,
+                source="store_purchase",
+            )
+        else:
+            if (
+                item.category == StoreItemCategory.ROOM_BACKGROUND.value
+                and item.linked_theme_id
+            ):
+                _grant_linked_room_theme_inventory(
+                    db,
+                    user_id=user.id,
+                    theme_id=item.linked_theme_id,
+                )
+
+            duration_days = _duration_days_for_item(item)
+            expires_at = (
+                datetime.utcnow() + timedelta(days=duration_days)
+                if duration_days is not None
+                else None
+            )
+            db.add(
+                UserStoreInventory(
+                    user_id=user.id,
+                    item_id=item.item_id,
+                    category=item.category,
+                    source="purchase",
+                    expires_at=expires_at,
+                )
+            )
+
+        operation.status = "COMPLETED"
+        operation.lease_until = None
+        operation.error_detail = None
+        db.add(operation)
         db.commit()
         return _item_payload(db, item, user.id)
-
-    existing = _inventory_for_item(db, user.id, item.item_id)
-    if existing is not None:
-        return _item_payload(db, item, user.id)
-
-    _debit_wallet_for_item(db, user, item)
-
-    if item.category == StoreItemCategory.ROOM_BACKGROUND.value and item.linked_theme_id:
-        _grant_linked_room_theme_inventory(db, user_id=user.id, theme_id=item.linked_theme_id)
-
-    duration_days = _duration_days_for_item(item)
-    expires_at = datetime.utcnow() + timedelta(days=duration_days) if duration_days is not None else None
-    db.add(UserStoreInventory(user_id=user.id, item_id=item.item_id, category=item.category, source="purchase", expires_at=expires_at))
-    db.commit()
-    return _item_payload(db, item, user.id)
-
+    except Exception as exc:
+        db.rollback()
+        operation = db.query(StorePurchaseOperation).filter(
+            StorePurchaseOperation.purchase_id == resolved_purchase_id
+        ).first()
+        if operation is None:
+            raise
+        _compensate_store_debit(
+            db,
+            operation=operation,
+            user=user,
+            item=item,
+            failure=exc,
+        )
 
 def inventory(db: Session, user: User) -> InventoryResponse:
     seed_default_store_items(db)
