@@ -50,7 +50,10 @@ class AuthenticatedPresenceReconcileTests(TestCase):
         self.assertTrue(participant.is_active)
         self.assertIsNone(participant.left_at)
         self.assertIsNotNone(participant.last_seen_at)
-        self.assertEqual(user.last_seen_at, participant.last_seen_at)
+        self.assertIsNone(
+            user.last_seen_at,
+            "Room Control must not mutate identity-owned users.last_seen_at",
+        )
         entry.assert_called_once_with(db, room, user)
         mark_presence.assert_called_once_with(db, room, user)
         db.flush.assert_called_once()
