@@ -19,6 +19,7 @@ from app.services.audit_log_service import create_admin_log
 
 router = APIRouter(prefix="/admin/games/props", tags=["Admin Game Props"])
 
+
 @router.get("/jungle-hunt", response_model=JungleHuntPropsResponse)
 def get_jungle_hunt_props(
     db: Session = Depends(get_db),
@@ -96,7 +97,23 @@ def update_lucky_gift_props(
         action="SUPER_OWNER_LUCKY_GIFT_PROPS_UPDATED",
         resource_type="game_props",
         resource_id="lucky_gifts",
-        reason=str(props_payload.get("reason") or "Super Owner lucky g@router.get("/lucky-gifts/house-pool", response_model=LuckyGiftHousePoolResponse)
+        reason=str(props_payload.get("reason") or "Super Owner lucky gift props update"),
+        metadata_json={
+            "testing_mode_enabled": result["testing_mode_enabled"],
+            "payout_pool_safe_ratio_basis_points": result["payout_pool_safe_ratio_basis_points"],
+            "whale_daily_spend": result["whale_daily_spend"],
+            "whale_single_spend": result["whale_single_spend"],
+            "manual_review_score": result["manual_review_score"],
+            "block_score": result["block_score"],
+            "multipliers": result["multipliers"],
+            "economy_transaction_id": result.get("transaction_id"),
+        },
+    )
+
+    return LuckyGiftPropsResponse(**result)
+
+
+@router.get("/lucky-gifts/house-pool", response_model=LuckyGiftHousePoolResponse)
 def get_lucky_gift_house_pool(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
@@ -152,4 +169,3 @@ def update_lucky_gift_house_pool(
     )
 
     return LuckyGiftHousePoolResponse(**result)
-
