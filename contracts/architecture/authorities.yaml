@@ -1,6 +1,6 @@
 {
   "schema_version": 1,
-  "updated_for_chunk": 23,
+  "updated_for_chunk": 27,
   "status": "architecture contract; current fields describe repository reality and target fields describe approved migration direction",
   "classifications": [
     "AUTHORITY",
@@ -22,14 +22,14 @@
       "domain": "identity",
       "classification": "AUTHORITY",
       "logical_owner": "identity",
-      "current_deployable": "core-api",
+      "current_deployable": "identity-service",
       "current_storage": [
-        "postgres:users",
+        "postgres:users account/security columns",
         "postgres:auth_identities",
         "postgres:login_history"
       ],
       "target_storage": [
-        "identity-service postgres"
+        "identity-service PostgreSQL authority"
       ],
       "mutated_by": [
         "identity/auth services"
@@ -37,23 +37,24 @@
       "source_states": [],
       "rebuild_from": [],
       "change_contract": {
-        "status": "planned",
+        "status": "service boundary live",
         "name": "identity.account.updated.v1"
       },
-      "migration_status": "physical extraction Chunk 27"
+      "migration_status": "Chunk 27 extracted behind /api/v1/auth compatibility proxy"
     },
     {
       "id": "identity.sessions",
       "domain": "identity",
       "classification": "AUTHORITY",
       "logical_owner": "identity",
-      "current_deployable": "core-api",
+      "current_deployable": "identity-service",
       "current_storage": [
-        "signed access-token contract",
-        "postgres login/device-ban records; dedicated durable session registry not present yet"
+        "postgres:identity_sessions",
+        "postgres:identity_devices",
+        "signed access token carries sid"
       ],
       "target_storage": [
-        "identity-service postgres: sessions + devices"
+        "identity-service PostgreSQL authority"
       ],
       "mutated_by": [
         "identity/auth services"
@@ -61,17 +62,17 @@
       "source_states": [],
       "rebuild_from": [],
       "change_contract": {
-        "status": "planned",
+        "status": "service boundary live",
         "name": "identity.session.changed.v1"
       },
-      "migration_status": "explicit storage gap; Chunk 27"
+      "migration_status": "Chunk 27 durable session/device registry live; pre-Chunk-27 JWTs accepted until expiry"
     },
     {
       "id": "identity.access_tokens",
       "domain": "identity",
       "classification": "EPHEMERAL",
       "logical_owner": "identity",
-      "current_deployable": "core-api + clients",
+      "current_deployable": "identity-service + clients",
       "current_storage": [
         "short-lived signed access tokens"
       ],
@@ -91,22 +92,22 @@
         "status": "planned",
         "name": "identity.session.revoked.v1"
       },
-      "migration_status": "realtime capabilities Chunk 22"
+      "migration_status": "Identity issues session-backed access tokens; realtime capability path remains Chunk 22"
     },
     {
       "id": "profiles.public",
       "domain": "profiles",
       "classification": "AUTHORITY",
       "logical_owner": "profile-social",
-      "current_deployable": "core-api",
+      "current_deployable": "profile-social-service",
       "current_storage": [
-        "postgres:users",
+        "postgres:users profile columns (column-scoped mutation authority)",
         "postgres:user_stealth_states",
         "postgres:profile_display_audits",
         "postgres:profile_visits"
       ],
       "target_storage": [
-        "profile-social service postgres"
+        "profile-social-service PostgreSQL authority"
       ],
       "mutated_by": [
         "profile services"
@@ -114,17 +115,17 @@
       "source_states": [],
       "rebuild_from": [],
       "change_contract": {
-        "status": "planned",
+        "status": "service boundary live",
         "name": "profile.updated.v1"
       },
-      "migration_status": "physical extraction Chunk 27"
+      "migration_status": "Chunk 27 profile writes and visit side effects route through Profile/Social"
     },
     {
       "id": "social.graph",
       "domain": "social",
       "classification": "AUTHORITY",
       "logical_owner": "profile-social",
-      "current_deployable": "core-api",
+      "current_deployable": "profile-social-service",
       "current_storage": [
         "postgres:user_follows",
         "postgres:user_blocks",
@@ -132,7 +133,7 @@
         "postgres:love_bond_requests"
       ],
       "target_storage": [
-        "profile-social service postgres"
+        "profile-social-service PostgreSQL authority"
       ],
       "mutated_by": [
         "social/relationship services"
@@ -140,23 +141,23 @@
       "source_states": [],
       "rebuild_from": [],
       "change_contract": {
-        "status": "planned",
+        "status": "service boundary live",
         "name": "social.relationship.updated.v1"
       },
-      "migration_status": "physical extraction Chunk 27"
+      "migration_status": "Chunk 27 public social and relationship routes proxied to Profile/Social"
     },
     {
       "id": "families.membership",
       "domain": "families",
       "classification": "AUTHORITY",
       "logical_owner": "profile-social",
-      "current_deployable": "core-api",
+      "current_deployable": "profile-social-service",
       "current_storage": [
         "postgres:family_economy_stats (current family record)",
         "postgres:family_member_stats"
       ],
       "target_storage": [
-        "profile-social service postgres family tables"
+        "profile-social-service PostgreSQL authority on legacy-named family tables"
       ],
       "mutated_by": [
         "family services/routes"
@@ -164,10 +165,10 @@
       "source_states": [],
       "rebuild_from": [],
       "change_contract": {
-        "status": "planned",
+        "status": "service boundary live",
         "name": "family.membership.updated.v1"
       },
-      "migration_status": "historical table naming does not transfer ownership"
+      "migration_status": "Chunk 27 family membership routes extracted; family economy ranking reads remain core projections"
     },
     {
       "id": "families.community_chat",

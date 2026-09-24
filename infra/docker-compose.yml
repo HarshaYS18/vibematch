@@ -150,6 +150,12 @@ services:
       ROOM_CONTROL_SERVICE_URL: http://room-control:8085/api/v1
       ROOM_CONTROL_INTERNAL_URL: http://room-control:8085/internal/room-control
       ROOM_CONTROL_INTERNAL_TOKEN: local-development-room-control-token-2026
+      IDENTITY_SERVICE_URL: http://identity:8086/api/v1
+      IDENTITY_INTERNAL_URL: http://identity:8086/internal/identity
+      IDENTITY_INTERNAL_TOKEN: local-development-identity-internal-token-2026
+      PROFILE_SOCIAL_SERVICE_URL: http://profile-social:8087/api/v1
+      PROFILE_SOCIAL_INTERNAL_URL: http://profile-social:8087/internal/profile-social
+      PROFILE_SOCIAL_INTERNAL_TOKEN: local-development-profile-social-token-2026
       NATS_URL: nats://nats:4222
       CORS_ALLOWED_ORIGINS: http://localhost:3000,http://localhost:8080
       ENABLE_DEV_LOGIN: "true"
@@ -207,6 +213,31 @@ services:
       migrate: {condition: service_completed_successfully}
       pgbouncer: {condition: service_healthy}
       realtime-redis: {condition: service_healthy}
+
+  identity:
+    profiles: ["app"]
+    build: {context: .., dockerfile: apps/identity-service/Dockerfile}
+    environment:
+      <<: *api_environment
+      DB_APPLICATION_NAME: funkey-identity
+      IDENTITY_DATABASE_URL: postgresql://funkey:funkey_dev_only@pgbouncer:6432/funkey
+    ports: ["127.0.0.1:8086:8086"]
+    depends_on:
+      migrate: {condition: service_completed_successfully}
+      pgbouncer: {condition: service_healthy}
+
+  profile-social:
+    profiles: ["app"]
+    build: {context: .., dockerfile: apps/profile-social-service/Dockerfile}
+    environment:
+      <<: *api_environment
+      DB_APPLICATION_NAME: funkey-profile-social
+      PROFILE_SOCIAL_DATABASE_URL: postgresql://funkey:funkey_dev_only@pgbouncer:6432/funkey
+    ports: ["127.0.0.1:8087:8087"]
+    depends_on:
+      migrate: {condition: service_completed_successfully}
+      pgbouncer: {condition: service_healthy}
+      inbox: {condition: service_started}
 
   realtime:
     profiles: ["app"]

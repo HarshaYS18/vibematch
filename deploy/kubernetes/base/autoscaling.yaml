@@ -123,3 +123,34 @@ spec:
       pods:
         metric: {name: funkey_http_inflight_requests}
         target: {type: AverageValue, averageValue: "40"}
+
+---
+apiVersion: autoscaling/v2
+kind: HorizontalPodAutoscaler
+metadata:
+  name: funkey-identity
+spec:
+  scaleTargetRef: {apiVersion: apps/v1, kind: Deployment, name: funkey-identity}
+  minReplicas: 3
+  maxReplicas: 20
+  behavior: {scaleDown: {stabilizationWindowSeconds: 300}}
+  metrics:
+    - type: Resource
+      resource: {name: cpu, target: {type: Utilization, averageUtilization: 60}}
+    - type: Pods
+      pods: {metric: {name: funkey_http_inflight_requests}, target: {type: AverageValue, averageValue: "40"}}
+---
+apiVersion: autoscaling/v2
+kind: HorizontalPodAutoscaler
+metadata:
+  name: funkey-profile-social
+spec:
+  scaleTargetRef: {apiVersion: apps/v1, kind: Deployment, name: funkey-profile-social}
+  minReplicas: 3
+  maxReplicas: 20
+  behavior: {scaleDown: {stabilizationWindowSeconds: 300}}
+  metrics:
+    - type: Resource
+      resource: {name: cpu, target: {type: Utilization, averageUtilization: 65}}
+    - type: Pods
+      pods: {metric: {name: funkey_http_inflight_requests}, target: {type: AverageValue, averageValue: "45"}}

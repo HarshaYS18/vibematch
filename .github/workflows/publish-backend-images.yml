@@ -34,6 +34,12 @@ jobs:
           - name: room-control
             dockerfile: apps/room-control-service/Dockerfile
             context: .
+          - name: identity
+            dockerfile: apps/identity-service/Dockerfile
+            context: .
+          - name: profile-social
+            dockerfile: apps/profile-social-service/Dockerfile
+            context: .
           - name: worker
             dockerfile: apps/worker/Dockerfile
             context: .

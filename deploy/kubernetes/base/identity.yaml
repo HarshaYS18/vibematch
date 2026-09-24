@@ -1,0 +1,47 @@
+apiVersion: v1
+kind: ServiceAccount
+metadata: {name: funkey-identity}
+automountServiceAccountToken: false
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: funkey-identity
+  labels: {app: funkey-identity}
+spec:
+  replicas: 3
+  revisionHistoryLimit: 5
+  strategy: {type: RollingUpdate, rollingUpdate: {maxSurge: 1, maxUnavailable: 0}}
+  selector: {matchLabels: {app: funkey-identity}}
+  template:
+    metadata:
+      annotations: {prometheus.io/scrape: "true", prometheus.io/path: /metrics, prometheus.io/port: "8086"}
+      labels: {app: funkey-identity}
+    spec:
+      serviceAccountName: funkey-identity
+      automountServiceAccountToken: false
+      terminationGracePeriodSeconds: 60
+      nodeSelector: {funkey.io/workload: application}
+      securityContext: {runAsNonRoot: true, seccompProfile: {type: RuntimeDefault}}
+      containers:
+        - name: identity
+          image: funkey-identity:dev
+          ports: [{name: http, containerPort: 8086}]
+          envFrom:
+            - configMapRef: {name: funkey-config}
+            - secretRef: {name: funkey-identity-secrets}
+          resources: {requests: {cpu: 250m, memory: 384Mi}, limits: {cpu: "1", memory: 768Mi}}
+          startupProbe: {httpGet: {path: /live, port: http}, failureThreshold: 30, periodSeconds: 2}
+          livenessProbe: {httpGet: {path: /live, port: http}, periodSeconds: 20}
+          readinessProbe: {httpGet: {path: /ready, port: http}, periodSeconds: 5}
+          securityContext: {allowPrivilegeEscalation: false, readOnlyRootFilesystem: true, capabilities: {drop: [ALL]}}
+---
+apiVersion: v1
+kind: Service
+metadata: {name: funkey-identity}
+spec: {selector: {app: funkey-identity}, ports: [{name: http, port: 8086, targetPort: http}]}
+---
+apiVersion: policy/v1
+kind: PodDisruptionBudget
+metadata: {name: funkey-identity}
+spec: {minAvailable: 2, selector: {matchLabels: {app: funkey-identity}}}

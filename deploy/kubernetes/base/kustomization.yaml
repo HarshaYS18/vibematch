@@ -8,6 +8,8 @@ resources:
   - inbox.yaml
   - vibes.yaml
   - room-control.yaml
+  - identity.yaml
+  - profile-social.yaml
   - realtime.yaml
   - worker.yaml
   - autoscaling.yaml

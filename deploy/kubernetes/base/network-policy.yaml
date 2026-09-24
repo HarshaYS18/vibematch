@@ -67,3 +67,24 @@ spec:
     - from:
         - namespaceSelector: {}
       ports: [{protocol: TCP, port: 8085}]
+
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata: {name: funkey-identity-ingress}
+spec:
+  podSelector: {matchLabels: {app: funkey-identity}}
+  policyTypes: [Ingress]
+  ingress:
+    - from: [{namespaceSelector: {}}]
+      ports: [{protocol: TCP, port: 8086}]
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata: {name: funkey-profile-social-ingress}
+spec:
+  podSelector: {matchLabels: {app: funkey-profile-social}}
+  policyTypes: [Ingress]
+  ingress:
+    - from: [{namespaceSelector: {}}]
+      ports: [{protocol: TCP, port: 8087}]
