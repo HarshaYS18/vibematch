@@ -8,6 +8,7 @@ from fastapi import HTTPException
 from sqlalchemy.orm import Session
 
 from app.models.economy import EconomyCurrency, EconomyDirection, UserWallet, WalletLedger
+from app.models.economy_journal import EconomyJournalEntry
 from app.models.economy_transaction import EconomyTransaction
 from app.services import event_outbox_service
 
@@ -34,6 +35,72 @@ def begin(db: Session, *, transaction_id: str, idempotency_key: str, business_re
     db.add(tx); db.flush()
     return tx, None
 
+def record_balanced_transfer(
+    db: Session,
+    *,
+    tx: EconomyTransaction,
+    currency: str,
+    amount: int,
+    debit_account: str,
+    credit_account: str,
+    source_type: str,
+    debit_user_id: int | None = None,
+    credit_user_id: int | None = None,
+) -> None:
+    """Append a balanced debit/credit pair inside the caller's transaction."""
+
+    amount = int(amount or 0)
+    if amount <= 0:
+        raise HTTPException(status_code=400, detail="journal amount must be positive")
+    for direction, account_code, user_id in (
+        ("DEBIT", debit_account, debit_user_id),
+        ("CREDIT", credit_account, credit_user_id),
+    ):
+        db.add(
+            EconomyJournalEntry(
+                economy_transaction_id=tx.id,
+                transaction_id=tx.transaction_id,
+                business_reference=tx.business_reference,
+                currency_type=currency,
+                account_code=account_code[:160],
+                direction=direction,
+                amount=amount,
+                user_id=user_id,
+                source_type=source_type[:80],
+            )
+        )
+
+
+def _assert_journal_balanced(db: Session, tx: EconomyTransaction) -> None:
+    rows = (
+        db.query(
+            EconomyJournalEntry.currency_type,
+            EconomyJournalEntry.direction,
+            EconomyJournalEntry.amount,
+        )
+        .filter(EconomyJournalEntry.economy_transaction_id == tx.id)
+        .all()
+    )
+    if not rows:
+        return
+
+    totals: dict[str, dict[str, int]] = {}
+    for currency, direction, amount in rows:
+        bucket = totals.setdefault(str(currency), {"DEBIT": 0, "CREDIT": 0})
+        bucket[str(direction)] = bucket.get(str(direction), 0) + int(amount or 0)
+
+    unbalanced = {
+        currency: values
+        for currency, values in totals.items()
+        if values.get("DEBIT", 0) != values.get("CREDIT", 0)
+    }
+    if unbalanced:
+        raise HTTPException(
+            status_code=500,
+            detail="Economy journal is unbalanced; transaction was not committed",
+        )
+
+
 def wallet_for_update(db: Session, user_id: int) -> UserWallet:
     wallet=db.query(UserWallet).filter(UserWallet.user_id==int(user_id)).with_for_update().first()
     if wallet is None:
@@ -54,6 +121,16 @@ def debit(db: Session, *, user_id:int, amount:int, currency:str, source_type:str
         wallet.ruby_balance=before-amount; after=wallet.ruby_balance
     else: raise HTTPException(status_code=400, detail="Unsupported currency")
     db.add(WalletLedger(user_id=user_id,currency_type=currency,direction=EconomyDirection.DEBIT.value,amount=amount,before_balance=before,after_balance=after,source_type=source_type,source_id=source_id,transaction_id=tx.transaction_id,idempotency_key=tx.idempotency_key,business_reference=tx.business_reference,created_by_user_id=actor_user_id,reason=reason))
+    record_balanced_transfer(
+        db,
+        tx=tx,
+        currency=currency,
+        amount=amount,
+        debit_account=f"USER_WALLET:{user_id}:{currency}",
+        credit_account=f"SYSTEM_CLEARING:{source_type}:{currency}",
+        source_type=source_type,
+        debit_user_id=user_id,
+    )
     return wallet
 
 def credit(db: Session, *, user_id:int, amount:int, currency:str, source_type:str, source_id:str|None, reason:str|None, tx:EconomyTransaction, actor_user_id:int|None, metadata_json:str|None=None) -> UserWallet:
@@ -67,9 +144,21 @@ def credit(db: Session, *, user_id:int, amount:int, currency:str, source_type:st
         before=int(wallet.ruby_balance or 0); wallet.ruby_balance=before+amount; wallet.lifetime_rubies_earned+=amount; after=wallet.ruby_balance
     else: raise HTTPException(status_code=400, detail="Unsupported currency")
     db.add(WalletLedger(user_id=user_id,currency_type=currency,direction=EconomyDirection.CREDIT.value,amount=amount,before_balance=before,after_balance=after,source_type=source_type,source_id=source_id,transaction_id=tx.transaction_id,idempotency_key=tx.idempotency_key,business_reference=tx.business_reference,created_by_user_id=actor_user_id,reason=reason,metadata_json=metadata_json))
+    record_balanced_transfer(
+        db,
+        tx=tx,
+        currency=currency,
+        amount=amount,
+        debit_account=f"SYSTEM_CLEARING:{source_type}:{currency}",
+        credit_account=f"USER_WALLET:{user_id}:{currency}",
+        source_type=source_type,
+        credit_user_id=user_id,
+    )
     return wallet
 
 def complete(db: Session, *, tx:EconomyTransaction, result:dict[str,Any], event_type:str, event_payload:dict[str,Any]):
+    db.flush()
+    _assert_journal_balanced(db, tx)
     tx.status="COMPLETED"; tx.completed_at=datetime.utcnow(); tx.result_json=json.dumps(result,separators=(",",":"),default=str)
     event_outbox_service.enqueue_event(db,event_type=event_type,actor_user_id=tx.actor_user_id,payload={"transaction_id":tx.transaction_id,"idempotency_key":tx.idempotency_key,"business_reference":tx.business_reference,**event_payload})
     db.commit()
