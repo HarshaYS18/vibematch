@@ -42,6 +42,14 @@ jobs:
             echo "Go source differs from gofmt output."
             exit 1
           fi
+      - name: Check Go module graph is tidy
+        shell: bash
+        run: |
+          go mod tidy
+          if ! git diff --exit-code -- go.mod go.sum; then
+            echo "Go module files differ from go mod tidy output."
+            exit 1
+          fi
       - run: go vet ./...
       - run: go test ./...
       - run: go test -race ./...
