@@ -150,6 +150,31 @@ def credit_wallet(
     )
 
 
+
+def adjust_wallet_levels(
+    *,
+    request_id: str,
+    actor_user_id: int,
+    target_user_id: int,
+    send_exp_total: int | None,
+    receive_exp_total: int | None,
+    ruby_total: int | None,
+    reason: str,
+) -> dict[str, Any]:
+    business_reference = f"super-owner-level-adjust:{target_user_id}:{request_id}"
+    return _request(
+        "wallet/admin-level-adjust",
+        {
+            **mutation_context("wallet.admin_level_adjust", business_reference),
+            "actor_user_id": int(actor_user_id),
+            "target_user_id": int(target_user_id),
+            "send_exp_total": send_exp_total,
+            "receive_exp_total": receive_exp_total,
+            "ruby_total": ruby_total,
+            "reason": reason,
+        },
+    )
+
 def claim_mission_reward(
     *,
     user_id: int,
