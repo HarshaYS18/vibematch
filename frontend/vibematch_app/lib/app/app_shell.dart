@@ -22,7 +22,6 @@ import '../identity/data/identity_repository.dart';
 import '../session/data/session_repository.dart';
 import 'runtime/app_identity_runtime.dart';
 import 'runtime/app_inbox_runtime.dart';
-import 'runtime/app_presence_runtime.dart';
 import '../realtime/app_realtime_hub.dart';
 import 'runtime/app_shell_navigation_controller.dart';
 import 'runtime/app_wallet_runtime.dart';
@@ -103,19 +102,8 @@ class _AppShellState extends ConsumerState<AppShell>
 
   @override
   void didChangeAppLifecycleState(AppLifecycleState state) {
-    final presence = ref.read(appPresenceRuntimeProvider);
     if (state == AppLifecycleState.resumed) {
-      presence.start(
-        onSessionInvalid: _handleAuthoritativeSessionInvalidation,
-      );
       unawaited(_reconcileCanonicalShellState());
-      return;
-    }
-
-    if (state == AppLifecycleState.paused ||
-        state == AppLifecycleState.hidden ||
-        state == AppLifecycleState.detached) {
-      presence.stop();
     }
   }
 
@@ -123,9 +111,6 @@ class _AppShellState extends ConsumerState<AppShell>
     ref
         .read(appIdentityRuntimeProvider)
         .start(initialUser: widget.currentUser);
-    ref.read(appPresenceRuntimeProvider).start(
-      onSessionInvalid: _handleAuthoritativeSessionInvalidation,
-    );
 
     final realtime = ref.read(appRealtimeHubProvider);
     await realtime.start();
@@ -220,7 +205,6 @@ class _AppShellState extends ConsumerState<AppShell>
     // Watching these providers keeps session-scoped runtimes alive only while
     // the authenticated shell is mounted.
     ref.watch(appIdentityRuntimeProvider);
-    ref.watch(appPresenceRuntimeProvider);
     ref.watch(appRealtimeHubProvider);
     ref.watch(appWalletRuntimeProvider);
 
