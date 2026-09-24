@@ -156,6 +156,9 @@ services:
       PROFILE_SOCIAL_SERVICE_URL: http://profile-social:8087/api/v1
       PROFILE_SOCIAL_INTERNAL_URL: http://profile-social:8087/internal/profile-social
       PROFILE_SOCIAL_INTERNAL_TOKEN: local-development-profile-social-token-2026
+      ECONOMY_SERVICE_URL: http://economy:8088/api/v1
+      ECONOMY_INTERNAL_URL: http://economy:8088/internal/economy
+      ECONOMY_INTERNAL_TOKEN: local-development-economy-internal-token-2026
       NATS_URL: nats://nats:4222
       CORS_ALLOWED_ORIGINS: http://localhost:3000,http://localhost:8080
       ENABLE_DEV_LOGIN: "true"
@@ -239,6 +242,23 @@ services:
       migrate: {condition: service_completed_successfully}
       pgbouncer: {condition: service_healthy}
       inbox: {condition: service_started}
+
+  economy:
+    profiles: ["app"]
+    build:
+      context: ..
+      dockerfile: apps/economy-service/Dockerfile
+    environment:
+      <<: *api_environment
+      DB_APPLICATION_NAME: funkey-economy
+      ECONOMY_DATABASE_URL: postgresql://funkey:funkey_dev_only@pgbouncer:6432/funkey
+    ports:
+      - "127.0.0.1:8088:8088"
+    depends_on:
+      migrate:
+        condition: service_completed_successfully
+      pgbouncer:
+        condition: service_healthy
 
   realtime:
     profiles: ["app"]

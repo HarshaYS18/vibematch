@@ -10,6 +10,7 @@ resources:
   - room-control.yaml
   - identity.yaml
   - profile-social.yaml
+  - economy.yaml
   - realtime.yaml
   - worker.yaml
   - autoscaling.yaml

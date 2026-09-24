@@ -154,3 +154,33 @@ spec:
       resource: {name: cpu, target: {type: Utilization, averageUtilization: 65}}
     - type: Pods
       pods: {metric: {name: funkey_http_inflight_requests}, target: {type: AverageValue, averageValue: "45"}}
+
+---
+apiVersion: autoscaling/v2
+kind: HorizontalPodAutoscaler
+metadata:
+  name: funkey-economy
+spec:
+  scaleTargetRef:
+    apiVersion: apps/v1
+    kind: Deployment
+    name: funkey-economy
+  minReplicas: 3
+  maxReplicas: 20
+  behavior:
+    scaleDown:
+      stabilizationWindowSeconds: 300
+  metrics:
+    - type: Resource
+      resource:
+        name: cpu
+        target:
+          type: Utilization
+          averageUtilization: 60
+    - type: Pods
+      pods:
+        metric:
+          name: funkey_http_inflight_requests
+        target:
+          type: AverageValue
+          averageValue: "35"

@@ -78,10 +78,10 @@ jobs:
           python - <<'PY'
           from pathlib import Path
           manifest = Path("/tmp/funkey-production.yaml").read_text()
-          for image in ("funkey-api", "funkey-inbox", "funkey-vibes", "funkey-room-control", "funkey-identity", "funkey-profile-social", "funkey-worker", "funkey-realtime", "funkey-media"):
+          for image in ("funkey-api", "funkey-inbox", "funkey-vibes", "funkey-room-control", "funkey-identity", "funkey-profile-social", "funkey-economy", "funkey-worker", "funkey-realtime", "funkey-media"):
               if f"{image}:dev" in manifest:
                   raise SystemExit(f"production render still contains mutable dev image: {image}")
-          if manifest.count("@sha256:") < 9:
+          if manifest.count("@sha256:") < 10:
               raise SystemExit("production render must pin all backend workloads by digest")
           PY
       - name: Parse load and chaos harnesses
@@ -102,6 +102,7 @@ jobs:
       - run: docker build -f apps/room-control-service/Dockerfile -t funkey-room-control:ci .
       - run: docker build -f apps/identity-service/Dockerfile -t funkey-identity:ci .
       - run: docker build -f apps/profile-social-service/Dockerfile -t funkey-profile-social:ci .
+      - run: docker build -f apps/economy-service/Dockerfile -t funkey-economy:ci .
       - run: docker build -f apps/realtime-gateway/Dockerfile -t funkey-realtime:ci .
       - run: docker build -f backend_media/Dockerfile -t funkey-media:ci backend_media
       - uses: aquasecurity/trivy-action@v0.36.0

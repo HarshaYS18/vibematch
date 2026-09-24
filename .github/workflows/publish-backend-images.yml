@@ -40,6 +40,9 @@ jobs:
           - name: profile-social
             dockerfile: apps/profile-social-service/Dockerfile
             context: .
+          - name: economy
+            dockerfile: apps/economy-service/Dockerfile
+            context: .
           - name: worker
             dockerfile: apps/worker/Dockerfile
             context: .

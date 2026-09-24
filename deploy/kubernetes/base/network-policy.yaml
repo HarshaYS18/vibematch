@@ -88,3 +88,20 @@ spec:
   ingress:
     - from: [{namespaceSelector: {}}]
       ports: [{protocol: TCP, port: 8087}]
+
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: funkey-economy-ingress
+spec:
+  podSelector:
+    matchLabels:
+      app: funkey-economy
+  policyTypes: [Ingress]
+  ingress:
+    - from:
+        - namespaceSelector: {}
+      ports:
+        - protocol: TCP
+          port: 8088
