@@ -56,3 +56,16 @@ If Room Control is unavailable, core returns a bounded 503 for proxied room auth
 ## Scaling and observability
 
 Room Control exports the shared HTTP/database telemetry and `/metrics`, uses its own bounded PostgreSQL pool, has a 3-pod HA floor, topology spreading, PDB, and HPA up to 20 replicas. Its connection budget is included in Terraform and production configuration validation.
+
+
+## Realtime and media authorization boundary
+
+Chunk 26 completion removes the last core shared-database dependency on room
+authority. Realtime capability issuance, subscription verification and
+`/realtime/command` now call the authenticated Room Control internal API.
+Ordinary room media authorization uses the same authoritative decision for
+membership, kickout, seat, mic and room-version state. Call-room media remains
+with the separate call authority.
+
+If Room Control is unavailable these checks fail closed; core must not fall back
+to querying `rooms`, `room_participants` or `room_seat_states` directly.

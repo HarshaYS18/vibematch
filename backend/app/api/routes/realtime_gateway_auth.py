@@ -4,6 +4,7 @@ The gateway transports events only. Room membership and moderation decisions
 remain in this control plane until a separately tested domain migration.
 """
 
+import asyncio
 from typing import Literal
 
 from fastapi import APIRouter, Depends, Header, HTTPException
@@ -14,11 +15,9 @@ from app.api.routes.users import get_current_user
 from app.core.security import decode_access_token
 from app.database import get_db
 from app.models.role import RoleName
-from app.models.room import Room
 from app.models.user import User
-from app.services import realtime_capability_service, realtime_command_service, role_service
+from app.services import realtime_capability_service, role_service, room_control_service_client
 from app.services.ban_service import is_device_banned
-from app.services.permissions.media_room_permission_service import evaluate_media_room_permission
 
 
 router = APIRouter(prefix="/realtime", tags=["Realtime Gateway Auth"])
@@ -108,25 +107,27 @@ def issue_realtime_capability(
     scopes = ["realtime:connect"]
 
     if room_public_id:
-        room = db.query(Room).filter(Room.room_public_id == room_public_id).first()
-        if room is None or not room.is_active:
-            raise HTTPException(status_code=404, detail="Room unavailable")
-        decision = evaluate_media_room_permission(
-            db=db,
-            user=current_user,
-            room=room,
-            action="join_room",
-            device_id=device_id,
-            has_active_room_connection=False,
-        )
-        if not decision.allowed:
+        try:
+            decision = room_control_service_client.authorize_room_action(
+                user_id=current_user.id,
+                room_public_id=room_public_id,
+                action="join_room",
+                device_id=device_id,
+                has_active_room_connection=False,
+                evaluate_permissions=True,
+            )
+        except room_control_service_client.RoomControlServiceUnavailable as exc:
+            raise HTTPException(status_code=503, detail=str(exc)) from exc
+        except room_control_service_client.RoomControlServiceError as exc:
+            raise HTTPException(status_code=exc.status_code, detail=exc.detail) from exc
+        if not decision.get("allowed", False):
             raise HTTPException(
                 status_code=403,
-                detail=decision.reason or "Room access denied",
+                detail=str(decision.get("reason") or "Room access denied"),
             )
         scopes = ["room:subscribe"]
-        permissions = list(decision.permissions)
-        membership_version = int(room.realtime_version or 0)
+        permissions = list(decision.get("permissions") or [])
+        membership_version = int(decision.get("membership_version") or 0)
 
     issued = realtime_capability_service.issue_realtime_capability(
         access_token=access_token,
@@ -167,21 +168,23 @@ def verify_realtime_gateway(
     if payload.requested_action == "subscribe":
         if not payload.room_public_id:
             raise HTTPException(status_code=422, detail="room_public_id is required")
-        room = db.query(Room).filter(Room.room_public_id == payload.room_public_id).first()
-        if room is None or not room.is_active:
-            raise HTTPException(status_code=404, detail="Room unavailable")
-        decision = evaluate_media_room_permission(
-            db=db,
-            user=current_user,
-            room=room,
-            action="join_room",
-            device_id=device_id,
-            has_active_room_connection=False,
-        )
-        if not decision.allowed:
+        try:
+            decision = room_control_service_client.authorize_room_action(
+                user_id=current_user.id,
+                room_public_id=payload.room_public_id,
+                action="join_room",
+                device_id=device_id,
+                has_active_room_connection=False,
+                evaluate_permissions=True,
+            )
+        except room_control_service_client.RoomControlServiceUnavailable as exc:
+            raise HTTPException(status_code=503, detail=str(exc)) from exc
+        except room_control_service_client.RoomControlServiceError as exc:
+            raise HTTPException(status_code=exc.status_code, detail=exc.detail) from exc
+        if not decision.get("allowed", False):
             raise HTTPException(
                 status_code=403,
-                detail=decision.reason or "Room access denied",
+                detail=str(decision.get("reason") or "Room access denied"),
             )
 
     return RealtimeVerifyResponse(
@@ -198,16 +201,23 @@ async def execute_realtime_command(
     db: Session = Depends(get_db),
 ):
     """Execute one allowlisted application command in the authoritative API."""
-    result = await realtime_command_service.execute_application_realtime_command(
-        db,
-        current_user,
-        command_type=payload.type,
-        room_public_id=payload.room_public_id,
-        conversation_id=payload.conversation_id,
-        activity=payload.activity,
-        payload=payload.payload,
-        command_id=payload.command_id,
-    )
+    room_public_id = str(payload.room_public_id or "").strip()
+    if not room_public_id:
+        raise HTTPException(status_code=422, detail="room_public_id is required")
+    try:
+        result = await asyncio.to_thread(
+            room_control_service_client.execute_realtime_command,
+            user_id=current_user.id,
+            command_type=payload.type,
+            room_public_id=room_public_id,
+            activity=payload.activity,
+            payload=payload.payload,
+            command_id=payload.command_id,
+        )
+    except room_control_service_client.RoomControlServiceUnavailable as exc:
+        raise HTTPException(status_code=503, detail=str(exc)) from exc
+    except room_control_service_client.RoomControlServiceError as exc:
+        raise HTTPException(status_code=exc.status_code, detail=exc.detail) from exc
     return RealtimeCommandResponse(
         command_id=payload.command_id,
         **result,

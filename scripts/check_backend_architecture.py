@@ -547,6 +547,58 @@ def _validate_inbox_service_extraction(errors: list[str]) -> None:
                     + str(source.relative_to(ROOT))
                 )
 
+    realtime_auth_path = (
+        ROOT / "backend" / "app" / "api" / "routes" /
+        "realtime_gateway_auth.py"
+    )
+    if realtime_auth_path.exists():
+        text = realtime_auth_path.read_text(encoding="utf-8")
+        if "room_control_service_client.authorize_room_action" not in text:
+            errors.append("core realtime authorization must use Room Control")
+        if "room_control_service_client.execute_realtime_command" not in text:
+            errors.append("core realtime commands must execute through Room Control")
+        for forbidden in (
+            "from app.models.room import Room",
+            "evaluate_media_room_permission(",
+            "db.query(Room)",
+        ):
+            if forbidden in text:
+                errors.append(
+                    "core realtime auth must not bypass Room Control: " + forbidden
+                )
+
+    media_auth_path = (
+        ROOT / "backend" / "app" / "services" /
+        "media_realtime_auth_service.py"
+    )
+    if media_auth_path.exists():
+        text = media_auth_path.read_text(encoding="utf-8")
+        if "room_control_service_client.authorize_room_action" not in text:
+            errors.append("ordinary room media authorization must use Room Control")
+        for forbidden in (
+            "from app.models.room import Room",
+            "evaluate_media_room_permission(",
+            "db.query(Room)",
+        ):
+            if forbidden in text:
+                errors.append(
+                    "core media auth must not bypass Room Control: " + forbidden
+                )
+
+    internal_path = ROOM_CONTROL_SERVICE_ROOT / "internal.py"
+    if internal_path.exists():
+        text = internal_path.read_text(encoding="utf-8")
+        for required_token in (
+            '"/authorize"',
+            '"/command"',
+            "evaluate_media_room_permission(",
+            "execute_application_realtime_command(",
+        ):
+            if required_token not in text:
+                errors.append(
+                    "Room Control internal authority API missing: " + required_token
+                )
+
     authority = json.loads(AUTHORITY_REGISTRY.read_text(encoding="utf-8"))
     inbox = next(
         (state for state in authority.get("states", [])

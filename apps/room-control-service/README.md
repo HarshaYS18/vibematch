@@ -30,3 +30,11 @@ room through the authenticated internal API.
 - metrics: `/metrics`
 - port: 8085
 - database: `ROOM_CONTROL_DATABASE_URL`
+
+
+## Internal realtime authority API
+
+`POST /internal/room-control/authorize` resolves authoritative room access and
+media permission context. `POST /internal/room-control/command` executes the
+allowlisted room command engine inside this deployable. Core realtime and media
+code must use these endpoints instead of reading Room Control tables directly.

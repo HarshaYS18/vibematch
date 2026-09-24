@@ -147,6 +147,44 @@ class RoomControlServiceContractTests(TestCase):
         )
         self.assertIn("GRANT INSERT ON TABLE event_outbox", sql)
 
+    def test_core_realtime_and_media_do_not_bypass_room_control(self):
+        realtime = (
+            ROOT / "backend" / "app" / "api" / "routes" /
+            "realtime_gateway_auth.py"
+        ).read_text(encoding="utf-8")
+        media = (
+            ROOT / "backend" / "app" / "services" /
+            "media_realtime_auth_service.py"
+        ).read_text(encoding="utf-8")
+        internal = (
+            ROOT / "apps" / "room-control-service" / "internal.py"
+        ).read_text(encoding="utf-8")
+
+        self.assertIn(
+            "room_control_service_client.authorize_room_action",
+            realtime,
+        )
+        self.assertIn(
+            "room_control_service_client.execute_realtime_command",
+            realtime,
+        )
+        self.assertNotIn("from app.models.room import Room", realtime)
+        self.assertNotIn("evaluate_media_room_permission(", realtime)
+        self.assertNotIn("db.query(Room)", realtime)
+
+        self.assertIn(
+            "room_control_service_client.authorize_room_action",
+            media,
+        )
+        self.assertNotIn("from app.models.room import Room", media)
+        self.assertNotIn("evaluate_media_room_permission(", media)
+        self.assertNotIn("db.query(Room)", media)
+
+        self.assertIn('"/authorize"', internal)
+        self.assertIn('"/command"', internal)
+        self.assertIn("evaluate_media_room_permission(", internal)
+        self.assertIn("execute_application_realtime_command(", internal)
+
     def test_all_room_authorities_point_to_room_control(self):
         payload = json.loads(
             (

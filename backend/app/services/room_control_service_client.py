@@ -81,3 +81,49 @@ def grant_room_theme(
         f"themes/{theme_id}/grant",
         json_body={"user_id": int(user_id), "source": source},
     )
+
+
+def authorize_room_action(
+    *,
+    user_id: int,
+    room_public_id: str,
+    action: str,
+    device_id: str | None = None,
+    has_active_room_connection: bool = False,
+    evaluate_permissions: bool = True,
+) -> dict[str, Any]:
+    return _request(
+        "POST",
+        "authorize",
+        json_body={
+            "user_id": int(user_id),
+            "room_public_id": room_public_id,
+            "action": action,
+            "device_id": device_id,
+            "has_active_room_connection": bool(has_active_room_connection),
+            "evaluate_permissions": bool(evaluate_permissions),
+        },
+    )
+
+
+def execute_realtime_command(
+    *,
+    user_id: int,
+    command_type: str,
+    room_public_id: str,
+    activity: str | None,
+    payload: dict[str, Any] | None,
+    command_id: str | None,
+) -> dict[str, Any]:
+    return _request(
+        "POST",
+        "command",
+        json_body={
+            "user_id": int(user_id),
+            "command_type": command_type,
+            "room_public_id": room_public_id,
+            "activity": activity,
+            "payload": dict(payload or {}),
+            "command_id": command_id,
+        },
+    )
