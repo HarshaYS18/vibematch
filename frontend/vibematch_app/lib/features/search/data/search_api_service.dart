@@ -1,18 +1,18 @@
 import 'package:flutter/material.dart';
 
-import '../../../core/network/api_client.dart';
+import 'package:vibematch_app/foundation/networking/app_network_client.dart';
 import '../../auth/data/auth_api_service.dart';
 import '../../rooms/data/room_api_service.dart';
 import '../models/search_result_item.dart';
 import '../models/search_result_type.dart';
 
 class SearchApiService {
-  SearchApiService({ApiClient? apiClient, AuthApiService? authApiService, RoomApiService? roomApiService})
-      : _apiClient = apiClient ?? ApiClient(),
+  SearchApiService({AppNetworkClient? apiClient, AuthApiService? authApiService, RoomApiService? roomApiService})
+      : _apiClient = apiClient ?? AppNetworkRuntime.shared,
         _authApiService = authApiService ?? const AuthApiService(),
         _roomApiService = roomApiService ?? const RoomApiService();
 
-  final ApiClient _apiClient;
+  final AppNetworkClient _apiClient;
   final AuthApiService _authApiService;
   final RoomApiService _roomApiService;
 

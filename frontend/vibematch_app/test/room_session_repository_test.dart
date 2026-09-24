@@ -3,7 +3,7 @@ import 'package:vibematch_app/foundation/networking/app_network_client.dart';
 import 'package:vibematch_app/room_session/data/room_session_repository.dart';
 import 'package:vibematch_app/room_session/domain/room_session_state.dart';
 
-class _FakeNetworkClient implements AppNetworkClient {
+class _FakeNetworkClient extends DioAppNetworkClient {
   _FakeNetworkClient(this.snapshot);
 
   Map<String, dynamic> snapshot;
@@ -15,6 +15,8 @@ class _FakeNetworkClient implements AppNetworkClient {
     String path, {
     Map<String, String?> queryParameters = const <String, String?>{},
     Map<String, String> headers = const <String, String>{},
+  
+    NetworkCancellation? cancellation,
   }) async {
     calls.add('GET $path');
     return <String, dynamic>{'room_id': 'VM123', 'room': snapshot};
@@ -25,6 +27,8 @@ class _FakeNetworkClient implements AppNetworkClient {
     String path, {
     Map<String, String?> queryParameters = const <String, String?>{},
     Map<String, String> headers = const <String, String>{},
+  
+    NetworkCancellation? cancellation,
   }) async {
     calls.add('GET_LIST $path');
     return const <dynamic>[];
@@ -36,6 +40,9 @@ class _FakeNetworkClient implements AppNetworkClient {
     Map<String, String?> queryParameters = const <String, String?>{},
     Map<String, String> headers = const <String, String>{},
     Object? body,
+  
+    NetworkCancellation? cancellation,
+    String? idempotencyKey,
   }) async {
     calls.add('POST $path');
     return <String, dynamic>{
@@ -52,6 +59,9 @@ class _FakeNetworkClient implements AppNetworkClient {
     Map<String, String?> queryParameters = const <String, String?>{},
     Map<String, String> headers = const <String, String>{},
     Object? body,
+  
+    NetworkCancellation? cancellation,
+    String? idempotencyKey,
   }) async {
     calls.add('PATCH $path');
     return <String, dynamic>{};
@@ -63,6 +73,9 @@ class _FakeNetworkClient implements AppNetworkClient {
     Map<String, String?> queryParameters = const <String, String?>{},
     Map<String, String> headers = const <String, String>{},
     Object? body,
+  
+    NetworkCancellation? cancellation,
+    String? idempotencyKey,
   }) async {
     calls.add('DELETE $path');
     return <String, dynamic>{};

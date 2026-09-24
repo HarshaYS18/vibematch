@@ -1,16 +1,16 @@
-import '../core/network/api_client.dart';
+import 'package:vibematch_app/foundation/networking/app_network_client.dart';
 import '../core/network/api_endpoints.dart';
 import '../features/auth/data/auth_api_service.dart';
 import 'app_source_registry.dart';
 
 class AppSourceRegistryRepository {
   AppSourceRegistryRepository({
-    ApiClient? apiClient,
+    AppNetworkClient? apiClient,
     AuthApiService authApiService = const AuthApiService(),
-  }) : _apiClient = apiClient ?? ApiClient(),
+  }) : _apiClient = apiClient ?? AppNetworkRuntime.shared,
        _authApiService = authApiService;
 
-  final ApiClient _apiClient;
+  final AppNetworkClient _apiClient;
   final AuthApiService _authApiService;
 
   Future<AppSourceRegistry> fetchAndValidate() async {

@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../../../core/network/api_exception.dart';
-import '../../../core/network/api_client.dart';
+import 'package:vibematch_app/foundation/networking/app_network_client.dart';
 import '../../auth/data/auth_api_service.dart';
 import '../../auth/models/user_identity_snapshot.dart';
 import 'live_room_membership_service.dart';
@@ -9,12 +9,12 @@ import '../presentation/live_room_models.dart';
 
 class LiveRoomPresenceRepository {
   LiveRoomPresenceRepository({
-    ApiClient? apiClient,
+    AppNetworkClient? apiClient,
     AuthApiService? authApiService,
-  }) : _apiClient = apiClient ?? ApiClient(),
+  }) : _apiClient = apiClient ?? AppNetworkRuntime.shared,
        _authApiService = authApiService ?? const AuthApiService();
 
-  final ApiClient _apiClient;
+  final AppNetworkClient _apiClient;
   final AuthApiService _authApiService;
 
   static final ValueNotifier<List<SeatUser>> activeParticipants =

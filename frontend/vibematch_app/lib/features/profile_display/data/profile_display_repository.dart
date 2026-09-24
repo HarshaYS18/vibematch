@@ -1,15 +1,15 @@
-import '../../../core/network/api_client.dart';
+import 'package:vibematch_app/foundation/networking/app_network_client.dart';
 import '../../auth/data/auth_api_service.dart';
 import '../models/canonical_user_display_model.dart';
 
 class ProfileDisplayRepository {
   ProfileDisplayRepository({
-    ApiClient? apiClient,
+    AppNetworkClient? apiClient,
     AuthApiService? authApiService,
-  }) : _apiClient = apiClient ?? ApiClient(),
+  }) : _apiClient = apiClient ?? AppNetworkRuntime.shared,
        _authApiService = authApiService ?? const AuthApiService();
 
-  final ApiClient _apiClient;
+  final AppNetworkClient _apiClient;
   final AuthApiService _authApiService;
 
   Future<CanonicalUserDisplayModel> getMe() async {

@@ -106,7 +106,7 @@ void main() {
   });
 }
 
-class _FakeNetworkClient implements AppNetworkClient {
+class _FakeNetworkClient extends DioAppNetworkClient {
   _FakeNetworkClient(this.catalog);
 
   final Map<String, dynamic> catalog;
@@ -116,6 +116,8 @@ class _FakeNetworkClient implements AppNetworkClient {
     String path, {
     Map<String, String?> queryParameters = const <String, String?>{},
     Map<String, String> headers = const <String, String>{},
+  
+    NetworkCancellation? cancellation,
   }) async {
     if (path == '/games/catalog/jungle_hunt') return catalog;
     throw StateError('Unexpected GET $path');
@@ -126,6 +128,8 @@ class _FakeNetworkClient implements AppNetworkClient {
     String path, {
     Map<String, String?> queryParameters = const <String, String?>{},
     Map<String, String> headers = const <String, String>{},
+  
+    NetworkCancellation? cancellation,
   }) async => throw StateError('Unexpected getList $path');
 
   @override
@@ -134,6 +138,9 @@ class _FakeNetworkClient implements AppNetworkClient {
     Map<String, String?> queryParameters = const <String, String?>{},
     Map<String, String> headers = const <String, String>{},
     Object? body,
+  
+    NetworkCancellation? cancellation,
+    String? idempotencyKey,
   }) async => throw StateError('Unexpected POST $path');
 
   @override
@@ -142,6 +149,9 @@ class _FakeNetworkClient implements AppNetworkClient {
     Map<String, String?> queryParameters = const <String, String?>{},
     Map<String, String> headers = const <String, String>{},
     Object? body,
+  
+    NetworkCancellation? cancellation,
+    String? idempotencyKey,
   }) async => throw StateError('Unexpected PATCH $path');
 
   @override
@@ -150,6 +160,9 @@ class _FakeNetworkClient implements AppNetworkClient {
     Map<String, String?> queryParameters = const <String, String?>{},
     Map<String, String> headers = const <String, String>{},
     Object? body,
+  
+    NetworkCancellation? cancellation,
+    String? idempotencyKey,
   }) async => throw StateError('Unexpected DELETE $path');
 
   @override

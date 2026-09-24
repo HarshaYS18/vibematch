@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../../../core/constants/app_constants.dart';
-import '../../../core/network/api_client.dart';
+import 'package:vibematch_app/foundation/networking/app_network_client.dart';
 import '../../../core/theme/app_colors.dart';
 
 class SplashPage extends StatefulWidget {
@@ -12,7 +12,7 @@ class SplashPage extends StatefulWidget {
 }
 
 class _SplashPageState extends State<SplashPage> {
-  final ApiClient _apiClient = ApiClient();
+  final AppNetworkClient _apiClient = AppNetworkRuntime.shared;
 
   bool _isLoading = true;
   bool _backendOnline = false;
@@ -26,7 +26,7 @@ class _SplashPageState extends State<SplashPage> {
 
   Future<void> _checkBackendHealth() async {
     try {
-      final result = await _apiClient.getHealthStatus();
+      final result = await _apiClient.getMap('/health');
 
       if (!mounted) return;
 

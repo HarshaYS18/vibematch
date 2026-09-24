@@ -1,9 +1,9 @@
-import '../../../core/network/api_client.dart';
+import 'package:vibematch_app/foundation/networking/app_network_client.dart';
 
 class RoomModerationRepository {
-  RoomModerationRepository({ApiClient? apiClient}) : _apiClient = apiClient ?? ApiClient();
+  RoomModerationRepository({AppNetworkClient? apiClient}) : _apiClient = apiClient ?? AppNetworkRuntime.shared;
 
-  final ApiClient _apiClient;
+  final AppNetworkClient _apiClient;
 
   Future<void> kickOutUser({
     required String roomId,
