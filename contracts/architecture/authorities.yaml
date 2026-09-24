@@ -1211,7 +1211,7 @@
       "domain": "notifications",
       "classification": "AUTHORITY",
       "logical_owner": "notification",
-      "current_deployable": "notification-service + notification-provider worker",
+      "current_deployable": "notification-service",
       "current_storage": [
         "postgres:notification_deliveries"
       ],
