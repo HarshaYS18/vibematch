@@ -12,7 +12,7 @@ from sqlalchemy.orm import Session
 from app.models.economy import EconomyCurrency, EconomyDirection, UserWallet, WalletLedger
 from app.models.economy_bulk_grant import EconomyBulkGrant, EconomyBulkGrantRecipient
 from app.models.user import User
-from app.services import event_outbox_service
+from app.services import economy_service_client, economy_transaction_service, event_outbox_service
 
 
 RUNNABLE = ("PENDING", "RUNNING", "RETRY")
@@ -205,6 +205,37 @@ def process_claimed_batch(
             "processed_count": int(job.processed_count),
         }
 
+    batch_business_reference = (
+        f"bulk-grant:{job.grant_id}:after:{int(job.last_user_id or 0)}"
+    )
+    context = economy_service_client.mutation_context(
+        "bulk_grant.batch",
+        batch_business_reference,
+    )
+    tx, cached = economy_transaction_service.begin(
+        db,
+        transaction_id=context["transaction_id"],
+        idempotency_key=context["idempotency_key"],
+        business_reference=context["business_reference"],
+        operation_type="bulk_grant.batch",
+        actor_user_id=job.actor_user_id,
+        request_payload={
+            "grant_id": job.grant_id,
+            "after_user_id": int(job.last_user_id or 0),
+            "user_ids": user_ids,
+            "coin_amount": int(job.coin_amount),
+        },
+    )
+    if cached is not None:
+        db.rollback()
+        return {
+            "status": "RUNNING",
+            "processed": 0,
+            "processed_count": int(job.processed_count),
+            "cursor": int(job.last_user_id),
+            "duplicate_batch": True,
+        }
+
     existing_ids = {
         int(row[0])
         for row in (
@@ -234,12 +265,22 @@ def process_claimed_batch(
                 after_balance=after,
                 source_type="SUPER_OWNER_SEND_ALL",
                 source_id=job.grant_id,
-                transaction_id=job.grant_id,
-                idempotency_key=job.idempotency_key,
-                business_reference=f"bulk-grant:{job.grant_id}",
+                transaction_id=tx.transaction_id,
+                idempotency_key=tx.idempotency_key,
+                business_reference=tx.business_reference,
                 created_by_user_id=job.actor_user_id,
                 reason=job.reason,
             )
+        )
+        economy_transaction_service.record_balanced_transfer(
+            db,
+            tx=tx,
+            currency=EconomyCurrency.COIN.value,
+            amount=int(job.coin_amount),
+            debit_account="SYSTEM_BULK_GRANT:COIN",
+            credit_account=f"USER_WALLET:{user_id}:COIN",
+            source_type="SUPER_OWNER_SEND_ALL",
+            credit_user_id=user_id,
         )
         db.add(
             EconomyBulkGrantRecipient(
@@ -257,13 +298,26 @@ def process_claimed_batch(
     job.next_attempt_at = datetime.utcnow()
     job.last_error = None
     db.add(job)
-    db.commit()
-    return {
+    result = {
         "status": "RUNNING",
         "processed": len(new_ids),
         "processed_count": int(job.processed_count),
         "cursor": int(job.last_user_id),
     }
+    economy_transaction_service.complete(
+        db,
+        tx=tx,
+        result=result,
+        event_type="economy.bulk_grant.batch_applied.v1",
+        event_payload={
+            "grant_id": job.grant_id,
+            "processed": len(new_ids),
+            "processed_count": int(job.processed_count),
+            "cursor": int(job.last_user_id),
+            "coin_amount": int(job.coin_amount),
+        },
+    )
+    return result
 
 
 def mark_attempt_failed(
