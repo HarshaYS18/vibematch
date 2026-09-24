@@ -21,6 +21,7 @@ ALTER TABLE gift_transactions OWNER TO funkey_economy_owner;
 ALTER TABLE ruby_withdraw_requests OWNER TO funkey_economy_owner;
 ALTER TABLE economy_transactions OWNER TO funkey_economy_owner;
 ALTER TABLE economy_journal_entries OWNER TO funkey_economy_owner;
+ALTER TABLE economy_house_reservations OWNER TO funkey_economy_owner;
 ALTER TABLE economy_bulk_grants OWNER TO funkey_economy_owner;
 ALTER TABLE economy_bulk_grant_recipients OWNER TO funkey_economy_owner;
 ALTER TABLE gift_catalog_categories OWNER TO funkey_economy_owner;
@@ -33,7 +34,7 @@ ALTER TABLE user_lucky_gift_stats OWNER TO funkey_economy_owner;
 REVOKE ALL ON TABLE
   user_wallets,wallet_ledger,coin_supply_pools,coin_pool_ledger,
   game_pools,game_pool_ledger,coin_sale_orders,gift_transactions,
-  ruby_withdraw_requests,economy_transactions,economy_journal_entries,
+  ruby_withdraw_requests,economy_transactions,economy_journal_entries,economy_house_reservations,
   economy_bulk_grants,economy_bulk_grant_recipients,
   gift_catalog_categories,gift_catalog_items,economy_rule_sets,economy_rule_levels,
   lucky_gift_transactions,user_lucky_gift_stats
@@ -42,7 +43,7 @@ FROM PUBLIC;
 GRANT SELECT,INSERT,UPDATE,DELETE ON TABLE
   user_wallets,wallet_ledger,coin_supply_pools,coin_pool_ledger,
   game_pools,game_pool_ledger,coin_sale_orders,gift_transactions,
-  ruby_withdraw_requests,economy_transactions,economy_journal_entries,
+  ruby_withdraw_requests,economy_transactions,economy_journal_entries,economy_house_reservations,
   economy_bulk_grants,economy_bulk_grant_recipients,
   gift_catalog_categories,gift_catalog_items,economy_rule_sets,economy_rule_levels,
   lucky_gift_transactions,user_lucky_gift_stats
@@ -64,7 +65,7 @@ GRANT SELECT,INSERT ON TABLE admin_logs TO funkey_economy_runtime;
 GRANT SELECT ON TABLE
   user_wallets,wallet_ledger,coin_supply_pools,coin_pool_ledger,
   game_pools,game_pool_ledger,coin_sale_orders,gift_transactions,
-  ruby_withdraw_requests,economy_transactions,economy_journal_entries,
+  ruby_withdraw_requests,economy_transactions,economy_journal_entries,economy_house_reservations,
   gift_catalog_categories,gift_catalog_items,economy_rule_sets,economy_rule_levels,
   lucky_gift_transactions,user_lucky_gift_stats
 TO funkey_economy_reader;
@@ -73,7 +74,7 @@ DO $$ DECLARE t text; s text; BEGIN
 FOREACH t IN ARRAY ARRAY[
   'user_wallets','wallet_ledger','coin_supply_pools','coin_pool_ledger',
   'game_pools','game_pool_ledger','coin_sale_orders','gift_transactions',
-  'ruby_withdraw_requests','economy_transactions','economy_journal_entries',
+  'ruby_withdraw_requests','economy_transactions','economy_journal_entries','economy_house_reservations',
   'economy_bulk_grants','economy_bulk_grant_recipients',
   'gift_catalog_categories','gift_catalog_items','economy_rule_sets','economy_rule_levels',
   'lucky_gift_transactions','user_lucky_gift_stats'
