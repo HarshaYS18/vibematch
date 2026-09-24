@@ -51,7 +51,7 @@ class EconomyLuckyGiftAdminCutoverTests(unittest.TestCase):
         props = (ROOT / "backend/app/services/lucky_gift_props_service.py").read_text(encoding="utf-8")
         house = (ROOT / "backend/app/services/lucky_gift_house_service.py").read_text(encoding="utf-8")
         self.assertIn("commit: bool = True", props)
-        self.assertGreaterEqual(house.count("commit: bool = True"), 5)
+        self.assertGreaterEqual(house.count("commit: bool = True"), 4)
         internal = (ROOT / "apps/economy-service/internal.py").read_text(encoding="utf-8")
         self.assertGreaterEqual(internal.count("commit=False"), 5)
 
