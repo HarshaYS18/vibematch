@@ -12,7 +12,7 @@ from app.models.lucky_packet import LuckyPacket, LuckyPacketClaim
 from app.models.room import Room
 from app.models.room_participant import RoomParticipant
 from app.models.user import User
-from app.services import economy_service
+from app.services import economy_service_client, economy_transaction_service
 
 COUNTDOWN_SECONDS = 30
 CLAIM_SECONDS = 20
@@ -40,17 +40,7 @@ def require_active_room_user(db: Session, room: Room, user_id: int) -> None:
 
 
 def _lock_wallet(db: Session, user_id: int) -> UserWallet:
-    wallet = (
-        db.query(UserWallet)
-        .filter(UserWallet.user_id == user_id)
-        .with_for_update()
-        .first()
-    )
-    if wallet is not None:
-        return wallet
-    wallet = economy_service.get_or_create_wallet(db, user_id)
-    db.flush()
-    return wallet
+    return economy_transaction_service.wallet_for_update(db, user_id)
 
 
 def _build_allocations(total: int, count: int) -> list[int]:
@@ -171,7 +161,13 @@ def snapshot(
     }
 
 
-def _finalize_locked(db: Session, packet: LuckyPacket, now: datetime) -> bool:
+def _finalize_locked(
+    db: Session,
+    packet: LuckyPacket,
+    now: datetime,
+    *,
+    tx,
+) -> bool:
     if packet.status != ACTIVE_STATUS:
         return False
     if now < packet.closes_at and packet.claimed_count < packet.winner_count:
@@ -179,16 +175,16 @@ def _finalize_locked(db: Session, packet: LuckyPacket, now: datetime) -> bool:
 
     unclaimed = max(0, int(packet.coin_amount) - int(packet.claimed_coin_amount))
     if unclaimed > 0 and int(packet.refunded_coin_amount) == 0:
-        sender_wallet = _lock_wallet(db, packet.sender_user_id)
-        economy_service._credit_wallet(
+        economy_transaction_service.credit(
             db,
-            sender_wallet,
-            EconomyCurrency.COIN,
-            unclaimed,
-            "LUCKY_PACKET_REFUND",
-            packet.public_id,
-            packet.sender_user_id,
-            "Unclaimed Lucky Packet coins refunded",
+            user_id=packet.sender_user_id,
+            amount=unclaimed,
+            currency=EconomyCurrency.COIN.value,
+            source_type="LUCKY_PACKET_REFUND",
+            source_id=packet.public_id,
+            reason="Unclaimed Lucky Packet coins refunded",
+            tx=tx,
+            actor_user_id=packet.sender_user_id,
         )
         packet.refunded_coin_amount = unclaimed
 
@@ -201,7 +197,6 @@ def _finalize_locked(db: Session, packet: LuckyPacket, now: datetime) -> bool:
     db.flush()
     return True
 
-
 def create_packet(
     db: Session,
     *,
@@ -210,6 +205,7 @@ def create_packet(
     coin_amount: int,
     winner_count: int,
     message: str,
+    tx,
 ) -> tuple[LuckyPacket, UserWallet, LuckyPacket | None]:
     if coin_amount < winner_count:
         raise HTTPException(
@@ -240,7 +236,7 @@ def create_packet(
         .first()
     )
     if previous is not None:
-        if _finalize_locked(db, previous, now):
+        if _finalize_locked(db, previous, now, tx=tx):
             finalized_previous = previous
         else:
             raise HTTPException(
@@ -249,10 +245,6 @@ def create_packet(
             )
 
     allocations = _build_allocations(coin_amount, winner_count)
-    wallet = _lock_wallet(db, sender.id)
-    if wallet.coin_balance < coin_amount:
-        raise HTTPException(status_code=400, detail="Insufficient coins. Please recharge.")
-
     packet = LuckyPacket(
         public_id=f"lp_{uuid4().hex}",
         room_id=locked_room.id,
@@ -269,19 +261,18 @@ def create_packet(
     db.add(packet)
     db.flush()
 
-    economy_service._debit_wallet(
+    wallet = economy_transaction_service.debit(
         db,
-        wallet,
-        EconomyCurrency.COIN,
-        coin_amount,
-        "LUCKY_PACKET_FUND",
-        packet.public_id,
-        sender.id,
-        f"Funded Lucky Packet for {winner_count} winners",
+        user_id=sender.id,
+        amount=coin_amount,
+        currency=EconomyCurrency.COIN.value,
+        source_type="LUCKY_PACKET_FUND",
+        source_id=packet.public_id,
+        reason=f"Funded Lucky Packet for {winner_count} winners",
+        tx=tx,
+        actor_user_id=sender.id,
     )
-    db.commit()
-    db.refresh(packet)
-    db.refresh(wallet)
+    db.flush()
     return packet, wallet, finalized_previous
 
 
@@ -297,7 +288,9 @@ def get_packet(db: Session, packet_public_id: str) -> LuckyPacket:
 
 
 def get_active_packet(db: Session, room: Room) -> LuckyPacket | None:
-    packet = (
+    # Read-only by contract. Expired ACTIVE rows are finalized by explicit
+    # mutation paths or the Economy maintenance sweep, never by a GET.
+    return (
         db.query(LuckyPacket)
         .filter(
             LuckyPacket.room_id == room.id,
@@ -306,27 +299,13 @@ def get_active_packet(db: Session, room: Room) -> LuckyPacket | None:
         .order_by(LuckyPacket.id.desc())
         .first()
     )
-    if packet is None:
-        return None
-    if datetime.utcnow() >= packet.closes_at:
-        locked = (
-            db.query(LuckyPacket)
-            .filter(LuckyPacket.id == packet.id)
-            .with_for_update()
-            .first()
-        )
-        if locked is not None and _finalize_locked(db, locked, datetime.utcnow()):
-            db.commit()
-            db.refresh(locked)
-            return locked
-    return packet
-
 
 def claim_packet(
     db: Session,
     *,
     packet_public_id: str,
     user: User,
+    tx,
 ) -> tuple[LuckyPacket, LuckyPacketClaim | None, UserWallet | None, bool, bool]:
     packet = (
         db.query(LuckyPacket)
@@ -359,14 +338,11 @@ def claim_packet(
         raise HTTPException(status_code=409, detail="Lucky Packet is not open yet")
 
     if now >= packet.closes_at or packet.status != ACTIVE_STATUS:
-        finalized = _finalize_locked(db, packet, now)
-        if finalized:
-            db.commit()
-            db.refresh(packet)
+        finalized = _finalize_locked(db, packet, now, tx=tx)
         return packet, None, None, False, finalized
 
     if packet.claimed_count >= packet.winner_count:
-        finalized = _finalize_locked(db, packet, now)
+        finalized = _finalize_locked(db, packet, now, tx=tx)
         if finalized:
             db.commit()
             db.refresh(packet)
@@ -377,16 +353,16 @@ def claim_packet(
         raise HTTPException(status_code=500, detail="Lucky Packet allocation is invalid")
     reward = int(allocations[packet.claimed_count])
 
-    wallet = _lock_wallet(db, user.id)
-    economy_service._credit_wallet(
+    wallet = economy_transaction_service.credit(
         db,
-        wallet,
-        EconomyCurrency.COIN,
-        reward,
-        "LUCKY_PACKET_CLAIM",
-        packet.public_id,
-        packet.sender_user_id,
-        "Lucky Packet reward",
+        user_id=user.id,
+        amount=reward,
+        currency=EconomyCurrency.COIN.value,
+        source_type="LUCKY_PACKET_CLAIM",
+        source_id=packet.public_id,
+        reason="Lucky Packet reward",
+        tx=tx,
+        actor_user_id=packet.sender_user_id,
     )
     claim = LuckyPacketClaim(
         packet_id=packet.id,
@@ -399,7 +375,7 @@ def claim_packet(
     packet.claimed_coin_amount += reward
     db.flush()
 
-    finalized = _finalize_locked(db, packet, now)
+    finalized = _finalize_locked(db, packet, now, tx=tx)
     db.commit()
     db.refresh(packet)
     db.refresh(claim)
@@ -412,6 +388,7 @@ def finalize_packet(
     *,
     packet_public_id: str,
     user: User,
+    tx,
 ) -> tuple[LuckyPacket, bool]:
     packet = (
         db.query(LuckyPacket)
@@ -426,11 +403,65 @@ def finalize_packet(
         raise HTTPException(status_code=404, detail="Room not found")
     require_active_room_user(db, room, user.id)
 
-    changed = _finalize_locked(db, packet, datetime.utcnow())
+    changed = _finalize_locked(db, packet, datetime.utcnow(), tx=tx)
     if changed:
-        db.commit()
-        db.refresh(packet)
+        db.flush()
     return packet, changed
+
+
+def finalize_expired_packets(db: Session, *, limit: int = 50) -> int:
+    """Finalize expired packet escrow through deterministic Economy transactions."""
+
+    now = datetime.utcnow()
+    rows = (
+        db.query(LuckyPacket)
+        .filter(
+            LuckyPacket.status == ACTIVE_STATUS,
+            LuckyPacket.closes_at <= now,
+        )
+        .order_by(LuckyPacket.closes_at.asc(), LuckyPacket.id.asc())
+        .with_for_update(skip_locked=True)
+        .limit(max(1, min(int(limit), 200)))
+        .all()
+    )
+    finalized = 0
+    for packet in rows:
+        business_reference = f"lucky-packet-expire:{packet.public_id}"
+        context = economy_service_client.mutation_context(
+            "lucky_packet.expire",
+            business_reference,
+        )
+        tx, cached = economy_transaction_service.begin(
+            db,
+            transaction_id=context["transaction_id"],
+            idempotency_key=context["idempotency_key"],
+            business_reference=context["business_reference"],
+            operation_type="lucky_packet.expire",
+            actor_user_id=packet.sender_user_id,
+            request_payload={"packet_public_id": packet.public_id},
+        )
+        if cached is not None:
+            continue
+        changed = _finalize_locked(db, packet, now, tx=tx)
+        result = {
+            "packet_id": packet.public_id,
+            "status": packet.status,
+            "refunded_coin_amount": int(packet.refunded_coin_amount or 0),
+            "changed": changed,
+        }
+        economy_transaction_service.complete(
+            db,
+            tx=tx,
+            result=result,
+            event_type="economy.lucky_packet.expired.v1",
+            event_payload={
+                "packet_id": packet.public_id,
+                "sender_user_id": packet.sender_user_id,
+                "refunded_coin_amount": int(packet.refunded_coin_amount or 0),
+            },
+        )
+        finalized += 1
+    return finalized
 
 
 def room_event_payload(
