@@ -4,7 +4,7 @@ from sqlalchemy.orm import Session
 from app.api.routes.users import get_current_user
 from app.database import get_db
 from app.models.user import User
-from app.services import economy_service, experience_service
+from app.services import economy_service_client, experience_service
 from app.services import level_progression_service as progression
 
 router = APIRouter(prefix="/experience", tags=["Experience"])
@@ -125,16 +125,22 @@ def claim_social_mission(
     if not mission["completed"]:
         raise HTTPException(status_code=409, detail="Complete this social mission before claiming its reward")
     reward = mission["reward"]
-    wallet, credited = economy_service.credit_social_mission_reward(
-        db,
-        current_user.id,
-        mission_id=mission_id,
-        cycle_key=str(mission["cycle_key"]),
-        reward_coin_amount=int(reward["amount"]),
-    )
+    cycle_key = str(mission["cycle_key"])
+    try:
+        result = economy_service_client.claim_mission_reward(
+            user_id=current_user.id,
+            mission_id=mission_id,
+            cycle_key=cycle_key,
+            reward_coin_amount=int(reward["amount"]),
+        )
+    except economy_service_client.EconomyServiceUnavailable as exc:
+        raise HTTPException(status_code=503, detail=str(exc)) from exc
+    except economy_service_client.EconomyServiceError as exc:
+        raise HTTPException(status_code=exc.status_code, detail=exc.detail) from exc
+
     refreshed = experience_service.social_missions_for_user(db, current_user)
     return {
-        "credited": credited,
-        "coin_balance": wallet.coin_balance,
+        "credited": bool(result.get("credited")),
+        "coin_balance": int(result.get("coin_balance") or 0),
         "mission": next(item for item in refreshed if item["id"] == mission_id),
     }
