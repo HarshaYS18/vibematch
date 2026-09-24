@@ -86,9 +86,12 @@ GRANT SELECT ON TABLE
     cricket_ball_events
 TO funkey_room_control_reader;
 
--- Presence is an ephemeral compatibility projection. Room Control may maintain
--- its room lifecycle checkpoint, but it does not own the durable truth.
-GRANT SELECT, INSERT, UPDATE ON TABLE user_room_presence TO funkey_room_control_runtime;
+-- Legacy DB presence is deliberately non-authoritative after the repair wave.
+-- No production runtime role receives write access; Go/Redis socket leases are
+-- the only connected-liveness writer.
+REVOKE ALL ON TABLE user_room_presence FROM PUBLIC;
+REVOKE ALL ON TABLE user_room_presence FROM funkey_room_control_runtime;
+REVOKE ALL ON TABLE user_room_presence FROM funkey_room_control_reader;
 
 -- Temporary bounded reads until Chunk 27 extracts identity/profile/social.
 -- No write grants are intentionally provided for these authorities.
@@ -147,13 +150,6 @@ BEGIN
         END IF;
     END LOOP;
 
-    sequence_name := pg_get_serial_sequence('user_room_presence', 'id');
-    IF sequence_name IS NOT NULL THEN
-        EXECUTE format(
-            'GRANT USAGE, SELECT ON SEQUENCE %s TO funkey_room_control_runtime',
-            sequence_name
-        );
-    END IF;
 END
 $$;
 
