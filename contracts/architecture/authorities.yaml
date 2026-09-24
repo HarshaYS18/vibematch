@@ -76,9 +76,11 @@
       "domain": "identity",
       "classification": "EPHEMERAL",
       "logical_owner": "identity",
-      "current_deployable": "identity-service + clients",
+      "current_deployable": "identity-service issuer + realtime-gateway verifier + clients",
       "current_storage": [
-        "short-lived signed access tokens"
+        "short-lived signed access tokens",
+        "short-lived signed realtime connect/room capabilities",
+        "realtime public verification key"
       ],
       "target_storage": [
         "short-lived access/realtime capabilities"
@@ -93,10 +95,10 @@
         "reauthenticate from identity.sessions"
       ],
       "change_contract": {
-        "status": "planned",
-        "name": "identity.session.revoked.v1"
+        "status": "live",
+        "name": "identity realtime capability v2"
       },
-      "migration_status": "Identity issues session-backed access tokens; realtime capability path remains Chunk 22"
+      "migration_status": "Chunk 22 signed connect and room capabilities are live; Go verifies grants locally"
     },
     {
       "id": "profiles.public",
@@ -350,17 +352,16 @@
       "domain": "presence",
       "classification": "EPHEMERAL",
       "logical_owner": "realtime",
-      "current_deployable": "core-api realtime compatibility + Go gateway",
+      "current_deployable": "realtime-gateway",
       "current_storage": [
         "redis/valkey TTL socket/presence leases",
-        "postgres:user_room_presence lifecycle/checkpoint compatibility"
+        "bounded realtime replay/routing state"
       ],
       "target_storage": [
         "redis/valkey TTL socket/presence leases owned by Go realtime"
       ],
       "mutated_by": [
-        "realtime connection managers",
-        "room presence lifecycle services"
+        "Go realtime gateway"
       ],
       "source_states": [
         "rooms.membership"
@@ -369,10 +370,10 @@
         "active authenticated sockets + rooms.membership"
       ],
       "change_contract": {
-        "status": "planned",
-        "name": "presence.updated.v2"
+        "status": "live",
+        "name": "presence/realtime lease v2"
       },
-      "migration_status": "Chunk 20 Redis lease live; Chunk 21 application socket convergence pending"
+      "migration_status": "Chunk 20 lease/replay foundation and Chunk 21 one-Go-socket convergence are live"
     },
     {
       "id": "realtime.connection_routing",
@@ -515,7 +516,8 @@
         "postgres:user_wallets",
         "postgres:wallet_ledger",
         "postgres:economy_transactions",
-        "postgres:economy_journal_entries"
+        "postgres:economy_journal_entries",
+        "postgres:economy_bulk_grants/economy_bulk_grant_recipients"
       ],
       "target_storage": [
         "economy-service postgres"
@@ -526,10 +528,10 @@
       "source_states": [],
       "rebuild_from": [],
       "change_contract": {
-        "status": "planned",
+        "status": "live",
         "name": "economy.wallet.changed.v1"
       },
-      "migration_status": "Chunk 25 authority cutover completed after Chunk 32 audit repair; core retains SELECT-only compatibility reads"
+      "migration_status": "Chunk 25 authority cutover completed after Chunk 32 repair; public, internal and bulk wallet mutations use Economy transaction/journal semantics and core retains SELECT-only compatibility reads"
     },
     {
       "id": "economy.supply_ledger",
@@ -541,6 +543,9 @@
         "postgres:coin_supply_pools",
         "postgres:coin_pool_ledger",
         "postgres:coin_sale_orders",
+        "postgres:game_pools",
+        "postgres:game_pool_ledger",
+        "postgres:economy_house_reservations",
         "postgres:ruby_withdraw_requests"
       ],
       "target_storage": [
@@ -552,10 +557,10 @@
       "source_states": [],
       "rebuild_from": [],
       "change_contract": {
-        "status": "planned",
+        "status": "live",
         "name": "economy.supply.changed.v1"
       },
-      "migration_status": "Chunk 25 authority cutover completed after Chunk 32 audit repair; exclusive PostgreSQL writer role enforced"
+      "migration_status": "Economy Service is the exclusive writer; supply/game pool movements and durable house liabilities are journaled and continuously reconciled"
     },
     {
       "id": "economy.vip_projection",
@@ -585,6 +590,59 @@
       "migration_status": "Derived status only; wallet/ledger remains authority"
     },
     {
+      "id": "economy.house_liability",
+      "domain": "economy",
+      "classification": "AUTHORITY",
+      "logical_owner": "economy",
+      "current_deployable": "economy-service",
+      "current_storage": [
+        "postgres:economy_house_reservations",
+        "postgres:game_pools.reserved_balance materialization"
+      ],
+      "target_storage": [
+        "economy-service PostgreSQL authority"
+      ],
+      "mutated_by": [
+        "Economy reservation/settlement services"
+      ],
+      "source_states": [
+        "economy.supply_ledger"
+      ],
+      "rebuild_from": [],
+      "change_contract": {
+        "status": "live",
+        "name": "economy.house_reservation.*.v1"
+      },
+      "migration_status": "Post-Chunk-32 repair replaced placeholder reservations with durable idempotent holds, exact release and reconciliation"
+    },
+    {
+      "id": "economy.lucky_packets",
+      "domain": "economy",
+      "classification": "AUTHORITY",
+      "logical_owner": "economy",
+      "current_deployable": "economy-service",
+      "current_storage": [
+        "postgres:lucky_packets",
+        "postgres:lucky_packet_claims",
+        "postgres:wallet_ledger settlement evidence"
+      ],
+      "target_storage": [
+        "economy-service PostgreSQL authority"
+      ],
+      "mutated_by": [
+        "Economy Lucky Packet API + Economy maintenance worker"
+      ],
+      "source_states": [
+        "economy.wallet_ledger"
+      ],
+      "rebuild_from": [],
+      "change_contract": {
+        "status": "live",
+        "name": "economy.lucky_packet.*.v1"
+      },
+      "migration_status": "Post-Chunk-32 repair made funding/claim/refund/finalization idempotent Economy transactions; GET is read-only and expired escrow is finalized by Economy maintenance"
+    },
+    {
       "id": "gifts.catalog",
       "domain": "gifts",
       "classification": "AUTHORITY",
@@ -603,7 +661,7 @@
       "source_states": [],
       "rebuild_from": [],
       "change_contract": {
-        "status": "planned",
+        "status": "live",
         "name": "gift.catalog.updated.v1"
       },
       "migration_status": "Economy Service owns gift configuration; core exposes compatibility routes only"
@@ -627,7 +685,7 @@
       "source_states": [],
       "rebuild_from": [],
       "change_contract": {
-        "status": "planned",
+        "status": "live",
         "name": "gift.settled.v1"
       },
       "migration_status": "Chunk 25 authority cutover completed; gift value movement executes only through Economy transaction APIs"
@@ -732,7 +790,7 @@
       "source_states": [],
       "rebuild_from": [],
       "change_contract": {
-        "status": "planned",
+        "status": "live",
         "name": "economy.mission_rewarded.v1"
       },
       "migration_status": "Reward claims are idempotent Economy transactions backed by wallet ledger and balanced journal evidence"
