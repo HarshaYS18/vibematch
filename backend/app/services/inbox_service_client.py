@@ -166,3 +166,7 @@ def send_family_message(
             "text": text,
         },
     )
+
+
+def execute_backup_job(job_id: str) -> dict[str, Any]:
+    return _request("POST", f"backup/jobs/{job_id}/execute")

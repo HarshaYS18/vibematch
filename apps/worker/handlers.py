@@ -4,9 +4,9 @@ from pydantic import BaseModel, Field
 from sqlalchemy.exc import IntegrityError
 from app.core.config import settings
 from app.database import SessionLocal
-from app.models.cdn_media import CdnMediaLinkedEntityType
+from app.models.cdn_media import CdnMediaAsset, CdnMediaLinkedEntityType, CdnMediaModerationStatus
 from app.models.event_outbox import WorkerProcessedEvent
-from app.services import cdn_media_service, inbox_service_client, notification_service_client
+from app.services import cdn_media_service, inbox_service_client, media_moderation_service, notification_service_client
 from apps.worker.events import EventEnvelope
 
 class NotificationRequested(BaseModel):
@@ -70,4 +70,101 @@ def handle_vibes_media_requested(event:EventEnvelope)->str:
         if payload.action=="delete" and asset is not None: cdn_media_service.mark_media_deleted(db,asset=asset,actor_user_id=event.actor_user_id,reason=payload.reason or "vibe_deleted")
     return _mark_processed(event,handler_name)
 
-HANDLERS={"notification.requested":handle_notification_requested,"vibes.post.published":handle_vibes_post_published,"vibes.media.requested":handle_vibes_media_requested}
+
+class MediaModerationRequested(BaseModel):
+    media_id: str = Field(min_length=1, max_length=100)
+
+
+class MediaDeleteRequested(BaseModel):
+    media_id: str = Field(min_length=1, max_length=100)
+    reason: str = Field(default="media_deleted", min_length=1, max_length=200)
+
+
+class MediaCleanupRequested(BaseModel):
+    limit: int = Field(default=100, ge=1, le=500)
+    actor_user_id: int | None = Field(default=None, gt=0)
+
+
+class InboxBackupRequested(BaseModel):
+    job_id: str = Field(min_length=1, max_length=100)
+    user_id: int = Field(gt=0)
+
+
+def handle_media_moderation_requested(event: EventEnvelope) -> str:
+    payload = MediaModerationRequested.model_validate(event.payload)
+    handler_name = "media.moderation.requested"
+    if _processed(event, handler_name):
+        return "duplicate"
+    with SessionLocal() as db:
+        asset = (
+            db.query(CdnMediaAsset)
+            .filter(CdnMediaAsset.public_id == payload.media_id)
+            .first()
+        )
+        if asset is None:
+            raise ValueError("Media asset not found")
+        if asset.moderation_status in {
+            CdnMediaModerationStatus.AI_APPROVED.value,
+            CdnMediaModerationStatus.AI_FLAGGED.value,
+            CdnMediaModerationStatus.HUMAN_APPROVED.value,
+            CdnMediaModerationStatus.HUMAN_REJECTED.value,
+            CdnMediaModerationStatus.NOT_REQUIRED.value,
+        }:
+            return "duplicate"
+        result = media_moderation_service.audit_image_media(
+            db,
+            asset=asset,
+            actor_user_id=event.actor_user_id,
+        )
+        if "audit failed:" in result.summary.lower():
+            raise RuntimeError("Media moderation provider failed")
+    return _mark_processed(event, handler_name)
+
+
+def handle_media_delete_requested(event: EventEnvelope) -> str:
+    payload = MediaDeleteRequested.model_validate(event.payload)
+    handler_name = "media.delete.requested"
+    if _processed(event, handler_name):
+        return "duplicate"
+    with SessionLocal() as db:
+        _, duplicate = cdn_media_service.execute_media_delete(
+            db,
+            media_id=payload.media_id,
+            actor_user_id=event.actor_user_id,
+            reason=payload.reason,
+        )
+    if duplicate:
+        return "duplicate"
+    return _mark_processed(event, handler_name)
+
+
+def handle_media_cleanup_requested(event: EventEnvelope) -> str:
+    payload = MediaCleanupRequested.model_validate(event.payload)
+    handler_name = "media.cleanup.requested"
+    if _processed(event, handler_name):
+        return "duplicate"
+    with SessionLocal() as db:
+        cdn_media_service.expire_due_inbox_media(
+            db,
+            limit=payload.limit,
+            actor_user_id=payload.actor_user_id or event.actor_user_id,
+        )
+    return _mark_processed(event, handler_name)
+
+
+def handle_inbox_backup_requested(event: EventEnvelope) -> str:
+    payload = InboxBackupRequested.model_validate(event.payload)
+    result = inbox_service_client.execute_backup_job(payload.job_id)
+    return "duplicate" if result.get("duplicate") else "processed"
+
+
+HANDLERS={
+    "notification.requested": handle_notification_requested,
+    "vibes.post.published": handle_vibes_post_published,
+    "vibes.media.requested": handle_vibes_media_requested,
+    "media.moderation.requested": handle_media_moderation_requested,
+    "media.delete.requested": handle_media_delete_requested,
+    "media.cleanup.requested": handle_media_cleanup_requested,
+    "inbox.backup.requested": handle_inbox_backup_requested,
+    "inbox.restore.requested": handle_inbox_backup_requested,
+}

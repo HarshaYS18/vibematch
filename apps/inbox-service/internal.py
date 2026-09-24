@@ -11,7 +11,7 @@ from app.core.config import settings
 from app.database import get_db
 from app.models.inbox import InboxMessage
 from app.models.user import User
-from app.services import inbox_service
+from app.services import inbox_backup_service, inbox_service
 
 
 router = APIRouter(prefix="/internal/inbox", tags=["Inbox Internal"])
@@ -256,4 +256,25 @@ def send_family_message(
         "family_id": int(family_id),
         "conversation_id": conversation.public_id,
         "message": inbox_service.message_to_dict(message, sender),
+    }
+
+
+@router.post(
+    "/backup/jobs/{job_id}/execute",
+    dependencies=[Depends(require_internal_token)],
+)
+def execute_backup_job(
+    job_id: str,
+    db: Session = Depends(get_db),
+):
+    try:
+        job, duplicate = inbox_backup_service.execute_backup_or_restore_job(
+            db,
+            job_id,
+        )
+    except ValueError as exc:
+        raise HTTPException(status_code=422, detail=str(exc)) from exc
+    return {
+        **inbox_backup_service.job_payload(job),
+        "duplicate": duplicate,
     }

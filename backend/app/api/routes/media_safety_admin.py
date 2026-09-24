@@ -248,4 +248,4 @@ def cleanup_expired_inbox_media(
     current_user: User = Depends(get_current_user),
 ):
     _require_media_safety_access(current_user)
-    return cdn_media_service.expire_due_inbox_media(db, limit=limit, actor_user_id=current_user.id)
+    return cdn_media_service.request_expired_inbox_media_cleanup(db, limit=limit, actor_user_id=current_user.id)

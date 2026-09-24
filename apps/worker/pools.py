@@ -31,8 +31,16 @@ POOLS: dict[str, PoolSpec] = {
     ),
     "media": PoolSpec(
         "media",
-        (SubscriptionSpec("funkey.events.vibes.media.requested", "funkey-worker-media-vibes"),),
-        frozenset({"vibes.media.requested"}),
+        (
+            SubscriptionSpec("funkey.events.vibes.media.requested", "funkey-worker-media-vibes"),
+            SubscriptionSpec("funkey.events.media.moderation.requested", "funkey-worker-media-moderation"),
+            SubscriptionSpec("funkey.events.media.delete.requested", "funkey-worker-media-delete"),
+        ),
+        frozenset({
+            "vibes.media.requested",
+            "media.moderation.requested",
+            "media.delete.requested",
+        }),
         max_in_flight=8,
     ),
     "fanout": PoolSpec(
@@ -41,7 +49,20 @@ POOLS: dict[str, PoolSpec] = {
         frozenset({"vibes.post.published"}),
         max_in_flight=12,
     ),
-    "maintenance": PoolSpec("maintenance", (), frozenset(), max_in_flight=4),
+    "maintenance": PoolSpec(
+        "maintenance",
+        (
+            SubscriptionSpec("funkey.events.inbox.backup.requested", "funkey-worker-maintenance-backup"),
+            SubscriptionSpec("funkey.events.inbox.restore.requested", "funkey-worker-maintenance-restore"),
+            SubscriptionSpec("funkey.events.media.cleanup.requested", "funkey-worker-maintenance-media-cleanup"),
+        ),
+        frozenset({
+            "inbox.backup.requested",
+            "inbox.restore.requested",
+            "media.cleanup.requested",
+        }),
+        max_in_flight=4,
+    ),
     # Chunk 37 activates the Kafka analytics bridge. It is intentionally
     # unsubscribed now so analytics events cannot be acknowledged and lost.
     "analytics": PoolSpec("analytics", (), frozenset(), max_in_flight=8, active=False),

@@ -13,7 +13,7 @@ from app.models.cdn_media import (
     MediaSafetySetting,
 )
 from app.models.user import User
-from app.services import inbox_service_client, media_storage_service
+from app.services import event_outbox_service, inbox_service_client, media_storage_service
 from app.services.audit_log_service import create_admin_log
 
 
@@ -65,6 +65,14 @@ def create_media_asset(
         is_active_reference=True,
     )
     db.add(asset)
+    db.flush()
+    if moderation_required and mime_type.startswith("image/"):
+        event_outbox_service.enqueue_event(
+            db,
+            event_type="media.moderation.requested",
+            actor_user_id=owner.id if owner else None,
+            payload={"media_id": asset.public_id},
+        )
     db.commit()
     db.refresh(asset)
     return asset
@@ -174,16 +182,80 @@ def link_media_to_entity(db: Session, *, public_url: str | None, linked_entity_t
     return asset
 
 
-def mark_media_deleted(db: Session, *, asset: CdnMediaAsset, actor_user_id: int | None = None, reason: str = "media_deleted") -> CdnMediaAsset:
+def mark_media_deleted(
+    db: Session,
+    *,
+    asset: CdnMediaAsset,
+    actor_user_id: int | None = None,
+    reason: str = "media_deleted",
+) -> CdnMediaAsset:
+    if asset.deletion_status in {
+        CdnMediaDeletionStatus.PENDING_DELETE.value,
+        CdnMediaDeletionStatus.DELETED.value,
+    }:
+        return asset
     asset.upload_status = CdnMediaUploadStatus.DELETED.value
-    asset.deletion_status = CdnMediaDeletionStatus.DELETED.value
+    asset.deletion_status = CdnMediaDeletionStatus.PENDING_DELETE.value
     asset.is_active_reference = False
     asset.deleted_at = datetime.utcnow()
+    asset.deletion_error = None
+    db.add(asset)
+    event_outbox_service.enqueue_event(
+        db,
+        event_type="media.delete.requested",
+        actor_user_id=actor_user_id,
+        payload={
+            "media_id": asset.public_id,
+            "reason": reason,
+        },
+    )
+    db.commit()
+    db.refresh(asset)
+    create_admin_log(
+        db=db,
+        actor_user_id=actor_user_id,
+        target_user_id=asset.owner_user_id,
+        action="CDN_MEDIA_DELETE_REQUESTED",
+        resource_type="cdn_media",
+        resource_id=asset.public_id,
+        reason=reason,
+        metadata_json={
+            "media_type": asset.media_type,
+            "object_key": asset.object_key,
+            "deletion_status": asset.deletion_status,
+        },
+    )
+    return asset
+
+
+def execute_media_delete(
+    db: Session,
+    *,
+    media_id: str,
+    actor_user_id: int | None = None,
+    reason: str = "media_deleted",
+) -> tuple[CdnMediaAsset, bool]:
+    asset = (
+        db.query(CdnMediaAsset)
+        .filter(CdnMediaAsset.public_id == media_id)
+        .first()
+    )
+    if asset is None:
+        raise ValueError("Media asset not found")
+    if asset.deletion_status == CdnMediaDeletionStatus.DELETED.value:
+        return asset, True
     try:
         media_storage_service.delete_media_object(asset.object_key)
     except Exception as exc:
-        asset.deletion_status = CdnMediaDeletionStatus.FAILED.value
-        asset.deletion_error = str(exc)
+        asset.deletion_status = CdnMediaDeletionStatus.RETRY_SCHEDULED.value
+        asset.deletion_error = type(exc).__name__
+        db.add(asset)
+        db.commit()
+        raise RuntimeError("Media object deletion failed") from exc
+
+    asset.deletion_status = CdnMediaDeletionStatus.DELETED.value
+    asset.deletion_error = None
+    asset.deleted_at = asset.deleted_at or datetime.utcnow()
     db.add(asset)
     db.commit()
     db.refresh(asset)
@@ -195,9 +267,13 @@ def mark_media_deleted(db: Session, *, asset: CdnMediaAsset, actor_user_id: int 
         resource_type="cdn_media",
         resource_id=asset.public_id,
         reason=reason,
-        metadata_json={"media_type": asset.media_type, "object_key": asset.object_key, "deletion_status": asset.deletion_status},
+        metadata_json={
+            "media_type": asset.media_type,
+            "object_key": asset.object_key,
+            "deletion_status": asset.deletion_status,
+        },
     )
-    return asset
+    return asset, False
 
 
 def _expire_inbox_message_references(
@@ -219,7 +295,39 @@ def _expire_inbox_message_references(
         return 0
 
 
-def expire_due_inbox_media(db: Session, *, limit: int = 100, actor_user_id: int | None = None) -> dict:
+def request_expired_inbox_media_cleanup(
+    db: Session,
+    *,
+    limit: int = 100,
+    actor_user_id: int | None = None,
+) -> dict:
+    now = datetime.utcnow()
+    bounded = max(1, min(int(limit), 500))
+    due = (
+        db.query(CdnMediaAsset.id)
+        .filter(CdnMediaAsset.media_type == CdnMediaType.INBOX_MEDIA.value)
+        .filter(CdnMediaAsset.expires_at.isnot(None))
+        .filter(CdnMediaAsset.expires_at <= now)
+        .filter(CdnMediaAsset.deletion_status == CdnMediaDeletionStatus.ACTIVE.value)
+        .limit(bounded)
+        .count()
+    )
+    event_outbox_service.enqueue_event(
+        db,
+        event_type="media.cleanup.requested",
+        actor_user_id=actor_user_id,
+        payload={"limit": bounded, "actor_user_id": actor_user_id},
+    )
+    db.commit()
+    return {"checked": int(due), "deleted": 0, "failed": 0}
+
+
+def expire_due_inbox_media(
+    db: Session,
+    *,
+    limit: int = 100,
+    actor_user_id: int | None = None,
+) -> dict:
     now = datetime.utcnow()
     assets = (
         db.query(CdnMediaAsset)
@@ -228,30 +336,50 @@ def expire_due_inbox_media(db: Session, *, limit: int = 100, actor_user_id: int 
         .filter(CdnMediaAsset.expires_at <= now)
         .filter(CdnMediaAsset.deletion_status == CdnMediaDeletionStatus.ACTIVE.value)
         .order_by(CdnMediaAsset.expires_at.asc())
-        .limit(limit)
+        .limit(max(1, min(int(limit), 500)))
         .all()
     )
-    deleted = 0
+    queued = 0
     failed = 0
     placeholders = 0
     for asset in assets:
         try:
             asset.upload_status = CdnMediaUploadStatus.EXPIRED.value
-            asset.deletion_status = CdnMediaDeletionStatus.DELETED.value
+            asset.deletion_status = CdnMediaDeletionStatus.PENDING_DELETE.value
             asset.is_active_reference = False
             asset.deleted_at = now
             placeholders += _expire_inbox_message_references(db, asset, now)
-            media_storage_service.delete_media_object(asset.object_key)
             db.add(asset)
-            deleted += 1
+            event_outbox_service.enqueue_event(
+                db,
+                event_type="media.delete.requested",
+                actor_user_id=actor_user_id,
+                payload={
+                    "media_id": asset.public_id,
+                    "reason": "inbox_media_expired",
+                },
+            )
+            queued += 1
         except Exception as exc:
-            asset.deletion_status = CdnMediaDeletionStatus.FAILED.value
-            asset.deletion_error = str(exc)
+            asset.deletion_status = CdnMediaDeletionStatus.RETRY_SCHEDULED.value
+            asset.deletion_error = type(exc).__name__
             db.add(asset)
             failed += 1
     db.commit()
-    create_admin_log(db=db, actor_user_id=actor_user_id, action="INBOX_MEDIA_EXPIRY_CLEANUP_RUN", resource_type="cdn_media_cleanup", reason="manual_or_scheduled_cleanup", metadata_json={"checked": len(assets), "deleted": deleted, "failed": failed, "placeholders": placeholders})
-    return {"checked": len(assets), "deleted": deleted, "failed": failed}
+    create_admin_log(
+        db=db,
+        actor_user_id=actor_user_id,
+        action="INBOX_MEDIA_EXPIRY_CLEANUP_QUEUED",
+        resource_type="cdn_media_cleanup",
+        reason="worker_cleanup",
+        metadata_json={
+            "checked": len(assets),
+            "queued": queued,
+            "failed": failed,
+            "placeholders": placeholders,
+        },
+    )
+    return {"checked": len(assets), "deleted": queued, "failed": failed}
 
 
 def get_inbox_retention_days(db: Session) -> int:

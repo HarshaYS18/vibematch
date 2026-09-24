@@ -91,10 +91,50 @@ def get_profile_email(access_token: str) -> str | None:
     return data.get("email")
 
 
+def _drive_query_literal(value: str) -> str:
+    return value.replace("\\", "\\\\").replace("'", "\\'")
+
+
+def _find_by_app_property(
+    access_token: str,
+    *,
+    key: str,
+    value: str,
+    parent_id: str | None = None,
+) -> dict[str, Any] | None:
+    query = (
+        "trashed = false and appProperties has "
+        f"{{ key='{_drive_query_literal(key)}' and value='{_drive_query_literal(value)}' }}"
+    )
+    if parent_id:
+        query += f" and '{_drive_query_literal(parent_id)}' in parents"
+    response = requests.get(
+        GOOGLE_DRIVE_FILES_URL,
+        headers={"Authorization": f"Bearer {access_token}"},
+        params={"q": query, "fields": "files(id,name)", "pageSize": 1},
+        timeout=20,
+    )
+    if response.status_code >= 300:
+        raise ValueError("Google Drive idempotency lookup failed")
+    files = response.json().get("files") or []
+    return files[0] if files else None
+
+
 def ensure_backup_folder(access_token: str, existing_folder_id: str | None = None) -> str:
     if existing_folder_id:
         return existing_folder_id
-    metadata = {"name": "Vibe Match Inbox Backups", "mimeType": "application/vnd.google-apps.folder"}
+    existing = _find_by_app_property(
+        access_token,
+        key="funkey_kind",
+        value="inbox_backup_folder",
+    )
+    if existing:
+        return str(existing["id"])
+    metadata = {
+        "name": "Vibe Match Inbox Backups",
+        "mimeType": "application/vnd.google-apps.folder",
+        "appProperties": {"funkey_kind": "inbox_backup_folder"},
+    }
     response = requests.post(
         GOOGLE_DRIVE_FILES_URL,
         headers={"Authorization": f"Bearer {access_token}", "Content-Type": "application/json"},
@@ -102,12 +142,32 @@ def ensure_backup_folder(access_token: str, existing_folder_id: str | None = Non
         timeout=20,
     )
     if response.status_code >= 300:
-        raise ValueError(f"Google Drive folder create failed: {response.text}")
+        raise ValueError("Google Drive folder create failed")
     return response.json()["id"]
 
 
-def upload_backup_file(access_token: str, folder_id: str, filename: str, encrypted_json: dict[str, Any]) -> str:
-    metadata = {"name": filename, "parents": [folder_id], "mimeType": "application/json"}
+def upload_backup_file(
+    access_token: str,
+    folder_id: str,
+    filename: str,
+    encrypted_json: dict[str, Any],
+    *,
+    idempotency_key: str,
+) -> str:
+    existing = _find_by_app_property(
+        access_token,
+        key="funkey_job_id",
+        value=idempotency_key,
+        parent_id=folder_id,
+    )
+    if existing:
+        return str(existing["id"])
+    metadata = {
+        "name": filename,
+        "parents": [folder_id],
+        "mimeType": "application/json",
+        "appProperties": {"funkey_job_id": idempotency_key},
+    }
     files = {
         "metadata": ("metadata", json.dumps(metadata), "application/json; charset=UTF-8"),
         "file": (filename, json.dumps(encrypted_json), "application/json"),
@@ -119,7 +179,7 @@ def upload_backup_file(access_token: str, folder_id: str, filename: str, encrypt
         timeout=30,
     )
     if response.status_code >= 300:
-        raise ValueError(f"Google Drive backup upload failed: {response.text}")
+        raise ValueError("Google Drive backup upload failed")
     return response.json()["id"]
 
 
