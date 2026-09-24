@@ -311,7 +311,7 @@ def list_conversations(
             db,
             conversations,
             current_user,
-            limit=inbox_service.ACTIVE_MESSAGE_WINDOW,
+            limit=1,
         )
     )
     return InboxConversationListResponse(
@@ -325,6 +325,7 @@ def list_conversations(
                     messages_next_cursor=message_cursors.get(conversation.id),
                     has_older_messages=has_older.get(conversation.id, False),
                     status_overrides=statuses,
+                    include_messages=False,
                 )
             )
             for conversation, participant in rows
