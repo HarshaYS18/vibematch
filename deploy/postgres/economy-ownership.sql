@@ -95,4 +95,6 @@ END $$;
 --   GRANT funkey_economy_runtime TO <production_economy_login>;
 --   GRANT funkey_economy_reader TO <production_core_api_login>;
 -- Never grant funkey_economy_runtime to core-api, Game Platform, Inbox,
--- Profile/Social, workers, Realtime or Flutter-facing credentials.
+-- Profile/Social, the generic Worker Platform, Realtime or Flutter-facing
+-- credentials. Economy-owned bulk/reconciliation workers are part of this
+-- authority boundary and use Economy-scoped runtime credentials.
