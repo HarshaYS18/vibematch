@@ -292,16 +292,30 @@ def get_or_create_definition(db: Session, actor: User | None = None) -> GameDefi
 
 
 def load_rules(db: Session) -> dict[str, Any]:
-    definition = get_or_create_definition(db)
-    rules = _merged(DEFAULT_RULES, definition.rules_json)
+    definition = (
+        db.query(GameDefinition)
+        .filter(GameDefinition.game_key == LUCKY_GIFT_KEY)
+        .first()
+    )
+    rules = _merged(
+        DEFAULT_RULES,
+        definition.rules_json if definition is not None else None,
+    )
     rules["multipliers"] = _normalized_multiplier_rows(rules.get("multipliers"))
     rules["special_scroll_multipliers"] = [100, 500, 1000]
     return rules
 
 
 def load_risk(db: Session) -> dict[str, Any]:
-    definition = get_or_create_definition(db)
-    return _merged(DEFAULT_RISK, definition.risk_config_json)
+    definition = (
+        db.query(GameDefinition)
+        .filter(GameDefinition.game_key == LUCKY_GIFT_KEY)
+        .first()
+    )
+    return _merged(
+        DEFAULT_RISK,
+        definition.risk_config_json if definition is not None else None,
+    )
 
 
 def get_props(db: Session) -> dict[str, Any]:
