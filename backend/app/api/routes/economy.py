@@ -539,123 +539,42 @@ def _send_lucky_gift_authoritative(
     )
     coin_value = int(catalog_gift["coin_value"])
     room_id = room.id if room is not None else None
+    request_id = (payload.request_id or str(uuid4())).strip()
 
     try:
-        total_coin_preview = coin_value * int(payload.quantity)
-        risk_result = lucky_gift_props_service.evaluate_whale_risk(
-            db,
-            user_id=current_user.id,
-            spend_amount=total_coin_preview,
-        )
-        result = economy_service.send_gift(
-            db=db,
-            sender=current_user,
+        result = economy_service_client.settle_lucky_gift(
+            request_id=request_id,
+            sender_user_id=current_user.id,
             receiver_user_id=receiver.id,
             gift_id=payload.gift_id,
+            gift_name=str(
+                catalog_gift.get("name")
+                or payload.gift_id.replace("_", " ").title()
+            ),
             coin_value=coin_value,
             quantity=payload.quantity,
             room_id=room_id,
             relationship_id=payload.relationship_id,
             is_relationship_gift=payload.is_relationship_gift,
-            commit=False,
         )
-        total_coin_value = int(result["total_coin_value"])
-        lucky_gift_house_service.record_spend_income(
-            db,
-            amount=total_coin_value,
-            actor=current_user,
-            source_id=f"lucky_gift:{result['gift_transaction_id']}",
-            user_id=current_user.id,
-            metadata={"gift_id": payload.gift_id, "receiver_user_id": receiver.id},
-        )
-        capacity = lucky_gift_house_service.safe_payout_capacity(db)
-        lucky_result = lucky_gift_props_service.roll_lucky_gift(
-            db,
-            gift_id=payload.gift_id,
-            gift_name=str(catalog_gift.get("name") or payload.gift_id.replace("_", " ").title()),
-            base_coin_value=coin_value,
-            quantity=payload.quantity,
-            house_risk_score=int(risk_result.get("score") or 0),
-            max_reward_coin_amount=int(capacity.get("max_safe_payout") or 0),
-        )
-        reward = int(lucky_result.get("reward_coin_amount") or 0)
-        multiplier = int(lucky_result.get("multiplier") or 0)
-        house_result = lucky_gift_house_service.validate_payout_exposure(
-            db,
-            payout_amount=reward,
-        )
-        lucky_gift_house_service.record_payout(
-            db,
-            amount=reward,
-            actor=current_user,
-            source_id=f"lucky_gift:{result['gift_transaction_id']}",
-            user_id=current_user.id,
-            metadata={
-                "gift_id": payload.gift_id,
-                "multiplier": multiplier,
-                "tier": lucky_result.get("tier"),
-            },
-        )
-        sender_wallet = economy_service.credit_lucky_gift_reward(
-            db,
-            current_user.id,
-            reward,
-            f"lucky_gift:{result['gift_transaction_id']}",
-            current_user.id,
-            commit=False,
-        )
-        lucky_tx, _ = lucky_gift_stats_service.record_lucky_gift_result(
-            db,
-            sender_user_id=current_user.id,
-            receiver_user_id=receiver.id,
-            room_id=room_id,
-            gift_id=payload.gift_id,
-            gift_name=str(catalog_gift.get("name") or payload.gift_id.replace("_", " ").title()),
-            coin_value=coin_value,
-            quantity=payload.quantity,
-            spent_coins=total_coin_value,
-            multiplier=multiplier,
-            reward_coins=reward,
-            net_win_coins=reward - total_coin_value,
-            metadata_json=_metadata_json(
-                {
-                    "gift_transaction_id": result["gift_transaction_id"],
-                    "source": "canonical_gift_send",
-                    "lucky_result": lucky_result,
-                    "risk": risk_result,
-                    "house": house_result,
-                    "capacity": capacity,
-                }
-            ),
-        )
-        db.commit()
-        db.refresh(sender_wallet)
-        db.refresh(lucky_tx)
-    except Exception:
-        db.rollback()
-        raise
+    except economy_service_client.EconomyServiceUnavailable as exc:
+        raise HTTPException(status_code=503, detail=str(exc)) from exc
+    except economy_service_client.EconomyServiceError as exc:
+        raise HTTPException(status_code=exc.status_code, detail=exc.detail) from exc
 
-    result["lucky_multiplier"] = multiplier
-    result["lucky_reward_coin_amount"] = reward
-    result["lucky_result"] = lucky_result
-    result["lucky_difficulty"] = lucky_result.get("difficulty")
-    result["risk_level"] = risk_result.get("level")
-    result["risk_score"] = risk_result.get("score")
-    result["risk_action"] = risk_result.get("action")
-    result["lucky_gift_transaction_id"] = lucky_tx.id
-    result["spent_coins"] = total_coin_value
-    result["reward_coins"] = reward
-    result["net_win_coins"] = reward - total_coin_value
-    result["sender_coin_balance"] = sender_wallet.coin_balance
-    result["winner_coin_balance"] = sender_wallet.coin_balance
-    result["wallet_coin_balance"] = sender_wallet.coin_balance
-    result["rule"] = f"Lucky gift result: {multiplier}x, reward {reward} coins."
-
-    exp_updates = (
-        result.get("experience_updates")
-        if isinstance(result.get("experience_updates"), dict)
-        else {}
+    exp_updates = experience_service.apply_gift_exp(
+        db,
+        sender_user_id=current_user.id,
+        receiver_user_id=receiver.id,
+        room_id=room_id,
+        send_exp=int(result.get("send_exp_amount") or 0),
+        receive_exp=int(result.get("receive_exp_amount") or 0),
+        room_exp=int(result.get("room_exp_amount") or 0),
+        source_id=str(result["gift_transaction_id"]),
     )
+    db.commit()
+    result["experience_updates"] = exp_updates
+
     _queue_after_gift(
         background_tasks,
         db,
@@ -677,5 +596,3 @@ def _send_lucky_gift_authoritative(
         is_lucky=True,
     )
     return GiftSendResponse(**result)
-
-

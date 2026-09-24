@@ -210,3 +210,34 @@ def settle_gift(
             "is_relationship_gift": bool(is_relationship_gift),
         },
     )
+
+
+def settle_lucky_gift(
+    *,
+    request_id: str,
+    sender_user_id: int,
+    receiver_user_id: int,
+    gift_id: str,
+    gift_name: str | None,
+    coin_value: int,
+    quantity: int,
+    room_id: int | None,
+    relationship_id: int | None,
+    is_relationship_gift: bool,
+) -> dict[str, Any]:
+    business_reference = f"lucky-gift:{sender_user_id}:{request_id}"
+    return _request(
+        "gifts/lucky/settle",
+        {
+            **mutation_context("gift.lucky.settle", business_reference),
+            "sender_user_id": int(sender_user_id),
+            "receiver_user_id": int(receiver_user_id),
+            "gift_id": gift_id,
+            "gift_name": gift_name,
+            "coin_value": int(coin_value),
+            "quantity": int(quantity),
+            "room_id": room_id,
+            "relationship_id": relationship_id,
+            "is_relationship_gift": bool(is_relationship_gift),
+        },
+    )

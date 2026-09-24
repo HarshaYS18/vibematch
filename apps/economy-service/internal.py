@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import json
 import hmac
 from typing import Any
 
@@ -14,6 +15,9 @@ from app.models.user import User
 from app.services import (
     economy_transaction_service,
     house_pool_service,
+    lucky_gift_house_service,
+    lucky_gift_props_service,
+    lucky_gift_stats_service,
     whale_risk_service,
 )
 
@@ -49,6 +53,7 @@ class GiftFinancialRequest(MutationContext):
     sender_user_id: int
     receiver_user_id: int
     gift_id: str = Field(min_length=1, max_length=80)
+    gift_name: str | None = Field(default=None, max_length=140)
     coin_value: int = Field(gt=0)
     quantity: int = Field(gt=0)
     room_id: int | None = None
@@ -293,6 +298,225 @@ def settle_regular_gift(
             "quantity": payload.quantity,
             "total_coin_value": total_coin_value,
             "receiver_ruby_amount": receiver_ruby_amount,
+        },
+    )
+
+
+
+@router.post("/gifts/lucky/settle", dependencies=[Depends(require_internal_token)])
+def settle_lucky_gift(
+    payload: GiftFinancialRequest,
+    db: Session = Depends(get_db),
+):
+    sender = db.query(User).filter(User.id == payload.sender_user_id).first()
+    receiver = db.query(User).filter(User.id == payload.receiver_user_id).first()
+    if sender is None:
+        raise HTTPException(status_code=404, detail="Gift sender not found")
+    if receiver is None:
+        raise HTTPException(status_code=404, detail="Gift receiver not found")
+
+    tx, cached = _begin(
+        db,
+        payload,
+        operation="gift.lucky.settle",
+        actor_user_id=payload.sender_user_id,
+    )
+    if cached is not None:
+        return cached
+
+    total_coin_value = int(payload.coin_value) * int(payload.quantity)
+    receiver_ruby_amount = total_coin_value * 3000 // 10000
+    platform_share_coin_value = total_coin_value - receiver_ruby_amount
+    room_exp_amount = total_coin_value if payload.room_id is not None else 0
+    love_score_amount = (
+        total_coin_value
+        if payload.relationship_id is not None or payload.is_relationship_gift
+        else 0
+    )
+    gift_name = payload.gift_name or payload.gift_id.replace("_", " ").title()
+
+    gift_tx = GiftTransaction(
+        sender_user_id=payload.sender_user_id,
+        receiver_user_id=payload.receiver_user_id,
+        room_id=payload.room_id,
+        gift_id=payload.gift_id,
+        coin_value=payload.coin_value,
+        quantity=payload.quantity,
+        total_coin_value=total_coin_value,
+        receiver_ruby_amount=receiver_ruby_amount,
+        platform_share_coin_value=platform_share_coin_value,
+        agency_share_coin_value=0,
+        room_exp_amount=room_exp_amount,
+        send_exp_amount=total_coin_value,
+        receive_exp_amount=total_coin_value,
+        relationship_id=payload.relationship_id,
+        love_score_amount=love_score_amount,
+    )
+    db.add(gift_tx)
+    db.flush()
+
+    sender_wallet = economy_transaction_service.debit(
+        db,
+        user_id=payload.sender_user_id,
+        amount=total_coin_value,
+        currency=EconomyCurrency.COIN.value,
+        source_type="GIFT_SEND",
+        source_id=str(gift_tx.id),
+        reason=f"Sent lucky gift {payload.gift_id}",
+        tx=tx,
+        actor_user_id=payload.sender_user_id,
+    )
+    receiver_wallet = economy_transaction_service.credit(
+        db,
+        user_id=payload.receiver_user_id,
+        amount=receiver_ruby_amount,
+        currency=EconomyCurrency.RUBY.value,
+        source_type="GIFT_RECEIVE_RUBY",
+        source_id=str(gift_tx.id),
+        reason=f"Received lucky gift {payload.gift_id}",
+        tx=tx,
+        actor_user_id=payload.sender_user_id,
+    )
+    receiver_wallet.lifetime_coins_received_as_gifts += total_coin_value
+
+    risk_result = lucky_gift_props_service.evaluate_whale_risk(
+        db,
+        user_id=payload.sender_user_id,
+        spend_amount=total_coin_value,
+    )
+    lucky_gift_house_service.record_spend_income(
+        db,
+        amount=total_coin_value,
+        actor=sender,
+        source_id=f"lucky_gift:{gift_tx.id}",
+        user_id=payload.sender_user_id,
+        metadata={
+            "gift_id": payload.gift_id,
+            "receiver_user_id": payload.receiver_user_id,
+        },
+    )
+    capacity = lucky_gift_house_service.safe_payout_capacity(db)
+    lucky_result = lucky_gift_props_service.roll_lucky_gift(
+        db,
+        gift_id=payload.gift_id,
+        gift_name=gift_name,
+        base_coin_value=payload.coin_value,
+        quantity=payload.quantity,
+        house_risk_score=int(risk_result.get("score") or 0),
+        max_reward_coin_amount=int(capacity.get("max_safe_payout") or 0),
+    )
+    reward = int(lucky_result.get("reward_coin_amount") or 0)
+    multiplier = int(lucky_result.get("multiplier") or 0)
+    house_result = lucky_gift_house_service.validate_payout_exposure(
+        db,
+        payout_amount=reward,
+    )
+    lucky_gift_house_service.record_payout(
+        db,
+        amount=reward,
+        actor=sender,
+        source_id=f"lucky_gift:{gift_tx.id}",
+        user_id=payload.sender_user_id,
+        metadata={
+            "gift_id": payload.gift_id,
+            "multiplier": multiplier,
+            "tier": lucky_result.get("tier"),
+        },
+    )
+    if reward > 0:
+        sender_wallet = economy_transaction_service.credit(
+            db,
+            user_id=payload.sender_user_id,
+            amount=reward,
+            currency=EconomyCurrency.COIN.value,
+            source_type="LUCKY_GIFT_REWARD",
+            source_id=f"lucky_gift:{gift_tx.id}",
+            reason="Lucky gift multiplier reward",
+            tx=tx,
+            actor_user_id=payload.sender_user_id,
+        )
+
+    lucky_tx, stats = lucky_gift_stats_service.record_lucky_gift_result(
+        db,
+        sender_user_id=payload.sender_user_id,
+        receiver_user_id=payload.receiver_user_id,
+        room_id=payload.room_id,
+        gift_id=payload.gift_id,
+        gift_name=gift_name,
+        coin_value=payload.coin_value,
+        quantity=payload.quantity,
+        spent_coins=total_coin_value,
+        multiplier=multiplier,
+        reward_coins=reward,
+        net_win_coins=reward - total_coin_value,
+        metadata_json=json.dumps(
+            {
+                "gift_transaction_id": gift_tx.id,
+                "source": "economy_service_lucky_gift",
+                "lucky_result": lucky_result,
+                "risk": risk_result,
+                "house": house_result,
+                "capacity": capacity,
+            },
+            separators=(",", ":"),
+            default=str,
+        ),
+    )
+
+    result = {
+        "transaction_id": tx.transaction_id,
+        "gift_transaction_id": gift_tx.id,
+        "lucky_gift_transaction_id": lucky_tx.id,
+        "sender_user_id": payload.sender_user_id,
+        "receiver_user_id": payload.receiver_user_id,
+        "total_coin_value": total_coin_value,
+        "receiver_ruby_amount": receiver_ruby_amount,
+        "platform_share_coin_value": platform_share_coin_value,
+        "send_exp_amount": total_coin_value,
+        "receive_exp_amount": total_coin_value,
+        "room_exp_amount": room_exp_amount,
+        "love_score_amount": love_score_amount,
+        "sender_coin_balance": int(sender_wallet.coin_balance or 0),
+        "wallet_coin_balance": int(sender_wallet.coin_balance or 0),
+        "winner_coin_balance": int(sender_wallet.coin_balance or 0),
+        "receiver_ruby_balance": int(receiver_wallet.ruby_balance or 0),
+        "receiver_lifetime_gift_coin_value": int(
+            receiver_wallet.lifetime_coins_received_as_gifts or 0
+        ),
+        "receiver_lifetime_rubies_earned": int(
+            receiver_wallet.lifetime_rubies_earned or 0
+        ),
+        "experience_updates": {},
+        "ruby_rule": "Receiver rubies = total gift coin value × 30%.",
+        "lucky_multiplier": multiplier,
+        "lucky_reward_coin_amount": reward,
+        "lucky_result": lucky_result,
+        "lucky_difficulty": lucky_result.get("difficulty"),
+        "risk_level": risk_result.get("level"),
+        "risk_score": risk_result.get("score"),
+        "risk_action": risk_result.get("action"),
+        "spent_coins": total_coin_value,
+        "reward_coins": reward,
+        "net_win_coins": reward - total_coin_value,
+        "rule": f"Lucky gift result: {multiplier}x, reward {reward} coins.",
+        "stats": lucky_gift_stats_service.stats_payload(stats),
+    }
+    return economy_transaction_service.complete(
+        db,
+        tx=tx,
+        result=result,
+        event_type="economy.lucky_gift_settled.v1",
+        event_payload={
+            "gift_transaction_id": gift_tx.id,
+            "lucky_gift_transaction_id": lucky_tx.id,
+            "sender_user_id": payload.sender_user_id,
+            "receiver_user_id": payload.receiver_user_id,
+            "room_id": payload.room_id,
+            "gift_id": payload.gift_id,
+            "quantity": payload.quantity,
+            "total_coin_value": total_coin_value,
+            "reward_coin_amount": reward,
+            "multiplier": multiplier,
         },
     )
 
