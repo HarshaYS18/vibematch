@@ -163,11 +163,17 @@ def place_bet(db: Session, round_id: int, user: User, target_id: int, amount: in
     rid=(request_id or str(uuid4())).strip()
     existing=db.query(GameBet).filter(GameBet.request_id==rid).first()
     if existing is not None:
-        if existing.round_id!=round_id or existing.user_id!=user.id: raise HTTPException(status_code=409,detail="Bet request_id is already bound to another bet")
+        if existing.round_id!=round_id or existing.user_id!=user.id or int(existing.target_id)!=int(target_id) or int(existing.amount)!=int(amount):
+            raise HTTPException(status_code=409,detail="Bet request_id is already bound to another bet")
         meta=_json(existing.metadata_json); stored=meta.get("result")
         if isinstance(stored,dict): return stored
         if meta.get("financial_status")=="REJECTED": raise HTTPException(status_code=int(meta.get("error_status") or 400),detail=str(meta.get("error_detail") or "Bet rejected"))
-        bet=existing; round_obj=db.query(GameRound).filter(GameRound.id==round_id).first(); risk_meta=meta.get("risk") or {}
+        bet=existing
+        round_obj=db.query(GameRound).filter(GameRound.id==round_id).first()
+        if round_obj is None: raise HTTPException(status_code=404,detail="Game round not found")
+        risk_meta=meta.get("risk") or {}
+        definition=get_definition(db,round_obj.game_key)
+        rules=_definition_rules(definition)
     else:
         round_obj=db.query(GameRound).filter(GameRound.id==round_id).first()
         if round_obj is None: raise HTTPException(status_code=404,detail="Game round not found")
