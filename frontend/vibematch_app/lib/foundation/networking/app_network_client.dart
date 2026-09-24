@@ -202,8 +202,7 @@ class DioAppNetworkClient implements AppNetworkClient {
 }
 
 class ApiClientNetworkAdapter extends DioAppNetworkClient {
-  ApiClientNetworkAdapter({CanonicalNetworkTransport? transport})
-      : super(transport: transport);
+  ApiClientNetworkAdapter({super.transport});
 }
 
 class AppNetworkRuntime {
