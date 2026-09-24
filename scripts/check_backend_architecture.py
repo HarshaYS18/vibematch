@@ -1160,8 +1160,10 @@ def _validate_economy_service_cutover(errors: list[str]) -> None:
         ROOT / "apps" / "economy-service" / "README.md",
         ROOT / "deploy" / "postgres" / "economy-ownership.sql",
         ROOT / "backend" / "app" / "models" / "economy_journal.py",
+        ROOT / "backend" / "app" / "models" / "economy_house_reservation.py",
         ROOT / "backend" / "app" / "services" / "economy_reconciliation_service.py",
         ROOT / "backend" / "alembic" / "versions" / "20260924_1100_economy_authority_cutover.py",
+        ROOT / "backend" / "alembic" / "versions" / "20260924_1200_economy_house_reservations.py",
         ROOT / "docs" / "architecture" / "economy-service.md",
         ROOT / "docs" / "runbooks" / "economy-service.md",
     )
@@ -1177,6 +1179,8 @@ def _validate_economy_service_cutover(errors: list[str]) -> None:
     for state_id in (
         "economy.wallet_ledger",
         "economy.supply_ledger",
+        "economy.house_liability",
+        "economy.lucky_packets",
         "gifts.catalog",
         "gifts.settlement",
         "games.financial_settlement",
@@ -1200,6 +1204,9 @@ def _validate_economy_service_cutover(errors: list[str]) -> None:
             "gift_transactions",
             "economy_transactions",
             "economy_journal_entries",
+            "economy_house_reservations",
+            "lucky_packets",
+            "lucky_packet_claims",
         ):
             if f"ALTER TABLE {table} OWNER TO funkey_economy_owner" not in text:
                 errors.append("Economy ownership missing table: " + table)
@@ -1223,8 +1230,15 @@ def _validate_economy_service_cutover(errors: list[str]) -> None:
     bulk_worker = ROOT / "apps" / "economy-service" / "bulk_worker.py"
     if bulk_worker.exists():
         text = bulk_worker.read_text(encoding="utf-8")
-        if "economy_reconciliation_service.reconcile" not in text:
-            errors.append("Economy worker must run continuous reconciliation")
+        for token in (
+            "economy_reconciliation_service.reconcile",
+            "lucky_packet_service.finalize_expired_packets",
+            "funkey_economy_reconciliation_supply_pool_mismatches",
+            "funkey_economy_reconciliation_game_pool_mismatches",
+            "funkey_economy_reconciliation_reservation_mismatches",
+        ):
+            if token not in text:
+                errors.append("Economy worker invariant missing: " + token)
 
     forbidden_mutations = (
         "economy_service.credit_social_mission_reward(",
@@ -1241,6 +1255,7 @@ def _validate_economy_service_cutover(errors: list[str]) -> None:
         ROOT / "backend" / "app" / "api" / "routes" / "experience.py",
         ROOT / "backend" / "app" / "api" / "routes" / "super_owner.py",
         ROOT / "backend" / "app" / "api" / "routes" / "control_center.py",
+        ROOT / "backend" / "app" / "api" / "routes" / "lucky_gift_admin.py",
     )
     for source in core_economy_surfaces:
         if not source.exists():
@@ -1254,6 +1269,77 @@ def _validate_economy_service_cutover(errors: list[str]) -> None:
                     + " contains "
                     + token
                 )
+
+
+    value_routes = (
+        ROOT / "backend" / "app" / "api" / "routes" / "coin_sales.py",
+        ROOT / "backend" / "app" / "api" / "routes" / "lucky_coins.py",
+        ROOT / "backend" / "app" / "api" / "routes" / "lucky_packets.py",
+        ROOT / "backend" / "app" / "api" / "routes" / "game_pool_admin.py",
+    )
+    for source in value_routes:
+        if not source.exists():
+            errors.append(
+                "Economy value route is missing: " + str(source.relative_to(ROOT))
+            )
+            continue
+        text = source.read_text(encoding="utf-8-sig")
+        for required_token in (
+            "economy_transaction_service.begin",
+            "economy_transaction_service.complete",
+        ):
+            if required_token not in text:
+                errors.append(
+                    "Economy value route must use canonical transaction semantics: "
+                    + str(source.relative_to(ROOT))
+                    + " missing "
+                    + required_token
+                )
+        for forbidden in (
+            "economy_service._credit_wallet(",
+            "economy_service._debit_wallet(",
+            "WalletLedger(",
+            "UserWallet(",
+        ):
+            if forbidden in text:
+                errors.append(
+                    "Economy value route bypasses transaction layer: "
+                    + str(source.relative_to(ROOT))
+                    + " contains "
+                    + forbidden
+                )
+
+    lucky_packet_service = (
+        ROOT / "backend" / "app" / "services" / "lucky_packet_service.py"
+    )
+    if lucky_packet_service.exists():
+        text = lucky_packet_service.read_text(encoding="utf-8")
+        active_read = _function_source(text, "get_active_packet")
+        for forbidden in ("_finalize_locked(", ".commit(", "_credit_wallet(", "_debit_wallet("):
+            if forbidden in active_read:
+                errors.append(
+                    "Lucky Packet active GET contract must remain read-only: " + forbidden
+                )
+        for required_token in (
+            "economy_transaction_service.debit(",
+            "economy_transaction_service.credit(",
+            "finalize_expired_packets(",
+        ):
+            if required_token not in text:
+                errors.append("Lucky Packet Economy invariant missing: " + required_token)
+
+    bulk_grant = (
+        ROOT / "backend" / "app" / "services" / "economy_bulk_grant_service.py"
+    )
+    if bulk_grant.exists():
+        text = bulk_grant.read_text(encoding="utf-8")
+        for required_token in (
+            "economy_transaction_service.begin(",
+            "economy_transaction_service.record_balanced_transfer(",
+            "economy_transaction_service.complete(",
+        ):
+            if required_token not in text:
+                errors.append("Economy bulk-grant invariant missing: " + required_token)
 
 
 def _validate_post_chunk28_platforms(errors: list[str]) -> None:
