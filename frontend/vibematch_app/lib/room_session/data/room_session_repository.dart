@@ -51,23 +51,6 @@ class RoomSessionRepository extends StateNotifier<RoomSessionState> {
     }
   }
 
-  Future<RoomSessionState> heartbeat() async {
-    try {
-      await _networkClient.postMap(
-        '/rooms/$_roomId/realtime/heartbeat',
-        headers: _headers(),
-      );
-      state = state.copyWith(
-        connection: RoomSessionConnection.connected,
-        clearError: true,
-      );
-      return state;
-    } catch (error) {
-      _fail(error, preserveConnection: true);
-      rethrow;
-    }
-  }
-
   Future<RoomSessionState> refreshAfterReconnect() async {
     state = state.copyWith(
       connection: RoomSessionConnection.reconnecting,
