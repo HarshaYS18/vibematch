@@ -54,6 +54,25 @@ class EconomyBulkWorkerDeploymentTests(unittest.TestCase):
         )
         self.assertEqual(1, pdb["spec"]["minAvailable"])
 
+    def test_bulk_worker_hpa_is_bounded(self):
+        docs = list(
+            yaml.safe_load_all(
+                (ROOT / "deploy/kubernetes/base/autoscaling.yaml").read_text(
+                    encoding="utf-8"
+                )
+            )
+        )
+        hpa = next(
+            item
+            for item in docs
+            if item
+            and item.get("kind") == "HorizontalPodAutoscaler"
+            and item.get("metadata", {}).get("name")
+            == "funkey-economy-bulk-worker"
+        )
+        self.assertEqual(2, hpa["spec"]["minReplicas"])
+        self.assertEqual(4, hpa["spec"]["maxReplicas"])
+
     def test_compose_worker_uses_bulk_health_port(self):
         source = (ROOT / "infra/docker-compose.yml").read_text(
             encoding="utf-8"
