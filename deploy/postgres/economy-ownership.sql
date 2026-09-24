@@ -32,6 +32,8 @@ ALTER TABLE lucky_gift_transactions OWNER TO funkey_economy_owner;
 ALTER TABLE user_lucky_gift_stats OWNER TO funkey_economy_owner;
 ALTER TABLE lucky_packets OWNER TO funkey_economy_owner;
 ALTER TABLE lucky_packet_claims OWNER TO funkey_economy_owner;
+ALTER TABLE user_vip_statuses OWNER TO funkey_economy_owner;
+ALTER TABLE user_vip_overrides OWNER TO funkey_economy_owner;
 
 REVOKE ALL ON TABLE
   user_wallets,wallet_ledger,coin_supply_pools,coin_pool_ledger,
@@ -39,7 +41,8 @@ REVOKE ALL ON TABLE
   ruby_withdraw_requests,economy_transactions,economy_journal_entries,economy_house_reservations,
   economy_bulk_grants,economy_bulk_grant_recipients,
   gift_catalog_categories,gift_catalog_items,economy_rule_sets,economy_rule_levels,
-  lucky_gift_transactions,user_lucky_gift_stats,lucky_packets,lucky_packet_claims
+  lucky_gift_transactions,user_lucky_gift_stats,lucky_packets,lucky_packet_claims,
+  user_vip_statuses,user_vip_overrides
 FROM PUBLIC;
 
 GRANT SELECT,INSERT,UPDATE,DELETE ON TABLE
@@ -56,9 +59,10 @@ GRANT SELECT ON TABLE
   users,user_roles,special_permissions,rooms,room_participants
 TO funkey_economy_runtime;
 
--- VIP status is a derived Economy projection from recharge/value history.
--- This grant does not transfer ownership of user/profile authority.
-GRANT SELECT,INSERT,UPDATE ON TABLE user_vip_statuses TO funkey_economy_runtime;
+-- VIP effective state and manual overrides are Economy-owned projections.
+GRANT SELECT,INSERT,UPDATE ON TABLE
+  user_vip_statuses,user_vip_overrides
+TO funkey_economy_runtime;
 
 GRANT INSERT ON TABLE event_outbox TO funkey_economy_runtime;
 GRANT SELECT,INSERT ON TABLE admin_logs TO funkey_economy_runtime;
@@ -69,7 +73,7 @@ GRANT SELECT ON TABLE
   game_pools,game_pool_ledger,coin_sale_orders,gift_transactions,
   ruby_withdraw_requests,economy_transactions,economy_journal_entries,economy_house_reservations,
   gift_catalog_categories,gift_catalog_items,economy_rule_sets,economy_rule_levels,
-  lucky_gift_transactions,user_lucky_gift_stats
+  lucky_gift_transactions,user_lucky_gift_stats,user_vip_statuses
 TO funkey_economy_reader;
 
 DO $$ DECLARE t text; s text; BEGIN
@@ -79,7 +83,8 @@ FOREACH t IN ARRAY ARRAY[
   'ruby_withdraw_requests','economy_transactions','economy_journal_entries','economy_house_reservations',
   'economy_bulk_grants','economy_bulk_grant_recipients',
   'gift_catalog_categories','gift_catalog_items','economy_rule_sets','economy_rule_levels',
-  'lucky_gift_transactions','user_lucky_gift_stats','lucky_packets','lucky_packet_claims'
+  'lucky_gift_transactions','user_lucky_gift_stats','lucky_packets','lucky_packet_claims',
+  'user_vip_statuses','user_vip_overrides'
 ] LOOP
   s:=pg_get_serial_sequence(t,'id');
   IF s IS NOT NULL THEN
