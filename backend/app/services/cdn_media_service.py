@@ -116,23 +116,83 @@ def register_uploaded_media(
     )
 
 
-def mark_profile_picture_replaced(db: Session, *, user: User, new_asset: CdnMediaAsset, actor_user_id: int | None = None) -> None:
+def _defer_profile_reference_until_moderated(
+    db: Session,
+    *,
+    new_asset: CdnMediaAsset,
+    reference_kind: str,
+) -> bool:
+    if new_asset.moderation_status != CdnMediaModerationStatus.PENDING.value:
+        return False
+    metadata = dict(new_asset.metadata_json or {})
+    metadata["pending_profile_reference"] = reference_kind
+    new_asset.metadata_json = metadata
+    new_asset.is_active_reference = False
+    db.add(new_asset)
+    db.commit()
+    return True
+
+
+def mark_profile_picture_replaced(
+    db: Session,
+    *,
+    user: User,
+    new_asset: CdnMediaAsset,
+    actor_user_id: int | None = None,
+) -> None:
+    if _defer_profile_reference_until_moderated(
+        db,
+        new_asset=new_asset,
+        reference_kind="profile_picture",
+    ):
+        return
+    if new_asset.moderation_status not in {
+        CdnMediaModerationStatus.AI_APPROVED.value,
+        CdnMediaModerationStatus.HUMAN_APPROVED.value,
+        CdnMediaModerationStatus.NOT_REQUIRED.value,
+    }:
+        return
     old_url = user.avatar_url
     if old_url:
         old_asset = find_active_asset_by_url(db, old_url)
         if old_asset and old_asset.id != new_asset.id:
             old_asset.replaced_by_media_id = new_asset.id
-            mark_media_deleted(db, asset=old_asset, actor_user_id=actor_user_id, reason="profile_picture_replaced")
+            mark_media_deleted(
+                db,
+                asset=old_asset,
+                actor_user_id=actor_user_id,
+                reason="profile_picture_replaced",
+            )
     user.avatar_url = new_asset.public_url
     new_asset.upload_status = CdnMediaUploadStatus.APPROVED.value
-    new_asset.moderation_status = CdnMediaModerationStatus.AI_APPROVED.value if new_asset.moderation_status == CdnMediaModerationStatus.PENDING.value else new_asset.moderation_status
     new_asset.is_active_reference = True
+    metadata = dict(new_asset.metadata_json or {})
+    metadata.pop("pending_profile_reference", None)
+    new_asset.metadata_json = metadata
     db.add(user)
     db.add(new_asset)
     db.commit()
 
 
-def add_cover_photo_reference(db: Session, *, user: User, new_asset: CdnMediaAsset, actor_user_id: int | None = None) -> None:
+def add_cover_photo_reference(
+    db: Session,
+    *,
+    user: User,
+    new_asset: CdnMediaAsset,
+    actor_user_id: int | None = None,
+) -> None:
+    if _defer_profile_reference_until_moderated(
+        db,
+        new_asset=new_asset,
+        reference_kind="cover_photo",
+    ):
+        return
+    if new_asset.moderation_status not in {
+        CdnMediaModerationStatus.AI_APPROVED.value,
+        CdnMediaModerationStatus.HUMAN_APPROVED.value,
+        CdnMediaModerationStatus.NOT_REQUIRED.value,
+    }:
+        return
     old_urls = list(user.cover_photo_urls or [])
     if new_asset.public_url not in old_urls:
         next_urls = [new_asset.public_url, *old_urls]
@@ -140,11 +200,48 @@ def add_cover_photo_reference(db: Session, *, user: User, new_asset: CdnMediaAss
         next_urls = old_urls
     user.cover_photo_urls = next_urls[:6]
     new_asset.upload_status = CdnMediaUploadStatus.APPROVED.value
-    new_asset.moderation_status = CdnMediaModerationStatus.AI_APPROVED.value if new_asset.moderation_status == CdnMediaModerationStatus.PENDING.value else new_asset.moderation_status
     new_asset.is_active_reference = True
+    metadata = dict(new_asset.metadata_json or {})
+    metadata.pop("pending_profile_reference", None)
+    new_asset.metadata_json = metadata
     db.add(user)
     db.add(new_asset)
     db.commit()
+
+
+def activate_approved_profile_media(
+    db: Session,
+    *,
+    asset: CdnMediaAsset,
+    actor_user_id: int | None = None,
+) -> None:
+    reference_kind = dict(asset.metadata_json or {}).get("pending_profile_reference")
+    if reference_kind not in {"profile_picture", "cover_photo"}:
+        return
+    if asset.moderation_status not in {
+        CdnMediaModerationStatus.AI_APPROVED.value,
+        CdnMediaModerationStatus.HUMAN_APPROVED.value,
+    }:
+        return
+    if asset.owner_user_id is None:
+        return
+    user = db.query(User).filter(User.id == asset.owner_user_id).first()
+    if user is None:
+        return
+    if reference_kind == "profile_picture":
+        mark_profile_picture_replaced(
+            db,
+            user=user,
+            new_asset=asset,
+            actor_user_id=actor_user_id,
+        )
+    else:
+        add_cover_photo_reference(
+            db,
+            user=user,
+            new_asset=asset,
+            actor_user_id=actor_user_id,
+        )
 
 
 def find_active_asset_by_url(db: Session, public_url: str) -> CdnMediaAsset | None:

@@ -118,6 +118,12 @@ def handle_media_moderation_requested(event: EventEnvelope) -> str:
         )
         if "audit failed:" in result.summary.lower():
             raise RuntimeError("Media moderation provider failed")
+        if asset.moderation_status == CdnMediaModerationStatus.AI_APPROVED.value:
+            cdn_media_service.activate_approved_profile_media(
+                db,
+                asset=asset,
+                actor_user_id=event.actor_user_id,
+            )
     return _mark_processed(event, handler_name)
 
 

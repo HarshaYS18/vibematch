@@ -48,5 +48,15 @@ class WorkerExternalWorkBoundaryTests(unittest.TestCase):
         self.assertNotIn("backup upload failed: {response.text}",google)
         self.assertIn("funkey_job_id",google)
 
+    def test_pending_profile_media_is_not_auto_approved(self):
+        service=(ROOT/"backend/app/services/cdn_media_service.py").read_text(encoding="utf-8")
+        handlers=(ROOT/"apps/worker/handlers.py").read_text(encoding="utf-8")
+        self.assertIn("pending_profile_reference",service)
+        self.assertNotIn(
+            "CdnMediaModerationStatus.AI_APPROVED.value if new_asset.moderation_status",
+            service,
+        )
+        self.assertIn("activate_approved_profile_media",handlers)
+
 
 if __name__=="__main__": unittest.main()
