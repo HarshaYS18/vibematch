@@ -57,7 +57,7 @@ void main() {
           source.contains("package:dio/dio.dart")) {
         violations.add('$path imports Dio directly');
       }
-      if (!foundationNetworking && RegExp(r'\\bHttpClient\\b').hasMatch(source)) {
+      if (!foundationNetworking && RegExp(r'\bHttpClient\b').hasMatch(source)) {
         violations.add('$path uses HttpClient directly');
       }
       if (!path.endsWith('/core/network/api_client.dart') &&
