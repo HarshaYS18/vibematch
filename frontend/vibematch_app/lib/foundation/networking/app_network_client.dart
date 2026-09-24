@@ -32,6 +32,13 @@ abstract interface class AppNetworkClient {
     NetworkCancellation? cancellation,
   });
 
+  Future<Map<String, dynamic>?> getOptionalMap(
+    String path, {
+    Map<String, String?> queryParameters = const <String, String?>{},
+    Map<String, String> headers = const <String, String>{},
+    NetworkCancellation? cancellation,
+  });
+
   Future<List<dynamic>> getList(
     String path, {
     Map<String, String?> queryParameters = const <String, String?>{},
@@ -140,6 +147,26 @@ class DioAppNetworkClient implements AppNetworkClient {
   }
 
   @override
+  Future<Map<String, dynamic>?> getOptionalMap(String path, {Map<String, String?> queryParameters = const <String, String?>{}, Map<String, String> headers = const <String, String>{}, NetworkCancellation? cancellation}) async {
+    final response = await request(
+      'GET',
+      path,
+      queryParameters: queryParameters,
+      headers: headers,
+      cancellation: cancellation,
+    );
+    if (response.body.trim().isEmpty) return null;
+    final value = jsonDecode(response.body);
+    if (value == null) return null;
+    if (value is Map<String, dynamic>) return value;
+    throw ApiException(
+      message: 'Expected a nullable JSON object response',
+      statusCode: response.statusCode,
+      body: value,
+    );
+  }
+
+  @override
   Future<List<dynamic>> getList(String path, {Map<String, String?> queryParameters = const <String, String?>{}, Map<String, String> headers = const <String, String>{}, NetworkCancellation? cancellation}) async {
     final value = await _json('GET', path, queryParameters: queryParameters, headers: headers, cancellation: cancellation);
     if (value is List<dynamic>) return value;
@@ -192,6 +219,7 @@ class DeduplicatingAppNetworkClient implements AppNetworkClient {
 
   final AppNetworkClient _inner;
   final Map<String, Future<Map<String, dynamic>>> _mapReads = {};
+  final Map<String, Future<Map<String, dynamic>?>> _optionalMapReads = {};
   final Map<String, Future<List<dynamic>>> _listReads = {};
 
   String _key(String path, Map<String, String?> query, Map<String, String> headers) {
@@ -210,6 +238,16 @@ class DeduplicatingAppNetworkClient implements AppNetworkClient {
     return _mapReads.putIfAbsent(key, () {
       final future = _inner.getMap(path, queryParameters: queryParameters, headers: headers, cancellation: cancellation);
       future.whenComplete(() => _mapReads.remove(key));
+      return future;
+    });
+  }
+
+  @override
+  Future<Map<String, dynamic>?> getOptionalMap(String path, {Map<String, String?> queryParameters = const <String, String?>{}, Map<String, String> headers = const <String, String>{}, NetworkCancellation? cancellation}) {
+    final key = _key(path, queryParameters, headers);
+    return _optionalMapReads.putIfAbsent(key, () {
+      final future = _inner.getOptionalMap(path, queryParameters: queryParameters, headers: headers, cancellation: cancellation);
+      future.whenComplete(() => _optionalMapReads.remove(key));
       return future;
     });
   }
@@ -236,6 +274,7 @@ class DeduplicatingAppNetworkClient implements AppNetworkClient {
   @override
   void close() {
     _mapReads.clear();
+    _optionalMapReads.clear();
     _listReads.clear();
     _inner.close();
   }

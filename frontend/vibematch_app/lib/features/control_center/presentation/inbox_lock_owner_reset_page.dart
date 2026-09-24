@@ -1,7 +1,7 @@
 import 'dart:convert';
 
 import 'package:flutter/material.dart';
-import 'package:http/http.dart' as http;
+import 'package:vibematch_app/foundation/networking/feature_http_compat.dart' as http;
 
 import '../../../core/network/vm_api_config.dart';
 import '../../auth/data/auth_api_service.dart';

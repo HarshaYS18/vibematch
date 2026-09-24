@@ -297,9 +297,16 @@ class CanonicalNetworkTransport {
           ),
       });
     }
+    final requestUri = query.isEmpty
+        ? uri
+        : uri.replace(
+            queryParameters: <String, String>{
+              ...uri.queryParameters,
+              ...query,
+            },
+          );
     final response = await _dio.requestUri<Object?>(
-      uri,
-      queryParameters: query.isEmpty ? null : query,
+      requestUri,
       data: data,
       cancelToken: cancellation?._token,
       options: Options(
