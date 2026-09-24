@@ -11,7 +11,7 @@ from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from sqlalchemy import text
 
 from app.core.config import settings
-from app.services import economy_bulk_grant_service, economy_reconciliation_service
+from app.services import economy_bulk_grant_service, economy_reconciliation_service, lucky_packet_service
 from bulk_database import SessionLocal, engine
 
 
@@ -28,6 +28,8 @@ _reconciliation_supply_pool_mismatches = 0
 _reconciliation_game_pool_mismatches = 0
 _reconciliation_reservation_mismatches = 0
 _reconciliation_unbalanced_journals = 0
+_lucky_packet_finalizations = 0
+_lucky_packet_finalize_failures = 0
 
 
 class HealthHandler(BaseHTTPRequestHandler):
@@ -58,6 +60,8 @@ class HealthHandler(BaseHTTPRequestHandler):
                 f"funkey_economy_reconciliation_game_pool_mismatches {_reconciliation_game_pool_mismatches}\n"
                 f"funkey_economy_reconciliation_reservation_mismatches {_reconciliation_reservation_mismatches}\n"
                 f"funkey_economy_reconciliation_unbalanced_journals {_reconciliation_unbalanced_journals}\n"
+                f"funkey_economy_lucky_packet_finalizations_total {_lucky_packet_finalizations}\n"
+                f"funkey_economy_lucky_packet_finalize_failures_total {_lucky_packet_finalize_failures}\n"
             ).encode()
             self.send_response(200)
             self.send_header("Content-Type", "text/plain; version=0.0.4")
@@ -88,6 +92,7 @@ def main() -> None:
     global _reconciliation_wallet_mismatches, _reconciliation_supply_pool_mismatches
     global _reconciliation_game_pool_mismatches, _reconciliation_reservation_mismatches
     global _reconciliation_unbalanced_journals
+    global _lucky_packet_finalizations, _lucky_packet_finalize_failures
     settings.validate_economy_service()
     settings.validate_economy_bulk_worker()
 
@@ -120,8 +125,15 @@ def main() -> None:
                     _reconciliation_unbalanced_journals = report.unbalanced_journal_transactions
                     if not report.healthy:
                         _reconciliation_failures += 1
+                    with SessionLocal() as db:
+                        finalized_packets = lucky_packet_service.finalize_expired_packets(
+                            db,
+                            limit=settings.ECONOMY_LUCKY_PACKET_FINALIZE_BATCH_SIZE,
+                        )
+                    _lucky_packet_finalizations += finalized_packets
                 except Exception:
                     _reconciliation_failures += 1
+                    _lucky_packet_finalize_failures += 1
                 next_reconciliation_at = (
                     time.monotonic()
                     + settings.ECONOMY_RECONCILIATION_INTERVAL_SECONDS
