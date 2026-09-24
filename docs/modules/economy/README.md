@@ -2,92 +2,72 @@
 
 ## Purpose
 
-Coordinates catalog pricing, coin supply, settlement, rules, and aggregate accounting.
+Provide the single Tier-0 authority for FunKey value movement and financial
+auditability.
 
-## Responsibilities
+## Current deployable
 
-The module owns coin_supply_pools, coin_pool_ledger, economy_rule_sets, coin_sale_orders. Routes should validate input and delegate business decisions to services.
+`apps/economy-service` is the exclusive financial writer. Core may retain stable
+public compatibility/read-orchestration surfaces through a SELECT-only Economy
+reader role.
 
-## What this module owns
+## Owns
 
-coin_supply_pools, coin_pool_ledger, economy_rule_sets, coin_sale_orders.
+- wallet balances and wallet ledger
+- coin supply pools and pool ledger
+- game financial pools and pool ledger
+- gift financial settlement
+- recharge/coin sale/ruby conversion/withdrawal value state
+- mission reward credits
+- Economy transaction/idempotency records
+- balanced accounting journal
+- bulk financial grants
+- Economy-owned gift/rule configuration
 
-## What this module does NOT own
+## Does not own
 
-This module does not own SFU transport state, edge routing, or client UI state.
+Identity/profile truth, room state, game lifecycle/risk/stats, realtime transport
+or client state. Game Platform calls Economy for value; Economy does not create
+game rounds as lifecycle authority.
 
-## Source of truth
+## Transaction contract
 
-PostgreSQL is the durable source of truth for coin_supply_pools, coin_pool_ledger, economy_rule_sets, coin_sale_orders.
+Cross-domain writes require `transaction_id`, `idempotency_key` and
+`business_reference`. The transaction record, balance mutation, operational
+ledger, balanced journal and outbox event commit atomically.
 
-## Important files
+## Accounting
 
-`backend/app/services/economy_service.py`, `backend/app/services/economy_rules_service.py`, `backend/app/api/routes/economy.py`.
+`user_wallets` + `wallet_ledger` are operational balance truth.
+`economy_journal_entries` is append-only balanced debit/credit evidence. It is
+validated before transaction commit and continuously reconciled by the Economy
+worker runtime.
 
-## Public API/contracts
+## Database ownership
 
-economy, coin sales, and control center routes. Preserve deployed request and response shapes while migrating implementation.
-
-## Events published
-
-Current code may emit domain WebSocket updates after committed writes. A versioned broker event for this domain must be added only with a contract and transactional publication path; do not claim every proposed event is live. Consumers must handle duplicates and refetch a snapshot after a gap.
-
-## Events consumed
-
-No durable broker consumer is implied by this ownership guide. Add a consumer only with a versioned contract, idempotency, retry limits, and an integration test.
-
-## Database tables/state owned
-
-Database tables and state: `coin_supply_pools, coin_pool_ledger, economy_rule_sets, coin_sale_orders`.
-
-## Redis keys/state owned
-
-Redis can cache read models but cannot own value or supply.
-
-## Dependencies
-
-Depends on FastAPI authentication, SQLAlchemy transaction/session handling, and the relevant domain services.
-
-## Security considerations
-
-Administrative prices and settlement need role checks, immutable audit, and idempotency. Never log tokens, OTPs, or payment secrets.
-
-## Failure modes
-
-Ambiguous payment or broker failure requires reconciliation against the ledger, not blind replay.
-
-## Retry/idempotency behavior
-
-Reads and writes should use bounded timeouts. Retries are safe only for read operations or writes backed by an idempotency key and known commit outcome.
-
-## Scaling behavior
-
-Scale stateless API replicas only within the PostgreSQL connection budget.
-
-## Autoscaling metrics
-
-Track route request rate, p95 latency, error rate, transaction latency, DB pool use, and domain-specific rejection counts. Trace commands through commit and fanout with a request ID; avoid user PII in metric labels.
+`deploy/postgres/economy-ownership.sql` defines owner/runtime/reader roles.
+Only Economy receives mutation rights. Core and other services must never be
+granted `funkey_economy_runtime`.
 
 ## Observability
 
-Trace commands through commit and fanout with a request ID; avoid user PII in metric labels.
+Trace transaction/business reference across caller -> Economy -> DB -> outbox.
+Monitor DB pool/latency, idempotency conflicts, outbox lag, bulk jobs and
+reconciliation mismatch gauges.
 
-## Local development
+## Operations
 
-Start dependencies with `.\\scripts\\dev-up.ps1`, then run affected backend tests with `python -m unittest discover -s backend/tests -p test_*.py` from the repository root with the backend import path configured, or use the test command in the root README.
+See `docs/architecture/economy-service.md`,
+`docs/runbooks/economy-service.md`, and `apps/economy-service/README.md`.
 
-## Testing
+## Migration status
 
-Add a regression test for authorization, transaction outcome, and duplicate/reconnect behavior when relevant.
-
-## Deployment notes
-
-Apply Alembic first; roll out compatible API behavior; check readiness and error metrics.
+Chunk 25 cutover is complete after the Chunk-32 audit repair. The old staged
+internal-only wording is superseded; Economy is now the declared exclusive
+financial writer with core compatibility reads only.
 
 ## Change checklist
 
-Before changing this module: identify the owning table and contract, add an additive migration if needed, preserve Flutter compatibility, verify permission checks, and document rollback.
-
-## Known migration status
-
-Existing FastAPI authority; no Go migration started.
+Never introduce a financial write outside Economy. New mutation types need
+stable idempotency/business identity, transactionally consistent ledger/journal
+evidence, outbox publication, reconciliation coverage, and rollback rules.
