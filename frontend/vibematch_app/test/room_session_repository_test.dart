@@ -144,7 +144,7 @@ void main() {
     );
   });
 
-  test('heartbeat is liveness-only and does not replace canonical state', () async {
+  test('reconnect performs one snapshot read without REST heartbeat', () async {
     final network = _FakeNetworkClient(_room(10, <int>[1, 2]));
     final repository = RoomSessionRepository(
       roomId: 'VM123',
@@ -155,11 +155,11 @@ void main() {
     await repository.join();
     network.snapshot = _room(11, <int>[1, 2, 3]);
 
-    final heartbeat = await repository.heartbeat();
+    final reconnected = await repository.refreshAfterReconnect();
 
-    expect(heartbeat.stateVersion, 10);
-    expect(heartbeat.presence.containsKey(3), isFalse);
-    expect(heartbeat.connection, RoomSessionConnection.connected);
+    expect(reconnected.stateVersion, 11);
+    expect(reconnected.presence.containsKey(3), isTrue);
+    expect(reconnected.connection, RoomSessionConnection.connected);
 
     network.snapshot = _room(12, <int>[2, 3]);
     final left = await repository.leave();
@@ -169,9 +169,13 @@ void main() {
       network.calls,
       containsAllInOrder(<String>[
         'POST /rooms/VM123/realtime/join',
-        'POST /rooms/VM123/realtime/heartbeat',
+        'GET /rooms/VM123/realtime/snapshot',
         'POST /rooms/VM123/realtime/leave',
       ]),
+    );
+    expect(
+      network.calls.any((call) => call.contains('/realtime/heartbeat')),
+      isFalse,
     );
   });
 
