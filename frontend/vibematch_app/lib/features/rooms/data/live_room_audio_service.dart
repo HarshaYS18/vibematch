@@ -3,6 +3,7 @@ import 'dart:convert';
 
 
 import 'package:flutter/foundation.dart';
+import 'package:vibematch_app/foundation/networking/feature_http_compat.dart' as http;
 import 'package:flutter_webrtc/flutter_webrtc.dart';
 import 'package:mediasfu_mediasoup_client/mediasfu_mediasoup_client.dart';
 import 'package:socket_io_client/socket_io_client.dart' as io;
