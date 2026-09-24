@@ -41,6 +41,7 @@ Each guide records ownership, contracts, state, security, scaling, operations, a
 - [kubernetes](modules/kubernetes/README.md)
 - [TURN](modules/TURN/README.md)
 - [object-storage](modules/object-storage/README.md)
+- [media-upload-v2](modules/media-upload-v2/README.md)
 - [migrations](modules/migrations/README.md)
 - [runbooks](modules/runbooks/README.md)
 

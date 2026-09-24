@@ -4,9 +4,9 @@ from pydantic import BaseModel, Field
 from sqlalchemy.exc import IntegrityError
 from app.core.config import settings
 from app.database import SessionLocal
-from app.models.cdn_media import CdnMediaAsset, CdnMediaLinkedEntityType, CdnMediaModerationStatus
+from app.models.cdn_media import CdnMediaAsset, CdnMediaLinkedEntityType, CdnMediaModerationStatus, MediaUploadSession
 from app.models.event_outbox import WorkerProcessedEvent
-from app.services import cdn_media_service, inbox_service_client, media_moderation_service, media_processing_service, notification_service_client
+from app.services import cdn_media_service, inbox_service_client, media_moderation_service, media_processing_service, media_storage_service, notification_service_client
 from apps.worker.events import EventEnvelope
 
 class NotificationRequested(BaseModel):
@@ -76,6 +76,11 @@ class MediaUploaded(BaseModel):
     upload_session_id: str = Field(min_length=1, max_length=100)
 
 
+class MediaUploadAbortRequested(BaseModel):
+    media_id: str = Field(min_length=1, max_length=100)
+    upload_session_id: str = Field(min_length=1, max_length=100)
+
+
 class MediaModerationRequested(BaseModel):
     media_id: str = Field(min_length=1, max_length=100)
 
@@ -105,6 +110,35 @@ def handle_media_uploaded(event: EventEnvelope) -> str:
             db,
             media_id=payload.media_id,
             actor_user_id=event.actor_user_id,
+        )
+    if duplicate:
+        return "duplicate"
+    return _mark_processed(event, handler_name)
+
+
+def handle_media_upload_abort_requested(event: EventEnvelope) -> str:
+    payload = MediaUploadAbortRequested.model_validate(event.payload)
+    handler_name = "media.upload.abort.requested"
+    if _processed(event, handler_name):
+        return "duplicate"
+    with SessionLocal() as db:
+        session = (
+            db.query(MediaUploadSession)
+            .filter(MediaUploadSession.public_id == payload.upload_session_id)
+            .first()
+        )
+        if session is None:
+            raise ValueError("Media upload session not found")
+        if session.storage_upload_id:
+            media_storage_service.abort_multipart_upload(
+                object_key=session.object_key,
+                upload_id=session.storage_upload_id,
+            )
+        _, duplicate = cdn_media_service.execute_media_delete(
+            db,
+            media_id=payload.media_id,
+            actor_user_id=event.actor_user_id,
+            reason="upload_session_expired",
         )
     if duplicate:
         return "duplicate"
@@ -193,6 +227,7 @@ HANDLERS={
     "vibes.post.published": handle_vibes_post_published,
     "vibes.media.requested": handle_vibes_media_requested,
     "media.uploaded": handle_media_uploaded,
+    "media.upload.abort.requested": handle_media_upload_abort_requested,
     "media.moderation.requested": handle_media_moderation_requested,
     "media.delete.requested": handle_media_delete_requested,
     "media.cleanup.requested": handle_media_cleanup_requested,

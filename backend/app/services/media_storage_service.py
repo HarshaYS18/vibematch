@@ -279,11 +279,18 @@ def complete_multipart_upload(
 def abort_multipart_upload(*, object_key: str, upload_id: str) -> None:
     if storage_driver() != "s3" or not upload_id:
         return
-    _s3_client().abort_multipart_upload(
-        Bucket=_require_s3_bucket(),
-        Key=object_key,
-        UploadId=upload_id,
-    )
+    try:
+        _s3_client().abort_multipart_upload(
+            Bucket=_require_s3_bucket(),
+            Key=object_key,
+            UploadId=upload_id,
+        )
+    except Exception as exc:
+        response = getattr(exc, "response", None)
+        error = response.get("Error") if isinstance(response, dict) else None
+        if isinstance(error, dict) and error.get("Code") == "NoSuchUpload":
+            return
+        raise
 
 
 def head_media_object(object_key: str) -> MediaObjectHead:

@@ -26,7 +26,7 @@ from opentelemetry.trace import SpanKind
 
 from app.core.telemetry import configure_telemetry, current_traceparent, shutdown_telemetry, traced
 from app.database import SessionLocal, engine
-from app.services import outbox_relay_service
+from app.services import media_upload_session_service, outbox_relay_service
 from apps.worker.events import EventEnvelope
 from apps.worker.handlers import HANDLERS
 from apps.worker.pools import get_pool
@@ -293,6 +293,45 @@ async def consume(
             await asyncio.sleep(2 + random.random())
 
 
+async def media_upload_session_sweep(stop: asyncio.Event):
+    interval = max(
+        60.0,
+        min(float(os.getenv("MEDIA_UPLOAD_CLEANUP_INTERVAL_SECONDS", "900")), 86400.0),
+    )
+    batch_size = max(
+        1,
+        min(int(os.getenv("MEDIA_UPLOAD_CLEANUP_BATCH_SIZE", "100")), 500),
+    )
+    while not stop.is_set():
+        try:
+            def sweep_once() -> int:
+                with SessionLocal() as db:
+                    return media_upload_session_service.expire_upload_sessions(
+                        db,
+                        limit=batch_size,
+                    )
+
+            expired = await asyncio.to_thread(sweep_once)
+            if expired:
+                _logger.info(json.dumps({
+                    "event": "media.upload_session.expired",
+                    "pool": POOL.name,
+                    "count": expired,
+                }))
+        except asyncio.CancelledError:
+            raise
+        except Exception as exc:
+            _logger.warning(json.dumps({
+                "event": "media.upload_session.cleanup_retry",
+                "pool": POOL.name,
+                "error": type(exc).__name__,
+            }))
+        try:
+            await asyncio.wait_for(stop.wait(), timeout=interval)
+        except asyncio.TimeoutError:
+            pass
+
+
 async def run():
     settings.validate_worker_runtime()
     if not POOL.active:
@@ -329,6 +368,8 @@ async def run():
             await js.add_stream(name=DLQ_STREAM, subjects=["funkey.dlq.>"], max_age=30 * 86400)
         if POOL.relay_outbox:
             tasks.append(asyncio.create_task(relay_outbox(js, stop)))
+        if POOL.name == "maintenance":
+            tasks.append(asyncio.create_task(media_upload_session_sweep(stop)))
         for spec in POOL.subscriptions:
             subscription = await js.pull_subscribe(
                 spec.subject, durable=spec.durable_name, stream=STREAM,

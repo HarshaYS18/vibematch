@@ -428,3 +428,53 @@ def media_status(
         .all()
     )
     return asset, variants
+
+
+
+def expire_upload_sessions(
+    db: Session,
+    *,
+    limit: int = 100,
+) -> int:
+    """Expire abandoned upload sessions and enqueue retryable physical cleanup."""
+    now = datetime.utcnow()
+    rows = (
+        db.query(MediaUploadSession)
+        .filter(
+            MediaUploadSession.status.in_(
+                {
+                    MediaUploadSessionStatus.CREATED.value,
+                    MediaUploadSessionStatus.UPLOADING.value,
+                }
+            ),
+            MediaUploadSession.expires_at <= now,
+        )
+        .order_by(MediaUploadSession.expires_at.asc(), MediaUploadSession.id.asc())
+        .with_for_update(skip_locked=True)
+        .limit(max(1, min(int(limit), 500)))
+        .all()
+    )
+    for session in rows:
+        asset = (
+            db.query(CdnMediaAsset)
+            .filter(CdnMediaAsset.id == session.media_id)
+            .first()
+        )
+        session.status = MediaUploadSessionStatus.EXPIRED.value
+        db.add(session)
+        if asset is not None:
+            asset.upload_status = CdnMediaUploadStatus.REJECTED.value
+            asset.processing_status = MediaProcessingStatus.FAILED.value
+            asset.processing_error = "upload_session_expired"
+            db.add(asset)
+            event_outbox_service.enqueue_event(
+                db,
+                event_type="media.upload.abort.requested",
+                actor_user_id=session.owner_user_id,
+                payload={
+                    "media_id": asset.public_id,
+                    "upload_session_id": session.public_id,
+                },
+            )
+    db.commit()
+    return len(rows)
