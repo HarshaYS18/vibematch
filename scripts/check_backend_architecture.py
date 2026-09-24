@@ -1245,6 +1245,13 @@ def _validate_economy_service_cutover(errors: list[str]) -> None:
         "economy_service.send_gift(",
         "economy_service.convert_rubies_to_coins(",
         "economy_service.create_withdraw_request(",
+        "get_or_create_wallet(",
+        "sync_vip_status(",
+        "wallet.coin_balance =",
+        "wallet.ruby_balance =",
+        "wallet.lifetime_coins_spent =",
+        "wallet.lifetime_coins_received_as_gifts =",
+        "wallet.lifetime_rubies_earned =",
         "WalletLedger(",
         "UserWallet(",
     )
@@ -1349,6 +1356,36 @@ def _validate_economy_service_cutover(errors: list[str]) -> None:
         ):
             if required_token not in text:
                 errors.append("Lucky Packet Economy invariant missing: " + required_token)
+
+    economy_route = ROOT / "backend" / "app" / "api" / "routes" / "economy.py"
+    if economy_route.exists():
+        text = economy_route.read_text(encoding="utf-8")
+        for function_name in (
+            "_public_wallet_summary",
+            "_private_wallet_payload",
+        ):
+            source = _function_source(text, function_name)
+            for forbidden in ("get_or_create_wallet(", "sync_vip_status(", ".commit("):
+                if forbidden in source:
+                    errors.append(
+                        "Economy read projection must remain read-only: "
+                        + function_name
+                        + " contains "
+                        + forbidden
+                    )
+
+    economy_service_source = (
+        ROOT / "backend" / "app" / "services" / "economy_service.py"
+    )
+    if economy_service_source.exists():
+        text = economy_service_source.read_text(encoding="utf-8")
+        dashboard_source = _function_source(text, "dashboard_for_user")
+        for forbidden in ("get_or_create_wallet(", ".commit(", ".flush("):
+            if forbidden in dashboard_source:
+                errors.append(
+                    "Economy dashboard GET projection must remain read-only: "
+                    + forbidden
+                )
 
     bulk_grant = (
         ROOT / "backend" / "app" / "services" / "economy_bulk_grant_service.py"
