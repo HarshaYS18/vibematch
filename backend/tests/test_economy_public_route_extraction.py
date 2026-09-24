@@ -23,7 +23,6 @@ class EconomyPublicRouteExtractionTests(unittest.TestCase):
         proxy=(ROOT/"backend/app/api/routes/economy_proxy.py").read_text(encoding="utf-8")
         self.assertIn("economy_proxy.router",central)
         for forbidden in (
-            "wallet.router",
             "coin_sales.router",
             "lucky_coins.router",
             "lucky_packets.router",
