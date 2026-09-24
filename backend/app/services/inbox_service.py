@@ -1267,6 +1267,7 @@ def conversation_to_dict(
     messages_next_cursor: str | None = None,
     has_older_messages: bool | None = None,
     status_overrides: dict[int, str] | None = None,
+    include_messages: bool = True,
 ) -> dict:
     participant = participant or next(
         (item for item in conversation.participants if item.user_id == current_user.id),
@@ -1337,9 +1338,9 @@ def conversation_to_dict(
                 status_override=statuses.get(message.id),
             )
             for message in messages
-        ],
-        "messages_next_cursor": messages_next_cursor,
-        "has_older_messages": bool(has_older_messages),
+        ] if include_messages else [],
+        "messages_next_cursor": messages_next_cursor if include_messages else None,
+        "has_older_messages": bool(has_older_messages) if include_messages else False,
         "current_room_name": conversation.current_room_name,
         "current_room_id": conversation.room_public_id,
         "is_locked_by_backend": conversation.is_locked,
