@@ -1,6 +1,8 @@
 import 'dart:convert';
 
 import 'package:http/http.dart' as http;
+import 'package:shared_preferences/shared_preferences.dart';
+import 'package:uuid/uuid.dart';
 
 import '../../../core/network/vm_api_config.dart';
 import '../../auth/data/auth_api_service.dart';
@@ -38,35 +40,68 @@ class WalletApiService {
   }
 
   Future<VmWallet> recharge({required int amountInr}) async {
+    final prefs = await SharedPreferences.getInstance();
+    final pendingKey = 'wallet_recharge_pending_$amountInr';
+    var providerReference = prefs.getString(pendingKey);
+    if (providerReference == null || providerReference.trim().isEmpty) {
+      providerReference = 'mvp_${const Uuid().v4()}';
+      await prefs.setString(pendingKey, providerReference);
+    }
+
     final response = await http.post(
       Uri.parse(VmApiConfig.endpoint('/wallets/recharge')),
       headers: _headers(),
       body: jsonEncode({
         'amount_inr': amountInr,
         'provider': 'mvp',
-        'provider_reference': 'mvp_${DateTime.now().millisecondsSinceEpoch}',
+        'provider_reference': providerReference,
       }),
     );
+    if (response.statusCode >= 200 && response.statusCode < 300) {
+      await prefs.remove(pendingKey);
+      final wallet = VmWallet.fromJson(
+        jsonDecode(response.body) as Map<String, dynamic>,
+      );
+      await _publishWalletSnapshot(wallet);
+      return wallet;
+    }
+    if (response.statusCode >= 400 && response.statusCode < 500) {
+      await prefs.remove(pendingKey);
+    }
     _throwIfBad(response, 'Recharge failed');
-    final wallet = VmWallet.fromJson(
-      jsonDecode(response.body) as Map<String, dynamic>,
-    );
-    await _publishWalletSnapshot(wallet);
-    return wallet;
+    throw StateError('Unreachable recharge response');
   }
 
   Future<VmWallet> convertRuby({required int rubyAmount}) async {
+    final prefs = await SharedPreferences.getInstance();
+    final pendingKey = 'wallet_convert_pending_$rubyAmount';
+    var requestId = prefs.getString(pendingKey);
+    if (requestId == null || requestId.trim().isEmpty) {
+      requestId = const Uuid().v4();
+      await prefs.setString(pendingKey, requestId);
+    }
+
     final response = await http.post(
       Uri.parse(VmApiConfig.endpoint('/wallets/rubies/convert')),
       headers: _headers(),
-      body: jsonEncode({'ruby_amount': rubyAmount}),
+      body: jsonEncode({
+        'ruby_amount': rubyAmount,
+        'request_id': requestId,
+      }),
     );
+    if (response.statusCode >= 200 && response.statusCode < 300) {
+      await prefs.remove(pendingKey);
+      final wallet = VmWallet.fromJson(
+        jsonDecode(response.body) as Map<String, dynamic>,
+      );
+      await _publishWalletSnapshot(wallet);
+      return wallet;
+    }
+    if (response.statusCode >= 400 && response.statusCode < 500) {
+      await prefs.remove(pendingKey);
+    }
     _throwIfBad(response, 'Ruby conversion failed');
-    final wallet = VmWallet.fromJson(
-      jsonDecode(response.body) as Map<String, dynamic>,
-    );
-    await _publishWalletSnapshot(wallet);
-    return wallet;
+    throw StateError('Unreachable ruby conversion response');
   }
 
   Future<void> _publishWalletSnapshot(VmWallet wallet) async {
