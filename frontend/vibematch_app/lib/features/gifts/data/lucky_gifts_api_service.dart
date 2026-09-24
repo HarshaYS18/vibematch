@@ -45,36 +45,6 @@ class LuckyGiftsApiService {
     return LuckyGiftPreview.fromJson(json);
   }
 
-  Future<LuckyGiftRecordResult> recordResult({
-    required String giftId,
-    int quantity = 1,
-    int? receiverPublicUserId,
-    String? roomPublicId,
-    int spentCoins = 0,
-    int multiplier = 0,
-    int rewardCoins = 0,
-    int netWinCoins = 0,
-  }) async {
-    final body = <String, dynamic>{
-      'gift_id': giftId,
-      'quantity': quantity,
-      'spent_coins': spentCoins,
-      'multiplier': multiplier,
-      'reward_coins': rewardCoins,
-      'net_win_coins': netWinCoins,
-    };
-    if (receiverPublicUserId != null) {
-      body['receiver_public_user_id'] = receiverPublicUserId;
-    }
-    final cleanRoomPublicId = roomPublicId?.trim();
-    if (cleanRoomPublicId != null && cleanRoomPublicId.isNotEmpty) {
-      body['room_public_id'] = cleanRoomPublicId;
-    }
-
-    final json = await _postMap('/lucky-gifts/results/record', body: body);
-    return LuckyGiftRecordResult.fromJson(json);
-  }
-
   Future<List<LuckyGiftHistoryEntry>> getHistory({
     LuckyGiftPeriod period = LuckyGiftPeriod.daily,
     String? roomPublicId,
@@ -345,26 +315,6 @@ class LuckyGiftPreview {
       totalSpendCoins: _int(json['total_spend_coins']),
       maxPossibleReward: _int(json['max_possible_reward']),
       canSend: _bool(json['can_send'], fallback: true),
-    );
-  }
-}
-
-class LuckyGiftRecordResult {
-  const LuckyGiftRecordResult({
-    required this.status,
-    required this.transactionId,
-    required this.stats,
-  });
-
-  final String status;
-  final int transactionId;
-  final LuckyGiftStats stats;
-
-  factory LuckyGiftRecordResult.fromJson(Map<String, dynamic> json) {
-    return LuckyGiftRecordResult(
-      status: _string(json['status'], fallback: ''),
-      transactionId: _int(json['transaction_id']),
-      stats: LuckyGiftStats.fromJson(_map(json['stats'])),
     );
   }
 }
