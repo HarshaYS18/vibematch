@@ -936,10 +936,17 @@ def update_lucky_gift_control_house_pool(
         return cached
 
     pool = _get_or_create_lucky_gift_control_pool(db)
+    before_balance = int(pool.balance or 0)
     if payload.balance is not None:
         pool.balance = int(payload.balance)
-    if payload.reserved_balance is not None:
-        pool.reserved_balance = int(payload.reserved_balance)
+    if (
+        payload.reserved_balance is not None
+        and int(payload.reserved_balance) != int(pool.reserved_balance or 0)
+    ):
+        raise HTTPException(
+            status_code=409,
+            detail="reserved_balance is derived from durable Economy reservations",
+        )
     if payload.max_payout_per_round is not None:
         pool.max_single_payout = int(payload.max_payout_per_round)
     if payload.daily_house_loss_limit is not None:
@@ -954,6 +961,28 @@ def update_lucky_gift_control_house_pool(
         pool.status = normalized_status
     db.flush()
 
+    balance_delta = int(pool.balance or 0) - before_balance
+    if balance_delta != 0:
+        if balance_delta > 0:
+            economy_transaction_service.record_balanced_transfer(
+                db,
+                tx=tx,
+                currency=EconomyCurrency.COIN.value,
+                amount=balance_delta,
+                debit_account="SYSTEM_POOL_ADJUSTMENT:COIN",
+                credit_account=f"GAME_POOL:{pool.id}:COIN",
+                source_type="LUCKY_GIFT_CONTROL_POOL_ADJUSTMENT",
+            )
+        else:
+            economy_transaction_service.record_balanced_transfer(
+                db,
+                tx=tx,
+                currency=EconomyCurrency.COIN.value,
+                amount=abs(balance_delta),
+                debit_account=f"GAME_POOL:{pool.id}:COIN",
+                credit_account="SYSTEM_POOL_ADJUSTMENT:COIN",
+                source_type="LUCKY_GIFT_CONTROL_POOL_ADJUSTMENT",
+            )
     result = {
         "transaction_id": tx.transaction_id,
         **_lucky_gift_control_pool_payload(db, pool),
