@@ -1,93 +1,29 @@
-# Worker
+# Worker Platform
 
 ## Purpose
 
-Processes durable asynchronous side effects such as notifications or post-processing.
+Execute durable asynchronous work without turning transport/runtime code into business authority.
 
-## Responsibilities
+## Pools and ownership
 
-Consumer execution, retries, dead-letter handling, and idempotency state; domain DB commits remain with owners.
+The worker image supports general/outbox, notification, media, fanout, maintenance, and analytics-bridge pools. `apps/worker/pools.py` is the executable subject/handler allowlist. Unexpected events are sent to the DLQ. The analytics pool is deliberately zero-replica/unsubscribed until Chunk 37 provides Kafka.
 
-## What this module owns
+The Worker Platform owns execution, retry, backpressure and DLQ mechanics plus generic worker idempotency markers. Domain truth remains with its owner. Inbox backup jobs are created and mutated through Inbox owner code; Notification intents go through Notification Service.
 
-Consumer execution, retries, dead-letter handling, and idempotency state; domain DB commits remain with owners.
+## External work
 
-## What this module does NOT own
+Chunk 30 moves OpenAI image moderation, physical object deletion, retention cleanup, Vibes fanout, and Google Drive backup/restore behind durable events. FCM delivery was isolated by Chunk 29. Raw upload/transcoding moves to Media v2 in Chunk 31.
 
-This module does not take over an adjacent domain merely because it transports or caches its data.
+## Retry and idempotency
 
-## Source of truth
+Explicit JetStream ack, bounded max delivery, bounded pool concurrency, event-specific DLQ, and stable owner job IDs are required. Google Drive uploads tag files with the durable backup job ID and query that property before retrying creation.
 
-PostgreSQL remains the durable source of truth for application state.
+## Scaling
 
-## Important files
-
-`apps/worker/main.py`, `apps/worker/events.py`, `apps/worker/handlers.py`, `backend/app/services/event_outbox_service.py`, `backend/app/services/outbox_relay_service.py`, and `contracts/events/`.
-
-## Public API/contracts
-
-No public HTTP business API. The worker consumes the versioned JetStream envelope and exposes only operational `/live`, `/ready`, and `/metrics` endpoints.
-
-## Events published
-
-This component may publish or consume versioned domain events as contracts are implemented. Existing room WebSocket/Redis events are distinct from durable JetStream publication; do not assume all proposed events are live.
-
-## Events consumed
-
-The deployable owns a durable JetStream pull consumer for implemented event contracts. It acknowledges only after successful idempotent handling, uses bounded redelivery, and publishes terminal failures to the dead-letter stream before acknowledging the source.
-
-## Database tables/state owned
-
-Database: Handler-specific records and durable idempotency/outbox state where introduced.
-
-## Redis keys/state owned
-
-May use short leases and rate limits; not sole record of delivery outcome.
-
-## Dependencies
-
-Dependencies include the configured runtime, PostgreSQL, Redis/Valkey, and relevant internal contracts where applicable.
-
-## Security considerations
-
-Never retry wallet/value movement without stable idempotency key. Do not log tokens, credentials, private content, or payment secrets.
-
-## Failure modes
-
-Broker outage creates backlog; stop consuming on drain, finish or safely return in-flight work.
-
-## Retry/idempotency behavior
-
-Use bounded timeouts and explicit retry budgets. Only replay writes when a stable idempotency key or reconciliation proves the commit outcome.
-
-## Scaling behavior
-
-Scale this workload independently when deployed.
-
-## Autoscaling metrics
-
-Measure its primary work unit, CPU, memory, saturation, errors, p95 latency, queue/backpressure where relevant, and dependency pressure. Respect the database connection budget and drain before scale-in.
+General outbox relay starts fixed at one replica. Notification, media, fanout and maintenance scale independently from their own durable consumers. Configured maxima are 5 + 5 + 4 + 5 plus one general relay = the existing aggregate 20-worker connection budget. Analytics remains disabled.
 
 ## Observability
 
-Propagate request and trace IDs through internal calls. Emit structured logs and low-cardinality metrics for readiness, throughput, failures, and drain progress. Pair alerts with the matching runbook.
+Structured completion/retry/DLQ logs, OpenTelemetry pool attributes, and low-cardinality pool-labelled readiness/in-flight/throughput metrics are emitted. Operational endpoints are `/live`, `/ready`, `/metrics`.
 
-## Local development
-
-See the root README and local development guide for PostgreSQL, Redis, FastAPI, media, and optional broker setup.
-
-## Testing
-
-Run the component's unit/contract checks and an integration test against real dependencies before changing a distributed contract.
-
-## Deployment notes
-
-Deploy compatible contracts first, then producers/consumers or routing. Verify health, rollback path, and operational dashboards.
-
-## Change checklist
-
-Review security boundaries, schema changes, resource limits, autoscaling signals, and scale-in drain behavior.
-
-## Known migration status
-
-Deployable implemented. PostgreSQL transactional-outbox claims, JetStream publication, durable notification consumption, idempotency, bounded retry/dead-letter handling, health/metrics and graceful shutdown are present. Production broker endpoints/credentials and measured scaling thresholds remain environment inputs.
+See `docs/runbooks/worker-platform.md`.

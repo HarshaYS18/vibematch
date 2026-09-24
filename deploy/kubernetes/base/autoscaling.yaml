@@ -44,28 +44,68 @@ spec:
 ---
 apiVersion: keda.sh/v1alpha1
 kind: ScaledObject
-metadata:
-  name: funkey-worker
+metadata: {name: funkey-worker-notification}
 spec:
-  scaleTargetRef: {name: funkey-worker}
+  scaleTargetRef: {name: funkey-worker-notification}
   pollingInterval: 15
   cooldownPeriod: 300
   minReplicaCount: 1
-  maxReplicaCount: 20
-  fallback:
-    failureThreshold: 3
-    replicas: 2
-  advanced:
-    restoreToOriginalReplicaCount: false
+  maxReplicaCount: 5
+  fallback: {failureThreshold: 3, replicas: 2}
   triggers:
     - type: nats-jetstream
-      metadata:
-        natsServerMonitoringEndpoint: nats-monitoring.example.invalid:8222
-        account: $G
-        stream: FUNKEY_EVENTS
-        consumer: funkey-worker
-        lagThreshold: "100"
-        activationLagThreshold: "10"
+      metadata: {natsServerMonitoringEndpoint: nats-monitoring.example.invalid:8222, account: $G, stream: FUNKEY_EVENTS, consumer: funkey-worker-notification, lagThreshold: "100", activationLagThreshold: "10"}
+---
+apiVersion: keda.sh/v1alpha1
+kind: ScaledObject
+metadata: {name: funkey-worker-fanout}
+spec:
+  scaleTargetRef: {name: funkey-worker-fanout}
+  pollingInterval: 15
+  cooldownPeriod: 300
+  minReplicaCount: 1
+  maxReplicaCount: 4
+  fallback: {failureThreshold: 3, replicas: 2}
+  triggers:
+    - type: nats-jetstream
+      metadata: {natsServerMonitoringEndpoint: nats-monitoring.example.invalid:8222, account: $G, stream: FUNKEY_EVENTS, consumer: funkey-worker-fanout, lagThreshold: "100", activationLagThreshold: "10"}
+---
+apiVersion: keda.sh/v1alpha1
+kind: ScaledObject
+metadata: {name: funkey-worker-media}
+spec:
+  scaleTargetRef: {name: funkey-worker-media}
+  pollingInterval: 15
+  cooldownPeriod: 300
+  minReplicaCount: 1
+  maxReplicaCount: 5
+  fallback: {failureThreshold: 3, replicas: 2}
+  triggers:
+    - type: nats-jetstream
+      metadata: {natsServerMonitoringEndpoint: nats-monitoring.example.invalid:8222, account: $G, stream: FUNKEY_EVENTS, consumer: funkey-worker-media-vibes, lagThreshold: "50", activationLagThreshold: "5"}
+    - type: nats-jetstream
+      metadata: {natsServerMonitoringEndpoint: nats-monitoring.example.invalid:8222, account: $G, stream: FUNKEY_EVENTS, consumer: funkey-worker-media-moderation, lagThreshold: "50", activationLagThreshold: "5"}
+    - type: nats-jetstream
+      metadata: {natsServerMonitoringEndpoint: nats-monitoring.example.invalid:8222, account: $G, stream: FUNKEY_EVENTS, consumer: funkey-worker-media-delete, lagThreshold: "50", activationLagThreshold: "5"}
+---
+apiVersion: keda.sh/v1alpha1
+kind: ScaledObject
+metadata: {name: funkey-worker-maintenance}
+spec:
+  scaleTargetRef: {name: funkey-worker-maintenance}
+  pollingInterval: 30
+  cooldownPeriod: 600
+  minReplicaCount: 1
+  maxReplicaCount: 5
+  fallback: {failureThreshold: 3, replicas: 1}
+  triggers:
+    - type: nats-jetstream
+      metadata: {natsServerMonitoringEndpoint: nats-monitoring.example.invalid:8222, account: $G, stream: FUNKEY_EVENTS, consumer: funkey-worker-maintenance-backup, lagThreshold: "20", activationLagThreshold: "2"}
+    - type: nats-jetstream
+      metadata: {natsServerMonitoringEndpoint: nats-monitoring.example.invalid:8222, account: $G, stream: FUNKEY_EVENTS, consumer: funkey-worker-maintenance-restore, lagThreshold: "20", activationLagThreshold: "2"}
+    - type: nats-jetstream
+      metadata: {natsServerMonitoringEndpoint: nats-monitoring.example.invalid:8222, account: $G, stream: FUNKEY_EVENTS, consumer: funkey-worker-maintenance-media-cleanup, lagThreshold: "20", activationLagThreshold: "2"}
+---
 ---
 apiVersion: autoscaling/v2
 kind: HorizontalPodAutoscaler

@@ -366,15 +366,73 @@ services:
     build: {context: .., dockerfile: apps/worker/Dockerfile}
     environment:
       <<: *api_environment
-      DB_APPLICATION_NAME: funkey-worker
+      DB_APPLICATION_NAME: funkey-worker-general
       DB_POOL_SIZE: "3"
       DB_MAX_OVERFLOW: "0"
       NATS_URL: nats://nats:4222
+      WORKER_POOL: general
     depends_on:
       nats: {condition: service_healthy}
       migrate: {condition: service_completed_successfully}
       pgbouncer: {condition: service_healthy}
+
+  worker-notification:
+    profiles: ["app"]
+    build: {context: .., dockerfile: apps/worker/Dockerfile}
+    environment:
+      <<: *api_environment
+      DB_APPLICATION_NAME: funkey-worker-notification
+      DB_POOL_SIZE: "3"
+      DB_MAX_OVERFLOW: "0"
+      NATS_URL: nats://nats:4222
+      WORKER_POOL: notification
+    depends_on:
+      nats: {condition: service_healthy}
       notification: {condition: service_started}
+
+  worker-media:
+    profiles: ["app"]
+    build: {context: .., dockerfile: apps/worker/Dockerfile}
+    environment:
+      <<: *api_environment
+      DB_APPLICATION_NAME: funkey-worker-media
+      DB_POOL_SIZE: "3"
+      DB_MAX_OVERFLOW: "0"
+      NATS_URL: nats://nats:4222
+      WORKER_POOL: media
+    depends_on:
+      nats: {condition: service_healthy}
+      migrate: {condition: service_completed_successfully}
+
+  worker-fanout:
+    profiles: ["app"]
+    build: {context: .., dockerfile: apps/worker/Dockerfile}
+    environment:
+      <<: *api_environment
+      DB_APPLICATION_NAME: funkey-worker-fanout
+      DB_POOL_SIZE: "3"
+      DB_MAX_OVERFLOW: "0"
+      NATS_URL: nats://nats:4222
+      WORKER_POOL: fanout
+    depends_on:
+      nats: {condition: service_healthy}
+      vibes: {condition: service_started}
+      inbox: {condition: service_started}
+      notification: {condition: service_started}
+
+  worker-maintenance:
+    profiles: ["app"]
+    build: {context: .., dockerfile: apps/worker/Dockerfile}
+    environment:
+      <<: *api_environment
+      DB_APPLICATION_NAME: funkey-worker-maintenance
+      DB_POOL_SIZE: "3"
+      DB_MAX_OVERFLOW: "0"
+      NATS_URL: nats://nats:4222
+      WORKER_POOL: maintenance
+    depends_on:
+      nats: {condition: service_healthy}
+      inbox: {condition: service_started}
 
 volumes:
   postgres_data:

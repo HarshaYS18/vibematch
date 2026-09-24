@@ -1,78 +1,174 @@
 apiVersion: v1
 kind: ServiceAccount
-metadata:
-  name: funkey-worker
+metadata: {name: funkey-worker}
 automountServiceAccountToken: false
 ---
 apiVersion: apps/v1
 kind: Deployment
-metadata:
-  name: funkey-worker
-  labels: {app: funkey-worker}
+metadata: {name: funkey-worker, labels: {app: funkey-worker, funkey.io/worker-pool: general}}
 spec:
   replicas: 1
   revisionHistoryLimit: 5
-  strategy:
-    type: RollingUpdate
-    rollingUpdate: {maxSurge: 1, maxUnavailable: 0}
+  strategy: {type: RollingUpdate, rollingUpdate: {maxSurge: 1, maxUnavailable: 0}}
   selector: {matchLabels: {app: funkey-worker}}
   template:
     metadata:
-      labels: {app: funkey-worker}
-      annotations:
-        prometheus.io/scrape: "true"
-        prometheus.io/path: /metrics
-        prometheus.io/port: "8082"
+      labels: {app: funkey-worker, funkey.io/worker-pool: general}
+      annotations: {prometheus.io/scrape: "true", prometheus.io/path: /metrics, prometheus.io/port: "8082"}
     spec:
       serviceAccountName: funkey-worker
       automountServiceAccountToken: false
       terminationGracePeriodSeconds: 90
       nodeSelector: {funkey.io/workload: application}
-      topologySpreadConstraints:
-        - maxSkew: 1
-          topologyKey: kubernetes.io/hostname
-          whenUnsatisfiable: ScheduleAnyway
-          labelSelector: {matchLabels: {app: funkey-worker}}
       securityContext: {runAsNonRoot: true, seccompProfile: {type: RuntimeDefault}}
       containers:
         - name: worker
           image: funkey-worker:dev
-          imagePullPolicy: IfNotPresent
           ports: [{name: health, containerPort: 8082}]
-          envFrom:
-            - configMapRef: {name: funkey-config}
-            - secretRef: {name: funkey-api-secrets}
+          envFrom: [{configMapRef: {name: funkey-config}}, {secretRef: {name: funkey-api-secrets}}]
           env:
-            - name: DB_APPLICATION_NAME
-              value: funkey-worker
+            - {name: WORKER_POOL, value: general}
+            - {name: DB_APPLICATION_NAME, value: funkey-worker-general}
             - name: DB_POOL_SIZE
-              valueFrom:
-                configMapKeyRef: {name: funkey-config, key: DB_WORKER_POOL_SIZE}
+              valueFrom: {configMapKeyRef: {name: funkey-config, key: DB_WORKER_POOL_SIZE}}
             - name: DB_MAX_OVERFLOW
-              valueFrom:
-                configMapKeyRef: {name: funkey-config, key: DB_WORKER_MAX_OVERFLOW}
-          resources:
-            requests: {cpu: 100m, memory: 256Mi}
-            limits: {cpu: "1", memory: 768Mi}
-          startupProbe:
-            httpGet: {path: /live, port: health}
-            failureThreshold: 30
-            periodSeconds: 2
-          livenessProbe:
-            httpGet: {path: /live, port: health}
-            periodSeconds: 20
-          readinessProbe:
-            httpGet: {path: /ready, port: health}
-            periodSeconds: 5
-          securityContext:
-            allowPrivilegeEscalation: false
-            readOnlyRootFilesystem: true
-            capabilities: {drop: [ALL]}
+              valueFrom: {configMapKeyRef: {name: funkey-config, key: DB_WORKER_MAX_OVERFLOW}}
+          resources: {requests: {cpu: 100m, memory: 256Mi}, limits: {cpu: "1", memory: 768Mi}}
+          startupProbe: {httpGet: {path: /live, port: health}, failureThreshold: 30, periodSeconds: 2}
+          livenessProbe: {httpGet: {path: /live, port: health}, periodSeconds: 20}
+          readinessProbe: {httpGet: {path: /ready, port: health}, periodSeconds: 5}
+          securityContext: {allowPrivilegeEscalation: false, readOnlyRootFilesystem: true, capabilities: {drop: [ALL]}}
 ---
 apiVersion: policy/v1
 kind: PodDisruptionBudget
-metadata:
-  name: funkey-worker
+metadata: {name: funkey-worker}
+spec: {minAvailable: 1, selector: {matchLabels: {app: funkey-worker}}}
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata: {name: funkey-worker-notification, labels: {app: funkey-worker-notification, funkey.io/worker-pool: notification}}
 spec:
-  minAvailable: 1
-  selector: {matchLabels: {app: funkey-worker}}
+  replicas: 1
+  selector: {matchLabels: {app: funkey-worker-notification}}
+  template:
+    metadata:
+      labels: {app: funkey-worker-notification, funkey.io/worker-pool: notification}
+      annotations: {prometheus.io/scrape: "true", prometheus.io/path: /metrics, prometheus.io/port: "8082"}
+    spec:
+      serviceAccountName: funkey-worker
+      automountServiceAccountToken: false
+      terminationGracePeriodSeconds: 90
+      nodeSelector: {funkey.io/workload: application}
+      securityContext: {runAsNonRoot: true, seccompProfile: {type: RuntimeDefault}}
+      containers:
+        - name: worker
+          image: funkey-worker:dev
+          ports: [{name: health, containerPort: 8082}]
+          envFrom: [{configMapRef: {name: funkey-config}}, {secretRef: {name: funkey-api-secrets}}]
+          env: [{name: WORKER_POOL, value: notification}, {name: DB_APPLICATION_NAME, value: funkey-worker-notification}, {name: DB_POOL_SIZE, value: "3"}, {name: DB_MAX_OVERFLOW, value: "0"}]
+          resources: {requests: {cpu: 100m, memory: 192Mi}, limits: {cpu: "1", memory: 512Mi}}
+          livenessProbe: {httpGet: {path: /live, port: health}, periodSeconds: 20}
+          readinessProbe: {httpGet: {path: /ready, port: health}, periodSeconds: 5}
+          securityContext: {allowPrivilegeEscalation: false, readOnlyRootFilesystem: true, capabilities: {drop: [ALL]}}
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata: {name: funkey-worker-media, labels: {app: funkey-worker-media, funkey.io/worker-pool: media}}
+spec:
+  replicas: 1
+  selector: {matchLabels: {app: funkey-worker-media}}
+  template:
+    metadata:
+      labels: {app: funkey-worker-media, funkey.io/worker-pool: media}
+      annotations: {prometheus.io/scrape: "true", prometheus.io/path: /metrics, prometheus.io/port: "8082"}
+    spec:
+      serviceAccountName: funkey-worker
+      automountServiceAccountToken: false
+      terminationGracePeriodSeconds: 90
+      nodeSelector: {funkey.io/workload: application}
+      securityContext: {runAsNonRoot: true, seccompProfile: {type: RuntimeDefault}}
+      containers:
+        - name: worker
+          image: funkey-worker:dev
+          ports: [{name: health, containerPort: 8082}]
+          envFrom: [{configMapRef: {name: funkey-config}}, {secretRef: {name: funkey-api-secrets}}]
+          env: [{name: WORKER_POOL, value: media}, {name: DB_APPLICATION_NAME, value: funkey-worker-media}, {name: DB_POOL_SIZE, value: "3"}, {name: DB_MAX_OVERFLOW, value: "0"}]
+          resources: {requests: {cpu: 150m, memory: 256Mi}, limits: {cpu: "1", memory: 768Mi}}
+          livenessProbe: {httpGet: {path: /live, port: health}, periodSeconds: 20}
+          readinessProbe: {httpGet: {path: /ready, port: health}, periodSeconds: 5}
+          securityContext: {allowPrivilegeEscalation: false, readOnlyRootFilesystem: true, capabilities: {drop: [ALL]}}
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata: {name: funkey-worker-fanout, labels: {app: funkey-worker-fanout, funkey.io/worker-pool: fanout}}
+spec:
+  replicas: 1
+  selector: {matchLabels: {app: funkey-worker-fanout}}
+  template:
+    metadata:
+      labels: {app: funkey-worker-fanout, funkey.io/worker-pool: fanout}
+      annotations: {prometheus.io/scrape: "true", prometheus.io/path: /metrics, prometheus.io/port: "8082"}
+    spec:
+      serviceAccountName: funkey-worker
+      automountServiceAccountToken: false
+      terminationGracePeriodSeconds: 90
+      nodeSelector: {funkey.io/workload: application}
+      securityContext: {runAsNonRoot: true, seccompProfile: {type: RuntimeDefault}}
+      containers:
+        - name: worker
+          image: funkey-worker:dev
+          ports: [{name: health, containerPort: 8082}]
+          envFrom: [{configMapRef: {name: funkey-config}}, {secretRef: {name: funkey-api-secrets}}]
+          env: [{name: WORKER_POOL, value: fanout}, {name: DB_APPLICATION_NAME, value: funkey-worker-fanout}, {name: DB_POOL_SIZE, value: "3"}, {name: DB_MAX_OVERFLOW, value: "0"}]
+          resources: {requests: {cpu: 100m, memory: 192Mi}, limits: {cpu: "1", memory: 512Mi}}
+          livenessProbe: {httpGet: {path: /live, port: health}, periodSeconds: 20}
+          readinessProbe: {httpGet: {path: /ready, port: health}, periodSeconds: 5}
+          securityContext: {allowPrivilegeEscalation: false, readOnlyRootFilesystem: true, capabilities: {drop: [ALL]}}
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata: {name: funkey-worker-maintenance, labels: {app: funkey-worker-maintenance, funkey.io/worker-pool: maintenance}}
+spec:
+  replicas: 1
+  selector: {matchLabels: {app: funkey-worker-maintenance}}
+  template:
+    metadata:
+      labels: {app: funkey-worker-maintenance, funkey.io/worker-pool: maintenance}
+      annotations: {prometheus.io/scrape: "true", prometheus.io/path: /metrics, prometheus.io/port: "8082"}
+    spec:
+      serviceAccountName: funkey-worker
+      automountServiceAccountToken: false
+      terminationGracePeriodSeconds: 120
+      nodeSelector: {funkey.io/workload: application}
+      securityContext: {runAsNonRoot: true, seccompProfile: {type: RuntimeDefault}}
+      containers:
+        - name: worker
+          image: funkey-worker:dev
+          ports: [{name: health, containerPort: 8082}]
+          envFrom: [{configMapRef: {name: funkey-config}}, {secretRef: {name: funkey-api-secrets}}]
+          env: [{name: WORKER_POOL, value: maintenance}, {name: DB_APPLICATION_NAME, value: funkey-worker-maintenance}, {name: DB_POOL_SIZE, value: "3"}, {name: DB_MAX_OVERFLOW, value: "0"}]
+          resources: {requests: {cpu: 100m, memory: 256Mi}, limits: {cpu: "1", memory: 768Mi}}
+          livenessProbe: {httpGet: {path: /live, port: health}, periodSeconds: 20}
+          readinessProbe: {httpGet: {path: /ready, port: health}, periodSeconds: 5}
+          securityContext: {allowPrivilegeEscalation: false, readOnlyRootFilesystem: true, capabilities: {drop: [ALL]}}
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata: {name: funkey-worker-analytics, labels: {app: funkey-worker-analytics, funkey.io/worker-pool: analytics}}
+spec:
+  replicas: 0
+  selector: {matchLabels: {app: funkey-worker-analytics}}
+  template:
+    metadata: {labels: {app: funkey-worker-analytics, funkey.io/worker-pool: analytics}}
+    spec:
+      serviceAccountName: funkey-worker
+      automountServiceAccountToken: false
+      nodeSelector: {funkey.io/workload: application}
+      securityContext: {runAsNonRoot: true, seccompProfile: {type: RuntimeDefault}}
+      containers:
+        - name: worker
+          image: funkey-worker:dev
+          envFrom: [{configMapRef: {name: funkey-config}}, {secretRef: {name: funkey-api-secrets}}]
+          env: [{name: WORKER_POOL, value: analytics}, {name: DB_APPLICATION_NAME, value: funkey-worker-analytics}]
+          resources: {requests: {cpu: 50m, memory: 128Mi}, limits: {cpu: 500m, memory: 384Mi}}
+          securityContext: {allowPrivilegeEscalation: false, readOnlyRootFilesystem: true, capabilities: {drop: [ALL]}}
