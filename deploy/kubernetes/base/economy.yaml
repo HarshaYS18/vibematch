@@ -101,3 +101,102 @@ spec:
   selector:
     matchLabels:
       app: funkey-economy
+
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: funkey-economy-bulk-worker
+  labels:
+    app: funkey-economy-bulk-worker
+spec:
+  replicas: 2
+  revisionHistoryLimit: 5
+  strategy:
+    type: RollingUpdate
+    rollingUpdate:
+      maxSurge: 1
+      maxUnavailable: 0
+  selector:
+    matchLabels:
+      app: funkey-economy-bulk-worker
+  template:
+    metadata:
+      annotations:
+        prometheus.io/scrape: "true"
+        prometheus.io/path: /metrics
+        prometheus.io/port: "8090"
+      labels:
+        app: funkey-economy-bulk-worker
+    spec:
+      serviceAccountName: funkey-economy
+      automountServiceAccountToken: false
+      terminationGracePeriodSeconds: 120
+      nodeSelector:
+        funkey.io/workload: application
+      securityContext:
+        runAsNonRoot: true
+        seccompProfile:
+          type: RuntimeDefault
+      topologySpreadConstraints:
+        - maxSkew: 1
+          topologyKey: topology.kubernetes.io/zone
+          whenUnsatisfiable: ScheduleAnyway
+          labelSelector:
+            matchLabels:
+              app: funkey-economy-bulk-worker
+      containers:
+        - name: economy-bulk-worker
+          image: funkey-economy:dev
+          command:
+            - python
+            - /app/apps/economy-service/bulk_worker.py
+          ports:
+            - name: health
+              containerPort: 8090
+          env:
+            - name: ECONOMY_BULK_HEALTH_PORT
+              value: "8090"
+          envFrom:
+            - configMapRef:
+                name: funkey-config
+            - secretRef:
+                name: funkey-economy-secrets
+          resources:
+            requests:
+              cpu: 150m
+              memory: 256Mi
+            limits:
+              cpu: "750m"
+              memory: 512Mi
+          startupProbe:
+            httpGet:
+              path: /live
+              port: health
+            failureThreshold: 30
+            periodSeconds: 2
+          livenessProbe:
+            httpGet:
+              path: /live
+              port: health
+            periodSeconds: 20
+          readinessProbe:
+            httpGet:
+              path: /ready
+              port: health
+            periodSeconds: 5
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            capabilities:
+              drop: [ALL]
+---
+apiVersion: policy/v1
+kind: PodDisruptionBudget
+metadata:
+  name: funkey-economy-bulk-worker
+spec:
+  minAvailable: 1
+  selector:
+    matchLabels:
+      app: funkey-economy-bulk-worker
