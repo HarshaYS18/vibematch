@@ -478,6 +478,14 @@ func roomLeaseKey(roomID string, userID int64) string {
 	return "funkey:realtime:room:leases:" + roomID + ":" + strconv.FormatInt(userID, 10)
 }
 
+func userRoomPresenceLeaseKey(userID int64) string {
+	return "funkey:realtime:gateway:user-rooms:" + strconv.FormatInt(userID, 10)
+}
+
+func roomUserPresenceLeaseKey(roomID string) string {
+	return "funkey:realtime:gateway:room-users:" + roomID
+}
+
 func roomStreamEpochKey(roomID string) string {
 	return "funkey:realtime:room:stream-epoch:" + roomID
 }
@@ -499,10 +507,20 @@ func (s *Server) touchRoomLease(c *Client, roomID string) {
 	now := time.Now()
 	expiresAt := float64(now.Add(s.Config.LeaseTTL).UnixMilli()) / 1000.0
 	key := roomLeaseKey(roomID, c.UserID)
+	nowScore := strconv.FormatFloat(float64(now.UnixMilli())/1000.0, 'f', 3, 64)
+	userRoomsKey := userRoomPresenceLeaseKey(c.UserID)
+	roomUsersKey := roomUserPresenceLeaseKey(roomID)
+	userMember := strconv.FormatInt(c.UserID, 10)
 	pipe := s.Redis.Pipeline()
 	pipe.ZAdd(ctx, key, redis.Z{Score: expiresAt, Member: c.ID})
-	pipe.ZRemRangeByScore(ctx, key, "-inf", strconv.FormatFloat(float64(now.UnixMilli())/1000.0, 'f', 3, 64))
+	pipe.ZRemRangeByScore(ctx, key, "-inf", nowScore)
 	pipe.Expire(ctx, key, s.Config.LeaseTTL*3)
+	pipe.ZAdd(ctx, userRoomsKey, redis.Z{Score: expiresAt, Member: roomID})
+	pipe.ZRemRangeByScore(ctx, userRoomsKey, "-inf", nowScore)
+	pipe.Expire(ctx, userRoomsKey, s.Config.LeaseTTL*3)
+	pipe.ZAdd(ctx, roomUsersKey, redis.Z{Score: expiresAt, Member: userMember})
+	pipe.ZRemRangeByScore(ctx, roomUsersKey, "-inf", nowScore)
+	pipe.Expire(ctx, roomUsersKey, s.Config.LeaseTTL*3)
 	_, _ = pipe.Exec(ctx)
 }
 
@@ -512,7 +530,16 @@ func (s *Server) deleteRoomLease(c *Client, roomID string) {
 	}
 	ctx, cancel := context.WithTimeout(context.Background(), time.Second)
 	defer cancel()
-	_ = s.Redis.ZRem(ctx, roomLeaseKey(roomID, c.UserID), c.ID).Err()
+	leaseKey := roomLeaseKey(roomID, c.UserID)
+	if err := s.Redis.ZRem(ctx, leaseKey, c.ID).Err(); err != nil {
+		return
+	}
+	if count, err := s.Redis.ZCard(ctx, leaseKey).Result(); err == nil && count == 0 {
+		pipe := s.Redis.Pipeline()
+		pipe.ZRem(ctx, userRoomPresenceLeaseKey(c.UserID), roomID)
+		pipe.ZRem(ctx, roomUserPresenceLeaseKey(roomID), strconv.FormatInt(c.UserID, 10))
+		_, _ = pipe.Exec(ctx)
+	}
 }
 
 func (s *Server) replayRoom(
@@ -670,6 +697,19 @@ func (s *Server) heartbeatOnce(ctx context.Context) {
 			pipe.ZAdd(ctx, leaseKey, redis.Z{Score: roomLeaseScore, Member: c.ID})
 			pipe.ZRemRangeByScore(ctx, leaseKey, "-inf", roomLeaseExpiry)
 			pipe.Expire(ctx, leaseKey, s.Config.LeaseTTL*3)
+
+			userRoomsKey := userRoomPresenceLeaseKey(c.UserID)
+			pipe.ZAdd(ctx, userRoomsKey, redis.Z{Score: roomLeaseScore, Member: roomID})
+			pipe.ZRemRangeByScore(ctx, userRoomsKey, "-inf", roomLeaseExpiry)
+			pipe.Expire(ctx, userRoomsKey, s.Config.LeaseTTL*3)
+
+			roomUsersKey := roomUserPresenceLeaseKey(roomID)
+			pipe.ZAdd(ctx, roomUsersKey, redis.Z{
+				Score:  roomLeaseScore,
+				Member: strconv.FormatInt(c.UserID, 10),
+			})
+			pipe.ZRemRangeByScore(ctx, roomUsersKey, "-inf", roomLeaseExpiry)
+			pipe.Expire(ctx, roomUsersKey, s.Config.LeaseTTL*3)
 		}
 	}
 	if _, err := pipe.Exec(ctx); err != nil {
