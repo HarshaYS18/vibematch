@@ -1,20 +1,83 @@
 # FunKey Economy Service
 
-Restored approved Chunk 25 Tier-0 financial authority.
+Economy Service is the Tier-0 financial authority for FunKey.
 
-## Owns
-Wallet balances, wallet ledger, supply pools/ledgers, gift financial settlement, purchases/refunds value transfer, mission reward credits, and game financial settlement.
+## Authority
 
-## Does not own
-Game catalog/round/risk/leaderboards, Store catalog/inventory, Profile/VIP presentation, Room state, or social graph.
+Economy is the exclusive writer for:
 
-## Tier-0 mutation contract
-Every new cross-domain financial mutation requires transaction_id, idempotency_key, and business_reference. Completed retries return the stored result. Reusing an idempotency key with different request content, or reusing a transaction ID with another idempotency key, fails closed.
+- user wallet balances and wallet ledger
+- coin supply pools and supply ledger
+- game financial pools and pool ledger
+- gift financial settlement
+- coin sales/recharges and ruby conversion/withdrawal
+- mission reward credits
+- bulk financial grants
+- Economy transaction/idempotency records
+- balanced accounting journal entries
+- gift catalog/economy rule configuration owned by Economy
 
-Wallet ledger entries carry the transaction metadata and a durable outbox event is written in the same database transaction.
+Game Platform owns game lifecycle/risk/stats, not value. Profile/Social owns
+profile/social truth, not wallet value. Core may perform bounded composite reads
+through the Economy reader role but must not receive Economy mutation rights.
 
-## Current phase
-The service is deployed internal-only first. Public/mobile Economy routes remain on the core API until all non-Economy callers are migrated and database ownership is cut over.
+## Transaction contract
+
+Every cross-domain financial mutation carries:
+
+- `transaction_id`
+- `idempotency_key`
+- `business_reference`
+
+Retries with the same identity return the stored result. Reusing an idempotency
+key with different request content, or rebinding a transaction ID, fails closed.
+
+Wallet mutations append the operational wallet ledger and a balanced debit/credit
+journal pair inside the same database transaction. Transaction completion checks
+journal balance before committing and publishes the durable outbox event in that
+same transaction.
+
+## Accounting and reconciliation
+
+`user_wallets` plus `wallet_ledger` remain operational balance truth.
+`economy_journal_entries` is an append-only balanced accounting/audit projection;
+it does not become a second balance authority.
+
+The Economy bulk-worker runtime continuously performs bounded, read-only
+reconciliation:
+
+- wallet materialized balance vs the latest ledger `after_balance`
+- debit total vs credit total by Economy transaction and currency
+
+A mismatch is an incident. The worker never "repairs" balances automatically.
+
+## Public compatibility
+
+Stable mobile/public URLs remain available through the core API. Extracted
+families are proxied to Economy Service; read/orchestration facades may remain in
+core using the SELECT-only Economy reader role. All value mutations delegate to
+Economy Service.
+
+## PostgreSQL roles
+
+`deploy/postgres/economy-ownership.sql` defines:
+
+- `funkey_economy_owner` — object ownership
+- `funkey_economy_runtime` — Economy service mutation role
+- `funkey_economy_reader` — bounded SELECT-only compatibility role
+
+Never grant `funkey_economy_runtime` to core-api, Game Platform, workers,
+Realtime, Profile/Social or other domain credentials.
 
 ## Operations
-/live, /ready, /metrics.
+
+- API: `8088`
+- health: `/live`, `/ready`
+- metrics: `/metrics`
+- database: `ECONOMY_DATABASE_URL`
+- public base: `/api/v1`
+- internal mutation base: `/internal/economy`
+- bulk worker: bounded jobs + periodic reconciliation
+
+See `docs/architecture/economy-service.md` and
+`docs/runbooks/economy-service.md`.
