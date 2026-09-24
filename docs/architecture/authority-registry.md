@@ -33,7 +33,7 @@ copy or route traffic.
 | Online presence/routing/replay | Realtime | Go gateway + realtime Redis | EPHEMERAL/rebuildable only. |
 | Inbox + family community chat | Inbox | `inbox-service` | Durable messages/read state are Inbox-owned. |
 | Vibes | Vibes | `vibes-service` | Feed/search/ranking copies are projections. |
-| Wallet/supply/gift/game settlement/mission rewards | Economy | `economy-service` | Exclusive financial writer; balanced journal is audit evidence. |
+| Wallet/supply/gift/game settlement/mission rewards/Lucky Packet escrow | Economy | `economy-service` | Exclusive financial writer; durable reservations + balanced journal provide liability/accounting evidence. |
 | VIP/SVIP materialization | Economy-derived projection | `economy-service` + readers | Rebuildable from Economy value history; not profile authority. |
 | Game catalog/session/round/bet/risk/stats | Game Platform | `game-platform-service` | Never mutates wallet/financial tables. |
 | Notifications + push delivery state | Notification | `notification-service` | FCM/provider is transport only. |
