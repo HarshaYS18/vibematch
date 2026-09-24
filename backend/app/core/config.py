@@ -137,6 +137,7 @@ class Settings(BaseSettings):
     ECONOMY_RECONCILIATION_INTERVAL_SECONDS: int = 60
     ECONOMY_RECONCILIATION_WALLET_BATCH_SIZE: int = 500
     ECONOMY_RECONCILIATION_POOL_BATCH_SIZE: int = 500
+    ECONOMY_LUCKY_PACKET_FINALIZE_BATCH_SIZE: int = 50
     ECONOMY_RECONCILIATION_JOURNAL_BATCH_SIZE: int = 1000
 
     # Chunk 28 Game Platform service boundary.
@@ -738,6 +739,8 @@ class Settings(BaseSettings):
             raise RuntimeError("Unsafe ECONOMY_RECONCILIATION_WALLET_BATCH_SIZE")
         if not 100 <= self.ECONOMY_RECONCILIATION_POOL_BATCH_SIZE <= 10000:
             raise RuntimeError("Unsafe ECONOMY_RECONCILIATION_POOL_BATCH_SIZE")
+        if not 1 <= self.ECONOMY_LUCKY_PACKET_FINALIZE_BATCH_SIZE <= 200:
+            raise RuntimeError("Unsafe ECONOMY_LUCKY_PACKET_FINALIZE_BATCH_SIZE")
         if not 100 <= self.ECONOMY_RECONCILIATION_JOURNAL_BATCH_SIZE <= 20000:
             raise RuntimeError("Unsafe ECONOMY_RECONCILIATION_JOURNAL_BATCH_SIZE")
         if (
