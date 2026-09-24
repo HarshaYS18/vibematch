@@ -32,8 +32,8 @@ Every cross-domain financial mutation carries:
 Retries with the same identity return the stored result. Reusing an idempotency
 key with different request content, or rebinding a transaction ID, fails closed.
 
-Wallet mutations append the operational wallet ledger and a balanced debit/credit
-journal pair inside the same database transaction. Transaction completion checks
+Wallet and pool value mutations append their operational ledger evidence plus balanced debit/credit
+journal legs inside the same Economy transaction. Transaction completion checks
 journal balance before committing and publishes the durable outbox event in that
 same transaction.
 
@@ -46,7 +46,10 @@ it does not become a second balance authority.
 The Economy bulk-worker runtime continuously performs bounded, read-only
 reconciliation:
 
-- wallet materialized balance vs the latest ledger `after_balance`
+- wallet materialized balance vs the latest wallet ledger `after_balance`
+- supply-pool materialized balance vs the latest supply ledger
+- game-pool materialized balance vs the latest game-pool ledger
+- reserved liability vs active `economy_house_reservations`
 - debit total vs credit total by Economy transaction and currency
 
 A mismatch is an incident. The worker never "repairs" balances automatically.
@@ -66,8 +69,9 @@ Economy Service.
 - `funkey_economy_runtime` — Economy service mutation role
 - `funkey_economy_reader` — bounded SELECT-only compatibility role
 
-Never grant `funkey_economy_runtime` to core-api, Game Platform, workers,
-Realtime, Profile/Social or other domain credentials.
+Never grant `funkey_economy_runtime` to core-api, Game Platform, the generic Worker Platform,
+Realtime, Profile/Social or other domains. The Economy-owned bulk/reconciliation worker is part of
+the Economy boundary and uses Economy-scoped credentials.
 
 ## Operations
 
@@ -77,7 +81,7 @@ Realtime, Profile/Social or other domain credentials.
 - database: `ECONOMY_DATABASE_URL`
 - public base: `/api/v1`
 - internal mutation base: `/internal/economy`
-- bulk worker: bounded jobs + periodic reconciliation
+- Economy worker: bounded bulk grants + Lucky Packet expiry finalization + periodic reconciliation
 
 See `docs/architecture/economy-service.md` and
 `docs/runbooks/economy-service.md`.
