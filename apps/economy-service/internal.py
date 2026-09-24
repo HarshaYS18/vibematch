@@ -1315,6 +1315,16 @@ def mint_supply(payload: SupplyMintRequest, db: Session = Depends(get_db)):
         reason=payload.reason,
         commit=False,
     )
+    economy_transaction_service.record_balanced_transfer(
+        db,
+        tx=tx,
+        currency=EconomyCurrency.COIN.value,
+        amount=payload.amount,
+        debit_account="SYSTEM_MINT:COIN",
+        credit_account="SUPPLY_POOL:" + str(pool.id) + ":COIN",
+        source_type="FOUNDER_MINT",
+        credit_user_id=pool.owner_user_id,
+    )
     result = {
         "transaction_id": tx.transaction_id,
         "id": pool.id,
@@ -1355,6 +1365,15 @@ def allocate_supply(payload: SupplyAllocateRequest, db: Session = Depends(get_db
         amount=payload.amount,
         reason=payload.reason,
         commit=False,
+    )
+    economy_transaction_service.record_balanced_transfer(
+        db,
+        tx=tx,
+        currency=EconomyCurrency.COIN.value,
+        amount=payload.amount,
+        debit_account="SUPPLY_POOL:" + str(payload.source_pool_id) + ":COIN",
+        credit_account="SUPPLY_POOL:" + str(pool.id) + ":COIN",
+        source_type="SUPPLY_ALLOCATION",
     )
     result = {
         "transaction_id": tx.transaction_id,
@@ -1400,7 +1419,18 @@ def seller_sale(payload: SellerSaleCommandRequest, db: Session = Depends(get_db)
         payment_amount=payload.payment_amount,
         payment_currency=payload.payment_currency,
         proof_url=payload.proof_url,
+        tx=tx,
         commit=False,
+    )
+    economy_transaction_service.record_balanced_transfer(
+        db,
+        tx=tx,
+        currency=EconomyCurrency.COIN.value,
+        amount=payload.coin_amount,
+        debit_account="SUPPLY_POOL:" + str(payload.source_pool_id) + ":COIN",
+        credit_account="SYSTEM_CLEARING:SELLER_COIN_SALE:COIN",
+        source_type="SELLER_COIN_SALE",
+        debit_user_id=seller.id,
     )
     result = {
         "transaction_id": tx.transaction_id,
@@ -1547,6 +1577,15 @@ def configure_game_pool(
     if cached is not None:
         return cached
 
+    existing_pool = (
+        db.query(GamePool)
+        .filter(
+            GamePool.game_key == payload.game_key,
+            GamePool.pool_type == payload.pool_type,
+        )
+        .first()
+    )
+    before_balance = int(existing_pool.balance or 0) if existing_pool is not None else 0
     pool = economy_service.create_game_pool(
         db=db,
         game_key=payload.game_key,
@@ -1558,6 +1597,17 @@ def configure_game_pool(
         rtp_target_basis_points=payload.rtp_target_basis_points,
         commit=False,
     )
+    configured_delta = int(pool.balance or 0) - before_balance
+    if configured_delta > 0:
+        economy_transaction_service.record_balanced_transfer(
+            db,
+            tx=tx,
+            currency=EconomyCurrency.COIN.value,
+            amount=configured_delta,
+            debit_account="SYSTEM_GAME_POOL_BOOTSTRAP:COIN",
+            credit_account="GAME_POOL:" + str(pool.id) + ":COIN",
+            source_type="GAME_POOL_CONFIGURE",
+        )
     result = {
         "transaction_id": tx.transaction_id,
         "id": pool.id,
