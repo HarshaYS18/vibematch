@@ -9,7 +9,8 @@ from sqlalchemy.orm import Session
 
 from app.core.config import settings
 from app.database import get_db
-from app.models.economy import EconomyCurrency, WalletLedger
+from app.models.economy import EconomyCurrency, GiftTransaction, WalletLedger
+from app.models.user import User
 from app.services import (
     economy_transaction_service,
     house_pool_service,
@@ -42,6 +43,17 @@ class MissionRewardRequest(MutationContext):
     mission_id: str = Field(min_length=1, max_length=120)
     cycle_key: str = Field(min_length=1, max_length=120)
     reward_coin_amount: int = Field(gt=0)
+
+
+class GiftFinancialRequest(MutationContext):
+    sender_user_id: int
+    receiver_user_id: int
+    gift_id: str = Field(min_length=1, max_length=80)
+    coin_value: int = Field(gt=0)
+    quantity: int = Field(gt=0)
+    room_id: int | None = None
+    relationship_id: int | None = None
+    is_relationship_gift: bool = False
 
 
 class GameFinancialRequest(MutationContext):
@@ -165,6 +177,124 @@ def credit_wallet(payload: WalletMutationRequest, db: Session = Depends(get_db))
         },
     )
 
+
+
+
+@router.post("/gifts/settle", dependencies=[Depends(require_internal_token)])
+def settle_regular_gift(
+    payload: GiftFinancialRequest,
+    db: Session = Depends(get_db),
+):
+    sender = db.query(User).filter(User.id == payload.sender_user_id).first()
+    receiver = db.query(User).filter(User.id == payload.receiver_user_id).first()
+    if sender is None:
+        raise HTTPException(status_code=404, detail="Gift sender not found")
+    if receiver is None:
+        raise HTTPException(status_code=404, detail="Gift receiver not found")
+
+    tx, cached = _begin(
+        db,
+        payload,
+        operation="gift.settle",
+        actor_user_id=payload.sender_user_id,
+    )
+    if cached is not None:
+        return cached
+
+    total_coin_value = int(payload.coin_value) * int(payload.quantity)
+    receiver_ruby_amount = total_coin_value * 3000 // 10000
+    platform_share_coin_value = total_coin_value - receiver_ruby_amount
+    room_exp_amount = total_coin_value if payload.room_id is not None else 0
+    love_score_amount = (
+        total_coin_value
+        if payload.relationship_id is not None or payload.is_relationship_gift
+        else 0
+    )
+
+    gift_tx = GiftTransaction(
+        sender_user_id=payload.sender_user_id,
+        receiver_user_id=payload.receiver_user_id,
+        room_id=payload.room_id,
+        gift_id=payload.gift_id,
+        coin_value=payload.coin_value,
+        quantity=payload.quantity,
+        total_coin_value=total_coin_value,
+        receiver_ruby_amount=receiver_ruby_amount,
+        platform_share_coin_value=platform_share_coin_value,
+        agency_share_coin_value=0,
+        room_exp_amount=room_exp_amount,
+        send_exp_amount=total_coin_value,
+        receive_exp_amount=total_coin_value,
+        relationship_id=payload.relationship_id,
+        love_score_amount=love_score_amount,
+    )
+    db.add(gift_tx)
+    db.flush()
+
+    sender_wallet = economy_transaction_service.debit(
+        db,
+        user_id=payload.sender_user_id,
+        amount=total_coin_value,
+        currency=EconomyCurrency.COIN.value,
+        source_type="GIFT_SEND",
+        source_id=str(gift_tx.id),
+        reason=f"Sent gift {payload.gift_id}",
+        tx=tx,
+        actor_user_id=payload.sender_user_id,
+    )
+    receiver_wallet = economy_transaction_service.credit(
+        db,
+        user_id=payload.receiver_user_id,
+        amount=receiver_ruby_amount,
+        currency=EconomyCurrency.RUBY.value,
+        source_type="GIFT_RECEIVE_RUBY",
+        source_id=str(gift_tx.id),
+        reason=f"Received gift {payload.gift_id}",
+        tx=tx,
+        actor_user_id=payload.sender_user_id,
+    )
+    receiver_wallet.lifetime_coins_received_as_gifts += total_coin_value
+
+    result = {
+        "transaction_id": tx.transaction_id,
+        "gift_transaction_id": gift_tx.id,
+        "sender_user_id": payload.sender_user_id,
+        "receiver_user_id": payload.receiver_user_id,
+        "total_coin_value": total_coin_value,
+        "receiver_ruby_amount": receiver_ruby_amount,
+        "platform_share_coin_value": platform_share_coin_value,
+        "send_exp_amount": total_coin_value,
+        "receive_exp_amount": total_coin_value,
+        "room_exp_amount": room_exp_amount,
+        "love_score_amount": love_score_amount,
+        "sender_coin_balance": int(sender_wallet.coin_balance or 0),
+        "receiver_ruby_balance": int(receiver_wallet.ruby_balance or 0),
+        "receiver_lifetime_gift_coin_value": int(
+            receiver_wallet.lifetime_coins_received_as_gifts or 0
+        ),
+        "receiver_lifetime_rubies_earned": int(
+            receiver_wallet.lifetime_rubies_earned or 0
+        ),
+        "experience_updates": {},
+        "ruby_rule": "Receiver rubies = total gift coin value × 30%.",
+        "rule": "Gift financial settlement committed.",
+    }
+    return economy_transaction_service.complete(
+        db,
+        tx=tx,
+        result=result,
+        event_type="economy.gift_settled.v1",
+        event_payload={
+            "gift_transaction_id": gift_tx.id,
+            "sender_user_id": payload.sender_user_id,
+            "receiver_user_id": payload.receiver_user_id,
+            "room_id": payload.room_id,
+            "gift_id": payload.gift_id,
+            "quantity": payload.quantity,
+            "total_coin_value": total_coin_value,
+            "receiver_ruby_amount": receiver_ruby_amount,
+        },
+    )
 
 @router.post("/mission-rewards/claim", dependencies=[Depends(require_internal_token)])
 def claim_mission_reward(

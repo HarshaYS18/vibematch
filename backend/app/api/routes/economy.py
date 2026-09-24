@@ -1,5 +1,6 @@
 import json
 from datetime import datetime
+from uuid import uuid4
 
 from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException
 from fastapi.encoders import jsonable_encoder
@@ -24,6 +25,8 @@ from app.schemas.economy import (
 from app.services import (
     economy_level_service,
     economy_service,
+    economy_service_client,
+    experience_service,
     gift_catalog_service,
     lucky_gift_house_service,
     lucky_gift_props_service,
@@ -462,21 +465,39 @@ def send_gift(
     coin_value = int(catalog_gift["coin_value"])
     room_id = room.id if room is not None else None
 
-    result = economy_service.send_gift(
-        db=db,
-        sender=current_user,
+    request_id = (payload.request_id or str(uuid4())).strip()
+    try:
+        result = economy_service_client.settle_gift(
+            request_id=request_id,
+            sender_user_id=current_user.id,
+            receiver_user_id=receiver.id,
+            gift_id=payload.gift_id,
+            coin_value=coin_value,
+            quantity=payload.quantity,
+            room_id=room_id,
+            relationship_id=payload.relationship_id,
+            is_relationship_gift=payload.is_relationship_gift,
+        )
+    except economy_service_client.EconomyServiceUnavailable as exc:
+        raise HTTPException(status_code=503, detail=str(exc)) from exc
+    except economy_service_client.EconomyServiceError as exc:
+        raise HTTPException(status_code=exc.status_code, detail=exc.detail) from exc
+
+    exp_updates = experience_service.apply_gift_exp(
+        db,
+        sender_user_id=current_user.id,
         receiver_user_id=receiver.id,
-        gift_id=payload.gift_id,
-        coin_value=coin_value,
-        quantity=payload.quantity,
         room_id=room_id,
-        relationship_id=payload.relationship_id,
-        is_relationship_gift=payload.is_relationship_gift,
+        send_exp=int(result.get("send_exp_amount") or 0),
+        receive_exp=int(result.get("receive_exp_amount") or 0),
+        room_exp=int(result.get("room_exp_amount") or 0),
+        source_id=str(result["gift_transaction_id"]),
     )
-    exp_updates = (
-        result.get("experience_updates")
-        if isinstance(result.get("experience_updates"), dict)
-        else {}
+    db.commit()
+    result["experience_updates"] = exp_updates
+    result["rule"] = (
+        "Gift send committed. Sender coins debited; receiver rubies credited "
+        "at 30%; Send/Receive/Room EXP updated instantly. Self gifting is allowed."
     )
     _queue_after_gift(
         background_tasks,
