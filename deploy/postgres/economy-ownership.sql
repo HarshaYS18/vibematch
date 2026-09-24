@@ -30,6 +30,8 @@ ALTER TABLE economy_rule_sets OWNER TO funkey_economy_owner;
 ALTER TABLE economy_rule_levels OWNER TO funkey_economy_owner;
 ALTER TABLE lucky_gift_transactions OWNER TO funkey_economy_owner;
 ALTER TABLE user_lucky_gift_stats OWNER TO funkey_economy_owner;
+ALTER TABLE lucky_packets OWNER TO funkey_economy_owner;
+ALTER TABLE lucky_packet_claims OWNER TO funkey_economy_owner;
 
 REVOKE ALL ON TABLE
   user_wallets,wallet_ledger,coin_supply_pools,coin_pool_ledger,
@@ -37,7 +39,7 @@ REVOKE ALL ON TABLE
   ruby_withdraw_requests,economy_transactions,economy_journal_entries,economy_house_reservations,
   economy_bulk_grants,economy_bulk_grant_recipients,
   gift_catalog_categories,gift_catalog_items,economy_rule_sets,economy_rule_levels,
-  lucky_gift_transactions,user_lucky_gift_stats
+  lucky_gift_transactions,user_lucky_gift_stats,lucky_packets,lucky_packet_claims
 FROM PUBLIC;
 
 GRANT SELECT,INSERT,UPDATE,DELETE ON TABLE
@@ -46,7 +48,7 @@ GRANT SELECT,INSERT,UPDATE,DELETE ON TABLE
   ruby_withdraw_requests,economy_transactions,economy_journal_entries,economy_house_reservations,
   economy_bulk_grants,economy_bulk_grant_recipients,
   gift_catalog_categories,gift_catalog_items,economy_rule_sets,economy_rule_levels,
-  lucky_gift_transactions,user_lucky_gift_stats
+  lucky_gift_transactions,user_lucky_gift_stats,lucky_packets,lucky_packet_claims
 TO funkey_economy_runtime;
 
 -- Economy may read identity/room context but does not own it.
@@ -77,7 +79,7 @@ FOREACH t IN ARRAY ARRAY[
   'ruby_withdraw_requests','economy_transactions','economy_journal_entries','economy_house_reservations',
   'economy_bulk_grants','economy_bulk_grant_recipients',
   'gift_catalog_categories','gift_catalog_items','economy_rule_sets','economy_rule_levels',
-  'lucky_gift_transactions','user_lucky_gift_stats'
+  'lucky_gift_transactions','user_lucky_gift_stats','lucky_packets','lucky_packet_claims'
 ] LOOP
   s:=pg_get_serial_sequence(t,'id');
   IF s IS NOT NULL THEN
