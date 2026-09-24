@@ -8,7 +8,7 @@ from sqlalchemy.orm import Session
 from app.api.routes.users import get_current_user
 from app.database import get_db
 from app.models.admin_log import AdminLog
-from app.models.economy import CoinSupplyPool, CoinSupplyPoolType, EconomyCurrency
+from app.models.economy import CoinSupplyPool
 from app.models.special_permission import SpecialPermission, SpecialPermissionName
 from app.models.user import User
 from app.models.vip_status import UserVipStatus
@@ -31,7 +31,6 @@ from app.schemas.super_owner import (
 )
 from app.services import economy_service_client, inbox_lock_service, profile_social_service_client
 from app.services.audit_log_service import create_admin_log
-from app.services.economy_service import get_or_create_coin_pool, get_or_create_wallet
 from app.services.role_service import get_primary_role
 from app.models.role import RoleName
 from app.services.special_permission_service import grant_special_permission
@@ -46,11 +45,6 @@ def require_super_owner(user: User) -> None:
 
 def _pool_response(pool: CoinSupplyPool) -> SuperOwnerPoolResponse:
     return SuperOwnerPoolResponse(id=pool.id, owner_user_id=pool.owner_user_id, pool_type=pool.pool_type, balance=pool.balance, reserved_balance=pool.reserved_balance, status=pool.status)
-
-
-def _wallet_response(user_id: int, db: Session) -> SuperOwnerWalletResponse:
-    wallet = get_or_create_wallet(db, user_id)
-    return SuperOwnerWalletResponse(user_id=user_id, coin_balance=wallet.coin_balance, ruby_balance=wallet.ruby_balance, lifetime_coins_spent=wallet.lifetime_coins_spent, lifetime_coins_received_as_gifts=wallet.lifetime_coins_received_as_gifts, lifetime_rubies_earned=wallet.lifetime_rubies_earned)
 
 
 def _target_user(db: Session, target_user_id: int) -> User:
@@ -249,20 +243,45 @@ def adjust_vip(payload: SuperOwnerVipAdjustmentRequest, db: Session = Depends(ge
 
 
 @router.post("/admin/users/levels-adjust", response_model=SuperOwnerWalletResponse)
-def adjust_levels(payload: SuperOwnerLevelAdjustmentRequest, db: Session = Depends(get_db), current_user: User = Depends(get_current_user)):
+def adjust_levels(
+    payload: SuperOwnerLevelAdjustmentRequest,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
     require_super_owner(current_user)
     target = _target_user(db, payload.target_user_id)
-    wallet = get_or_create_wallet(db, target.id)
-    if payload.send_exp_total is not None:
-        wallet.lifetime_coins_spent = payload.send_exp_total
-    if payload.receive_exp_total is not None:
-        wallet.lifetime_coins_received_as_gifts = payload.receive_exp_total
-    if payload.ruby_total is not None:
-        wallet.lifetime_rubies_earned = payload.ruby_total
-        wallet.ruby_balance = payload.ruby_total
-    db.commit()
-    create_admin_log(db=db, actor_user_id=current_user.id, target_user_id=target.id, action="SUPER_OWNER_LEVELS_ADJUSTED", resource_type="user_wallet", resource_id=str(wallet.id), reason=payload.reason, metadata_json={"send_exp_total": payload.send_exp_total, "receive_exp_total": payload.receive_exp_total, "ruby_total": payload.ruby_total})
-    return _wallet_response(target.id, db)
+    request_id = (payload.request_id or str(uuid4())).strip()
+    try:
+        result = economy_service_client.adjust_wallet_levels(
+            request_id=request_id,
+            actor_user_id=current_user.id,
+            target_user_id=target.id,
+            send_exp_total=payload.send_exp_total,
+            receive_exp_total=payload.receive_exp_total,
+            ruby_total=payload.ruby_total,
+            reason=payload.reason,
+        )
+    except economy_service_client.EconomyServiceUnavailable as exc:
+        raise HTTPException(status_code=503, detail=str(exc)) from exc
+    except economy_service_client.EconomyServiceError as exc:
+        raise HTTPException(status_code=exc.status_code, detail=exc.detail) from exc
+
+    create_admin_log(
+        db=db,
+        actor_user_id=current_user.id,
+        target_user_id=target.id,
+        action="SUPER_OWNER_LEVELS_ADJUSTED",
+        resource_type="user_wallet",
+        resource_id=str(target.id),
+        reason=payload.reason,
+        metadata_json={
+            "send_exp_total": payload.send_exp_total,
+            "receive_exp_total": payload.receive_exp_total,
+            "ruby_total": payload.ruby_total,
+            "economy_transaction_id": result.get("transaction_id"),
+        },
+    )
+    return SuperOwnerWalletResponse(**result)
 
 
 @router.get("/admin/moderation/owner-logs", response_model=list[SuperOwnerLogResponse])
