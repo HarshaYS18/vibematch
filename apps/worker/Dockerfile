@@ -10,6 +10,9 @@ RUN /opt/venv/bin/pip install --no-cache-dir -r worker-requirements.txt
 FROM python:3.13-slim-bookworm
 ENV PATH=/opt/venv/bin:$PATH PYTHONUNBUFFERED=1 PYTHONDONTWRITEBYTECODE=1 PYTHONPATH=/app:/app/backend
 WORKDIR /app
+RUN apt-get update \
+    && apt-get install -y --no-install-recommends ffmpeg \
+    && rm -rf /var/lib/apt/lists/*
 RUN groupadd --system funkey && useradd --system --gid funkey --home /app funkey
 COPY --from=build /opt/venv /opt/venv
 COPY --chown=funkey:funkey backend/ /app/backend/

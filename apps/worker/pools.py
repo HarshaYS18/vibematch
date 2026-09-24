@@ -33,11 +33,13 @@ POOLS: dict[str, PoolSpec] = {
         "media",
         (
             SubscriptionSpec("funkey.events.vibes.media.requested", "funkey-worker-media-vibes"),
+            SubscriptionSpec("funkey.events.media.uploaded", "funkey-worker-media-uploaded", ack_wait_seconds=600, max_ack_pending=24),
             SubscriptionSpec("funkey.events.media.moderation.requested", "funkey-worker-media-moderation"),
             SubscriptionSpec("funkey.events.media.delete.requested", "funkey-worker-media-delete"),
         ),
         frozenset({
             "vibes.media.requested",
+            "media.uploaded",
             "media.moderation.requested",
             "media.delete.requested",
         }),

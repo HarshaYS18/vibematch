@@ -7,7 +7,12 @@ import json
 
 from sqlalchemy.orm import Session
 
-from app.models.cdn_media import CdnMediaAsset, CdnMediaModerationStatus, MediaSafetySetting
+from app.models.cdn_media import (
+    CdnMediaAsset,
+    CdnMediaModerationStatus,
+    CdnMediaUploadStatus,
+    MediaSafetySetting,
+)
 from app.services.audit_log_service import create_admin_log
 
 
@@ -90,7 +95,8 @@ def audit_image_media(db: Session, *, asset: CdnMediaAsset, actor_user_id: int |
         _apply_asset_result(db, asset, result, actor_user_id=actor_user_id)
         return result
 
-    input_payload = [{"type": "image_url", "image_url": {"url": asset.public_url}}]
+    review_url = asset.thumbnail_url or asset.public_url
+    input_payload = [{"type": "image_url", "image_url": {"url": review_url}}]
     ok, payload = _safe_openai_moderation(input_payload, model=model)
     if not ok:
         fallback = settings.get("fallback_if_provider_fails", "human_review_required")
@@ -113,12 +119,19 @@ def _apply_asset_result(db: Session, asset: CdnMediaAsset, result: ModerationRes
     asset.moderation_summary = result.summary
     if result.decision == ModerationDecision.APPROVED:
         asset.moderation_status = CdnMediaModerationStatus.AI_APPROVED.value
+        asset.upload_status = CdnMediaUploadStatus.APPROVED.value
+        asset.human_review_status = None
+    elif result.decision == ModerationDecision.DISABLED:
+        asset.moderation_status = CdnMediaModerationStatus.NOT_REQUIRED.value
+        asset.upload_status = CdnMediaUploadStatus.APPROVED.value
         asset.human_review_status = None
     elif result.decision in {ModerationDecision.REVIEW_REQUIRED, ModerationDecision.PROVIDER_FAILED}:
         asset.moderation_status = CdnMediaModerationStatus.HUMAN_REVIEW_REQUIRED.value
+        asset.upload_status = CdnMediaUploadStatus.MODERATION_PENDING.value
         asset.human_review_status = "pending"
     elif result.decision in {ModerationDecision.FLAGGED, ModerationDecision.REJECTED}:
         asset.moderation_status = CdnMediaModerationStatus.AI_FLAGGED.value
+        asset.upload_status = CdnMediaUploadStatus.QUARANTINED.value
         asset.human_review_status = "pending"
     db.add(asset)
     db.commit()

@@ -84,6 +84,8 @@ spec:
     - type: nats-jetstream
       metadata: {natsServerMonitoringEndpoint: nats-monitoring.example.invalid:8222, account: $G, stream: FUNKEY_EVENTS, consumer: funkey-worker-media-vibes, lagThreshold: "50", activationLagThreshold: "5"}
     - type: nats-jetstream
+      metadata: {natsServerMonitoringEndpoint: nats-monitoring.example.invalid:8222, account: $G, stream: FUNKEY_EVENTS, consumer: funkey-worker-media-uploaded, lagThreshold: "25", activationLagThreshold: "3"}
+    - type: nats-jetstream
       metadata: {natsServerMonitoringEndpoint: nats-monitoring.example.invalid:8222, account: $G, stream: FUNKEY_EVENTS, consumer: funkey-worker-media-moderation, lagThreshold: "50", activationLagThreshold: "5"}
     - type: nats-jetstream
       metadata: {natsServerMonitoringEndpoint: nats-monitoring.example.invalid:8222, account: $G, stream: FUNKEY_EVENTS, consumer: funkey-worker-media-delete, lagThreshold: "50", activationLagThreshold: "5"}
