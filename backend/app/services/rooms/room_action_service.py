@@ -11,10 +11,11 @@ from app.models.room import Room, RoomMode
 from app.models.room_participant import RoomParticipant
 from app.models.room_realtime_state import RoomChatMessage, RoomMemberRequest, RoomRealtimeEvent, RoomSeatApplication, RoomSeatState
 from app.models.user import User
+from app.services import presence_projection_service
 from app.services.event_outbox_service import enqueue_event
 from app.services.permissions import room_permission_service
 from app.services.rooms.room_kickout_service import create_room_kickout_for_user, deactivate_room_user_for_kickout
-from app.services.rooms.room_service import assert_room_entry_allowed, close_other_active_room_sessions, deactivate_user_in_room, mark_user_room_presence_active, user_has_active_room_conflict
+from app.services.rooms.room_service import assert_room_entry_allowed, close_other_active_room_sessions, deactivate_user_in_room, user_has_active_room_conflict
 from app.services.rooms.room_state_service import ensure_room_seats, normalize_layout, room_snapshot, seat_count_for_layout
 from app.services.rooms import room_activity_service, watch_party_service
 
@@ -269,7 +270,6 @@ def join_room(db: Session, room: Room, user: User, payload: dict[str, Any] | Non
     assert_room_entry_allowed(db, room, user, lock_password=str((payload or {}).get("lock_password") or "") or None)
     closed_room_ids = close_other_active_room_sessions(db, user.id, except_room_public_id=room.room_public_id)
     participant = _ensure_room_participant(db, room, user, payload)
-    mark_user_room_presence_active(db, room, user)
     _auto_place_host_admin_if_needed(db, room, user, participant)
     record_room_event(
         db,
@@ -322,22 +322,28 @@ def reconcile_authenticated_room_presence(
     participant.is_active = True
     participant.last_seen_at = now
     participant.left_at = None
-    mark_user_room_presence_active(db, room, user)
     db.flush()
 
 
-def heartbeat_room(db: Session, room: Room, user: User) -> dict[str, Any]:
+def heartbeat_room(
+    db: Session,
+    room: Room,
+    user: User,
+) -> dict[str, Any]:
+    """Read-only compatibility check; Go/Redis owns connected liveness."""
     assert_room_entry_allowed(db, room, user)
-    if user_has_active_room_conflict(db, user.id, room.room_public_id):
-        deactivate_user_in_room(db, room, user.id)
-        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="This account is already active in another chatroom")
     participant = _room_participant(db, room, user)
-    if participant:
-        participant.is_active = True
-        participant.last_seen_at = datetime.utcnow()
-        participant.left_at = None
-        mark_user_room_presence_active(db, room, user)
-    db.flush()
+    if participant is None or not participant.is_active:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="Room session is not active",
+        )
+    active_rooms = presence_projection_service.active_room_ids_for_user(user.id)
+    if room.room_public_id not in active_rooms:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="Realtime room lease is not active",
+        )
     return room_snapshot(db, room, include_chat=False)
 
 
