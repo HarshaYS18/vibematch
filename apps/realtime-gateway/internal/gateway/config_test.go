@@ -15,6 +15,11 @@ func TestProductionConfigRequiresOriginAndRedis(t *testing.T) {
 		t.Fatal("production config accepted implicit local Redis")
 	}
 	t.Setenv("REALTIME_REDIS_URL", "redis://redis:6379/0")
+	t.Setenv("REALTIME_NATS_URL", "nats://nats:4222")
+	t.Setenv(
+		"REALTIME_INBOX_COMMAND_URL",
+		"http://funkey-inbox:8083/api/v1/realtime/command",
+	)
 	if _, err := LoadConfig(); err != nil {
 		t.Fatalf("production config unexpectedly rejected: %v", err)
 	}
