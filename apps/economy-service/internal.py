@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import json
 import hmac
+from datetime import datetime
 from typing import Any
 
 from fastapi import APIRouter, Depends, Header, HTTPException
@@ -167,6 +168,17 @@ class AdminWalletLevelAdjustRequest(MutationContext):
     send_exp_total: int | None = Field(default=None, ge=0)
     receive_exp_total: int | None = Field(default=None, ge=0)
     ruby_total: int | None = Field(default=None, ge=0)
+    reason: str = Field(min_length=3, max_length=255)
+
+
+class AdminVipOverrideRequest(MutationContext):
+    actor_user_id: int
+    target_user_id: int
+    vip_level: int = Field(ge=0, le=100)
+    svip_level: int = Field(ge=0, le=100)
+    vip_is_active: bool
+    svip_is_active: bool
+    svip_expires_at: datetime | None = None
     reason: str = Field(min_length=3, max_length=255)
 
 
@@ -437,6 +449,70 @@ def admin_adjust_wallet_levels(
             "send_exp_total": payload.send_exp_total,
             "receive_exp_total": payload.receive_exp_total,
             "ruby_total": payload.ruby_total,
+        },
+    )
+
+
+@router.post(
+    "/vip/admin-override",
+    dependencies=[Depends(require_internal_token)],
+)
+def admin_override_vip(
+    payload: AdminVipOverrideRequest,
+    db: Session = Depends(get_db),
+):
+    target = db.query(User).filter(User.id == payload.target_user_id).first()
+    if target is None or not target.is_active:
+        raise HTTPException(status_code=404, detail="Target user not found")
+
+    tx, cached = _begin(
+        db,
+        payload,
+        operation="vip.admin_override",
+        actor_user_id=payload.actor_user_id,
+    )
+    if cached is not None:
+        return cached
+
+    status = economy_level_service.set_vip_override(
+        db,
+        user_id=target.id,
+        actor_user_id=payload.actor_user_id,
+        vip_level=payload.vip_level,
+        svip_level=payload.svip_level,
+        vip_is_active=payload.vip_is_active,
+        svip_is_active=payload.svip_is_active,
+        svip_expires_at=payload.svip_expires_at,
+        reason=payload.reason,
+        transaction_id=tx.transaction_id,
+        request_id=payload.idempotency_key,
+    )
+    result = {
+        "transaction_id": tx.transaction_id,
+        "user_id": target.id,
+        "public_user_id": target.public_user_id,
+        "vip_level": int(status.vip_level or 0),
+        "svip_level": int(status.svip_level or 0),
+        "vip_is_active": bool(status.vip_is_active),
+        "svip_is_active": bool(status.svip_is_active),
+        "svip_expires_at": (
+            status.svip_expires_at.isoformat()
+            if status.svip_expires_at is not None
+            else None
+        ),
+        "updated_by_user_id": status.updated_by_user_id,
+        "update_reason": status.update_reason,
+    }
+    return economy_transaction_service.complete(
+        db,
+        tx=tx,
+        result=result,
+        event_type="economy.vip_override.changed.v1",
+        event_payload={
+            "target_user_id": target.id,
+            "actor_user_id": payload.actor_user_id,
+            "vip_level": result["vip_level"],
+            "svip_level": result["svip_level"],
         },
     )
 
