@@ -16,10 +16,22 @@ from threading import Lock, Thread
 # Keep the Python control plane as the single model/migration owner.
 sys.path.insert(0, str(Path(__file__).resolve().parents[2] / "backend"))
 
-import nats
-from nats.errors import TimeoutError as NatsTimeoutError
-from nats.js import api as js_api
-from nats.js.errors import NotFoundError
+try:
+    import nats
+    from nats.errors import TimeoutError as NatsTimeoutError
+    from nats.js import api as js_api
+    from nats.js.errors import NotFoundError
+except ModuleNotFoundError:
+    # Keep pure unit-test imports independent of Worker runtime extras.
+    # Production startup still fails hard below when nats-py is unavailable.
+    nats = None
+    js_api = None
+
+    class NatsTimeoutError(Exception):
+        pass
+
+    class NotFoundError(Exception):
+        pass
 from pydantic import ValidationError
 from sqlalchemy import text
 from opentelemetry.trace import SpanKind
@@ -334,6 +346,8 @@ async def media_upload_session_sweep(stop: asyncio.Event):
 
 async def run():
     settings.validate_worker_runtime()
+    if nats is None or js_api is None:
+        raise RuntimeError("nats-py is required to run the Worker Platform")
     if not POOL.active:
         raise RuntimeError(
             f"WORKER_POOL={POOL.name} is intentionally inactive until its transport is configured"
