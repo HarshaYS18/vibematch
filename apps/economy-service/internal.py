@@ -1777,6 +1777,16 @@ def game_wager(payload: GameFinancialRequest, db: Session = Depends(get_db)):
         reference_type="COIN_GAME_WAGER_INCOME",
         reference_id=payload.round_id or payload.business_reference,
     )
+    if house_income.get("recorded"):
+        economy_transaction_service.record_balanced_transfer(
+            db,
+            tx=tx,
+            currency=EconomyCurrency.COIN.value,
+            amount=payload.wager_amount,
+            debit_account="SYSTEM_CLEARING:COIN_GAME_WAGER:COIN",
+            credit_account="GAME_POOL:" + str(house_income["pool_id"]) + ":COIN",
+            source_type="COIN_GAME_WAGER_INCOME",
+        )
     reservation_scope = (
         f"game-round:{payload.round_id}:{payload.user_id}"
         if payload.round_id
@@ -1872,6 +1882,27 @@ def game_settle(payload: GameFinancialRequest, db: Session = Depends(get_db)):
         reference_type="COIN_GAME_SETTLEMENT",
         reference_id=payload.round_id or payload.business_reference,
     )
+    if house_result.get("recorded") and house_profit_or_loss != 0:
+        if house_profit_or_loss > 0:
+            economy_transaction_service.record_balanced_transfer(
+                db,
+                tx=tx,
+                currency=EconomyCurrency.COIN.value,
+                amount=house_profit_or_loss,
+                debit_account="SYSTEM_CLEARING:COIN_GAME_SETTLEMENT:COIN",
+                credit_account="GAME_POOL:" + str(house_result["pool_id"]) + ":COIN",
+                source_type="COIN_GAME_SETTLEMENT",
+            )
+        else:
+            economy_transaction_service.record_balanced_transfer(
+                db,
+                tx=tx,
+                currency=EconomyCurrency.COIN.value,
+                amount=abs(house_profit_or_loss),
+                debit_account="GAME_POOL:" + str(house_result["pool_id"]) + ":COIN",
+                credit_account="SYSTEM_CLEARING:COIN_GAME_SETTLEMENT:COIN",
+                source_type="COIN_GAME_SETTLEMENT",
+            )
     reservation_scope = (
         f"game-round:{payload.round_id}:{payload.user_id}"
         if payload.round_id
