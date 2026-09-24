@@ -25,7 +25,7 @@ def get_app_source_registry() -> AppSourceRegistryResponse:
             "child_writes": "Mutations go through feature child APIs and must return or trigger canonical backend state.",
             "configs": "Display/config data comes from backend config/catalog/rule endpoints before any local fallback.",
             "control_center": "Owner/SuperAdmin Control Center APIs manage rules, catalog, roles, permissions, and stealth.",
-            "live_room": "RoomSessionRepository owns canonical room lifecycle/state; the Go /ws application socket delivers authorized realtime deltas and commands while media transport remains separate.",
+            "live_room": "RoomSessionRepository owns canonical room lifecycle/state; the Go /ws application socket owns liveness and delivers authorized realtime deltas/commands while media transport remains separate.",
         },
         tabs=[
             TabSourceRegistryItem(
@@ -54,7 +54,6 @@ def get_app_source_registry() -> AppSourceRegistryResponse:
                 ],
                 child_writes=[
                     _endpoint("/rooms/{room_public_id}/realtime/join", "Canonical room entry and privacy gate returning a full room snapshot."),
-                    _endpoint("/rooms/{room_public_id}/realtime/heartbeat", "Presence heartbeat returning an explicitly marked partial room snapshot."),
                     _endpoint("/rooms/{room_public_id}/realtime/leave", "Canonical room exit returning final room state."),
                     _endpoint("/rooms/{room_public_id}/realtime/seat/take", "Canonical seat take/request mutation."),
                     _endpoint("/rooms/{room_public_id}/realtime/seat/leave", "Canonical seat leave mutation."),
