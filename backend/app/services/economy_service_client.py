@@ -430,3 +430,24 @@ def configure_game_pool(
             "rtp_target_basis_points": rtp_target_basis_points,
         },
     )
+
+
+def queue_bulk_grant(
+    *,
+    request_id: str,
+    actor_user_id: int,
+    coin_amount: int,
+    active_only: bool,
+    reason: str,
+) -> dict[str, Any]:
+    business_reference = f"bulk-grant:{actor_user_id}:{request_id}"
+    return _request(
+        "bulk-grants/enqueue",
+        {
+            **mutation_context("bulk_grant.queue", business_reference),
+            "actor_user_id": actor_user_id,
+            "coin_amount": coin_amount,
+            "active_only": active_only,
+            "reason": reason,
+        },
+    )

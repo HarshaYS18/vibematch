@@ -13,10 +13,12 @@ from app.database import get_db
 from app.models.economy import EconomyCurrency, GiftTransaction, RubyWithdrawRequest, WalletLedger
 from app.models.user import User
 from app.services import (
+    economy_bulk_grant_service,
     economy_level_service,
     economy_level_service,
     economy_service,
     economy_transaction_service,
+    event_outbox_service,
     house_pool_service,
     lucky_gift_house_service,
     lucky_gift_props_service,
@@ -92,6 +94,13 @@ class GamePoolConfigureCommandRequest(MutationContext):
     daily_loss_limit: int = Field(default=0, ge=0)
     max_single_payout: int = Field(default=0, ge=0)
     rtp_target_basis_points: int = Field(default=8000, ge=0, le=10000)
+
+
+class BulkGrantEnqueueRequest(MutationContext):
+    actor_user_id: int
+    coin_amount: int = Field(gt=0, le=10_000_000)
+    active_only: bool = True
+    reason: str = Field(min_length=3, max_length=255)
 
 
 class MissionRewardRequest(MutationContext):
@@ -1029,6 +1038,49 @@ def configure_game_pool(
             "opening_balance": payload.opening_balance,
         },
     )
+
+
+@router.post("/bulk-grants/enqueue", dependencies=[Depends(require_internal_token)])
+def enqueue_bulk_grant(
+    payload: BulkGrantEnqueueRequest,
+    db: Session = Depends(get_db),
+):
+    actor = db.query(User).filter(User.id == payload.actor_user_id).first()
+    if actor is None:
+        raise HTTPException(status_code=404, detail="Actor user not found")
+
+    job, created = economy_bulk_grant_service.create_job(
+        db,
+        grant_id=payload.transaction_id,
+        idempotency_key=payload.idempotency_key,
+        actor_user_id=payload.actor_user_id,
+        coin_amount=payload.coin_amount,
+        active_only=payload.active_only,
+        reason=payload.reason,
+    )
+
+    if created:
+        event_outbox_service.enqueue_event(
+            db,
+            event_type="economy.bulk_grant.queued.v1",
+            actor_user_id=payload.actor_user_id,
+            payload={
+                "grant_id": job.grant_id,
+                "coin_amount": int(job.coin_amount),
+                "active_only": bool(job.active_only),
+                "eligible_count": int(job.eligible_count),
+                "business_reference": payload.business_reference,
+            },
+        )
+    db.commit()
+
+    return {
+        "grant_id": job.grant_id,
+        "status": job.status,
+        "eligible_count": int(job.eligible_count),
+        "processed_count": int(job.processed_count),
+        "created": created,
+    }
 
 
 @router.post("/mission-rewards/claim", dependencies=[Depends(require_internal_token)])
