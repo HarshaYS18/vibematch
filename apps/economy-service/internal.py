@@ -24,7 +24,6 @@ from app.models.user import User
 from app.services import (
     economy_bulk_grant_service,
     economy_level_service,
-    economy_level_service,
     economy_service,
     economy_transaction_service,
     event_outbox_service,
@@ -160,6 +159,15 @@ class MissionRewardRequest(MutationContext):
     mission_id: str = Field(min_length=1, max_length=120)
     cycle_key: str = Field(min_length=1, max_length=120)
     reward_coin_amount: int = Field(gt=0)
+
+
+class AdminWalletLevelAdjustRequest(MutationContext):
+    actor_user_id: int
+    target_user_id: int
+    send_exp_total: int | None = Field(default=None, ge=0)
+    receive_exp_total: int | None = Field(default=None, ge=0)
+    ruby_total: int | None = Field(default=None, ge=0)
+    reason: str = Field(min_length=3, max_length=255)
 
 
 class WalletRechargeRequest(MutationContext):
@@ -328,7 +336,109 @@ def wallet_snapshot(user_id: int, db: Session = Depends(get_db)):
         "coin_balance": int(wallet.coin_balance or 0),
         "ruby_balance": int(wallet.ruby_balance or 0),
         "pending_withdraw_rubies": int(wallet.pending_withdraw_rubies or 0),
+        "lifetime_coins_spent": int(wallet.lifetime_coins_spent or 0),
+        "lifetime_coins_received_as_gifts": int(
+            wallet.lifetime_coins_received_as_gifts or 0
+        ),
+        "lifetime_rubies_earned": int(wallet.lifetime_rubies_earned or 0),
     }
+
+
+@router.post(
+    "/wallet/admin-level-adjust",
+    dependencies=[Depends(require_internal_token)],
+)
+def admin_adjust_wallet_levels(
+    payload: AdminWalletLevelAdjustRequest,
+    db: Session = Depends(get_db),
+):
+    if (
+        payload.send_exp_total is None
+        and payload.receive_exp_total is None
+        and payload.ruby_total is None
+    ):
+        raise HTTPException(
+            status_code=400,
+            detail="At least one level total must be provided",
+        )
+
+    tx, cached = _begin(
+        db,
+        payload,
+        operation="wallet.admin_level_adjust",
+        actor_user_id=payload.actor_user_id,
+    )
+    if cached is not None:
+        return cached
+
+    wallet = economy_transaction_service.wallet_for_update(
+        db,
+        payload.target_user_id,
+    )
+
+    if payload.send_exp_total is not None:
+        wallet.lifetime_coins_spent = int(payload.send_exp_total)
+    if payload.receive_exp_total is not None:
+        wallet.lifetime_coins_received_as_gifts = int(
+            payload.receive_exp_total
+        )
+
+    if payload.ruby_total is not None:
+        target_rubies = int(payload.ruby_total)
+        current_rubies = int(wallet.ruby_balance or 0)
+        delta = target_rubies - current_rubies
+        if delta > 0:
+            wallet = economy_transaction_service.credit(
+                db,
+                user_id=payload.target_user_id,
+                amount=delta,
+                currency=EconomyCurrency.RUBY.value,
+                source_type="SUPER_OWNER_LEVEL_ADJUSTMENT",
+                source_id=tx.transaction_id,
+                reason=payload.reason,
+                tx=tx,
+                actor_user_id=payload.actor_user_id,
+            )
+        elif delta < 0:
+            wallet = economy_transaction_service.debit(
+                db,
+                user_id=payload.target_user_id,
+                amount=abs(delta),
+                currency=EconomyCurrency.RUBY.value,
+                source_type="SUPER_OWNER_LEVEL_ADJUSTMENT",
+                source_id=tx.transaction_id,
+                reason=payload.reason,
+                tx=tx,
+                actor_user_id=payload.actor_user_id,
+            )
+        # Preserve the historical admin contract: ruby_total is both the
+        # current Ruby balance and the absolute lifetime Ruby-earned total.
+        wallet.lifetime_rubies_earned = target_rubies
+
+    result = {
+        "transaction_id": tx.transaction_id,
+        "user_id": int(payload.target_user_id),
+        "coin_balance": int(wallet.coin_balance or 0),
+        "ruby_balance": int(wallet.ruby_balance or 0),
+        "lifetime_coins_spent": int(wallet.lifetime_coins_spent or 0),
+        "lifetime_coins_received_as_gifts": int(
+            wallet.lifetime_coins_received_as_gifts or 0
+        ),
+        "lifetime_rubies_earned": int(wallet.lifetime_rubies_earned or 0),
+    }
+    return economy_transaction_service.complete(
+        db,
+        tx=tx,
+        result=result,
+        event_type="economy.wallet.admin_levels_adjusted.v1",
+        event_payload={
+            "target_user_id": payload.target_user_id,
+            "actor_user_id": payload.actor_user_id,
+            "send_exp_total": payload.send_exp_total,
+            "receive_exp_total": payload.receive_exp_total,
+            "ruby_total": payload.ruby_total,
+        },
+    )
 
 
 @router.post("/wallet/recharge", dependencies=[Depends(require_internal_token)])
