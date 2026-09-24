@@ -10,10 +10,14 @@ BEGIN
     IF NOT EXISTS (SELECT 1 FROM pg_roles WHERE rolname = 'funkey_room_control_runtime') THEN
         CREATE ROLE funkey_room_control_runtime NOLOGIN;
     END IF;
+    IF NOT EXISTS (SELECT 1 FROM pg_roles WHERE rolname = 'funkey_room_control_reader') THEN
+        CREATE ROLE funkey_room_control_reader NOLOGIN;
+    END IF;
 END
 $$;
 
 GRANT USAGE ON SCHEMA public TO funkey_room_control_runtime;
+GRANT USAGE ON SCHEMA public TO funkey_room_control_reader;
 
 ALTER TABLE rooms OWNER TO funkey_room_control_owner;
 ALTER TABLE room_participants OWNER TO funkey_room_control_owner;
@@ -26,6 +30,9 @@ ALTER TABLE room_kickouts OWNER TO funkey_room_control_owner;
 ALTER TABLE room_themes OWNER TO funkey_room_control_owner;
 ALTER TABLE user_room_theme_inventory OWNER TO funkey_room_control_owner;
 ALTER TABLE room_theme_reviews OWNER TO funkey_room_control_owner;
+ALTER TABLE cricket_tournaments OWNER TO funkey_room_control_owner;
+ALTER TABLE cricket_matches OWNER TO funkey_room_control_owner;
+ALTER TABLE cricket_ball_events OWNER TO funkey_room_control_owner;
 
 REVOKE ALL ON TABLE
     rooms,
@@ -38,7 +45,10 @@ REVOKE ALL ON TABLE
     room_kickouts,
     room_themes,
     user_room_theme_inventory,
-    room_theme_reviews
+    room_theme_reviews,
+    cricket_tournaments,
+    cricket_matches,
+    cricket_ball_events
 FROM PUBLIC;
 
 GRANT SELECT, INSERT, UPDATE, DELETE ON TABLE
@@ -52,8 +62,29 @@ GRANT SELECT, INSERT, UPDATE, DELETE ON TABLE
     room_kickouts,
     room_themes,
     user_room_theme_inventory,
-    room_theme_reviews
+    room_theme_reviews,
+    cricket_tournaments,
+    cricket_matches,
+    cricket_ball_events
 TO funkey_room_control_runtime;
+
+-- Core/API compatibility facades may render room state but cannot mutate it.
+GRANT SELECT ON TABLE
+    rooms,
+    room_participants,
+    room_seat_states,
+    room_realtime_events,
+    room_member_requests,
+    room_seat_applications,
+    room_chat_messages,
+    room_kickouts,
+    room_themes,
+    user_room_theme_inventory,
+    room_theme_reviews,
+    cricket_tournaments,
+    cricket_matches,
+    cricket_ball_events
+TO funkey_room_control_reader;
 
 -- Presence is an ephemeral compatibility projection. Room Control may maintain
 -- its room lifecycle checkpoint, but it does not own the durable truth.
@@ -97,7 +128,10 @@ BEGIN
         'room_kickouts',
         'room_themes',
         'user_room_theme_inventory',
-        'room_theme_reviews'
+        'room_theme_reviews',
+        'cricket_tournaments',
+        'cricket_matches',
+        'cricket_ball_events'
     ]
     LOOP
         sequence_name := pg_get_serial_sequence(table_name, 'id');
@@ -125,4 +159,5 @@ $$;
 
 -- Deployment binding:
 --   GRANT funkey_room_control_runtime TO <production_room_control_login>;
+--   GRANT funkey_room_control_reader TO <production_core_api_login>;
 -- Keep the core API login out of funkey_room_control_runtime after cutover.
