@@ -1,120 +1,150 @@
 # FunKey production runbook
 
-This is the operational entry point for the production-backend branch. The authoritative implementation audit is [docs/FUNKEY_PRODUCTION_BACKEND_COMPLETION_REPORT.md](docs/FUNKEY_PRODUCTION_BACKEND_COMPLETION_REPORT.md); provider/account prerequisites remain in [docs/EXTERNAL_PREREQUISITES.md](docs/EXTERNAL_PREREQUISITES.md).
+This is the operational entry point for the current FunKey architecture through
+Chunk 32 and the post-audit repair pass. The machine authority registry is
+`contracts/architecture/authorities.yaml`; provider/account prerequisites remain
+in `docs/EXTERNAL_PREREQUISITES.md`.
 
 ## Runtime topology
 
-The production application is split into four independently scalable deployables:
+| Workload | Port | Responsibility |
+|---|---:|---|
+| Core FastAPI | 8000 | stable public compatibility/composite reads and remaining non-extracted domains |
+| Go realtime gateway | 8081 | single `funkey.v2` application WebSocket, routing, presence/replay |
+| Worker Platform | 8082 | specialized JetStream execution pools, retry/backpressure/DLQ |
+| Inbox Service | 8083 | Inbox durable authority |
+| Vibes Service | 8084 | Vibes/feed durable authority |
+| Room Control Service | 8085 | room/membership/seat/watch/activity authority |
+| Identity Service | 8086 | account/auth/session/device authority |
+| Profile/Social Service | 8087 | profile/social/family membership authority |
+| Economy Service | 8088 | exclusive Tier-0 financial writer |
+| Game Platform Service | 8089 | game lifecycle/risk/stats; no financial authority |
+| Notification Service | 8090 | notification/device/preference/delivery authority |
+| Notification provider worker | 8091 health | FCM provider delivery only |
+| `backend_media` | 4100 | mediasoup signaling/SFU transport |
 
-1. **FastAPI control/API plane** — port `8000`
-   - REST APIs and the compatibility WebSocket paths under `/api/v1`
-   - authentication, authorization, users, profiles, rooms, seats, inbox, economy, games and durable application state
-   - authoritative realtime subscription verification
-   - media-node registry, room assignment and drain controls
-   - PostgreSQL is authoritative; Redis is coordination/cache, never wallet or identity truth
+Economy bulk workers use the Economy image and isolated Economy credentials.
+They also run bounded read-only ledger/journal reconciliation. Media upload/
+processing work is handled by the media worker pool.
 
-2. **Go realtime gateway** — port `8081`
-   - authenticated WebSocket transport
-   - bounded outbound queues and per-pod/per-user connection budgets
-   - subscription authorization and periodic revalidation
-   - Redis cross-instance fanout, event-ID deduplication, reconnect/resync signaling and graceful drain
-   - no direct durable business writes
+## Authority invariants
 
-3. **Python worker** — health/metrics port `8082`
-   - transactional-outbox relay to NATS JetStream
-   - durable pull consumer, idempotent handling, bounded retry and dead-letter behavior
-   - graceful drain and health/readiness/metrics endpoints
+- PostgreSQL is durable business truth.
+- Extracted services are the only mutation owners for their domain tables.
+- Economy Service is the only financial writer; core may have Economy SELECT-only access.
+- Go realtime is transport/routing/presence/replay only.
+- Redis/Valkey is cache/ephemeral/projection only.
+- NATS JetStream carries operational async work from transactional outbox events.
+- `backend_media` owns WebRTC transport, never room authorization/business truth.
+- object storage/CDN owns bytes, not media/game business state.
+- Flutter caches are replaceable client state.
+- Alembic is the only production schema mutation path.
 
-4. **`backend_media` mediasoup media plane** — signaling port `4100`
-   - Socket.IO signaling and mediasoup transport
-   - node heartbeat/capacity registration, sticky assignment and graceful drain
-   - sensitive media actions re-authorized through FastAPI
+## Realtime authentication
 
-There is exactly one executable media implementation: `backend_media/`.
+The Go gateway validates short-lived signed realtime capabilities locally.
+Connect grants and room-specific subscribe grants are distinct. Durable commands
+are relayed to their owning authority. Do not restore periodic hot-path auth
+round trips or legacy FastAPI application WebSocket authorities.
 
 ## Required infrastructure
 
-Production needs PostgreSQL, a highly available Redis/Valkey primary, NATS JetStream, S3-compatible object storage/CDN, TURN, Kubernetes with separate application/realtime/media node-pool capacity, TLS/DNS, secret management/workload identity, and a metrics/logging platform. The repository provides provider-neutral Terraform contracts and Kubernetes/GitOps desired state; real cloud resources require the selected provider, account IDs, credentials, DNS zones and quotas.
+Production requires managed PostgreSQL with PgBouncer and direct migration DSN,
+three isolated Redis/Valkey roles, NATS JetStream, private object storage/CDN,
+TURN, Kubernetes, TLS/DNS, secret management/workload identity, registry,
+observability backends and tested backup/PITR. Provider-specific activation is
+tracked in `docs/EXTERNAL_PREREQUISITES.md`.
 
-## Database schema ownership
+## Database ownership
 
-**Alembic is the only schema mutation authority.** Runtime schema creation/patching is forbidden.
+Apply Alembic first, then the relevant ownership SQL for extracted domains.
+Core should receive reader roles only where a documented composite read still
+needs direct SQL.
 
-The GitOps migration job is an Argo CD `PreSync` hook. It must succeed before compatible workloads are promoted. Do not automatically downgrade a production schema during rollback; use expand/contract migrations and restore procedures.
-
-## Local development
-
-Use `infra/docker-compose.yml` for PostgreSQL, Redis and NATS, then run the application deployables independently. The convenience task runner is `scripts/task.ps1`.
-
-Typical checks:
-
-```powershell
-pwsh scripts/task.ps1 test
-pwsh scripts/task.ps1 lint
-pwsh scripts/task.ps1 integration-test
-pwsh scripts/task.ps1 load-test-smoke
-```
-
-The canonical media worker remains under `backend_media/`; removed legacy media servers must not be restored.
+For Economy, apply `deploy/postgres/economy-ownership.sql`; never grant
+`funkey_economy_runtime` to core or another service. Reconciliation mismatches
+must be investigated from ledger/transaction/journal evidence, not repaired by
+editing balances.
 
 ## Production boot order
 
-1. Managed PostgreSQL, Redis/Valkey, NATS JetStream, object storage/CDN and TURN are healthy.
-2. Kubernetes nodes, ingress/load balancers, DNS/TLS, secret injection and observability are healthy.
-3. Run the Alembic migration hook to the expected head.
-4. Start/roll FastAPI and confirm `/live`, `/ready` and `/metrics`.
-5. Start/roll workers and confirm JetStream connectivity, readiness and no unexpected dead-letter growth.
-6. Start/roll realtime gateway replicas and confirm Redis subscription health, authentication verification and WebSocket upgrade/reconnect.
-7. Start/roll media nodes, verify registry heartbeat, media discovery and TURN-only connectivity.
-8. Promote client traffic only after smoke, rollback and dashboard checks pass.
+1. Managed PostgreSQL/PgBouncer, Redis roles, NATS, object storage/CDN and TURN are healthy.
+2. Kubernetes nodes, ingress, DNS/TLS, secret injection and observability are healthy.
+3. Run the Alembic PreSync migration job to the expected head.
+4. Apply/verify domain ownership roles.
+5. Start Identity and Profile/Social.
+6. Start Economy and its bulk/reconciliation workers.
+7. Start Inbox, Vibes, Room Control, Game Platform and Notification/provider workers.
+8. Start core compatibility API and confirm owner dependencies/readers.
+9. Start Go realtime and verify capability key retrieval, Redis and room replay.
+10. Start general/specialized worker pools and verify JetStream consumers/DLQs.
+11. Start media nodes and verify registry heartbeat, assignment and TURN.
+12. Promote client traffic only after smoke, dashboards and rollback checks pass.
 
-## GitOps release path
+## Health and deployment checks
 
-Images are built, scanned, signed and published by `.github/workflows/publish-backend-images.yml`. Production desired state is digest-pinned. Use `.github/workflows/prepare-gitops-promotion.yml` with immutable `name@sha256:<digest>` references; it creates a reviewable environment promotion PR.
+Every service must pass `/live`, `/ready` and metrics checks appropriate to its
+runtime. A healthy core API does not imply Inbox/Economy/Room/Notification
+health; check the owning service for the failing capability.
 
-Staging Argo CD is configured for automated prune/self-heal. Production requires an explicit reviewed sync. The migration job runs before workload sync.
+Production images are immutable digest pins. Staging may auto prune/self-heal;
+production promotion requires reviewed GitOps sync. Do not auto-downgrade schema
+during application rollback.
 
-## Scaling and drain rules
+## Scaling and drain
 
-- API: HPA on CPU and inflight requests; DB pool sizes are bounded by the Terraform/Kubernetes connection budget.
-- Realtime: HPA on CPU and `funkey_realtime_connections`; each gateway enforces local and per-user connection ceilings.
-- Worker: KEDA scales from JetStream consumer lag with a safe fallback replica count.
-- Media: HPA contracts use CPU, peer and room metrics, but real SFU capacity must be measured with actual WebRTC/TURN traffic.
-- PDBs and topology spread protect API, realtime and media availability.
-- Realtime and media scale-in must drain first. Media nodes stop receiving new room assignments before termination.
+- Domain APIs scale within their isolated PostgreSQL connection budgets.
+- Go realtime scales on connection/in-flight pressure and drains before termination.
+- Worker pools scale independently by consumer lag and bounded concurrency.
+- Economy bulk-worker scale must remain inside its dedicated DB budget.
+- Media scale-in drains nodes before termination and assignment removal.
+- Notification provider workers scale delivery independently of the public API.
 
-## Observability and incident response
+## Economy incident checks
 
-API, gateway, worker and media expose Prometheus metrics and structured operational logs. Repository alert rules and the Grafana dashboard are under `deploy/observability/`. The environment must provide the Prometheus Operator/metrics adapter, Grafana discovery, log collection and paging routes.
+Monitor:
+- transaction error/idempotency conflicts
+- wallet/DB pool latency
+- outbox backlog
+- bulk job failures
+- `funkey_economy_reconciliation_wallet_mismatches`
+- `funkey_economy_reconciliation_unbalanced_journals`
 
-Use [docs/runbooks/README.md](docs/runbooks/README.md) for database, Redis, queue, realtime, media, TURN, deployment, migration, latency, capacity, region and security incidents.
+Any non-zero reconciliation mismatch is an incident. Do not dual-write from core
+as a workaround.
 
-## Load, soak and failure validation
+## Inbox incident checks
 
-`tests/load/` contains HTTP, WebSocket, media-discovery and reconnect-storm k6 scenarios. `tests/chaos/` contains staging-only pod termination/drain exercises. Large-scale capacity claims require a real staging environment with distributed load generators and real WebRTC clients; the repository deliberately does not claim an unmeasured concurrency number.
+Conversation lists are summary-only. Active message history is independently
+cursor-paged. If Inbox list latency grows, inspect conversation query plans and
+last-message summary query; do not reintroduce embedded full histories.
 
-## Required pre-deploy gates
+## Media v2
 
-The branch CI must pass:
+Upload sessions authorize direct object-store upload. Completion verifies object
+metadata before durable processing begins. Processing/moderation/cleanup occur
+through worker events. Never fix CDN access by making user media public-read.
 
-- architecture guard and backend tests/migration replay
+## CI / pre-deploy gates
+
+The branch must pass:
+- backend architecture/authority guards
+- fresh and legacy Alembic replay
+- backend regressions and PostgreSQL query plans
+- service contracts and generated clients
+- Go format/vet/test/race
 - media typecheck/build/lint/tests
-- Flutter tests/analyze/release web build
-- Go format/vet/unit/race tests
-- Terraform format/init/validate
-- local/staging/production/media/observability Kustomize renders
-- immutable production-image policy
+- Flutter tests/analyze/production web build
+- Terraform/Kustomize/Compose validation
+- container builds and vulnerability scan
+- secret/source scan and SBOM
 - load/chaos harness parse checks
-- container builds, secret scan, filesystem scan and SBOM generation
 
-After repository CI, staging must still verify real provider bindings, backup/restore, TURN, load/soak, failure drills, alert delivery and rollback before production traffic.
+Repository CI is not real-environment capacity proof. Staging still needs
+provider binding, restore drills, TURN tests, distributed load/soak, failure
+drills, alert delivery and rollback evidence.
 
-## Architecture invariants
+## Runbooks
 
-- FastAPI/PostgreSQL remain authoritative for identity, authorization, room membership, seats, messages, wallet/economy and other durable state.
-- Redis/Valkey provides ephemeral fanout, leases, presence/routing coordination and caching.
-- NATS JetStream carries durable asynchronous work from the PostgreSQL transactional outbox.
-- The Go gateway transports authorized realtime events; it does not become a second business-state authority.
-- `backend_media` owns media transport, not application authorization.
-- Alembic owns schema evolution.
-- Production images are immutable digest pins.
+Use `docs/runbooks/README.md` plus domain-specific runbooks, especially Economy,
+Inbox, Room Control, Notification, Worker Platform, Media v2 and realtime.
