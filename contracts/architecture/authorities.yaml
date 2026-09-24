@@ -331,21 +331,25 @@
       "current_deployable": "room-control-service",
       "current_storage": [
         "postgres:room_realtime_events where event_type=room_activity.state.*; latest event is current canonical state",
-        "postgres:room_chat_messages"
+        "postgres:room_chat_messages",
+        "postgres:cricket_tournaments",
+        "postgres:cricket_matches",
+        "postgres:cricket_ball_events"
       ],
       "target_storage": [
         "room-control current-state model + audit/replay log"
       ],
       "mutated_by": [
-        "room_activity_service"
+        "room_activity_service",
+        "Room Control Cricket service"
       ],
       "source_states": [],
       "rebuild_from": [],
       "change_contract": {
         "status": "live",
-        "name": "room_activity.state.*"
+        "name": "room_activity.state.* + room_cricket.*"
       },
-      "migration_status": "Chunk 26 extracted to Room Control service"
+      "migration_status": "Chunk 26 authority; post-Chunk-32 repair moved durable Cricket state under Room Control with serialized ball events"
     },
     {
       "id": "presence.online_lease",
