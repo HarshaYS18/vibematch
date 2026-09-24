@@ -811,7 +811,7 @@ def settle_lucky_gift(
         db,
         payout_amount=reward,
     )
-    lucky_gift_house_service.record_payout(
+    payout_movements = lucky_gift_house_service.record_payout(
         db,
         amount=reward,
         actor=sender,
@@ -823,6 +823,16 @@ def settle_lucky_gift(
             "tier": lucky_result.get("tier"),
         },
     )
+    for movement in payout_movements.get("movements", []):
+        economy_transaction_service.record_balanced_transfer(
+            db,
+            tx=tx,
+            currency=EconomyCurrency.COIN.value,
+            amount=int(movement["amount"]),
+            debit_account="GAME_POOL:" + str(movement["pool_id"]) + ":COIN",
+            credit_account="SYSTEM_CLEARING:LUCKY_GIFT_PAYOUT:COIN",
+            source_type=str(movement["source_type"]),
+        )
     if reward > 0:
         sender_wallet = economy_transaction_service.credit(
             db,
