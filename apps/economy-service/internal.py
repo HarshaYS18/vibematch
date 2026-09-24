@@ -1123,6 +1123,26 @@ def adjust_lucky_gift_pool_admin(
         reason=payload.reason,
         commit=False,
     )
+    if payload.direction == EconomyDirection.CREDIT.value:
+        economy_transaction_service.record_balanced_transfer(
+            db,
+            tx=tx,
+            currency=EconomyCurrency.COIN.value,
+            amount=payload.amount,
+            debit_account="SYSTEM_POOL_ADJUSTMENT:COIN",
+            credit_account="GAME_POOL:" + str(pool.id) + ":COIN",
+            source_type="SUPER_OWNER_LUCKY_POOL_ADJUSTMENT",
+        )
+    else:
+        economy_transaction_service.record_balanced_transfer(
+            db,
+            tx=tx,
+            currency=EconomyCurrency.COIN.value,
+            amount=payload.amount,
+            debit_account="GAME_POOL:" + str(pool.id) + ":COIN",
+            credit_account="SYSTEM_POOL_ADJUSTMENT:COIN",
+            source_type="SUPER_OWNER_LUCKY_POOL_ADJUSTMENT",
+        )
     result = {"transaction_id": tx.transaction_id, **lucky_gift_house_service.pool_response(pool)}
     return economy_transaction_service.complete(
         db,
@@ -1163,6 +1183,15 @@ def allocate_lucky_gift_pool_admin(
         reason=payload.reason,
         commit=False,
     )
+    economy_transaction_service.record_balanced_transfer(
+        db,
+        tx=tx,
+        currency=EconomyCurrency.COIN.value,
+        amount=payload.amount,
+        debit_account="GAME_POOL:" + str(pair["main_pool"]["id"]) + ":COIN",
+        credit_account="GAME_POOL:" + str(pair["lucky_pool"]["id"]) + ":COIN",
+        source_type="LUCKY_POOL_ALLOCATE_TO_GAME",
+    )
     result = {"transaction_id": tx.transaction_id, **pair}
     return economy_transaction_service.complete(
         db,
@@ -1200,6 +1229,15 @@ def withdraw_lucky_gift_pool_admin(
         amount=payload.amount,
         reason=payload.reason,
         commit=False,
+    )
+    economy_transaction_service.record_balanced_transfer(
+        db,
+        tx=tx,
+        currency=EconomyCurrency.COIN.value,
+        amount=payload.amount,
+        debit_account="GAME_POOL:" + str(pair["lucky_pool"]["id"]) + ":COIN",
+        credit_account="GAME_POOL:" + str(pair["main_pool"]["id"]) + ":COIN",
+        source_type="LUCKY_POOL_WITHDRAW_TO_MAIN",
     )
     result = {"transaction_id": tx.transaction_id, **pair}
     return economy_transaction_service.complete(
