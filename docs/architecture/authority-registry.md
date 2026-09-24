@@ -27,8 +27,8 @@ See [state-classification.md](state-classification.md) for AUTHORITY, PROJECTION
 | Online presence/routing | Realtime | compatibility paths + Go gateway | Target presence is Redis/Valkey lease state; membership remains Room Control. |
 | Inbox | Inbox | core-api + compatibility WS | Messages are durable; typing is ephemeral. |
 | Vibes | Vibes | core-api | Feed/index/ranking copies are projections. |
-| Wallet/ledgers/gift/game settlement/mission rewards | Economy | core-api | No other domain independently mutates financial truth. |
-| Game catalog/round lifecycle | Game Platform | core-api + CDN bridge | Final value settlement is an Economy command. |
+| Wallet/ledgers/gift/game settlement/mission rewards | Economy | economy-service + compatibility facades | No other domain independently mutates financial truth. |
+| Game catalog/round lifecycle | Game Platform | game-platform-service + CDN bridge | Final value settlement is an Economy command. |
 | Notifications | Notification | core-api/worker | FCM is delivery transport only. |
 | Media metadata/objects | Media Control | core-api + storage | mediasoup owns transport lifecycle only. |
 | Search | Search Projection | direct DB search today | OpenSearch is projection only. |
@@ -60,4 +60,4 @@ The registry itself has no runtime telemetry; CI conformance is its signal. Runt
 
 ## Known gaps
 
-Dedicated durable session/device tables are not yet present; presence remains transitional; OpenSearch/Kafka/ClickHouse/Recommendation are explicitly not deployed; naming a logical owner does not mean physical service extraction is complete.
+Identity and Game Platform durable session registries are live; presence remains transitional; OpenSearch/Kafka/ClickHouse/Recommendation are explicitly not deployed; naming a logical owner does not mean physical service extraction is complete.

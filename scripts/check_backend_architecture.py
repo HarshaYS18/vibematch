@@ -77,6 +77,9 @@ PROFILE_SOCIAL_SERVICE_ROOT = ROOT / "apps" / "profile-social-service"
 IDENTITY_OWNERSHIP_SQL = ROOT / "deploy" / "postgres" / "identity-ownership.sql"
 PROFILE_SOCIAL_OWNERSHIP_SQL = ROOT / "deploy" / "postgres" / "profile-social-ownership.sql"
 IDENTITY_PROFILE_SOCIAL_MIGRATION = ROOT / "backend" / "alembic" / "versions" / "20260924_0300_identity_profile_social_boundaries.py"
+GAME_PLATFORM_SERVICE_ROOT = ROOT / "apps" / "game-platform-service"
+GAME_PLATFORM_OWNERSHIP_SQL = ROOT / "deploy" / "postgres" / "game-platform-ownership.sql"
+GAME_PLATFORM_RUNTIME_MIGRATION = ROOT / "backend" / "alembic" / "versions" / "20260924_0800_game_platform_runtime.py"
 ALLOWED_STATE_CLASSES = {"AUTHORITY", "PROJECTION", "CACHE", "EPHEMERAL"}
 REQUIRED_AUTHORITY_STATE_IDS = {
     "identity.accounts", "identity.sessions", "profiles.public", "rooms.definition",
@@ -1013,6 +1016,98 @@ def _has_tracked_content(path: Path) -> bool:
     return path.exists() and any(item.is_file() for item in path.rglob("*"))
 
 
+def _validate_game_platform_extraction(errors: list[str]) -> None:
+    required = (
+        GAME_PLATFORM_SERVICE_ROOT / "main.py",
+        GAME_PLATFORM_SERVICE_ROOT / "database.py",
+        GAME_PLATFORM_SERVICE_ROOT / "Dockerfile",
+        GAME_PLATFORM_OWNERSHIP_SQL,
+        GAME_PLATFORM_RUNTIME_MIGRATION,
+        ROOT / "backend" / "app" / "api" / "routes" / "game_platform_proxy.py",
+        ROOT / "backend" / "app" / "services" / "game_platform_runtime_service.py",
+    )
+    for path in required:
+        if not path.exists():
+            errors.append(
+                "Chunk 28 Game Platform path is missing: "
+                + str(path.relative_to(ROOT))
+            )
+
+    router_path = ROOT / "backend" / "app" / "api" / "router.py"
+    if router_path.exists():
+        text = router_path.read_text(encoding="utf-8")
+        for token in ("game_platform_proxy.router", "game_platform_proxy.admin_router"):
+            if token not in text:
+                errors.append("Chunk 28 Game Platform compatibility proxy missing: " + token)
+        for forbidden in ("games.router", "games_master.router", "games.admin_router"):
+            if re.search(rf"(?<![A-Za-z0-9_]){re.escape(forbidden)}\\b", text):
+                errors.append("core API must not mount Game Platform authority directly: " + forbidden)
+        if (
+            "game_settlements.router" not in text
+            or text.index("game_settlements.router") > text.index("game_platform_proxy.router")
+        ):
+            errors.append("Economy-backed /games financial facade must precede Game Platform catch-all")
+        if (
+            "game_props_admin.router" not in text
+            or text.index("game_props_admin.router") > text.index("game_platform_proxy.admin_router")
+        ):
+            errors.append("game props authority facade must precede Game Platform admin catch-all")
+
+    legacy_finance = ROOT / "backend" / "app" / "api" / "routes" / "game_settlements.py"
+    if legacy_finance.exists():
+        text = legacy_finance.read_text(encoding="utf-8")
+        for required_token in (
+            "economy_service_client.game_wager",
+            "economy_service_client.game_settle",
+            'Header(default=None, alias="Idempotency-Key")',
+        ):
+            if required_token not in text:
+                errors.append("legacy game financial facade must delegate to Economy: " + required_token)
+        if "game_settlement_service" in text:
+            errors.append("core legacy game facade must not use direct game_settlement_service")
+
+    runtime = ROOT / "backend" / "app" / "services" / "game_platform_runtime_service.py"
+    if runtime.exists():
+        text = runtime.read_text(encoding="utf-8")
+        for required_token in (
+            "economy_service_client.game_wager",
+            "economy_service_client.game_settle",
+            "game.session.opened.v1",
+            "game.bet.accepted.v1",
+            "game.round.settled.v1",
+        ):
+            if required_token not in text:
+                errors.append("Game Platform runtime boundary missing: " + required_token)
+        for forbidden in ("UserWallet", "WalletLedger", "game_pool_service"):
+            if forbidden in text:
+                errors.append("Game Platform must not mutate Economy authority: " + forbidden)
+
+    if GAME_PLATFORM_OWNERSHIP_SQL.exists():
+        sql = GAME_PLATFORM_OWNERSHIP_SQL.read_text(encoding="utf-8")
+        for table in (
+            "game_definitions",
+            "game_sessions",
+            "game_rounds",
+            "game_round_players",
+            "game_bets",
+            "game_risk_audits",
+            "user_game_stats",
+        ):
+            if f"ALTER TABLE {table} OWNER TO funkey_game_platform_owner" not in sql:
+                errors.append("Game Platform ownership missing table: " + table)
+        for forbidden in ("ALTER TABLE user_wallets", "ALTER TABLE wallet_ledger", "ALTER TABLE game_pools", "ALTER TABLE game_pool_ledger"):
+            if forbidden in sql:
+                errors.append("Game Platform ownership must exclude financial table: " + forbidden)
+
+    if AUTHORITY_REGISTRY.exists():
+        payload = json.loads(AUTHORITY_REGISTRY.read_text(encoding="utf-8"))
+        states = {str(item.get("id")): item for item in payload.get("states", [])}
+        if states.get("games.catalog_rounds", {}).get("current_deployable") != "game-platform-service":
+            errors.append("games.catalog_rounds: Chunk 28 deployable must be game-platform-service")
+        if states.get("games.financial_settlement", {}).get("current_deployable") != "economy-service":
+            errors.append("games.financial_settlement: current deployable must be economy-service")
+
+
 def main() -> int:
     errors: list[str] = []
     _validate_authority_registry(errors)
@@ -1023,6 +1118,7 @@ def main() -> int:
     _validate_vibes_service_extraction(errors)
     _validate_room_control_extraction(errors)
     _validate_identity_profile_social_extraction(errors)
+    _validate_game_platform_extraction(errors)
 
     for path in REQUIRED_PATHS:
         if not path.exists():
@@ -1124,6 +1220,7 @@ def main() -> int:
     print(" - Vibes authority is isolated with bounded cursor feeds and async fanout")
     print(" - Room Control owns durable room state behind a core compatibility proxy")
     print(" - Identity and Profile/Social mutation authorities are physically extracted")
+    print(" - Game Platform owns game lifecycle while Economy owns all game value movement")
     return 0
 
 

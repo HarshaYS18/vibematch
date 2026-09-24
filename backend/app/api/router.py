@@ -9,8 +9,8 @@ from fastapi import APIRouter
 from app.api.routes import (
     admin_support, ai_moderation, app_source_registry, calls,
     control_center, economy, economy_admin, economy_master, economy_proxy,
-    experience, families_economy, game_props_admin,
-    game_settlements, games, games_master, health, home_banners,
+    experience, families_economy, game_platform_proxy, game_props_admin,
+    game_settlements, health, home_banners,
     identity_proxy, inbox_proxy, inbox_stories,
     lucky_gift_admin, media, media_control, media_realtime_auth, media_safety_admin,
     notifications, presence, profile_social_proxy, push, rankings,
@@ -64,11 +64,19 @@ api_router.include_router(media.router)
 api_router.include_router(room_music_media.router)
 
 # Economy financial route families are extracted behind a compatibility proxy.
-# Core keeps /wallets and /economy as read/orchestration facades.
+# Core keeps /wallets and /economy as read/orchestration facades. The concrete
+# legacy /games financial facade is registered before the Game Platform
+# catch-all and delegates every value mutation to Economy.
 api_router.include_router(economy_proxy.router)
+api_router.include_router(game_settlements.router)
+
+# Game catalog, sessions, rounds, risk state, stats and rankings are owned by
+# the separately deployed Game Platform service. Public URLs remain stable.
+api_router.include_router(game_platform_proxy.router)
+
 for router in (
-    wallet.router, economy.router, economy_master.router, games.router, games_master.router,
-    game_settlements.router, store_router, experience.router,
+    wallet.router, economy.router, economy_master.router,
+    store_router, experience.router,
 ):
     api_router.include_router(router)
 
@@ -77,8 +85,13 @@ for router in (
     admin_support.router, ai_moderation.router,
     media_safety_admin.router, vip_admin.router, super_owner.router,
     control_center.router, game_props_admin.router,
-    economy_admin.router, games.admin_router,
+    economy_admin.router,
     room_control_proxy.admin_router, lucky_gift_admin.router,
     home_banners.admin_router, vibes_proxy.admin_router,
 ):
     api_router.include_router(router)
+
+# Register the Game Platform admin catch-all after concrete /admin/games/props
+# and Economy-owned /admin/games/pools routes so domain boundaries cannot be
+# shadowed by the compatibility proxy.
+api_router.include_router(game_platform_proxy.admin_router)

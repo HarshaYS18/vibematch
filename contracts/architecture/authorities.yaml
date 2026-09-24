@@ -608,52 +608,53 @@
       "domain": "games",
       "classification": "AUTHORITY",
       "logical_owner": "game-platform",
-      "current_deployable": "core-api + CDN game bridge",
+      "current_deployable": "game-platform-service",
       "current_storage": [
         "postgres:game_definitions",
+        "postgres:game_sessions",
         "postgres:game_rounds",
         "postgres:game_round_players",
         "postgres:game_bets",
         "postgres:game_risk_audits"
       ],
       "target_storage": [
-        "game-platform postgres"
+        "game-platform-service PostgreSQL authority"
       ],
       "mutated_by": [
-        "game services"
+        "game-platform services"
       ],
       "source_states": [],
       "rebuild_from": [],
       "change_contract": {
-        "status": "planned",
+        "status": "service boundary live",
         "name": "game.round.changed.v1"
       },
-      "migration_status": "Chunk 28"
+      "migration_status": "Chunk 28 extracted behind the core /api/v1/games compatibility proxy; CDN HTML delivery remains client-side"
     },
     {
       "id": "games.financial_settlement",
       "domain": "games",
       "classification": "AUTHORITY",
       "logical_owner": "economy",
-      "current_deployable": "core-api",
+      "current_deployable": "economy-service",
       "current_storage": [
         "postgres:game_pools",
         "postgres:game_pool_ledger",
         "postgres:wallet_ledger"
       ],
       "target_storage": [
-        "economy-service postgres invoked by Game Platform"
+        "economy-service PostgreSQL authority"
       ],
       "mutated_by": [
-        "economy/game settlement services"
+        "economy-service game financial commands"
       ],
       "source_states": [],
       "rebuild_from": [],
       "change_contract": {
-        "status": "planned",
+        "status": "service boundary live",
         "name": "economy.game_settled.v1"
       },
-      "migration_status": "Economy-owned despite co-location"
+      "migration_status": "Chunk 28 Game Platform and legacy core facades delegate wager debit and final settlement to Economy"
     },
     {
       "id": "missions.progress",

@@ -54,3 +54,12 @@ Hot route query ceilings live in `backend/app/core/query_budget.py` and are emit
 After Alembic reaches the current head, run `deploy/postgres/room-control-ownership.sql` with the provider/admin or migration role. It creates the NOLOGIN `funkey_room_control_owner` and `funkey_room_control_runtime` roles and transfers durable Room Control tables to the service owner.
 
 Provision the production Room Control LOGIN externally, grant it membership in `funkey_room_control_runtime`, and store its PgBouncer URL as `ROOM_CONTROL_DATABASE_URL` in `funkey-room-control-secrets`. The runtime has DML only for room-owned tables, bounded compatibility writes for `user_room_presence`, bounded read-only access to identity/profile/economy context, and insert-only access to `event_outbox`. Do not grant the Room Control runtime role to the core API login.
+
+
+## Game Platform service role boundary
+
+After Alembic reaches the Chunk 28 head, run `deploy/postgres/game-platform-ownership.sql` with the provider/admin or migration role. It creates NOLOGIN owner/runtime/reader roles and transfers game catalog, durable game sessions, rounds, bets, risk audits and game-stat authority to Game Platform.
+
+Provision the production Game Platform LOGIN externally, grant it membership in `funkey_game_platform_runtime`, and store its PgBouncer URL as `GAME_PLATFORM_DATABASE_URL` in `funkey-game-platform-secrets`. After compatibility-proxy cutover, core should receive only the reader role for game-domain tables.
+
+Do **not** grant Game Platform mutation rights to `user_wallets`, `wallet_ledger`, `game_pools` or `game_pool_ledger`. Wager debit, house accounting and final winnings remain Economy commands.
