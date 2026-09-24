@@ -817,38 +817,12 @@ def _prepare_join(
     return joined, was_active
 
 
-@router.post("/{room_public_id}/heartbeat", response_model=RoomHeartbeatResponse)
-def heartbeat_live_room(
-    room_public_id: str,
-    db: Session = Depends(get_db),
-    current_user: User = Depends(get_current_user),
-):
-    """Deprecated compatibility heartbeat; live presence is the socket lease."""
-    room = get_room_by_public_id(db, room_public_id)
-    if room is None:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail="Room not found or not accessible",
-        )
-    room_permission_service.require_room_view(db, room, current_user)
-    participant = (
-        db.query(RoomParticipant.id)
-        .filter(
-            RoomParticipant.room_id == room.id,
-            RoomParticipant.user_id == current_user.id,
-            RoomParticipant.is_active.is_(True),
-        )
-        .first()
-    )
-    if participant is None:
-        raise HTTPException(
-            status_code=status.HTTP_409_CONFLICT,
-            detail="Room session is not active",
-        )
-    return RoomHeartbeatResponse(
-        room_id=room.room_public_id,
-        state_version=int(room.realtime_version or 0),
-        event_sequence=int(room.realtime_event_sequence or 0),
+@router.post("/{room_public_id}/heartbeat", deprecated=True)
+def heartbeat_live_room(room_public_id: str):
+    """Retired compatibility endpoint; socket leases own room liveness."""
+    raise HTTPException(
+        status_code=status.HTTP_410_GONE,
+        detail="Room REST heartbeat retired; realtime socket lease owns liveness",
     )
 
 
