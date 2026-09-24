@@ -93,6 +93,9 @@ class EconomyBulkWorkerDeploymentTests(unittest.TestCase):
             'ECONOMY_BULK_WORKER_DB_POOL_SIZE: "2"',
             'ECONOMY_BULK_WORKER_MAX_REPLICAS: "4"',
             'DB_ECONOMY_BULK_WORKER_CONNECTION_BUDGET: "8"',
+            'ECONOMY_RECONCILIATION_INTERVAL_SECONDS: "60"',
+            'ECONOMY_RECONCILIATION_POOL_BATCH_SIZE: "500"',
+            'ECONOMY_LUCKY_PACKET_FINALIZE_BATCH_SIZE: "50"',
         ):
             self.assertIn(token, source)
 
