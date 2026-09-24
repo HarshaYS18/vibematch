@@ -17,7 +17,7 @@ class CallMediaPermissionsTests(TestCase):
         participant = SimpleNamespace(status=CallParticipantStatus.JOINED if joined else CallParticipantStatus.INVITED)
         db = MagicMock()
         db.query.return_value.filter.return_value.first.side_effect = [call, participant]
-        with patch.object(auth, "_room_lookup", return_value=None), patch.object(auth.ban_service, "is_device_banned", return_value=False), patch.object(auth.role_service, "get_user_roles", return_value=[RoleName.USER]), patch.object(auth.role_service, "get_primary_role", return_value=RoleName.USER):
+        with patch.object(auth.ban_service, "is_device_banned", return_value=False), patch.object(auth.role_service, "get_user_roles", return_value=[RoleName.USER]), patch.object(auth.role_service, "get_primary_role", return_value=RoleName.USER):
             return auth.verify_media_realtime_request(db=db, user=user, room_public_id="call_room_test", requested_action=action)
 
     def test_only_joined_active_call_participants_get_media(self):

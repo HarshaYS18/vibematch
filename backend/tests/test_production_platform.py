@@ -183,7 +183,11 @@ class GatewayAuthTests(TestCase):
         user = SimpleNamespace(id=7)
         with patch.object(realtime_gateway_auth, "decode_access_token", return_value={"device_id": "device"}), \
              patch.object(realtime_gateway_auth, "is_device_banned", return_value=False), \
-             patch.object(realtime_gateway_auth, "evaluate_media_room_permission", return_value=SimpleNamespace(allowed=False, reason="kicked")):
+             patch.object(
+                 realtime_gateway_auth.room_control_service_client,
+                 "authorize_room_action",
+                 return_value={"allowed": False, "reason": "kicked", "permissions": []},
+             ):
             with self.assertRaises(HTTPException) as raised:
                 realtime_gateway_auth.verify_realtime_gateway(
                     realtime_gateway_auth.RealtimeVerifyRequest(requested_action="subscribe", room_public_id="VM123"),
