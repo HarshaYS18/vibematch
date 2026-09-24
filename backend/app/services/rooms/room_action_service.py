@@ -322,7 +322,6 @@ def reconcile_authenticated_room_presence(
     participant.is_active = True
     participant.last_seen_at = now
     participant.left_at = None
-    user.last_seen_at = now
     mark_user_room_presence_active(db, room, user)
     db.flush()
 

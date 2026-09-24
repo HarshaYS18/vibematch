@@ -1,6 +1,6 @@
 # FunKey Kubernetes deployment
 
-`base/` deploys the Python control plane, extracted Python Inbox service, Go realtime gateway, and Python JetStream worker. `overlays/local`, `overlays/staging`, and `overlays/production` set environment configuration. `media/` is an opt-in deployment for the canonical `backend_media/` implementation; it must only be applied after the node networking and drain prerequisites below are verified. `jobs/migrate.yaml` is a release gate, not a continuously reconciled Job.
+`base/` deploys the Python control plane, extracted Python Inbox, Vibes, and Room Control services, Go realtime gateway, and Python JetStream worker. `overlays/local`, `overlays/staging`, and `overlays/production` set environment configuration. `media/` is an opt-in deployment for the canonical `backend_media/` implementation; it must only be applied after the node networking and drain prerequisites below are verified. `jobs/migrate.yaml` is a release gate, not a continuously reconciled Job.
 
 ## Required bindings before staging or production
 
@@ -24,9 +24,16 @@ The included base ingress sends HTTP and WebSocket traffic to distinct services 
 
 ## Connection budget
 
-Use the Terraform preflight contract to enforce `api_max_pods × api_pool_per_pod + inbox_max_pods × inbox_pool_per_pod + worker_max_pods × worker_pool_per_pod + reserved_connections <= database_max_connections`. Reserve migrations, admin, monitoring, and failover capacity. Match actual Python pool settings and HPA maxima before deployment; PgBouncer or a managed pooler is recommended at scale.
+Use the Terraform preflight contract to enforce `api_max_pods × api_pool_per_pod + inbox_max_pods × inbox_pool_per_pod + vibes_max_pods × vibes_pool_per_pod + room_control_max_pods × room_control_pool_per_pod + worker_max_pods × worker_pool_per_pod + reserved_connections <= database_max_connections`. Reserve migrations, admin, monitoring, and failover capacity. Match actual Python pool settings and HPA maxima before deployment; PgBouncer or a managed pooler is recommended at scale.
 
 
 ## Chunk 24 Vibes service
 
 `funkey-vibes` is independently deployable on port 8084. Production ingress routes Vibes public/moderation paths directly to it while the core API keeps a rollback proxy. Bind `funkey-vibes-secrets` externally with the service-local database login, JWT validation secret, and `VIBES_INTERNAL_TOKEN`.
+
+
+## Chunk 26 Room Control service
+
+`funkey-room-control` is independently deployable on port 8085 with a 3-pod HA floor and a max of 20 replicas. It is cluster-internal in Chunk 26: the public API continues through the core compatibility proxy because paid room-theme purchase and contribution ranking are cross-domain orchestration/projection routes that remain in core.
+
+Bind `funkey-room-control-secrets` externally with `ROOM_CONTROL_DATABASE_URL`, the strong shared `ROOM_CONTROL_INTERNAL_TOKEN`, JWT verification material required by the current identity contract, and any service-specific secrets. The same internal token is required by core for authenticated internal quote/grant/room-resolution calls. Do not put it in a ConfigMap.

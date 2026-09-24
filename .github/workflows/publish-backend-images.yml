@@ -25,6 +25,15 @@ jobs:
           - name: api
             dockerfile: backend/Dockerfile
             context: .
+          - name: inbox
+            dockerfile: apps/inbox-service/Dockerfile
+            context: .
+          - name: vibes
+            dockerfile: apps/vibes-service/Dockerfile
+            context: .
+          - name: room-control
+            dockerfile: apps/room-control-service/Dockerfile
+            context: .
           - name: worker
             dockerfile: apps/worker/Dockerfile
             context: .

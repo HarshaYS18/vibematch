@@ -7,8 +7,24 @@ import argparse
 import re
 from pathlib import Path
 
-_IMAGE_KEYS = ("api", "worker", "realtime", "media")
-_IMAGE_NAMES = {key: f"funkey-{key}" for key in _IMAGE_KEYS}
+_IMAGE_KEYS = (
+    "api",
+    "inbox",
+    "vibes",
+    "room_control",
+    "worker",
+    "realtime",
+    "media",
+)
+_IMAGE_NAMES = {
+    "api": "funkey-api",
+    "inbox": "funkey-inbox",
+    "vibes": "funkey-vibes",
+    "room_control": "funkey-room-control",
+    "worker": "funkey-worker",
+    "realtime": "funkey-realtime",
+    "media": "funkey-media",
+}
 _REF_RE = re.compile(r"^(?P<name>[^\s@]+)@(?P<digest>sha256:[0-9a-fA-F]{64})$")
 
 
@@ -49,7 +65,7 @@ def main() -> None:
     parser = argparse.ArgumentParser()
     parser.add_argument("--environment", choices=("staging", "production"), required=True)
     for key in _IMAGE_KEYS:
-        parser.add_argument(f"--{key}", required=True)
+        parser.add_argument(f"--{key.replace('_', '-')}", dest=key, required=True)
     args = parser.parse_args()
     root = Path(__file__).resolve().parents[1]
     path = root / "deploy" / "kubernetes" / "overlays" / args.environment / "kustomization.yaml"

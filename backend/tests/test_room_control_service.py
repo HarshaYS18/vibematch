@@ -1,0 +1,185 @@
+from __future__ import annotations
+
+import json
+from pathlib import Path
+from unittest import TestCase
+
+from sqlalchemy import create_engine
+from sqlalchemy.orm import sessionmaker
+from sqlalchemy.pool import StaticPool
+
+import app.models  # register relationship targets
+from app.api.routes.room_cross_domain import _debit_theme_once
+from app.database import Base
+from app.models.economy import UserWallet, WalletLedger
+from app.models.user import User
+
+
+ROOT = Path(__file__).resolve().parents[2]
+
+
+class RoomControlServiceContractTests(TestCase):
+    def test_core_mounts_proxy_and_not_room_authority(self):
+        router = (ROOT / "backend" / "app" / "api" / "router.py").read_text(
+            encoding="utf-8"
+        )
+        self.assertIn("room_control_proxy.router", router)
+        self.assertIn("room_control_proxy.admin_router", router)
+        self.assertIn("room_cross_domain.router", router)
+        self.assertNotIn("rooms.router", router)
+        self.assertNotIn("rooms.admin_router", router)
+        self.assertNotIn("room_realtime_commands.router", router)
+
+    def test_room_command_background_transactions_use_room_session(self):
+        commands = (
+            ROOT / "backend" / "app" / "api" / "routes" /
+            "room_realtime_commands.py"
+        ).read_text(encoding="utf-8")
+        rooms = (
+            ROOT / "backend" / "app" / "api" / "routes" /
+            "rooms" / "rooms.py"
+        ).read_text(encoding="utf-8")
+        self.assertNotIn("SessionLocal", commands)
+        self.assertIn("with room_session() as db:", commands)
+        self.assertIn("with room_session() as snapshot_db:", rooms)
+
+    def test_room_theme_service_has_no_economy_write_authority(self):
+        source = (
+            ROOT / "backend" / "app" / "services" / "rooms" /
+            "room_theme_service.py"
+        ).read_text(encoding="utf-8")
+        for forbidden in (
+            "UserWallet",
+            "WalletLedger",
+            "EconomyCurrency",
+            "EconomyDirection",
+        ):
+            self.assertNotIn(forbidden, source)
+        self.assertIn("room_theme_purchase_quote", source)
+        self.assertIn("grant_room_theme_inventory", source)
+
+    def test_theme_debit_is_idempotent_under_wallet_lock(self):
+        engine = create_engine(
+            "sqlite://",
+            connect_args={"check_same_thread": False},
+            poolclass=StaticPool,
+        )
+        Base.metadata.create_all(
+            engine,
+            tables=[
+                User.__table__,
+                UserWallet.__table__,
+                WalletLedger.__table__,
+            ],
+        )
+        factory = sessionmaker(bind=engine)
+        with factory.begin() as db:
+            db.add(
+                User(
+                    id=1,
+                    public_user_id=6418000000001,
+                    username="buyer",
+                )
+            )
+            db.add(
+                UserWallet(
+                    user_id=1,
+                    coin_balance=1000,
+                    lifetime_coins_spent=0,
+                )
+            )
+
+        with factory() as db:
+            user = db.get(User, 1)
+            _debit_theme_once(
+                db,
+                user=user,
+                theme_id="royal_stage",
+                theme_name="Royal Stage",
+                price=250,
+            )
+            _debit_theme_once(
+                db,
+                user=user,
+                theme_id="royal_stage",
+                theme_name="Royal Stage",
+                price=250,
+            )
+            wallet = db.query(UserWallet).filter(UserWallet.user_id == 1).one()
+            ledgers = (
+                db.query(WalletLedger)
+                .filter(
+                    WalletLedger.user_id == 1,
+                    WalletLedger.source_type == "ROOM_THEME_PURCHASE",
+                    WalletLedger.source_id == "royal_stage",
+                )
+                .all()
+            )
+            self.assertEqual(750, wallet.coin_balance)
+            self.assertEqual(250, wallet.lifetime_coins_spent)
+            self.assertEqual(1, len(ledgers))
+        engine.dispose()
+
+    def test_room_owned_tables_have_isolated_runtime_role(self):
+        sql = (
+            ROOT / "deploy" / "postgres" / "room-control-ownership.sql"
+        ).read_text(encoding="utf-8")
+        for table in (
+            "rooms",
+            "room_participants",
+            "room_seat_states",
+            "room_realtime_events",
+            "room_member_requests",
+            "room_seat_applications",
+            "room_chat_messages",
+            "room_kickouts",
+            "room_themes",
+            "user_room_theme_inventory",
+            "room_theme_reviews",
+        ):
+            self.assertIn(
+                f"ALTER TABLE {table} OWNER TO funkey_room_control_owner",
+                sql,
+            )
+        self.assertIn(
+            "GRANT SELECT, INSERT, UPDATE ON TABLE user_room_presence",
+            sql,
+        )
+        self.assertIn("GRANT INSERT ON TABLE event_outbox", sql)
+
+    def test_all_room_authorities_point_to_room_control(self):
+        payload = json.loads(
+            (
+                ROOT / "contracts" / "architecture" / "authorities.yaml"
+            ).read_text(encoding="utf-8")
+        )
+        room_states = [
+            state for state in payload["states"]
+            if str(state.get("id") or "").startswith("rooms.")
+        ]
+        self.assertGreaterEqual(len(room_states), 6)
+        for state in room_states:
+            with self.subTest(state=state["id"]):
+                self.assertEqual(
+                    "room-control-service",
+                    state["current_deployable"],
+                )
+
+    def test_room_control_deployment_is_present_and_bounded(self):
+        manifest = (
+            ROOT / "deploy" / "kubernetes" / "base" / "room-control.yaml"
+        ).read_text(encoding="utf-8")
+        self.assertIn("name: funkey-room-control", manifest)
+        self.assertIn("containerPort: 8085", manifest)
+        self.assertIn("funkey-room-control-secrets", manifest)
+        self.assertIn("readOnlyRootFilesystem: true", manifest)
+        autoscaling = (
+            ROOT / "deploy" / "kubernetes" / "base" / "autoscaling.yaml"
+        ).read_text(encoding="utf-8")
+        self.assertIn("name: funkey-room-control", autoscaling)
+        self.assertIn("maxReplicas: 20", autoscaling)
+
+
+if __name__ == "__main__":
+    import unittest
+    unittest.main()

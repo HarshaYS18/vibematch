@@ -8,7 +8,7 @@ from starlette.concurrency import run_in_threadpool
 
 from app.api.routes.room_realtime_commands import client_room_snapshot
 from app.api.routes.users import get_current_user
-from app.database import SessionLocal, get_db
+from app.database import get_db
 from app.models.room import Room
 from app.models.room_participant import RoomParticipant
 from app.models.user import User
@@ -25,7 +25,6 @@ from app.schemas.room_theme import (
     CustomRoomBackgroundSubmitRequest,
     RoomCoverPhotoUpdateRequest,
     RoomThemeApplyRequest,
-    RoomThemePurchaseRequest,
     RoomThemeResponse,
     RoomThemeReviewDecisionRequest,
     RoomThemeReviewResponse,
@@ -47,8 +46,8 @@ from app.schemas.rooms.room_background import RoomBackgroundConfigResponse
 from app.schemas.rooms.room_kickout import RoomKickoutCreateRequest, RoomKickoutResponse
 from app.services.permissions import room_permission_service
 from app.services.rooms import room_action_service, room_state_service
+from app.services.rooms.room_db_context import room_session
 from app.services.rooms.room_background_service import list_room_backgrounds
-from app.services.rooms.room_contribution_service import room_contribution_rankings
 from app.services.rooms.room_kickout_service import (
     create_room_kickout,
     list_active_room_kickouts,
@@ -76,7 +75,6 @@ from app.services.rooms.room_theme_service import (
     decide_custom_background_review,
     list_pending_custom_background_reviews,
     list_store_room_themes,
-    purchase_room_theme,
     submit_custom_room_background,
 )
 from app.services.role_service import get_user_roles
@@ -318,7 +316,7 @@ async def _record_and_broadcast(
 
 
 def _read_room_snapshot_for_broadcast(room_public_id: str) -> dict | None:
-    with SessionLocal() as snapshot_db:
+    with room_session() as snapshot_db:
         room = (
             snapshot_db.query(Room)
             .filter(
@@ -459,15 +457,6 @@ def get_room_theme_store(
     current_user: User = Depends(get_current_user),
 ):
     return list_store_room_themes(db, current_user)
-
-
-@router.post("/themes/purchase", response_model=RoomThemeResponse)
-def purchase_room_background_theme(
-    payload: RoomThemePurchaseRequest,
-    db: Session = Depends(get_db),
-    current_user: User = Depends(get_current_user),
-):
-    return purchase_room_theme(db, current_user, payload.theme_id)
 
 
 @router.post(
@@ -711,29 +700,6 @@ async def apply_room_background_theme(
         extra={"background_theme_id": room.background_theme_id},
     )
     return _room_settings_response(room)
-
-
-@router.get("/{room_public_id}/contributions")
-def get_room_contribution_rankings(
-    room_public_id: str,
-    period: str = Query(default="daily"),
-    category: str = Query(default="sent"),
-    limit: int = Query(default=100, ge=1, le=100),
-    db: Session = Depends(get_db),
-):
-    payload = room_contribution_rankings(
-        db=db,
-        room_public_id=room_public_id,
-        category=category,
-        period=period,
-        limit=limit,
-    )
-    if payload is None:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail="Room not found",
-        )
-    return payload
 
 
 @router.get("/{room_public_id}", response_model=RoomDetailResponse)

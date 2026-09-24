@@ -14,11 +14,11 @@ from app.api.routes import (
     inbox_proxy, inbox_stories, love_bonds, lucky_coins,
     lucky_gifts, lucky_gift_admin, lucky_packets, media, media_control, media_realtime_auth, media_safety_admin,
     moderation, notifications, presence, profile_display, push, rankings,
-    relationship_exp, role_badges, room_levels, room_music_media,
-    room_realtime_commands, realtime_gateway_auth, settings, social, super_owner,
+    relationship_exp, role_badges, room_control_proxy, room_cross_domain,
+    room_levels, room_music_media, realtime_gateway_auth, settings, social, super_owner,
     support, users, vibes_proxy, vip_admin, wallet,
 )
-from app.api.routes.rooms import cricket, rooms
+from app.api.routes.rooms import cricket
 from app.api.routes.store import router as store_router
 
 api_router = APIRouter(prefix="/api/v1")
@@ -38,10 +38,12 @@ for router in (
 ):
     api_router.include_router(router)
 
-# Rooms and realtime.
+# Rooms and realtime. Cross-domain projections/commerce stay explicit in core
+# and must be registered before the Room Control catch-all proxy.
 for router in (
-    rooms.router, room_levels.router, cricket.router,
-    room_realtime_commands.router, realtime_gateway_auth.router, media_control.router, media_realtime_auth.router,
+    room_levels.router, cricket.router, room_cross_domain.router,
+    media_control.router, media_realtime_auth.router, realtime_gateway_auth.router,
+    room_control_proxy.router,
 ):
     api_router.include_router(router)
 
@@ -72,7 +74,7 @@ for router in (
     media_safety_admin.router, vip_admin.router, super_owner.router,
     control_center.router, game_pool_admin.router, game_props_admin.router,
     economy_admin.router, games.admin_router, gift_catalog.admin_router,
-    rooms.admin_router, coin_sales.admin_router, lucky_gift_admin.router,
+    room_control_proxy.admin_router, coin_sales.admin_router, lucky_gift_admin.router,
     home_banners.admin_router, vibes_proxy.admin_router,
 ):
     api_router.include_router(router)

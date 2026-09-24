@@ -16,6 +16,9 @@ images:
   - name: funkey-vibes
     newName: ghcr.io/harshays18/vibematch/funkey-vibes
     digest: sha256:0000000000000000000000000000000000000000000000000000000000000000
+  - name: funkey-room-control
+    newName: ghcr.io/harshays18/vibematch/funkey-room-control
+    digest: sha256:0000000000000000000000000000000000000000000000000000000000000000
   - name: funkey-worker
     newName: ghcr.io/harshays18/vibematch/funkey-worker
     digest: sha256:0000000000000000000000000000000000000000000000000000000000000000

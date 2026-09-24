@@ -47,3 +47,10 @@ Provision the production Vibes LOGIN externally, grant it membership in `funkey_
 Hot route query ceilings live in `backend/app/core/query_budget.py` and are emitted by the core API plus the extracted Inbox and Vibes services. CI runs PostgreSQL `EXPLAIN (ANALYZE, BUFFERS, FORMAT JSON)` against seeded hot-query shapes and verifies the Chunk 25 indexes are actually used.
 
 `contracts/database/storage-policy.json` deliberately keeps read replicas and table partitioning disabled until measured evidence and stale-read/partition-pruning semantics are documented. Redis remains non-authoritative and must preserve correctness when lost.
+
+
+## Room Control service role boundary
+
+After Alembic reaches the current head, run `deploy/postgres/room-control-ownership.sql` with the provider/admin or migration role. It creates the NOLOGIN `funkey_room_control_owner` and `funkey_room_control_runtime` roles and transfers durable Room Control tables to the service owner.
+
+Provision the production Room Control LOGIN externally, grant it membership in `funkey_room_control_runtime`, and store its PgBouncer URL as `ROOM_CONTROL_DATABASE_URL` in `funkey-room-control-secrets`. The runtime has DML only for room-owned tables, bounded compatibility writes for `user_room_presence`, bounded read-only access to identity/profile/economy context, and insert-only access to `event_outbox`. Do not grant the Room Control runtime role to the core API login.

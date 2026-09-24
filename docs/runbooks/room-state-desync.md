@@ -42,3 +42,10 @@ Do not extend replay retention without measuring Redis memory and event volume.
 ## Recovery validation
 
 Validate join -> snapshot, mutation -> delta, short disconnect -> replay, and old/trimmed stream -> snapshot fallback. Confirm replay-fallback and sequence-failure rates return to normal.
+
+
+## Chunk 26 service boundary checks
+
+If snapshots or commands fail after the Room Control extraction, distinguish transport health from authority health. Verify `funkey-room-control` readiness and its PostgreSQL pool before debugging the Go gateway or Redis replay. A healthy realtime socket cannot compensate for an unavailable Room Control authority.
+
+Core proxy 503s for `/api/v1/rooms/**` indicate the Room Control service is unavailable. Do not bypass the service by re-enabling direct core writes with the generic database credential. Restore Room Control or roll back the compatible image while keeping one authoritative room writer.

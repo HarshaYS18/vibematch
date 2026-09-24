@@ -22,7 +22,7 @@ PostgreSQL is durable authority. Redis room leases, transport sequences, and rep
 
 ## Important files
 
-`backend/app/services/rooms/room_action_service.py`, `backend/app/services/rooms/room_state_service.py`, `backend/app/api/routes/room_realtime.py`, `backend/app/realtime/connection_manager.py`, and `docs/architecture/room-state-engine-v2.md`.
+`apps/room-control-service/main.py`, `backend/app/services/rooms/room_action_service.py`, `backend/app/services/rooms/room_state_service.py`, `backend/app/services/rooms/room_db_context.py`, `backend/app/api/routes/room_realtime_commands.py`, and `docs/architecture/room-control-service.md`.
 
 ## Public API/contracts
 
@@ -82,7 +82,7 @@ Add a regression test for authorization, transaction outcome, and duplicate/reco
 
 ## Deployment notes
 
-Apply Alembic first; roll out compatible API behavior; check readiness and error metrics.
+Room Control is independently deployable as `funkey-room-control` on port 8085. Apply Alembic first, apply the service-local PostgreSQL role boundary, then roll out the Room Control image before directing core compatibility-proxy traffic to it. Core retains only the public compatibility proxy and explicit cross-domain room commerce/contribution orchestration.
 
 ## Change checklist
 
@@ -90,4 +90,4 @@ Before changing this module: identify the owning table and contract, add an addi
 
 ## Known migration status
 
-Chunk 20 Room State Engine v2 is implemented: snapshot reads are side-effect free, periodic room DB heartbeat is removed, current membership/seat request state has dedicated tables, durable room/event versions are explicit, and bounded Redis replay falls back to snapshots. Legacy FastAPI room-socket replacement payloads remain during migration; Chunk 21 owns the one-Go-socket cutover.
+Chunk 20 Room State Engine v2 is implemented and Chunk 21 completed the one-Go-socket application realtime cutover. Chunk 26 physically extracts durable Room Control authority from core into `room-control-service`, preserves the public `/api/v1/rooms/**` contract through a compatibility proxy, isolates room PostgreSQL credentials, and keeps Go realtime/Redis/media transport outside Room Control authority.

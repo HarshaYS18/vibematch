@@ -81,6 +81,18 @@ class Settings(BaseSettings):
     VIBES_MAX_REPLICAS: int = 20
     DB_VIBES_CONNECTION_BUDGET: int = 100
 
+    # Chunk 26 Room Control service boundary.
+    ROOM_CONTROL_SERVICE_URL: str = "http://127.0.0.1:8085/api/v1"
+    ROOM_CONTROL_INTERNAL_URL: str = "http://127.0.0.1:8085/internal/room-control"
+    ROOM_CONTROL_SERVICE_TIMEOUT_SECONDS: float = 5.0
+    ROOM_CONTROL_INTERNAL_TOKEN: str = "change-this-room-control-internal-token"
+    ROOM_CONTROL_DATABASE_URL: str = ""
+    ROOM_CONTROL_DB_POOL_SIZE: int = 3
+    ROOM_CONTROL_DB_MAX_OVERFLOW: int = 0
+    ROOM_CONTROL_DB_POOL_TIMEOUT_SECONDS: int = 3
+    ROOM_CONTROL_MAX_REPLICAS: int = 20
+    DB_ROOM_CONTROL_CONNECTION_BUDGET: int = 60
+
     # Topology budgets. These are planning/validation limits, not capacity claims.
     API_MAX_REPLICAS: int = 20
     DB_API_CONNECTION_BUDGET: int = 100
@@ -194,6 +206,7 @@ class Settings(BaseSettings):
             self.DB_API_CONNECTION_BUDGET
             + self.DB_INBOX_CONNECTION_BUDGET
             + self.DB_VIBES_CONNECTION_BUDGET
+            + self.DB_ROOM_CONTROL_CONNECTION_BUDGET
             + self.DB_WORKER_CONNECTION_BUDGET
             + self.DB_ROLLOUT_SURGE_CONNECTION_RESERVE
         )
@@ -208,6 +221,7 @@ class Settings(BaseSettings):
             "MEDIA_INTERNAL_TOKEN",
             "INBOX_BACKUP_ENCRYPTION_KEY",
             "INBOX_INTERNAL_TOKEN",
+            "ROOM_CONTROL_INTERNAL_TOKEN",
         ):
             value = getattr(self, name).strip()
             if len(value) < 32 or "change-this" in value.lower():
@@ -329,6 +343,18 @@ class Settings(BaseSettings):
             > self.DB_VIBES_CONNECTION_BUDGET
         ):
             unsafe.append("DB_VIBES_CONNECTION_BUDGET")
+        if not self.ROOM_CONTROL_SERVICE_URL.strip():
+            unsafe.append("ROOM_CONTROL_SERVICE_URL")
+        if not self.ROOM_CONTROL_INTERNAL_URL.strip():
+            unsafe.append("ROOM_CONTROL_INTERNAL_URL")
+        if self.ROOM_CONTROL_DB_POOL_SIZE <= 0 or self.ROOM_CONTROL_DB_MAX_OVERFLOW < 0:
+            unsafe.append("ROOM_CONTROL_DB_POOL_SIZE/ROOM_CONTROL_DB_MAX_OVERFLOW")
+        if (
+            self.ROOM_CONTROL_MAX_REPLICAS
+            * (self.ROOM_CONTROL_DB_POOL_SIZE + self.ROOM_CONTROL_DB_MAX_OVERFLOW)
+            > self.DB_ROOM_CONTROL_CONNECTION_BUDGET
+        ):
+            unsafe.append("DB_ROOM_CONTROL_CONNECTION_BUDGET")
         if self.WORKER_MAX_REPLICAS * (
             self.DB_WORKER_POOL_SIZE + self.DB_WORKER_MAX_OVERFLOW
         ) > self.DB_WORKER_CONNECTION_BUDGET:
@@ -423,6 +449,36 @@ class Settings(BaseSettings):
         if unsafe:
             raise RuntimeError(
                 "Unsafe Vibes service production configuration: "
+                + ", ".join(unsafe)
+            )
+
+    def validate_room_control_service(self) -> None:
+        """Validate settings owned by the extracted Room Control deployable."""
+
+        if not self.is_production:
+            return
+        unsafe: list[str] = []
+        if (
+            len(self.ROOM_CONTROL_INTERNAL_TOKEN.strip()) < 32
+            or "change-this" in self.ROOM_CONTROL_INTERNAL_TOKEN.lower()
+        ):
+            unsafe.append("ROOM_CONTROL_INTERNAL_TOKEN")
+        room_url = self.ROOM_CONTROL_DATABASE_URL.strip()
+        if not room_url:
+            unsafe.append("ROOM_CONTROL_DATABASE_URL")
+        elif room_url == self.database_url.strip():
+            unsafe.append("ROOM_CONTROL_DATABASE_URL(service-isolated credentials required)")
+        if self.ROOM_CONTROL_DB_POOL_SIZE <= 0 or self.ROOM_CONTROL_DB_MAX_OVERFLOW < 0:
+            unsafe.append("ROOM_CONTROL_DB_POOL_SIZE/ROOM_CONTROL_DB_MAX_OVERFLOW")
+        if (
+            self.ROOM_CONTROL_MAX_REPLICAS
+            * (self.ROOM_CONTROL_DB_POOL_SIZE + self.ROOM_CONTROL_DB_MAX_OVERFLOW)
+            > self.DB_ROOM_CONTROL_CONNECTION_BUDGET
+        ):
+            unsafe.append("DB_ROOM_CONTROL_CONNECTION_BUDGET")
+        if unsafe:
+            raise RuntimeError(
+                "Unsafe Room Control production configuration: "
                 + ", ".join(unsafe)
             )
 

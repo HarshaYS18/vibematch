@@ -70,6 +70,8 @@ VIBES_SERVICE_MIGRATION = (
 )
 VIBES_OWNERSHIP_SQL = ROOT / "deploy" / "postgres" / "vibes-ownership.sql"
 VIBES_SERVICE_ROOT = ROOT / "apps" / "vibes-service"
+ROOM_CONTROL_SERVICE_ROOT = ROOT / "apps" / "room-control-service"
+ROOM_CONTROL_OWNERSHIP_SQL = ROOT / "deploy" / "postgres" / "room-control-ownership.sql"
 ALLOWED_STATE_CLASSES = {"AUTHORITY", "PROJECTION", "CACHE", "EPHEMERAL"}
 REQUIRED_AUTHORITY_STATE_IDS = {
     "identity.accounts", "identity.sessions", "profiles.public", "rooms.definition",
@@ -645,6 +647,148 @@ def _validate_vibes_service_extraction(errors: list[str]) -> None:
         errors.append("authority registry must declare vibes-service as current Vibes deployable")
 
 
+
+def _validate_room_control_extraction(errors: list[str]) -> None:
+    required = (
+        ROOM_CONTROL_SERVICE_ROOT / "main.py",
+        ROOM_CONTROL_SERVICE_ROOT / "database.py",
+        ROOM_CONTROL_SERVICE_ROOT / "internal.py",
+        ROOM_CONTROL_SERVICE_ROOT / "Dockerfile",
+        ROOM_CONTROL_OWNERSHIP_SQL,
+        ROOT / "backend" / "app" / "api" / "routes" / "room_control_proxy.py",
+        ROOT / "backend" / "app" / "api" / "routes" / "room_cross_domain.py",
+        ROOT / "backend" / "app" / "services" / "room_control_service_client.py",
+        ROOT / "backend" / "app" / "services" / "rooms" / "room_db_context.py",
+    )
+    for path in required:
+        if not path.exists():
+            errors.append(
+                "Chunk 26 Room Control extraction path is missing: "
+                + str(path.relative_to(ROOT))
+            )
+
+    router_path = ROOT / "backend" / "app" / "api" / "router.py"
+    if router_path.exists():
+        text = router_path.read_text(encoding="utf-8")
+        for required_token in (
+            "room_control_proxy.router",
+            "room_control_proxy.admin_router",
+            "room_cross_domain.router",
+        ):
+            if required_token not in text:
+                errors.append("core API missing Room Control boundary: " + required_token)
+        for forbidden in (
+            "rooms.router",
+            "rooms.admin_router",
+            "room_realtime_commands.router",
+        ):
+            if forbidden in text:
+                errors.append(
+                    "core API must not mount Room Control authority directly: "
+                    + forbidden
+                )
+        if (
+            "media_control.router" in text
+            and "room_control_proxy.router" in text
+            and text.index("media_control.router") > text.index("room_control_proxy.router")
+        ):
+            errors.append(
+                "media_control must be registered before the Room Control catch-all proxy"
+            )
+
+    command_path = (
+        ROOT / "backend" / "app" / "api" / "routes" /
+        "room_realtime_commands.py"
+    )
+    if command_path.exists():
+        text = command_path.read_text(encoding="utf-8")
+        if "SessionLocal" in text:
+            errors.append(
+                "Room realtime commands must use room_session(), not core SessionLocal"
+            )
+        if "with room_session() as db:" not in text:
+            errors.append("Room realtime command transaction missing room_session()")
+
+    rooms_path = ROOT / "backend" / "app" / "api" / "routes" / "rooms" / "rooms.py"
+    if rooms_path.exists():
+        text = rooms_path.read_text(encoding="utf-8")
+        for forbidden in (
+            '"/themes/purchase"',
+            '"/{room_public_id}/contributions"',
+            "purchase_room_theme(",
+            "room_contribution_rankings(",
+        ):
+            if forbidden in text:
+                errors.append(
+                    "cross-domain room route must stay in core orchestration: "
+                    + forbidden
+                )
+        if "room_session()" not in text:
+            errors.append("Room snapshot background work must use room_session()")
+
+    theme_path = (
+        ROOT / "backend" / "app" / "services" / "rooms" /
+        "room_theme_service.py"
+    )
+    if theme_path.exists():
+        text = theme_path.read_text(encoding="utf-8")
+        for forbidden in ("UserWallet", "WalletLedger", "EconomyCurrency", "EconomyDirection"):
+            if forbidden in text:
+                errors.append(
+                    "Room Control theme service must not write economy authority: "
+                    + forbidden
+                )
+        for required_token in (
+            "room_theme_purchase_quote",
+            "grant_room_theme_inventory",
+        ):
+            if required_token not in text:
+                errors.append("Room theme authority seam missing: " + required_token)
+
+    for relative in (
+        "backend/app/services/rooms/room_service.py",
+        "backend/app/services/rooms/room_action_service.py",
+    ):
+        path = ROOT / relative
+        if path.exists() and re.search(
+            r"\b(?:user|current_user)\.last_seen_at\s*=",
+            path.read_text(encoding="utf-8"),
+        ):
+            errors.append(
+                "Room Control must not mutate identity last_seen_at: " + relative
+            )
+
+    if ROOM_CONTROL_OWNERSHIP_SQL.exists():
+        text = ROOM_CONTROL_OWNERSHIP_SQL.read_text(encoding="utf-8")
+        for table in (
+            "rooms",
+            "room_participants",
+            "room_seat_states",
+            "room_realtime_events",
+            "room_member_requests",
+            "room_seat_applications",
+            "room_chat_messages",
+            "room_kickouts",
+            "room_themes",
+            "user_room_theme_inventory",
+            "room_theme_reviews",
+        ):
+            if f"ALTER TABLE {table} OWNER TO funkey_room_control_owner" not in text:
+                errors.append("Room Control ownership missing table: " + table)
+        if "GRANT SELECT, INSERT, UPDATE ON TABLE user_room_presence" not in text:
+            errors.append("Room Control presence compatibility grant is missing")
+        if "GRANT INSERT ON TABLE event_outbox" not in text:
+            errors.append("Room Control transactional outbox grant is missing")
+
+    authority = json.loads(AUTHORITY_REGISTRY.read_text(encoding="utf-8"))
+    for state in authority.get("states", []):
+        state_id = str(state.get("id") or "")
+        if state_id.startswith("rooms.") and state.get("current_deployable") != "room-control-service":
+            errors.append(
+                state_id + ": authority registry must declare room-control-service"
+            )
+
+
 def _has_tracked_content(path: Path) -> bool:
     return path.exists() and any(item.is_file() for item in path.rglob("*"))
 
@@ -657,6 +801,7 @@ def main() -> int:
     _validate_room_state_engine(errors)
     _validate_inbox_service_extraction(errors)
     _validate_vibes_service_extraction(errors)
+    _validate_room_control_extraction(errors)
 
     for path in REQUIRED_PATHS:
         if not path.exists():
@@ -756,6 +901,7 @@ def main() -> int:
     print(" - legacy FastAPI application websocket routes are not mounted")
     print(" - Inbox chat authority is isolated, bounded, and routed through NATS/Go")
     print(" - Vibes authority is isolated with bounded cursor feeds and async fanout")
+    print(" - Room Control owns durable room state behind a core compatibility proxy")
     return 0
 
 

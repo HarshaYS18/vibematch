@@ -11,7 +11,7 @@ from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
 
 from app.api.routes.users import get_current_user
-from app.database import SessionLocal, get_db
+from app.database import get_db
 from app.models.room import Room
 from app.models.room_kickout import RoomKickout
 from app.models.room_participant import RoomParticipant
@@ -35,6 +35,7 @@ from app.schemas.room_realtime import (
 from app.services.permissions import room_permission_service as policy_permissions
 from app.services import realtime_revocation_service
 from app.services.rooms import room_action_service, room_activity_service, room_permission_service, room_state_service, watch_party_service
+from app.services.rooms.room_db_context import room_session
 from app.services.user_master_state_service import get_user_master_state
 
 
@@ -717,7 +718,7 @@ def _execute_room_command_transaction(
     payload: dict[str, Any],
 ) -> RoomCommandOutcome:
     emissions: list[RoomCommandEmission] = []
-    with SessionLocal() as db:
+    with room_session() as db:
         try:
             actor = db.query(User).filter(User.id == actor_user_id).first()
             if actor is None or actor.is_banned or not actor.is_active:

@@ -54,3 +54,16 @@ spec:
     - from:
         - namespaceSelector: {}
       ports: [{protocol: TCP, port: 8084}]
+
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: funkey-room-control-ingress
+spec:
+  podSelector: {matchLabels: {app: funkey-room-control}}
+  policyTypes: [Ingress]
+  ingress:
+    - from:
+        - namespaceSelector: {}
+      ports: [{protocol: TCP, port: 8085}]

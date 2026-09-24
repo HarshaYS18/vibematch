@@ -147,6 +147,9 @@ services:
       VIBES_SERVICE_URL: http://vibes:8084/api/v1
       VIBES_INTERNAL_URL: http://vibes:8084/internal/vibes
       VIBES_INTERNAL_TOKEN: local-development-vibes-internal-token-2026
+      ROOM_CONTROL_SERVICE_URL: http://room-control:8085/api/v1
+      ROOM_CONTROL_INTERNAL_URL: http://room-control:8085/internal/room-control
+      ROOM_CONTROL_INTERNAL_TOKEN: local-development-room-control-token-2026
       NATS_URL: nats://nats:4222
       CORS_ALLOWED_ORIGINS: http://localhost:3000,http://localhost:8080
       ENABLE_DEV_LOGIN: "true"
@@ -191,6 +194,19 @@ services:
       migrate: {condition: service_completed_successfully}
       pgbouncer: {condition: service_healthy}
       nats: {condition: service_healthy}
+
+  room-control:
+    profiles: ["app"]
+    build: {context: .., dockerfile: apps/room-control-service/Dockerfile}
+    environment:
+      <<: *api_environment
+      DB_APPLICATION_NAME: funkey-room-control
+      ROOM_CONTROL_DATABASE_URL: postgresql://funkey:funkey_dev_only@pgbouncer:6432/funkey
+    ports: ["127.0.0.1:8085:8085"]
+    depends_on:
+      migrate: {condition: service_completed_successfully}
+      pgbouncer: {condition: service_healthy}
+      realtime-redis: {condition: service_healthy}
 
   realtime:
     profiles: ["app"]

@@ -119,3 +119,10 @@ Chunk 20 is complete only when:
 - canonical application realtime carries v2 deltas;
 - `RoomSessionRepository` remains Flutter room authority;
 - migrations, backend tests, Flutter tests, architecture guard, and platform CI pass.
+
+
+## Chunk 26 physical authority extraction
+
+The Room State Engine v2 semantics remain unchanged after physical extraction. The authoritative SQL transactions now run in `funkey-room-control` using its service-local database credential. Background room command transactions use `room_db_context.room_session()`, configured to the Room Control session factory at service startup, so dependency overrides cannot accidentally route part of a command through the core API pool.
+
+Core no longer mounts the room authority routers. It keeps a compatibility proxy plus the two explicit cross-domain orchestration routes for paid room-theme purchases and room contribution projections. Go realtime remains the application transport and Redis remains rebuildable replay/presence state.

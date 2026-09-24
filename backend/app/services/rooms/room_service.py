@@ -197,7 +197,6 @@ def _upsert_active_participant(db: Session, room: Room, user: User) -> RoomParti
         participant.is_room_admin = True
         participant.member_added_at = participant.member_added_at or now
         participant.admin_added_at = participant.admin_added_at or now
-    user.last_seen_at = now
     return participant
 
 
@@ -682,7 +681,6 @@ def heartbeat_room(db: Session, room_public_id: str, current_user: User) -> Room
         participant = _upsert_active_participant(db, room, current_user)
     else:
         participant.last_seen_at = datetime.utcnow()
-        current_user.last_seen_at = participant.last_seen_at
     mark_user_room_presence_active(db, room, current_user)
     _refresh_room_online_count(db, room)
     db.commit()

@@ -199,7 +199,7 @@
       "domain": "rooms",
       "classification": "AUTHORITY",
       "logical_owner": "room-control",
-      "current_deployable": "core-api",
+      "current_deployable": "room-control-service",
       "current_storage": [
         "postgres:rooms",
         "postgres:room_themes",
@@ -215,17 +215,17 @@
       "source_states": [],
       "rebuild_from": [],
       "change_contract": {
-        "status": "planned",
+        "status": "live",
         "name": "room.updated.v1"
       },
-      "migration_status": "physical extraction Chunk 26"
+      "migration_status": "Chunk 26 extracted to Room Control service"
     },
     {
       "id": "rooms.membership",
       "domain": "rooms",
       "classification": "AUTHORITY",
       "logical_owner": "room-control",
-      "current_deployable": "core-api",
+      "current_deployable": "room-control-service",
       "current_storage": [
         "postgres:room_participants",
         "postgres:room_member_requests",
@@ -243,14 +243,14 @@
         "status": "live",
         "name": "room.joined/room.left"
       },
-      "migration_status": "current"
+      "migration_status": "Chunk 26 extracted to Room Control service"
     },
     {
       "id": "rooms.permissions",
       "domain": "rooms",
       "classification": "AUTHORITY",
       "logical_owner": "room-control",
-      "current_deployable": "core-api",
+      "current_deployable": "room-control-service",
       "current_storage": [
         "postgres:room_participants member/admin flags",
         "postgres:user_roles/special_permissions for global policy"
@@ -264,17 +264,17 @@
       "source_states": [],
       "rebuild_from": [],
       "change_contract": {
-        "status": "planned",
+        "status": "live",
         "name": "room.permission.updated.v1"
       },
-      "migration_status": "current"
+      "migration_status": "Chunk 26 extracted to Room Control service"
     },
     {
       "id": "rooms.seats",
       "domain": "rooms",
       "classification": "AUTHORITY",
       "logical_owner": "room-control",
-      "current_deployable": "core-api",
+      "current_deployable": "room-control-service",
       "current_storage": [
         "postgres:room_seat_states",
         "postgres:room_seat_applications"
@@ -291,14 +291,14 @@
         "status": "live",
         "name": "seat.updated family"
       },
-      "migration_status": "current"
+      "migration_status": "Chunk 26 extracted to Room Control service"
     },
     {
       "id": "rooms.watch_party",
       "domain": "rooms",
       "classification": "AUTHORITY",
       "logical_owner": "room-control",
-      "current_deployable": "core-api",
+      "current_deployable": "room-control-service",
       "current_storage": [
         "postgres:room_realtime_events where event_type=watch_party.*; latest event is current canonical state"
       ],
@@ -314,16 +314,17 @@
         "status": "live",
         "name": "watch_party.*"
       },
-      "migration_status": "dedicated current-state optimization remains same owner"
+      "migration_status": "Chunk 26 extracted to Room Control service"
     },
     {
       "id": "rooms.activity",
       "domain": "rooms",
       "classification": "AUTHORITY",
       "logical_owner": "room-control",
-      "current_deployable": "core-api",
+      "current_deployable": "room-control-service",
       "current_storage": [
-        "postgres:room_realtime_events where event_type=room_activity.state.*; latest event is current canonical state"
+        "postgres:room_realtime_events where event_type=room_activity.state.*; latest event is current canonical state",
+        "postgres:room_chat_messages"
       ],
       "target_storage": [
         "room-control current-state model + audit/replay log"
@@ -337,7 +338,7 @@
         "status": "live",
         "name": "room_activity.state.*"
       },
-      "migration_status": "current event-log authority can be optimized later"
+      "migration_status": "Chunk 26 extracted to Room Control service"
     },
     {
       "id": "presence.online_lease",
