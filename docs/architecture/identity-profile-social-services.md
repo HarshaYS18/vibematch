@@ -20,3 +20,9 @@ New access tokens contain sid. identity_sessions and identity_devices make revoc
 
 ## Invariants
 Core may compose reads but must not regain extracted mutation authority. Identity must not mutate public profile/social/family truth. Profile/Social must not mutate login, account-status, device or session columns. Each service uses distinct DB credentials and bounded pools.
+
+
+## Read-only compatibility roles
+The legacy core API still composes cross-domain reads during migration. PostgreSQL therefore exposes funkey_identity_reader and funkey_profile_social_reader. The production core login may be a member of these reader roles only; it must not inherit either domain runtime mutation role.
+
+Profile display may read Economy-owned wallet/ledger/rule projections, but Profile/Social has SELECT-only grants for those tables. Profile rendering is forbidden from creating wallets or synchronizing VIP state.

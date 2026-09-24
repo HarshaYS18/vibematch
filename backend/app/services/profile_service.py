@@ -3,6 +3,7 @@ from datetime import datetime, timedelta
 from fastapi import HTTPException
 from sqlalchemy.orm import Session
 
+from app.models.economy import UserWallet
 from app.models.user import User
 from app.models.vip_status import UserVipStatus
 from app.services import economy_level_service, role_badge_service, role_service, store_service
@@ -46,17 +47,26 @@ def vip_summary(db: Session, user: User, levels: dict | None = None) -> dict:
 
 
 def wallet_summary(db: Session, user: User, *, include_private_balances: bool = True) -> dict:
-    wallet = economy_level_service.get_or_create_wallet(db, user.id)
-    levels = economy_level_service.wallet_level_payload(db, wallet)
-    economy_level_service.sync_vip_status(db, user.id, levels)
-    coin_balance = wallet.coin_balance if include_private_balances else 0
-    ruby_balance = wallet.ruby_balance if include_private_balances else 0
+    """Read-only economy projection for profile rendering.
+
+    Profile/display reads must never create wallet rows or synchronize VIP state.
+    Missing wallet authority is rendered as zero balances while level progress is
+    derived from the durable ledgers/rules.
+    """
+    wallet = db.query(UserWallet).filter(UserWallet.user_id == user.id).first()
+    levels = economy_level_service.user_level_payload(db, user.id)
+
+    def wallet_value(field: str) -> int:
+        return int(getattr(wallet, field, 0) or 0) if wallet is not None else 0
+
+    coin_balance = wallet_value("coin_balance") if include_private_balances else 0
+    ruby_balance = wallet_value("ruby_balance") if include_private_balances else 0
     return {
         "coin_balance": coin_balance,
         "ruby_balance": ruby_balance,
-        "lifetime_coins_spent": wallet.lifetime_coins_spent,
-        "lifetime_coins_received_as_gifts": wallet.lifetime_coins_received_as_gifts,
-        "lifetime_rubies_earned": wallet.lifetime_rubies_earned,
+        "lifetime_coins_spent": wallet_value("lifetime_coins_spent"),
+        "lifetime_coins_received_as_gifts": wallet_value("lifetime_coins_received_as_gifts"),
+        "lifetime_rubies_earned": wallet_value("lifetime_rubies_earned"),
         "monthly_gift_coins_sent": levels["monthly_gift_coins_sent"],
         "monthly_gift_coins_received": levels["monthly_gift_coins_received"],
         "lifetime_send_exp": levels["lifetime_send_exp"],

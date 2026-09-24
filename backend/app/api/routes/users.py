@@ -263,7 +263,7 @@ def update_my_profile(
     current_user: User = Depends(get_current_user),
 ):
     try:
-        response = profile_social_service_client.update_profile(
+        profile_social_service_client.update_profile(
             user_id=current_user.id,
             profile=payload.model_dump(exclude_unset=True, mode="json"),
         )
@@ -271,7 +271,12 @@ def update_my_profile(
         raise HTTPException(status_code=503, detail=str(exc)) from exc
     except profile_social_service_client.ProfileSocialServiceError as exc:
         raise HTTPException(status_code=exc.status_code, detail=exc.detail) from exc
-    return UserMeResponse(**response)
+
+    # Profile/Social committed the authoritative mutation on a separate DB
+    # connection. Refresh the shared legacy row, then compose the unchanged
+    # mobile response from read-only projections.
+    db.refresh(current_user)
+    return _user_me_response(db, current_user)
 
 
 @router.get("/search", response_model=UserSearchResponse)

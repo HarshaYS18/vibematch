@@ -14,22 +14,17 @@ class ChunkOneSourceOfTruthTests(TestCase):
         db = Mock()
         payload = UserProfileUpdateRequest(display_name="New Name")
 
-        remote_payload = {
-            "id": 7,
-            "public_user_id": 6418000007,
-            "username": "user-7",
-            "display_name": "New Name",
-            "roles": [],
-            "primary_role": "user",
-            "role_badges": [],
-        }
         with (
             patch.object(
                 users_route.profile_social_service_client,
                 "update_profile",
-                return_value=remote_payload,
+                return_value={"updated": True, "user_id": 7},
             ) as update_profile,
-            patch.object(users_route, "UserMeResponse", side_effect=lambda **kwargs: kwargs),
+            patch.object(
+                users_route,
+                "_user_me_response",
+                return_value={"ok": True},
+            ) as compose_response,
         ):
             result = users_route.update_my_profile(
                 payload,
@@ -37,11 +32,13 @@ class ChunkOneSourceOfTruthTests(TestCase):
                 current_user=current_user,
             )
 
-        self.assertEqual(remote_payload, result)
+        self.assertEqual({"ok": True}, result)
         update_profile.assert_called_once_with(
             user_id=7,
             profile={"display_name": "New Name"},
         )
+        db.refresh.assert_called_once_with(current_user)
+        compose_response.assert_called_once_with(db, current_user)
 
     def test_membership_roster_keeps_offline_saved_member(self):
         user = SimpleNamespace(public_user_id=6418001001)

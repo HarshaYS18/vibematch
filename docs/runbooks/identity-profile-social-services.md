@@ -13,7 +13,7 @@ Profile/social writes should fail closed with bounded 503 responses while unrela
 A successful new login revokes the user's older active durable session. Tokens without sid belong only to the pre-Chunk-27 compatibility window and disappear by normal expiry.
 
 ## Database cutover
-Run Alembic first. Apply identity-ownership.sql and profile-social-ownership.sql with an admin/migration role. Bind distinct production logins to the runtime roles. Verify column-level profile grants before removing legacy core write privilege.
+Run Alembic first. Apply identity-ownership.sql and profile-social-ownership.sql with an admin/migration role. Bind distinct production service logins to the runtime roles. Bind the core API login only to funkey_identity_reader and funkey_profile_social_reader for composite reads. Verify column-level profile grants before removing legacy core write privilege; never grant the core API either mutation runtime role.
 
 ## Rollback
 Rollback code/routing first. Do not drop identity_sessions or identity_devices. They are additive and safe to retain during investigation.

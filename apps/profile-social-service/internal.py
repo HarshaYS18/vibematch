@@ -53,8 +53,9 @@ def update_profile(user_id:int,payload:ProfilePatchRequest,db:Session=Depends(ge
     if "friend_gender_preference" in fields: current_user.friend_gender_preference=users._clean_enum(request.friend_gender_preference,users._ALLOWED_GENDER_PREFS,"friend gender preference")
     if "friend_marital_preference" in fields: current_user.friend_marital_preference=users._clean_enum(request.friend_marital_preference,users._ALLOWED_MARITAL_PREFS,"friend marital preference")
     if "interests" in fields: current_user.interests=users._clean_interests(request.interests or [])
-    db.add(current_user); db.commit(); db.refresh(current_user)
-    return users._user_me_response(db,current_user)
+    db.add(current_user)
+    db.commit()
+    return {"updated": True, "user_id": current_user.id}
 
 @router.post("/profile-visits",dependencies=[Depends(require_internal_token)])
 def record_profile_visit(payload:ProfileVisitRequest,db:Session=Depends(get_db)):

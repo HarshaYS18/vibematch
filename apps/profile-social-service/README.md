@@ -21,3 +21,7 @@ Writes fail closed with bounded 503 responses when the service is unavailable; u
 
 ## Observability
 Use standard OpenTelemetry traces, request ids, query counters and DB pool metrics. Avoid high-cardinality user identifiers in metric labels.
+
+
+## Read-only Economy projection
+Profile rendering reads user_wallets, wallet_ledger, gift_transactions and economy rule tables with SELECT-only privileges. The profile service must never create wallets, synchronize VIP rows, or mutate Economy truth as a side effect of a GET/profile response.

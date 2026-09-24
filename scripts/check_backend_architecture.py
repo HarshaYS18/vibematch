@@ -966,6 +966,31 @@ def _validate_identity_profile_social_extraction(errors: list[str]) -> None:
                 errors.append("Profile/Social ownership missing table: " + table)
         if "GRANT UPDATE (" not in social_sql:
             errors.append("Profile/Social users mutation must be column scoped")
+        if "funkey_profile_social_reader" not in social_sql:
+            errors.append("Profile/Social read compatibility role is missing")
+        for table in ("user_wallets", "wallet_ledger", "gift_transactions", "economy_rule_sets", "economy_rule_levels"):
+            token = "GRANT SELECT ON TABLE"
+            if table not in social_sql or token not in social_sql:
+                errors.append("Profile/Social economy projection read grant missing: " + table)
+
+    if IDENTITY_OWNERSHIP_SQL.exists():
+        identity_sql = IDENTITY_OWNERSHIP_SQL.read_text(encoding="utf-8")
+        if "funkey_identity_reader" not in identity_sql:
+            errors.append("Identity read compatibility role is missing")
+
+    profile_service_path = ROOT / "backend" / "app" / "services" / "profile_service.py"
+    if profile_service_path.exists():
+        profile_text = profile_service_path.read_text(encoding="utf-8")
+        wallet_source = _function_source(profile_text, "wallet_summary")
+        for forbidden in ("get_or_create_wallet(", "sync_vip_status("):
+            if forbidden in wallet_source:
+                errors.append("Profile wallet summary must be read-only; found " + forbidden)
+
+    profile_internal = PROFILE_SOCIAL_SERVICE_ROOT / "internal.py"
+    if profile_internal.exists():
+        internal_text = profile_internal.read_text(encoding="utf-8")
+        if "return users._user_me_response" in internal_text:
+            errors.append("Profile/Social mutation response must not compose cross-domain wallet/VIP state")
 
     if AUTHORITY_REGISTRY.exists():
         payload = json.loads(AUTHORITY_REGISTRY.read_text(encoding="utf-8"))

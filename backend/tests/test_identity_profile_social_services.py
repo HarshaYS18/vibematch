@@ -62,7 +62,24 @@ class IdentityProfileSocialBoundaryTests(unittest.TestCase):
 
     def test_profile_mutation_routes_to_service(self):
         users = (ROOT / "backend/app/api/routes/users.py").read_text(encoding="utf-8")
+        internal = (ROOT / "apps/profile-social-service/internal.py").read_text(encoding="utf-8")
+        profile = (ROOT / "backend/app/services/profile_service.py").read_text(encoding="utf-8")
         self.assertIn("profile_social_service_client.update_profile", users)
+        self.assertIn("db.refresh(current_user)", users)
+        self.assertNotIn("return users._user_me_response", internal)
+        wallet_start = profile.index("def wallet_summary")
+        wallet_end = profile.find("\ndef ", wallet_start + 5)
+        wallet_source = profile[wallet_start:] if wallet_end < 0 else profile[wallet_start:wallet_end]
+        self.assertNotIn("get_or_create_wallet(", wallet_source)
+        self.assertNotIn("sync_vip_status(", wallet_source)
+
+    def test_reader_roles_preserve_read_without_mutation_authority(self):
+        identity_sql = (ROOT / "deploy/postgres/identity-ownership.sql").read_text(encoding="utf-8")
+        social_sql = (ROOT / "deploy/postgres/profile-social-ownership.sql").read_text(encoding="utf-8")
+        self.assertIn("funkey_identity_reader", identity_sql)
+        self.assertIn("funkey_profile_social_reader", social_sql)
+        self.assertIn("GRANT SELECT ON TABLE users,user_roles,special_permissions,user_bans,device_bans TO funkey_identity_reader", identity_sql)
+        self.assertIn("TO funkey_profile_social_reader", social_sql)
 
     def test_authority_registry_cutover(self):
         payload = json.loads(
