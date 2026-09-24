@@ -124,8 +124,10 @@ def project_user_presence(
 
 
 def is_user_online(user_id: int) -> bool:
-    projection = project_user_presence.__globals__["get_realtime_redis"]()
+    redis_client = get_realtime_redis()
     try:
-        return int(projection.zcount(_user_lease_key(user_id), time.time(), "+inf") or 0) > 0
+        return int(
+            redis_client.zcount(_user_lease_key(user_id), time.time(), "+inf") or 0
+        ) > 0
     except Exception:
         return False
