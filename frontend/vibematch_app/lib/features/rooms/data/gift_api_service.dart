@@ -1,6 +1,8 @@
 import 'dart:convert';
 
 import 'package:http/http.dart' as http;
+import 'package:shared_preferences/shared_preferences.dart';
+import 'package:uuid/uuid.dart';
 
 import '../../../core/network/vm_api_config.dart';
 import '../../auth/data/auth_api_service.dart';
@@ -37,6 +39,15 @@ class GiftApiService {
     int? relationshipId,
     bool isRelationshipGift = false,
   }) async {
+    final requestId = await _pendingGiftRequestId(
+      receiverPublicUserId: receiverPublicUserId,
+      giftId: giftId,
+      quantity: quantity,
+      roomPublicId: roomPublicId,
+      relationshipId: relationshipId,
+      isRelationshipGift: isRelationshipGift,
+      lucky: false,
+    );
     final response = await http.post(
       Uri.parse(VmApiConfig.endpoint('/economy/gifts/send')),
       headers: _headers(),
@@ -44,13 +55,39 @@ class GiftApiService {
         'receiver_public_user_id': receiverPublicUserId,
         'gift_id': giftId,
         'quantity': quantity,
+        'request_id': requestId,
         'room_public_id': roomPublicId,
         'relationship_id': relationshipId,
         'is_relationship_gift': isRelationshipGift,
       }),
     );
+    if (response.statusCode >= 200 && response.statusCode < 300) {
+      await _clearPendingGiftRequest(
+        receiverPublicUserId: receiverPublicUserId,
+        giftId: giftId,
+        quantity: quantity,
+        roomPublicId: roomPublicId,
+        relationshipId: relationshipId,
+        isRelationshipGift: isRelationshipGift,
+        lucky: false,
+      );
+      return GiftSendPublicResult.fromJson(
+        jsonDecode(response.body) as Map<String, dynamic>,
+      );
+    }
+    if (response.statusCode >= 400 && response.statusCode < 500) {
+      await _clearPendingGiftRequest(
+        receiverPublicUserId: receiverPublicUserId,
+        giftId: giftId,
+        quantity: quantity,
+        roomPublicId: roomPublicId,
+        relationshipId: relationshipId,
+        isRelationshipGift: isRelationshipGift,
+        lucky: false,
+      );
+    }
     _throwIfBad(response, 'Gift send failed');
-    return GiftSendPublicResult.fromJson(jsonDecode(response.body) as Map<String, dynamic>);
+    throw StateError('Unreachable gift send response');
   }
 
   Future<GiftSendPublicResult> sendLuckyGiftPublic({
@@ -63,6 +100,15 @@ class GiftApiService {
     int? relationshipId,
     bool isRelationshipGift = false,
   }) async {
+    final requestId = await _pendingGiftRequestId(
+      receiverPublicUserId: receiverPublicUserId,
+      giftId: giftId,
+      quantity: quantity,
+      roomPublicId: roomPublicId,
+      relationshipId: relationshipId,
+      isRelationshipGift: isRelationshipGift,
+      lucky: true,
+    );
     final response = await http.post(
       Uri.parse(VmApiConfig.endpoint('/economy/gifts/send')),
       headers: _headers(),
@@ -70,14 +116,40 @@ class GiftApiService {
         'receiver_public_user_id': receiverPublicUserId,
         'gift_id': giftId,
         'quantity': quantity,
+        'request_id': requestId,
         'room_public_id': roomPublicId,
         'house_risk_score': houseRiskScore,
         'relationship_id': relationshipId,
         'is_relationship_gift': isRelationshipGift,
       }),
     );
+    if (response.statusCode >= 200 && response.statusCode < 300) {
+      await _clearPendingGiftRequest(
+        receiverPublicUserId: receiverPublicUserId,
+        giftId: giftId,
+        quantity: quantity,
+        roomPublicId: roomPublicId,
+        relationshipId: relationshipId,
+        isRelationshipGift: isRelationshipGift,
+        lucky: true,
+      );
+      return GiftSendPublicResult.fromJson(
+        jsonDecode(response.body) as Map<String, dynamic>,
+      );
+    }
+    if (response.statusCode >= 400 && response.statusCode < 500) {
+      await _clearPendingGiftRequest(
+        receiverPublicUserId: receiverPublicUserId,
+        giftId: giftId,
+        quantity: quantity,
+        roomPublicId: roomPublicId,
+        relationshipId: relationshipId,
+        isRelationshipGift: isRelationshipGift,
+        lucky: true,
+      );
+    }
     _throwIfBad(response, 'Lucky gift send failed');
-    return GiftSendPublicResult.fromJson(jsonDecode(response.body) as Map<String, dynamic>);
+    throw StateError('Unreachable lucky gift send response');
   }
 
   Map<String, String> _headers() {

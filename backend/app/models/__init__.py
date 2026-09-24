@@ -69,7 +69,7 @@ from app.models.call_session import (
     CallSessionStatus,
     CallSessionType,
 )
-from app.models.experience import RoomExperienceStatus, UserExperienceStatus
+from app.models.experience import ExperienceMutationReceipt, RoomExperienceStatus, UserExperienceStatus
 from app.models.mvp_feature import MvpFeatureState
 from app.models.economy_transaction import EconomyTransaction
 from app.models.economy import (

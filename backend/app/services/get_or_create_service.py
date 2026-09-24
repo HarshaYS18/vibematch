@@ -16,3 +16,18 @@ def get_or_create_unique(db: Session, model, column, value):
     except IntegrityError:
         return db.query(model).filter(column == value).one()
     return row
+
+
+def get_or_create_unique_with_created(db: Session, model, column, value):
+    """Race-safe unique insert that also reports whether this transaction created it."""
+    row = db.query(model).filter(column == value).first()
+    if row is not None:
+        return row, False
+    try:
+        with db.begin_nested():
+            row = model(**{column.key: value})
+            db.add(row)
+            db.flush()
+        return row, True
+    except IntegrityError:
+        return db.query(model).filter(column == value).one(), False

@@ -4,13 +4,13 @@ from sqlalchemy import func
 from sqlalchemy.orm import Session
 
 from app.models.economy import GiftTransaction, WalletLedger
-from app.models.experience import RoomExperienceStatus, UserExperienceStatus
+from app.models.experience import ExperienceMutationReceipt, RoomExperienceStatus, UserExperienceStatus
 from app.models.room_realtime_state import RoomRealtimeEvent
 from app.models.room import Room
 from app.models.user import User
 from app.services import economy_rules_service
 from app.services import level_progression_service as progression
-from app.services.get_or_create_service import get_or_create_unique
+from app.services.get_or_create_service import get_or_create_unique, get_or_create_unique_with_created
 
 MAX_EXP_LEVEL = progression.MAX_LEVEL
 
@@ -49,16 +49,46 @@ def apply_gift_exp(
     room_exp: int,
     source_id: str,
 ) -> dict:
+    receipt_key = f"GIFT_SETTLEMENT:{source_id}"
+    receipt, created = get_or_create_unique_with_created(
+        db,
+        ExperienceMutationReceipt,
+        ExperienceMutationReceipt.receipt_key,
+        receipt_key,
+    )
+    if created:
+        receipt.source_type = "GIFT_SETTLEMENT"
+        receipt.source_id = source_id
+        db.add(receipt)
+    else:
+        sender_status = get_or_create_user_exp(db, sender_user_id)
+        receiver_status = get_or_create_user_exp(db, receiver_user_id)
+        room_status = (
+            get_or_create_room_exp(db, room_id)
+            if room_id is not None and room_exp > 0
+            else None
+        )
+        return {
+            "sender": user_exp_payload(sender_status),
+            "receiver": user_exp_payload(receiver_status),
+            "room": room_exp_payload(room_status) if room_status else None,
+            "duplicate": True,
+        }
+
     sender_status = get_or_create_user_exp(db, sender_user_id)
     receiver_status = get_or_create_user_exp(db, receiver_user_id)
 
     sender_status.send_total_exp += max(send_exp, 0)
-    sender_status.send_level = economy_rules_service.level_for_exp(db, sender_status.send_total_exp, "send")
+    sender_status.send_level = economy_rules_service.level_for_exp(
+        db, sender_status.send_total_exp, "send"
+    )
     sender_status.last_source_type = "GIFT_SEND"
     sender_status.last_source_id = source_id
 
     receiver_status.receive_total_exp += max(receive_exp, 0)
-    receiver_status.receive_level = economy_rules_service.level_for_exp(db, receiver_status.receive_total_exp, "receive")
+    receiver_status.receive_level = economy_rules_service.level_for_exp(
+        db, receiver_status.receive_total_exp, "receive"
+    )
     receiver_status.last_source_type = "GIFT_RECEIVE"
     receiver_status.last_source_id = source_id
 
@@ -66,7 +96,9 @@ def apply_gift_exp(
     if room_id is not None and room_exp > 0:
         room_status = get_or_create_room_exp(db, room_id)
         room_status.total_exp += max(room_exp, 0)
-        room_status.level = economy_rules_service.level_for_exp(db, room_status.total_exp, "room")
+        room_status.level = economy_rules_service.level_for_exp(
+            db, room_status.total_exp, "room"
+        )
         room_status.last_source_type = "GIFT_RECEIVE"
         room_status.last_source_id = source_id
 
@@ -74,8 +106,8 @@ def apply_gift_exp(
         "sender": user_exp_payload(sender_status),
         "receiver": user_exp_payload(receiver_status),
         "room": room_exp_payload(room_status) if room_status else None,
+        "duplicate": False,
     }
-
 
 def vip_svip_payload(*, lifetime_recharge_coin_exp: int, monthly_recharge_coin_exp: int) -> dict:
     return {
