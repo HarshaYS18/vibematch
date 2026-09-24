@@ -346,7 +346,13 @@ def get_props(db: Session) -> dict[str, Any]:
     }
 
 
-def update_props(db: Session, actor: User, payload: dict[str, Any]) -> dict[str, Any]:
+def update_props(
+    db: Session,
+    actor: User,
+    payload: dict[str, Any],
+    *,
+    commit: bool = True,
+) -> dict[str, Any]:
     definition = get_or_create_definition(db, actor)
     current = get_props(db)
     rules = _merged(DEFAULT_RULES, definition.rules_json)
@@ -370,8 +376,11 @@ def update_props(db: Session, actor: User, payload: dict[str, Any]) -> dict[str,
     definition.rules_json = _dumps(rules)
     definition.risk_config_json = _dumps(risk)
     definition.updated_by_user_id = actor.id
-    db.commit()
-    db.refresh(definition)
+    if commit:
+        db.commit()
+        db.refresh(definition)
+    else:
+        db.flush()
     return get_props(db)
 
 

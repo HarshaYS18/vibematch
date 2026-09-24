@@ -176,7 +176,7 @@ def record_payout(db: Session, *, amount: int, actor: User, source_id: str, user
     main_pool.balance -= remaining
 
 
-def adjust_pool(db: Session, *, actor: User, game_key: str, pool_type: str, direction: str, amount: int, reason: str) -> GamePool:
+def adjust_pool(db: Session, *, actor: User, game_key: str, pool_type: str, direction: str, amount: int, reason: str, commit: bool = True) -> GamePool:
     if amount <= 0:
         raise HTTPException(status_code=400, detail="Amount must be positive")
     pool = get_or_create_pool(db, game_key, pool_type)
@@ -189,12 +189,15 @@ def adjust_pool(db: Session, *, actor: User, game_key: str, pool_type: str, dire
         pool.balance += amount
     else:
         pool.balance -= amount
-    db.commit()
-    db.refresh(pool)
+    if commit:
+        db.commit()
+        db.refresh(pool)
+    else:
+        db.flush()
     return pool
 
 
-def allocate_main_to_lucky(db: Session, *, actor: User, amount: int, reason: str) -> dict:
+def allocate_main_to_lucky(db: Session, *, actor: User, amount: int, reason: str, commit: bool = True) -> dict:
     if amount <= 0:
         raise HTTPException(status_code=400, detail="Amount must be positive")
     main_pool, lucky_pool = ensure_house_pools(db)
@@ -204,13 +207,16 @@ def allocate_main_to_lucky(db: Session, *, actor: User, amount: int, reason: str
     _ledger(db, lucky_pool, EconomyDirection.CREDIT.value, amount, "LUCKY_POOL_ALLOCATE_FROM_MAIN", actor, reason, source_id=GLOBAL_POOL_KEY)
     main_pool.balance -= amount
     lucky_pool.balance += amount
-    db.commit()
-    db.refresh(main_pool)
-    db.refresh(lucky_pool)
+    if commit:
+        db.commit()
+        db.refresh(main_pool)
+        db.refresh(lucky_pool)
+    else:
+        db.flush()
     return {"main_pool": pool_response(main_pool), "lucky_pool": pool_response(lucky_pool)}
 
 
-def withdraw_lucky_to_main(db: Session, *, actor: User, amount: int, reason: str) -> dict:
+def withdraw_lucky_to_main(db: Session, *, actor: User, amount: int, reason: str, commit: bool = True) -> dict:
     if amount <= 0:
         raise HTTPException(status_code=400, detail="Amount must be positive")
     main_pool, lucky_pool = ensure_house_pools(db)
@@ -220,13 +226,16 @@ def withdraw_lucky_to_main(db: Session, *, actor: User, amount: int, reason: str
     _ledger(db, main_pool, EconomyDirection.CREDIT.value, amount, "LUCKY_POOL_WITHDRAW_FROM_GAME", actor, reason, source_id=LUCKY_GIFT_KEY)
     lucky_pool.balance -= amount
     main_pool.balance += amount
-    db.commit()
-    db.refresh(main_pool)
-    db.refresh(lucky_pool)
+    if commit:
+        db.commit()
+        db.refresh(main_pool)
+        db.refresh(lucky_pool)
+    else:
+        db.flush()
     return {"main_pool": pool_response(main_pool), "lucky_pool": pool_response(lucky_pool)}
 
 
-def update_pool_settings(db: Session, *, actor: User, game_key: str, pool_type: str, status: str | None, daily_payout_cap: int | None, daily_loss_limit: int | None, max_single_payout: int | None, rtp_target_basis_points: int | None, reason: str) -> GamePool:
+def update_pool_settings(db: Session, *, actor: User, game_key: str, pool_type: str, status: str | None, daily_payout_cap: int | None, daily_loss_limit: int | None, max_single_payout: int | None, rtp_target_basis_points: int | None, reason: str, commit: bool = True) -> GamePool:
     pool = get_or_create_pool(db, game_key, pool_type)
     if status is not None:
         if status not in {item.value for item in EconomyPoolStatus}:
@@ -241,6 +250,9 @@ def update_pool_settings(db: Session, *, actor: User, game_key: str, pool_type: 
     if rtp_target_basis_points is not None:
         pool.rtp_target_basis_points = rtp_target_basis_points
     _ledger(db, pool, EconomyDirection.CREDIT.value, 0, "SUPER_OWNER_LUCKY_POOL_SETTINGS", actor, reason)
-    db.commit()
-    db.refresh(pool)
+    if commit:
+        db.commit()
+        db.refresh(pool)
+    else:
+        db.flush()
     return pool

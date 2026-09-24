@@ -96,6 +96,38 @@ class GamePoolConfigureCommandRequest(MutationContext):
     rtp_target_basis_points: int = Field(default=8000, ge=0, le=10000)
 
 
+class LuckyGiftPropsAdminCommandRequest(MutationContext):
+    actor_user_id: int
+    props: dict[str, Any] = Field(default_factory=dict)
+
+
+class LuckyGiftPoolAdjustCommandRequest(MutationContext):
+    actor_user_id: int
+    game_key: str = Field(default="lucky_gifts", min_length=2, max_length=80)
+    pool_type: str = Field(default="GAME_HOUSE_POOL", min_length=3, max_length=80)
+    direction: str = Field(pattern="^(CREDIT|DEBIT)$")
+    amount: int = Field(gt=0)
+    reason: str = Field(min_length=3, max_length=255)
+
+
+class LuckyGiftPoolTransferCommandRequest(MutationContext):
+    actor_user_id: int
+    amount: int = Field(gt=0)
+    reason: str = Field(min_length=3, max_length=255)
+
+
+class LuckyGiftPoolSettingsCommandRequest(MutationContext):
+    actor_user_id: int
+    game_key: str = Field(default="lucky_gifts", min_length=2, max_length=80)
+    pool_type: str = Field(default="GAME_HOUSE_POOL", min_length=3, max_length=80)
+    status: str | None = Field(default=None, pattern="^(ACTIVE|FROZEN|CLOSED)$")
+    daily_payout_cap: int | None = Field(default=None, ge=0)
+    daily_loss_limit: int | None = Field(default=None, ge=0)
+    max_single_payout: int | None = Field(default=None, ge=0)
+    rtp_target_basis_points: int | None = Field(default=None, ge=0, le=10000)
+    reason: str = Field(min_length=3, max_length=255)
+
+
 class BulkGrantEnqueueRequest(MutationContext):
     actor_user_id: int
     coin_amount: int = Field(gt=0, le=10_000_000)
@@ -758,6 +790,201 @@ def settle_lucky_gift(
             "multiplier": multiplier,
         },
     )
+
+@router.post("/lucky-gifts/admin/props", dependencies=[Depends(require_internal_token)])
+def update_lucky_gift_props_admin(
+    payload: LuckyGiftPropsAdminCommandRequest,
+    db: Session = Depends(get_db),
+):
+    actor = db.query(User).filter(User.id == payload.actor_user_id).first()
+    if actor is None:
+        raise HTTPException(status_code=404, detail="Actor user not found")
+    tx, cached = _begin(
+        db,
+        payload,
+        operation="lucky_gift.props.update",
+        actor_user_id=actor.id,
+    )
+    if cached is not None:
+        return cached
+    props = lucky_gift_props_service.update_props(
+        db,
+        actor,
+        payload.props,
+        commit=False,
+    )
+    result = {"transaction_id": tx.transaction_id, **props}
+    return economy_transaction_service.complete(
+        db,
+        tx=tx,
+        result=result,
+        event_type="economy.lucky_gift.props_updated.v1",
+        event_payload={"actor_user_id": actor.id, "game_key": "lucky_gifts"},
+    )
+
+
+@router.post("/lucky-gifts/admin/house-pool/adjust", dependencies=[Depends(require_internal_token)])
+def adjust_lucky_gift_pool_admin(
+    payload: LuckyGiftPoolAdjustCommandRequest,
+    db: Session = Depends(get_db),
+):
+    actor = db.query(User).filter(User.id == payload.actor_user_id).first()
+    if actor is None:
+        raise HTTPException(status_code=404, detail="Actor user not found")
+    tx, cached = _begin(
+        db,
+        payload,
+        operation="lucky_gift.pool.adjust",
+        actor_user_id=actor.id,
+    )
+    if cached is not None:
+        return cached
+    pool = lucky_gift_house_service.adjust_pool(
+        db=db,
+        actor=actor,
+        game_key=payload.game_key,
+        pool_type=payload.pool_type,
+        direction=payload.direction,
+        amount=payload.amount,
+        reason=payload.reason,
+        commit=False,
+    )
+    result = {"transaction_id": tx.transaction_id, **lucky_gift_house_service.pool_response(pool)}
+    return economy_transaction_service.complete(
+        db,
+        tx=tx,
+        result=result,
+        event_type="economy.lucky_gift.pool_adjusted.v1",
+        event_payload={
+            "actor_user_id": actor.id,
+            "pool_id": pool.id,
+            "game_key": payload.game_key,
+            "pool_type": payload.pool_type,
+            "direction": payload.direction,
+            "amount": payload.amount,
+        },
+    )
+
+
+@router.post("/lucky-gifts/admin/house-pool/allocate", dependencies=[Depends(require_internal_token)])
+def allocate_lucky_gift_pool_admin(
+    payload: LuckyGiftPoolTransferCommandRequest,
+    db: Session = Depends(get_db),
+):
+    actor = db.query(User).filter(User.id == payload.actor_user_id).first()
+    if actor is None:
+        raise HTTPException(status_code=404, detail="Actor user not found")
+    tx, cached = _begin(
+        db,
+        payload,
+        operation="lucky_gift.pool.allocate",
+        actor_user_id=actor.id,
+    )
+    if cached is not None:
+        return cached
+    pair = lucky_gift_house_service.allocate_main_to_lucky(
+        db=db,
+        actor=actor,
+        amount=payload.amount,
+        reason=payload.reason,
+        commit=False,
+    )
+    result = {"transaction_id": tx.transaction_id, **pair}
+    return economy_transaction_service.complete(
+        db,
+        tx=tx,
+        result=result,
+        event_type="economy.lucky_gift.pool_allocated.v1",
+        event_payload={
+            "actor_user_id": actor.id,
+            "game_key": "lucky_gifts",
+            "amount": payload.amount,
+            "direction": "MAIN_TO_LUCKY",
+        },
+    )
+
+
+@router.post("/lucky-gifts/admin/house-pool/withdraw", dependencies=[Depends(require_internal_token)])
+def withdraw_lucky_gift_pool_admin(
+    payload: LuckyGiftPoolTransferCommandRequest,
+    db: Session = Depends(get_db),
+):
+    actor = db.query(User).filter(User.id == payload.actor_user_id).first()
+    if actor is None:
+        raise HTTPException(status_code=404, detail="Actor user not found")
+    tx, cached = _begin(
+        db,
+        payload,
+        operation="lucky_gift.pool.withdraw",
+        actor_user_id=actor.id,
+    )
+    if cached is not None:
+        return cached
+    pair = lucky_gift_house_service.withdraw_lucky_to_main(
+        db=db,
+        actor=actor,
+        amount=payload.amount,
+        reason=payload.reason,
+        commit=False,
+    )
+    result = {"transaction_id": tx.transaction_id, **pair}
+    return economy_transaction_service.complete(
+        db,
+        tx=tx,
+        result=result,
+        event_type="economy.lucky_gift.pool_withdrawn.v1",
+        event_payload={
+            "actor_user_id": actor.id,
+            "game_key": "lucky_gifts",
+            "amount": payload.amount,
+            "direction": "LUCKY_TO_MAIN",
+        },
+    )
+
+
+@router.post("/lucky-gifts/admin/house-pool/settings", dependencies=[Depends(require_internal_token)])
+def update_lucky_gift_pool_settings_admin(
+    payload: LuckyGiftPoolSettingsCommandRequest,
+    db: Session = Depends(get_db),
+):
+    actor = db.query(User).filter(User.id == payload.actor_user_id).first()
+    if actor is None:
+        raise HTTPException(status_code=404, detail="Actor user not found")
+    tx, cached = _begin(
+        db,
+        payload,
+        operation="lucky_gift.pool.settings",
+        actor_user_id=actor.id,
+    )
+    if cached is not None:
+        return cached
+    pool = lucky_gift_house_service.update_pool_settings(
+        db=db,
+        actor=actor,
+        game_key=payload.game_key,
+        pool_type=payload.pool_type,
+        status=payload.status,
+        daily_payout_cap=payload.daily_payout_cap,
+        daily_loss_limit=payload.daily_loss_limit,
+        max_single_payout=payload.max_single_payout,
+        rtp_target_basis_points=payload.rtp_target_basis_points,
+        reason=payload.reason,
+        commit=False,
+    )
+    result = {"transaction_id": tx.transaction_id, **lucky_gift_house_service.pool_response(pool)}
+    return economy_transaction_service.complete(
+        db,
+        tx=tx,
+        result=result,
+        event_type="economy.lucky_gift.pool_settings_updated.v1",
+        event_payload={
+            "actor_user_id": actor.id,
+            "pool_id": pool.id,
+            "game_key": payload.game_key,
+            "pool_type": payload.pool_type,
+        },
+    )
+
 
 @router.post("/supply/mint", dependencies=[Depends(require_internal_token)])
 def mint_supply(payload: SupplyMintRequest, db: Session = Depends(get_db)):

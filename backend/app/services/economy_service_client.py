@@ -451,3 +451,114 @@ def queue_bulk_grant(
             "reason": reason,
         },
     )
+
+def update_lucky_gift_props(
+    *,
+    request_id: str,
+    actor_user_id: int,
+    props: dict[str, Any],
+) -> dict[str, Any]:
+    business_reference = f"lucky-gift-props:{actor_user_id}:{request_id}"
+    return _request(
+        "lucky-gifts/admin/props",
+        {
+            **mutation_context("lucky_gift.props.update", business_reference),
+            "actor_user_id": actor_user_id,
+            "props": props,
+        },
+    )
+
+
+def adjust_lucky_gift_pool(
+    *,
+    request_id: str,
+    actor_user_id: int,
+    game_key: str,
+    pool_type: str,
+    direction: str,
+    amount: int,
+    reason: str,
+) -> dict[str, Any]:
+    business_reference = f"lucky-gift-pool-adjust:{actor_user_id}:{request_id}"
+    return _request(
+        "lucky-gifts/admin/house-pool/adjust",
+        {
+            **mutation_context("lucky_gift.pool.adjust", business_reference),
+            "actor_user_id": actor_user_id,
+            "game_key": game_key,
+            "pool_type": pool_type,
+            "direction": direction,
+            "amount": amount,
+            "reason": reason,
+        },
+    )
+
+
+def allocate_lucky_gift_pool(
+    *,
+    request_id: str,
+    actor_user_id: int,
+    amount: int,
+    reason: str,
+) -> dict[str, Any]:
+    business_reference = f"lucky-gift-pool-allocate:{actor_user_id}:{request_id}"
+    return _request(
+        "lucky-gifts/admin/house-pool/allocate",
+        {
+            **mutation_context("lucky_gift.pool.allocate", business_reference),
+            "actor_user_id": actor_user_id,
+            "amount": amount,
+            "reason": reason,
+        },
+    )
+
+
+def withdraw_lucky_gift_pool(
+    *,
+    request_id: str,
+    actor_user_id: int,
+    amount: int,
+    reason: str,
+) -> dict[str, Any]:
+    business_reference = f"lucky-gift-pool-withdraw:{actor_user_id}:{request_id}"
+    return _request(
+        "lucky-gifts/admin/house-pool/withdraw",
+        {
+            **mutation_context("lucky_gift.pool.withdraw", business_reference),
+            "actor_user_id": actor_user_id,
+            "amount": amount,
+            "reason": reason,
+        },
+    )
+
+
+def update_lucky_gift_pool_settings(
+    *,
+    request_id: str,
+    actor_user_id: int,
+    game_key: str,
+    pool_type: str,
+    status: str | None,
+    daily_payout_cap: int | None,
+    daily_loss_limit: int | None,
+    max_single_payout: int | None,
+    rtp_target_basis_points: int | None,
+    reason: str,
+) -> dict[str, Any]:
+    business_reference = f"lucky-gift-pool-settings:{actor_user_id}:{request_id}"
+    return _request(
+        "lucky-gifts/admin/house-pool/settings",
+        {
+            **mutation_context("lucky_gift.pool.settings", business_reference),
+            "actor_user_id": actor_user_id,
+            "game_key": game_key,
+            "pool_type": pool_type,
+            "status": status,
+            "daily_payout_cap": daily_payout_cap,
+            "daily_loss_limit": daily_loss_limit,
+            "max_single_payout": max_single_payout,
+            "rtp_target_basis_points": rtp_target_basis_points,
+            "reason": reason,
+        },
+    )
+
