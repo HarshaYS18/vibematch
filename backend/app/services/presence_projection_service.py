@@ -13,6 +13,7 @@ from app.models.room_participant import RoomParticipant
 
 _GLOBAL_USER_LEASE_PREFIX = "funkey:realtime:gateway:user-active"
 _USER_ROOM_LEASE_PREFIX = "funkey:realtime:gateway:user-rooms"
+_ROOM_USER_LEASE_PREFIX = "funkey:realtime:gateway:room-users"
 
 
 @dataclass(frozen=True)
@@ -28,6 +29,72 @@ def _user_lease_key(user_id: int) -> str:
 
 def _user_room_key(user_id: int) -> str:
     return f"{_USER_ROOM_LEASE_PREFIX}:{int(user_id)}"
+
+
+def _room_user_key(room_public_id: str) -> str:
+    return f"{_ROOM_USER_LEASE_PREFIX}:{room_public_id.strip()}"
+
+
+def _text(value: object) -> str:
+    if isinstance(value, bytes):
+        return value.decode("utf-8", errors="replace")
+    return str(value)
+
+
+def active_room_ids_for_user(user_id: int) -> set[str]:
+    """Return rooms with a live Go-gateway lease for this user."""
+    redis_client = get_realtime_redis()
+    try:
+        values = redis_client.zrangebyscore(
+            _user_room_key(user_id),
+            time.time(),
+            "+inf",
+        )
+    except Exception:
+        return set()
+    return {_text(value) for value in values if _text(value).strip()}
+
+
+def room_online_user_ids(room_public_id: str) -> set[int]:
+    """Return backend user IDs with an unexpired socket lease in a room."""
+    redis_client = get_realtime_redis()
+    try:
+        values = redis_client.zrangebyscore(
+            _room_user_key(room_public_id),
+            time.time(),
+            "+inf",
+        )
+    except Exception:
+        return set()
+    result: set[int] = set()
+    for value in values:
+        try:
+            user_id = int(_text(value))
+        except (TypeError, ValueError):
+            continue
+        if user_id > 0:
+            result.add(user_id)
+    return result
+
+
+def room_online_counts(room_public_ids: list[str] | tuple[str, ...] | set[str]) -> dict[str, int]:
+    """Batch Redis room counts without consulting participant heartbeat timestamps."""
+    resolved = [room_id.strip() for room_id in dict.fromkeys(room_public_ids) if room_id.strip()]
+    if not resolved:
+        return {}
+    redis_client = get_realtime_redis()
+    now = time.time()
+    try:
+        pipe = redis_client.pipeline(transaction=False)
+        for room_id in resolved:
+            pipe.zcount(_room_user_key(room_id), now, "+inf")
+        values = pipe.execute()
+    except Exception:
+        return {room_id: 0 for room_id in resolved}
+    return {
+        room_id: int(value or 0)
+        for room_id, value in zip(resolved, values, strict=False)
+    }
 
 
 def project_user_presence(
@@ -79,7 +146,7 @@ def project_user_presence(
             room_results = pipe.execute()
             for user_id, values in zip(online_ids, room_results, strict=False):
                 if values:
-                    room_by_user[user_id] = str(values[0])
+                    room_by_user[user_id] = _text(values[0])
         except Exception:
             room_by_user = {}
 
