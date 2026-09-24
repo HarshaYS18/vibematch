@@ -51,6 +51,11 @@ class GamePlatformCutoverTests(unittest.TestCase):
         sql=(ROOT/"deploy/postgres/game-platform-ownership.sql").read_text(encoding="utf-8")
         self.assertIn("GRANT SELECT,INSERT ON TABLE admin_logs TO funkey_game_platform_runtime",sql)
 
+    def test_game_master_reads_do_not_use_legacy_game_pool_side_effects(self):
+        source=(ROOT/"backend/app/api/routes/games_master.py").read_text(encoding="utf-8")
+        self.assertIn("game_platform_runtime_service as game_service",source)
+        self.assertNotIn("global_jungle_game_service_v2",source)
+
 
 if __name__=="__main__":
     unittest.main()

@@ -1095,6 +1095,14 @@ def _validate_game_platform_extraction(errors: list[str]) -> None:
         if "economy_service.create_game_round" in block:
             errors.append("core/Economy admin must not create Game Platform round rows directly")
 
+    games_master = ROOT / "backend" / "app" / "api" / "routes" / "games_master.py"
+    if games_master.exists():
+        text = games_master.read_text(encoding="utf-8")
+        if "game_platform_runtime_service as game_service" not in text:
+            errors.append("Game Platform master/rankings must use game_platform_runtime_service")
+        if "global_jungle_game_service_v2" in text:
+            errors.append("Game Platform master/rankings must not trigger legacy Economy game-pool writes")
+
     runtime = ROOT / "backend" / "app" / "services" / "game_platform_runtime_service.py"
     if runtime.exists():
         text = runtime.read_text(encoding="utf-8")
