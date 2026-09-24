@@ -8,15 +8,15 @@ from fastapi import APIRouter
 
 from app.api.routes import (
     admin_support, ai_moderation, app_source_registry, calls,
-    coin_sales, control_center, economy, economy_admin, economy_master,
-    experience, families_economy, game_pool_admin, game_props_admin,
-    game_settlements, games, games_master, gift_catalog, health, home_banners,
-    identity_proxy, inbox_proxy, inbox_stories, lucky_coins,
-    lucky_gifts, lucky_gift_admin, lucky_packets, media, media_control, media_realtime_auth, media_safety_admin,
+    control_center, economy, economy_admin, economy_master, economy_proxy,
+    experience, families_economy, game_props_admin,
+    game_settlements, games, games_master, health, home_banners,
+    identity_proxy, inbox_proxy, inbox_stories,
+    lucky_gift_admin, media, media_control, media_realtime_auth, media_safety_admin,
     notifications, presence, profile_social_proxy, push, rankings,
     relationship_exp, role_badges, room_control_proxy, room_cross_domain,
     room_levels, room_music_media, realtime_gateway_auth, settings, super_owner,
-    support, users, vibes_proxy, vip_admin, wallet,
+    support, users, vibes_proxy, vip_admin,
 )
 from app.api.routes.rooms import cricket
 from app.api.routes.store import router as store_router
@@ -63,22 +63,22 @@ api_router.include_router(inbox_proxy.router)
 api_router.include_router(media.router)
 api_router.include_router(room_music_media.router)
 
-# Economy, gifts, games and store.
+# Economy financial route families are extracted behind a compatibility proxy.
+# Core keeps only the /economy read + gift orchestration facade.
+api_router.include_router(economy_proxy.router)
 for router in (
-    wallet.router, economy.router, economy_master.router, gift_catalog.router,
-    lucky_gifts.router, lucky_coins.router, games.router, games_master.router,
-    game_settlements.router, store_router, coin_sales.router, experience.router,
+    economy.router, economy_master.router, games.router, games_master.router,
+    game_settlements.router, store_router, experience.router,
 ):
     api_router.include_router(router)
-api_router.include_router(lucky_packets.router)
 
 # Administrative surfaces.
 for router in (
     admin_support.router, ai_moderation.router,
     media_safety_admin.router, vip_admin.router, super_owner.router,
-    control_center.router, game_pool_admin.router, game_props_admin.router,
-    economy_admin.router, games.admin_router, gift_catalog.admin_router,
-    room_control_proxy.admin_router, coin_sales.admin_router, lucky_gift_admin.router,
+    control_center.router, game_props_admin.router,
+    economy_admin.router, games.admin_router,
+    room_control_proxy.admin_router, lucky_gift_admin.router,
     home_banners.admin_router, vibes_proxy.admin_router,
 ):
     api_router.include_router(router)

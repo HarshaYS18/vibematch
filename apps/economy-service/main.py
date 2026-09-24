@@ -1,7 +1,16 @@
-from fastapi import FastAPI
+from fastapi import APIRouter, FastAPI
 from fastapi.responses import PlainTextResponse
 from sqlalchemy import text
 
+from app.api.routes import (
+    coin_sales,
+    game_pool_admin,
+    gift_catalog,
+    lucky_coins,
+    lucky_gifts,
+    lucky_packets,
+    wallet,
+)
 from app.core.config import settings
 from app.core.operational import install_query_counter, operational_middleware, render_metrics
 from app.core.telemetry import configure_telemetry
@@ -20,6 +29,22 @@ app = FastAPI(
 )
 app.middleware("http")(operational_middleware)
 app.dependency_overrides[get_db] = get_economy_db
+
+api = APIRouter(prefix="/api/v1")
+for public_router in (
+    wallet.router,
+    coin_sales.router,
+    lucky_coins.router,
+    lucky_packets.router,
+    gift_catalog.router,
+    lucky_gifts.router,
+    game_pool_admin.router,
+    coin_sales.admin_router,
+    gift_catalog.admin_router,
+):
+    api.include_router(public_router)
+
+app.include_router(api)
 app.include_router(internal_router)
 
 
