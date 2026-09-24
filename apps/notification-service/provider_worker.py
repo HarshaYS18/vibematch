@@ -5,6 +5,7 @@ from threading import Event, Thread
 from app.core.config import settings
 from app.core.telemetry import configure_telemetry, shutdown_telemetry
 from app.services import notification_delivery_service
+from app.services.push_notification_service import assert_firebase_configuration
 from database import SessionLocal, engine
 
 _logger=logging.getLogger("funkey.notification-provider"); _stop=Event(); _ready=False
@@ -18,7 +19,7 @@ class HealthHandler(BaseHTTPRequestHandler):
 def _signal_handler(*_args): _stop.set()
 def run():
     global _ready
-    settings.validate_notification_service(); logging.basicConfig(level=logging.INFO,format="%(message)s"); configure_telemetry("funkey-notification-provider",engine=engine)
+    settings.validate_notification_provider(); assert_firebase_configuration(); logging.basicConfig(level=logging.INFO,format="%(message)s"); configure_telemetry("funkey-notification-provider",engine=engine)
     signal.signal(signal.SIGINT,_signal_handler); signal.signal(signal.SIGTERM,_signal_handler)
     health=ThreadingHTTPServer(("0.0.0.0",int(os.getenv("NOTIFICATION_PROVIDER_HEALTH_PORT","8091"))),HealthHandler); Thread(target=health.serve_forever,daemon=True).start(); _ready=True
     try:

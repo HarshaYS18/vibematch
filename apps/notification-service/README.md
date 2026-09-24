@@ -9,3 +9,7 @@ A recipient + dedupe key creates at most one notification. Each active device ge
 Core preserves `/api/v1/notifications/*` and `/api/v1/push/*` through `notification_proxy`, so Flutter UI/API paths do not change.
 
 Operations: API `8090`; provider health `8091`; database `NOTIFICATION_DATABASE_URL`; internal auth `NOTIFICATION_INTERNAL_TOKEN`.
+
+## Credential isolation
+
+The HTTP API needs the Notification database role and internal-intent token, but no FCM private key. Only the provider worker receives the FCM service account and validates provider configuration. This keeps provider credentials out of public API pods.

@@ -103,7 +103,7 @@ class ProductionConfigTests(TestCase):
             "postgresql://funkey_migrate:strong-secret@postgres.internal:5432/funkey",
             settings_obj.migration_database_url,
         )
-        self.assertEqual(748, settings_obj.expected_pooler_client_connections)
+        self.assertEqual(848, settings_obj.expected_pooler_client_connections)
 
         with self.assertRaisesRegex(RuntimeError, "MIGRATION_DATABASE_URL"):
             Settings(
@@ -295,20 +295,20 @@ class OutboxLeaseTests(TestCase):
 
 
 class WorkerIdempotencyTests(TestCase):
-    def test_notification_is_inserted_once_for_duplicate_delivery(self):
-        db_engine = create_engine("sqlite://", connect_args={"check_same_thread": False}, poolclass=StaticPool)
-        Base.metadata.create_all(db_engine, tables=[User.__table__, UserNotification.__table__, WorkerProcessedEvent.__table__])
-        factory = sessionmaker(bind=db_engine)
-        with factory.begin() as db:
-            db.add(User(id=7, public_user_id=6418000007, username="recipient"))
+    def test_notification_worker_delegates_idempotency_to_notification_service(self):
         event = EventEnvelope(
             event_id=uuid4(), event_type="notification.requested", event_version=1,
             occurred_at=datetime.now(timezone.utc),
             payload={"recipient_user_id": 7, "notification_type": "test", "title": "Hello", "body": "Body"},
         )
-        with patch.object(handlers, "SessionLocal", factory):
+        with patch.object(
+            handlers.notification_service_client,
+            "create_intent",
+            side_effect=[{"duplicate": False}, {"duplicate": True}],
+        ) as create_intent:
             self.assertEqual(handlers.handle_notification_requested(event), "processed")
             self.assertEqual(handlers.handle_notification_requested(event), "duplicate")
-        with factory() as db:
-            self.assertEqual(db.query(UserNotification).count(), 1)
-        db_engine.dispose()
+        self.assertEqual(create_intent.call_count, 2)
+        for call in create_intent.call_args_list:
+            self.assertEqual(call.kwargs["source_event_id"], str(event.event_id))
+            self.assertEqual(call.kwargs["recipient_user_id"], 7)

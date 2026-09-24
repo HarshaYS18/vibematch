@@ -41,3 +41,7 @@ API image: `funkey-notification` on port 8090. Provider worker uses the same imm
 ## Migration status
 
 Chunk 29 extracted. Core public URLs are compatibility proxies; PostgreSQL ownership grants prevent core/generic worker writes after cutover.
+
+## Credential boundary
+
+The API deployment receives the Notification database credential and internal-intent secret. The provider deployment uses a separate provider secret plus the mounted FCM service account. Public API pods do not mount FCM credentials.

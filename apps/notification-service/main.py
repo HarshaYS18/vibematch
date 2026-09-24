@@ -6,12 +6,10 @@ from app.core.config import settings
 from app.core.operational import install_query_counter, operational_middleware, render_metrics
 from app.core.telemetry import configure_telemetry
 from app.database import get_db
-from app.services.push_notification_service import assert_firebase_configuration
 from database import engine, get_notification_db
 from internal import router as internal_router
 
 settings.validate_notification_service()
-assert_firebase_configuration()
 app=FastAPI(title="FunKey Notification Service",version="1.0.0",docs_url=None,redoc_url=None)
 app.middleware("http")(operational_middleware); app.dependency_overrides[get_db]=get_notification_db
 api=APIRouter(prefix="/api/v1"); api.include_router(notifications.router); api.include_router(push.router)

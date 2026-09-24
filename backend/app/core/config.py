@@ -170,7 +170,7 @@ class Settings(BaseSettings):
     DB_WORKER_MAX_OVERFLOW: int = 0
     DB_WORKER_CONNECTION_BUDGET: int = 60
     DB_ROLLOUT_SURGE_CONNECTION_RESERVE: int = 20
-    DB_POOLER_MAX_CLIENT_CONNECTIONS: int = 800
+    DB_POOLER_MAX_CLIENT_CONNECTIONS: int = 1000
     DB_SERVER_CONNECTION_LIMIT: int = 160
     DB_POOLER_MAX_SERVER_CONNECTIONS: int = 120
     DB_DIRECT_CONNECTION_RESERVE: int = 40
@@ -300,7 +300,6 @@ class Settings(BaseSettings):
             "IDENTITY_INTERNAL_TOKEN",
             "PROFILE_SOCIAL_INTERNAL_TOKEN",
             "ECONOMY_INTERNAL_TOKEN",
-            "NOTIFICATION_INTERNAL_TOKEN",
         ):
             value = getattr(self, name).strip()
             if len(value) < 32 or "change-this" in value.lower():
@@ -436,8 +435,6 @@ class Settings(BaseSettings):
             unsafe.append("DB_ROOM_CONTROL_CONNECTION_BUDGET")
         if not self.NOTIFICATION_SERVICE_URL.strip():
             unsafe.append("NOTIFICATION_SERVICE_URL")
-        if not self.NOTIFICATION_INTERNAL_URL.strip():
-            unsafe.append("NOTIFICATION_INTERNAL_URL")
         if self.NOTIFICATION_DB_POOL_SIZE <= 0 or self.NOTIFICATION_DB_MAX_OVERFLOW < 0:
             unsafe.append("NOTIFICATION_DB_POOL_SIZE/NOTIFICATION_DB_MAX_OVERFLOW")
         if (
@@ -676,12 +673,35 @@ class Settings(BaseSettings):
             > self.DB_NOTIFICATION_CONNECTION_BUDGET
         ):
             unsafe.append("DB_NOTIFICATION_CONNECTION_BUDGET")
-        if not self.FCM_PROJECT_ID.strip() or not self.FIREBASE_SERVICE_ACCOUNT_PATH.strip():
-            unsafe.append("FCM_PROJECT_ID/FIREBASE_SERVICE_ACCOUNT_PATH")
         if unsafe:
             raise RuntimeError(
                 "Unsafe Notification service production configuration: "
                 + ", ".join(unsafe)
+            )
+
+    def validate_notification_provider(self) -> None:
+        """Validate provider-worker settings without requiring API-only secrets."""
+        if not self.is_production:
+            return
+        unsafe: list[str] = []
+        url = self.NOTIFICATION_DATABASE_URL.strip()
+        if not url:
+            unsafe.append("NOTIFICATION_DATABASE_URL")
+        elif url == self.database_url.strip():
+            unsafe.append("NOTIFICATION_DATABASE_URL(service-isolated credentials required)")
+        if self.NOTIFICATION_DB_POOL_SIZE <= 0 or self.NOTIFICATION_DB_MAX_OVERFLOW < 0:
+            unsafe.append("NOTIFICATION_DB_POOL_SIZE/NOTIFICATION_DB_MAX_OVERFLOW")
+        if self.NOTIFICATION_PROVIDER_MAX_REPLICAS < 1:
+            unsafe.append("NOTIFICATION_PROVIDER_MAX_REPLICAS")
+        if not 10 <= self.NOTIFICATION_PROVIDER_LEASE_SECONDS <= 600:
+            unsafe.append("NOTIFICATION_PROVIDER_LEASE_SECONDS")
+        if not 1 <= self.NOTIFICATION_PROVIDER_MAX_ATTEMPTS <= 20:
+            unsafe.append("NOTIFICATION_PROVIDER_MAX_ATTEMPTS")
+        if not self.FCM_PROJECT_ID.strip() or not self.FIREBASE_SERVICE_ACCOUNT_PATH.strip():
+            unsafe.append("FCM_PROJECT_ID/FIREBASE_SERVICE_ACCOUNT_PATH")
+        if unsafe:
+            raise RuntimeError(
+                "Unsafe Notification provider configuration: " + ", ".join(unsafe)
             )
 
     def validate_economy_bulk_worker(self) -> None:
