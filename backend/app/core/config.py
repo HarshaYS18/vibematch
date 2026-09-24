@@ -134,6 +134,9 @@ class Settings(BaseSettings):
     ECONOMY_BULK_WORKER_DB_MAX_OVERFLOW: int = 0
     ECONOMY_BULK_WORKER_MAX_REPLICAS: int = 4
     DB_ECONOMY_BULK_WORKER_CONNECTION_BUDGET: int = 8
+    ECONOMY_RECONCILIATION_INTERVAL_SECONDS: int = 60
+    ECONOMY_RECONCILIATION_WALLET_BATCH_SIZE: int = 500
+    ECONOMY_RECONCILIATION_JOURNAL_BATCH_SIZE: int = 1000
 
     # Chunk 28 Game Platform service boundary.
     GAME_PLATFORM_SERVICE_URL: str = "http://127.0.0.1:8089/api/v1"
@@ -728,6 +731,12 @@ class Settings(BaseSettings):
             raise RuntimeError("Unsafe ECONOMY_BULK_LEASE_SECONDS")
         if self.ECONOMY_BULK_POLL_SECONDS < 0.1:
             raise RuntimeError("Unsafe ECONOMY_BULK_POLL_SECONDS")
+        if not 15 <= self.ECONOMY_RECONCILIATION_INTERVAL_SECONDS <= 3600:
+            raise RuntimeError("Unsafe ECONOMY_RECONCILIATION_INTERVAL_SECONDS")
+        if not 100 <= self.ECONOMY_RECONCILIATION_WALLET_BATCH_SIZE <= 10000:
+            raise RuntimeError("Unsafe ECONOMY_RECONCILIATION_WALLET_BATCH_SIZE")
+        if not 100 <= self.ECONOMY_RECONCILIATION_JOURNAL_BATCH_SIZE <= 20000:
+            raise RuntimeError("Unsafe ECONOMY_RECONCILIATION_JOURNAL_BATCH_SIZE")
         if (
             self.ECONOMY_BULK_WORKER_MAX_REPLICAS
             * (
