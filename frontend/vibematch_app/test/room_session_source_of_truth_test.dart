@@ -19,7 +19,8 @@ void main() {
     expect(state, contains('final Map<int, RoomMembershipEntry> membershipRoster'));
     expect(state, contains('final Map<int, RoomSessionSeat> seats'));
     expect(repository, contains('/realtime/join'));
-    expect(repository, contains('/realtime/heartbeat'));
+    expect(repository, isNot(contains('/realtime/heartbeat')));
+    expect(shell, isNot(contains('Duration(seconds: 12)')));
     expect(repository, contains('/realtime/snapshot'));
     expect(shell, contains('roomSessionRepositoryProvider'));
     expect(repository, isNot(contains('ValueNotifier')));
