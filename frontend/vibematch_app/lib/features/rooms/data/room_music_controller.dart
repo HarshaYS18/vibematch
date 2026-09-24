@@ -280,9 +280,8 @@ class RoomMusicController {
   Future<String> _ensureUploaded(RoomMusicTrack track) async {
     if (track.uploadedUrl.trim().isNotEmpty) return track.uploadedUrl;
 
-    final bytes = await XFile(track.path).readAsBytes();
-    final result = await _uploadService.uploadRoomMusicBytes(
-      bytes: bytes,
+    final result = await _uploadService.uploadRoomMusicXFile(
+      XFile(track.path),
       filename: _uploadFilenameFor(track),
     );
 

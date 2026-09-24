@@ -98,10 +98,16 @@ class _CreateVibePageModularState extends State<CreateVibePageModular> {
       _postingStatusText = null;
     });
     try {
-      final picked = sourceType == VibeMediaType.video ? await _picker.pickVideo(source: ImageSource.gallery) : await _picker.pickImage(source: ImageSource.gallery, imageQuality: 92);
+      final picked = sourceType == VibeMediaType.video
+          ? await _picker.pickVideo(source: ImageSource.gallery)
+          : await _picker.pickImage(
+              source: ImageSource.gallery,
+              imageQuality: 90,
+              maxWidth: 2560,
+              maxHeight: 2560,
+            );
       if (picked == null) return;
-      final bytes = await picked.readAsBytes();
-      final size = bytes.length;
+      final size = await picked.length();
       if (size <= 0) {
         _showAction('Selected media is empty.');
         return;
@@ -110,10 +116,13 @@ class _CreateVibePageModularState extends State<CreateVibePageModular> {
         _showAction('Vibe media must be 20 MB or smaller.');
         return;
       }
+      final previewBytes = sourceType == VibeMediaType.photo
+          ? await picked.readAsBytes()
+          : null;
       setState(() {
         _selectedType = sourceType;
         _selectedMediaFile = picked;
-        _selectedMediaPreviewBytes = sourceType == VibeMediaType.photo ? bytes : null;
+        _selectedMediaPreviewBytes = previewBytes;
         _uploadedMediaUrl = null;
         _selectedMediaName = picked.name;
         _selectedMediaBytes = size;
