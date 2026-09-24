@@ -1309,6 +1309,27 @@ def _validate_economy_service_cutover(errors: list[str]) -> None:
                     + forbidden
                 )
 
+    lucky_gift_route = (
+        ROOT / "backend" / "app" / "api" / "routes" / "lucky_gifts.py"
+    )
+    if lucky_gift_route.exists():
+        text = lucky_gift_route.read_text(encoding="utf-8")
+        result_source = _function_source(text, "record_lucky_gift_result")
+        for forbidden in (
+            "lucky_gift_stats_service.record_lucky_gift_result(",
+            ".commit(",
+            ".add(",
+        ):
+            if forbidden in result_source:
+                errors.append(
+                    "Lucky Gift client result endpoint must remain lookup-only: "
+                    + forbidden
+                )
+        if "_recent_matching_transaction(" not in result_source:
+            errors.append(
+                "Lucky Gift compatibility result endpoint must resolve authoritative history"
+            )
+
     lucky_packet_service = (
         ROOT / "backend" / "app" / "services" / "lucky_packet_service.py"
     )
