@@ -24,6 +24,9 @@ _failures = 0
 _reconciliation_runs = 0
 _reconciliation_failures = 0
 _reconciliation_wallet_mismatches = 0
+_reconciliation_supply_pool_mismatches = 0
+_reconciliation_game_pool_mismatches = 0
+_reconciliation_reservation_mismatches = 0
 _reconciliation_unbalanced_journals = 0
 
 
@@ -51,6 +54,9 @@ class HealthHandler(BaseHTTPRequestHandler):
                 f"funkey_economy_reconciliation_runs_total {_reconciliation_runs}\n"
                 f"funkey_economy_reconciliation_failures_total {_reconciliation_failures}\n"
                 f"funkey_economy_reconciliation_wallet_mismatches {_reconciliation_wallet_mismatches}\n"
+                f"funkey_economy_reconciliation_supply_pool_mismatches {_reconciliation_supply_pool_mismatches}\n"
+                f"funkey_economy_reconciliation_game_pool_mismatches {_reconciliation_game_pool_mismatches}\n"
+                f"funkey_economy_reconciliation_reservation_mismatches {_reconciliation_reservation_mismatches}\n"
                 f"funkey_economy_reconciliation_unbalanced_journals {_reconciliation_unbalanced_journals}\n"
             ).encode()
             self.send_response(200)
@@ -79,7 +85,9 @@ def _handle_signal(_signum, _frame):
 def main() -> None:
     global _ready, _batches, _failures
     global _reconciliation_runs, _reconciliation_failures
-    global _reconciliation_wallet_mismatches, _reconciliation_unbalanced_journals
+    global _reconciliation_wallet_mismatches, _reconciliation_supply_pool_mismatches
+    global _reconciliation_game_pool_mismatches, _reconciliation_reservation_mismatches
+    global _reconciliation_unbalanced_journals
     settings.validate_economy_service()
     settings.validate_economy_bulk_worker()
 
@@ -101,10 +109,14 @@ def main() -> None:
                         report = economy_reconciliation_service.reconcile(
                             db,
                             wallet_limit=settings.ECONOMY_RECONCILIATION_WALLET_BATCH_SIZE,
+                            pool_limit=settings.ECONOMY_RECONCILIATION_POOL_BATCH_SIZE,
                             journal_transaction_limit=settings.ECONOMY_RECONCILIATION_JOURNAL_BATCH_SIZE,
                         )
                     _reconciliation_runs += 1
                     _reconciliation_wallet_mismatches = report.wallet_mismatches
+                    _reconciliation_supply_pool_mismatches = report.supply_pool_mismatches
+                    _reconciliation_game_pool_mismatches = report.game_pool_mismatches
+                    _reconciliation_reservation_mismatches = report.reservation_mismatches
                     _reconciliation_unbalanced_journals = report.unbalanced_journal_transactions
                     if not report.healthy:
                         _reconciliation_failures += 1
