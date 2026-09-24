@@ -240,15 +240,18 @@ def get_owned_session(
     *,
     owner_user_id: int,
     session_id: str,
+    for_update: bool = False,
 ) -> MediaUploadSession:
-    session = (
+    query = (
         db.query(MediaUploadSession)
         .filter(
             MediaUploadSession.public_id == session_id,
             MediaUploadSession.owner_user_id == int(owner_user_id),
         )
-        .first()
     )
+    if for_update:
+        query = query.with_for_update()
+    session = query.first()
     if session is None:
         raise MediaUploadSessionError("Media upload session not found")
     return session
@@ -307,8 +310,14 @@ def complete_upload_session(
         db,
         owner_user_id=owner_user_id,
         session_id=session_id,
+        for_update=True,
     )
-    asset = db.get(CdnMediaAsset, session.media_id)
+    asset = (
+        db.query(CdnMediaAsset)
+        .filter(CdnMediaAsset.id == session.media_id)
+        .with_for_update()
+        .first()
+    )
     if asset is None:
         raise MediaUploadSessionError("Media asset not found")
     if session.status == MediaUploadSessionStatus.COMPLETED.value:

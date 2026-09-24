@@ -212,7 +212,7 @@ def _process_video(db: Session, asset: CdnMediaAsset, source: Path, work: Path) 
         "ffmpeg", "-y", "-ss", "1", "-i", str(source),
         "-frames:v", "1",
         "-vf", "scale=1024:-2:force_original_aspect_ratio=decrease",
-        "-c:v", "libwebp", "-quality", "82",
+        "-c:v", "libwebp", "-q:v", "80",
         str(poster),
     ])
     poster_width = min(1024, source_width)

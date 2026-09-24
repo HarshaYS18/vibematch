@@ -20,6 +20,8 @@ class MediaV2ControlPlaneTests(unittest.TestCase):
         self.assertLess(head_index, event_index)
         self.assertIn("size_mismatch", service)
         self.assertIn("content_type_mismatch", service)
+        self.assertIn("for_update=True", service)
+        self.assertIn(".with_for_update()", service)
 
     def test_production_uploads_are_direct_and_private_by_default(self):
         storage = (ROOT / "backend/app/services/media_storage_service.py").read_text(encoding="utf-8")

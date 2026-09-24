@@ -10,6 +10,7 @@ class MediaV2WorkerTests(unittest.TestCase):
         handlers = (ROOT / "apps/worker/handlers.py").read_text(encoding="utf-8")
         self.assertEqual(pools.count('"media.uploaded"'), 1)
         self.assertIn("funkey-worker-media-uploaded", pools)
+        self.assertIn("ack_wait_seconds=1800", pools)
         self.assertIn('"media.uploaded": handle_media_uploaded', handlers)
 
     def test_image_derivatives_cover_required_widths(self):
@@ -35,6 +36,17 @@ class MediaV2WorkerTests(unittest.TestCase):
         self.assertIn("PROCESSING_FAILED", processing)
         self.assertIn('event_type="media.moderation.requested"', processing)
         self.assertIn("MediaProcessingStatus.READY", processing)
+
+    def test_moderation_approval_releases_asset_and_profile(self):
+        moderation = (ROOT / "backend/app/services/media_moderation_service.py").read_text(encoding="utf-8")
+        handlers = (ROOT / "apps/worker/handlers.py").read_text(encoding="utf-8")
+        self.assertIn("asset.is_active_reference = True", moderation)
+        self.assertIn("CdnMediaModerationStatus.NOT_REQUIRED.value", handlers)
+
+    def test_video_poster_uses_portable_ffmpeg_quality_option(self):
+        processing = (ROOT / "backend/app/services/media_processing_service.py").read_text(encoding="utf-8")
+        self.assertIn('"-q:v", "80"', processing)
+        self.assertNotIn('"-quality", "82"', processing)
 
 
 if __name__ == "__main__":

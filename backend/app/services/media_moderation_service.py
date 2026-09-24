@@ -120,10 +120,12 @@ def _apply_asset_result(db: Session, asset: CdnMediaAsset, result: ModerationRes
     if result.decision == ModerationDecision.APPROVED:
         asset.moderation_status = CdnMediaModerationStatus.AI_APPROVED.value
         asset.upload_status = CdnMediaUploadStatus.APPROVED.value
+        asset.is_active_reference = True
         asset.human_review_status = None
     elif result.decision == ModerationDecision.DISABLED:
         asset.moderation_status = CdnMediaModerationStatus.NOT_REQUIRED.value
         asset.upload_status = CdnMediaUploadStatus.APPROVED.value
+        asset.is_active_reference = True
         asset.human_review_status = None
     elif result.decision in {ModerationDecision.REVIEW_REQUIRED, ModerationDecision.PROVIDER_FAILED}:
         asset.moderation_status = CdnMediaModerationStatus.HUMAN_REVIEW_REQUIRED.value
