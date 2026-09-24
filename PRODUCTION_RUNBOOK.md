@@ -108,6 +108,9 @@ Monitor:
 - outbox backlog
 - bulk job failures
 - `funkey_economy_reconciliation_wallet_mismatches`
+- `funkey_economy_reconciliation_supply_pool_mismatches`
+- `funkey_economy_reconciliation_game_pool_mismatches`
+- `funkey_economy_reconciliation_reservation_mismatches`
 - `funkey_economy_reconciliation_unbalanced_journals`
 
 Any non-zero reconciliation mismatch is an incident. Do not dual-write from core
