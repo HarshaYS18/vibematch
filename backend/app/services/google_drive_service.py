@@ -59,7 +59,7 @@ def exchange_code_for_tokens(code: str) -> dict[str, Any]:
         timeout=20,
     )
     if response.status_code >= 300:
-        raise ValueError(f"Google token exchange failed: {response.text}")
+        raise ValueError("Google token exchange failed")
     return response.json()
 
 
@@ -75,7 +75,7 @@ def refresh_access_token(refresh_token: str) -> dict[str, Any]:
         timeout=20,
     )
     if response.status_code >= 300:
-        raise ValueError(f"Google token refresh failed: {response.text}")
+        raise ValueError("Google token refresh failed")
     return response.json()
 
 
@@ -190,7 +190,7 @@ def download_backup_file(access_token: str, file_id: str) -> dict[str, Any]:
         timeout=30,
     )
     if response.status_code >= 300:
-        raise ValueError(f"Google Drive backup download failed: {response.text}")
+        raise ValueError("Google Drive backup download failed")
     return response.json()
 
 

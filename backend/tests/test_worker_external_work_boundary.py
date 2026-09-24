@@ -45,7 +45,7 @@ class WorkerExternalWorkBoundaryTests(unittest.TestCase):
 
     def test_google_provider_errors_do_not_persist_response_bodies(self):
         google=(ROOT/"backend/app/services/google_drive_service.py").read_text(encoding="utf-8")
-        self.assertNotIn("backup upload failed: {response.text}",google)
+        self.assertNotIn("response.text",google)
         self.assertIn("funkey_job_id",google)
 
     def test_pending_profile_media_is_not_auto_approved(self):
