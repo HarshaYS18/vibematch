@@ -451,6 +451,8 @@ def _validate_inbox_service_extraction(errors: list[str]) -> None:
         for required_token in (
             "list_conversations_page(",
             "list_messages_page(",
+            "limit=1",
+            "include_messages=False",
             '"/conversations/{conversation_id}/read"',
         ):
             if required_token not in text:
