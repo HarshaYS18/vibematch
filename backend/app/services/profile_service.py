@@ -1,3 +1,5 @@
+from datetime import datetime
+
 from fastapi import HTTPException
 from sqlalchemy.orm import Session
 
@@ -27,18 +29,34 @@ def _gradient_for_svip(svip_level: int, is_active: bool) -> dict[str, object]:
 
 
 def vip_summary(db: Session, user: User, levels: dict | None = None) -> dict:
-    levels = levels or economy_level_service.user_level_payload(db, user.id)
     status = db.query(UserVipStatus).filter(UserVipStatus.user_id == user.id).first()
-    vip_level = int((levels.get("vip") or {}).get("level") or 0)
-    svip_level = int((levels.get("svip") or {}).get("level") or 0)
-    svip_active = svip_level > 0
+    if status is None:
+        levels = levels or economy_level_service.user_level_payload(db, user.id)
+        vip_level = int((levels.get("vip") or {}).get("level") or 0)
+        svip_level = int((levels.get("svip") or {}).get("level") or 0)
+        vip_active = vip_level > 0
+        svip_active = svip_level > 0
+        svip_expires_at = None
+    else:
+        vip_level = int(status.vip_level or 0)
+        svip_level = int(status.svip_level or 0)
+        vip_active = bool(status.vip_is_active and vip_level > 0)
+        svip_active = bool(status.svip_is_active and svip_level > 0)
+        if (
+            svip_active
+            and status.svip_expires_at is not None
+            and status.svip_expires_at <= datetime.utcnow()
+        ):
+            svip_active = False
+        svip_expires_at = status.svip_expires_at if svip_active else None
+
     gradient = _gradient_for_svip(svip_level, svip_active)
     return {
         "vip_level": vip_level,
         "svip_level": svip_level,
-        "vip_is_active": vip_level > 0,
+        "vip_is_active": vip_active,
         "svip_is_active": svip_active,
-        "svip_expires_at": status.svip_expires_at if status and svip_active else None,
+        "svip_expires_at": svip_expires_at,
         "name_gradient_key": str(gradient["key"]),
         "name_gradient_colors": list(gradient["colors"]),
     }
