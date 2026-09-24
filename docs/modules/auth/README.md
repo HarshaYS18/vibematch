@@ -91,3 +91,7 @@ Before changing this module: identify the owning table and contract, add an addi
 ## Known migration status
 
 Existing FastAPI domain; no Go migration started.
+
+
+## Chunk 27 deployed boundary
+Public /api/v1/auth traffic now reaches apps/identity-service through the stable core facade. Identity owns account/authentication mutation plus durable identity_sessions and identity_devices. New access tokens contain a session id and support durable revocation; older tokens are a finite compatibility window until normal expiry.

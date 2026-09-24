@@ -91,3 +91,7 @@ Before changing this module: identify the owning table and contract, add an addi
 ## Known migration status
 
 Existing FastAPI domain; no Go migration started.
+
+
+## Chunk 27 deployed boundary
+Profile mutation and profile-visit side effects now execute in apps/profile-social-service. The legacy users row is intentionally retained during the safe migration: Identity owns the physical row while Profile/Social receives PostgreSQL UPDATE rights only for the documented profile columns. Composite profile reads may remain in core but are read-only.

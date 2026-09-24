@@ -91,3 +91,7 @@ Before changing this module: identify the owning table and contract, add an addi
 ## Known migration status
 
 Existing FastAPI domain; no Go migration started.
+
+
+## Chunk 27 deployed boundary
+Public social, love-bond, family-membership and profile-display routes are served by apps/profile-social-service behind the unchanged core API surface. Family economy ranking endpoints remain read-only core projections. No new social/family relationship mutation should be added to core.

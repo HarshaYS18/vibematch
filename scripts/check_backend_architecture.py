@@ -72,6 +72,11 @@ VIBES_OWNERSHIP_SQL = ROOT / "deploy" / "postgres" / "vibes-ownership.sql"
 VIBES_SERVICE_ROOT = ROOT / "apps" / "vibes-service"
 ROOM_CONTROL_SERVICE_ROOT = ROOT / "apps" / "room-control-service"
 ROOM_CONTROL_OWNERSHIP_SQL = ROOT / "deploy" / "postgres" / "room-control-ownership.sql"
+IDENTITY_SERVICE_ROOT = ROOT / "apps" / "identity-service"
+PROFILE_SOCIAL_SERVICE_ROOT = ROOT / "apps" / "profile-social-service"
+IDENTITY_OWNERSHIP_SQL = ROOT / "deploy" / "postgres" / "identity-ownership.sql"
+PROFILE_SOCIAL_OWNERSHIP_SQL = ROOT / "deploy" / "postgres" / "profile-social-ownership.sql"
+IDENTITY_PROFILE_SOCIAL_MIGRATION = ROOT / "backend" / "alembic" / "versions" / "20260924_0300_identity_profile_social_boundaries.py"
 ALLOWED_STATE_CLASSES = {"AUTHORITY", "PROJECTION", "CACHE", "EPHEMERAL"}
 REQUIRED_AUTHORITY_STATE_IDS = {
     "identity.accounts", "identity.sessions", "profiles.public", "rooms.definition",
@@ -841,6 +846,106 @@ def _validate_room_control_extraction(errors: list[str]) -> None:
             )
 
 
+def _validate_identity_profile_social_extraction(errors: list[str]) -> None:
+    required = (
+        IDENTITY_SERVICE_ROOT / "main.py",
+        IDENTITY_SERVICE_ROOT / "database.py",
+        IDENTITY_SERVICE_ROOT / "internal.py",
+        PROFILE_SOCIAL_SERVICE_ROOT / "main.py",
+        PROFILE_SOCIAL_SERVICE_ROOT / "database.py",
+        PROFILE_SOCIAL_SERVICE_ROOT / "internal.py",
+        IDENTITY_OWNERSHIP_SQL,
+        PROFILE_SOCIAL_OWNERSHIP_SQL,
+        IDENTITY_PROFILE_SOCIAL_MIGRATION,
+        ROOT / "backend" / "app" / "api" / "routes" / "identity_proxy.py",
+        ROOT / "backend" / "app" / "api" / "routes" / "profile_social_proxy.py",
+    )
+    for path in required:
+        if not path.exists():
+            errors.append(
+                "Chunk 27 identity/profile-social path is missing: "
+                + str(path.relative_to(ROOT))
+            )
+
+    router_path = ROOT / "backend" / "app" / "api" / "router.py"
+    if router_path.exists():
+        router_text = router_path.read_text(encoding="utf-8")
+        for token in ("identity_proxy.router", "profile_social_proxy.router"):
+            if token not in router_text:
+                errors.append("Chunk 27 compatibility proxy missing: " + token)
+        for token in (
+            "auth.router",
+            "social.router",
+            "love_bonds.router",
+            "families.router",
+            "profile_display.router",
+        ):
+            if token in router_text:
+                errors.append(
+                    "Chunk 27 extracted public router still mounted in core: " + token
+                )
+
+    users_path = ROOT / "backend" / "app" / "api" / "routes" / "users.py"
+    if users_path.exists():
+        users_text = users_path.read_text(encoding="utf-8")
+        if "profile_social_service_client.update_profile" not in users_text:
+            errors.append("Profile mutation must route through Profile/Social service")
+        if "identity_session_service.is_session_active" not in users_text:
+            errors.append("JWT validation must honor durable Identity sessions")
+
+    security_path = ROOT / "backend" / "app" / "core" / "security.py"
+    if security_path.exists():
+        security_text = security_path.read_text(encoding="utf-8")
+        if 'payload["sid"] = session_id' not in security_text:
+            errors.append("New access tokens must carry durable Identity session id")
+
+    if IDENTITY_OWNERSHIP_SQL.exists():
+        identity_sql = IDENTITY_OWNERSHIP_SQL.read_text(encoding="utf-8")
+        for table in (
+            "users",
+            "auth_identities",
+            "login_history",
+            "identity_devices",
+            "identity_sessions",
+        ):
+            token = f"ALTER TABLE {table} OWNER TO funkey_identity_owner"
+            if token not in identity_sql:
+                errors.append("Identity ownership missing table: " + table)
+
+    if PROFILE_SOCIAL_OWNERSHIP_SQL.exists():
+        social_sql = PROFILE_SOCIAL_OWNERSHIP_SQL.read_text(encoding="utf-8")
+        for table in (
+            "user_follows",
+            "user_blocks",
+            "love_bonds",
+            "love_bond_requests",
+            "profile_visits",
+            "family_economy_stats",
+            "family_member_stats",
+        ):
+            token = f"ALTER TABLE {table} OWNER TO funkey_profile_social_owner"
+            if token not in social_sql:
+                errors.append("Profile/Social ownership missing table: " + table)
+        if "GRANT UPDATE (" not in social_sql:
+            errors.append("Profile/Social users mutation must be column scoped")
+
+    if AUTHORITY_REGISTRY.exists():
+        payload = json.loads(AUTHORITY_REGISTRY.read_text(encoding="utf-8"))
+        states = {str(item.get("id")): item for item in payload.get("states", [])}
+        expected = {
+            "identity.accounts": "identity-service",
+            "identity.sessions": "identity-service",
+            "profiles.public": "profile-social-service",
+            "social.graph": "profile-social-service",
+            "families.membership": "profile-social-service",
+        }
+        for state_id, deployable in expected.items():
+            if states.get(state_id, {}).get("current_deployable") != deployable:
+                errors.append(
+                    f"{state_id}: Chunk 27 deployable must be {deployable}"
+                )
+
+
 def _has_tracked_content(path: Path) -> bool:
     return path.exists() and any(item.is_file() for item in path.rglob("*"))
 
@@ -854,6 +959,7 @@ def main() -> int:
     _validate_inbox_service_extraction(errors)
     _validate_vibes_service_extraction(errors)
     _validate_room_control_extraction(errors)
+    _validate_identity_profile_social_extraction(errors)
 
     for path in REQUIRED_PATHS:
         if not path.exists():
@@ -954,6 +1060,7 @@ def main() -> int:
     print(" - Inbox chat authority is isolated, bounded, and routed through NATS/Go")
     print(" - Vibes authority is isolated with bounded cursor feeds and async fanout")
     print(" - Room Control owns durable room state behind a core compatibility proxy")
+    print(" - Identity and Profile/Social mutation authorities are physically extracted")
     return 0
 
 
