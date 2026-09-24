@@ -54,7 +54,6 @@ class _LiveRoomPresenceShellPageState
     null,
   );
 
-  Timer? _heartbeatTimer;
   Timer? _enteredMessageTimer;
   LiveRoomPresenceSnapshot? _snapshot;
   bool _joining = true;
@@ -95,7 +94,6 @@ class _LiveRoomPresenceShellPageState
 
   @override
   void dispose() {
-    _heartbeatTimer?.cancel();
     _enteredMessageTimer?.cancel();
     if (!LiveRoomMinimizedOverlayService.instance.isShowing) {
       _roomSessionRealtimeBridge.deactivate();
@@ -132,12 +130,11 @@ class _LiveRoomPresenceShellPageState
     _joining = false;
     _presenceEstablished = true;
     _presenceError = null;
-    _startHeartbeat();
     unawaited(_roomSessionRealtimeBridge.activate());
-    // A minimized-room restore may render cached visual state immediately, but
-    // backend presence is still authoritative. Reconcile now instead of waiting
-    // for the first periodic heartbeat.
-    unawaited(_heartbeat());
+    // A minimized-room restore may render cached visual state immediately.
+    // Reconcile once after reconnect; steady-state liveness comes from the
+    // authenticated realtime socket lease and room-state deltas.
+    unawaited(_refreshAfterRestore());
     _restoreSavedSeatIfNeeded();
   }
 
@@ -247,7 +244,6 @@ class _LiveRoomPresenceShellPageState
 
       _showEnteredMessageIfNeeded(snapshot);
       _autoSeatIfAllowed(snapshot);
-      _startHeartbeat();
       await _roomSessionRealtimeBridge.activate();
     } catch (error) {
       if (!mounted) return;
@@ -256,12 +252,10 @@ class _LiveRoomPresenceShellPageState
       if (_presenceEstablished) {
         _joining = false;
         _livePresenceWarning.value = message;
-        _startHeartbeat();
-        return;
+          return;
       }
 
-      _heartbeatTimer?.cancel();
-      setState(() {
+        setState(() {
         _joining = false;
         _presenceError = message;
       });
@@ -333,38 +327,21 @@ class _LiveRoomPresenceShellPageState
     );
   }
 
-  void _startHeartbeat() {
-    _heartbeatTimer?.cancel();
-    _heartbeatTimer = Timer.periodic(
-      const Duration(seconds: 12),
-      (_) => unawaited(_heartbeat()),
-    );
-  }
-
-  Future<void> _heartbeat() async {
+  Future<void> _refreshAfterRestore() async {
     try {
-      final roomState = await _roomSessionRepository.heartbeat();
+      final roomState = await _roomSessionRepository.refreshAfterReconnect();
       final snapshot = RoomSessionLegacyAdapter.toPresenceSnapshot(
         roomState,
         currentPublicUserId: widget.currentUser?.publicUserId,
         publishLegacyCaches: true,
       );
       if (!mounted) return;
-
       _seedIdentityFromPresence(snapshot);
       _livePresenceWarning.value = null;
-
-      final onlineCountChanged = _onlineCount != snapshot.onlineCount;
-      if (onlineCountChanged) {
-        setState(() {
-          _snapshot = snapshot;
-          _presenceError = null;
-        });
-      } else {
+      setState(() {
         _snapshot = snapshot;
         _presenceError = null;
-      }
-
+      });
       _autoSeatIfAllowed(snapshot);
     } catch (error) {
       if (!mounted) return;
@@ -373,7 +350,6 @@ class _LiveRoomPresenceShellPageState
   }
 
   Future<void> _retryPresence() async {
-    _heartbeatTimer?.cancel();
     await _joinPresence();
   }
 
