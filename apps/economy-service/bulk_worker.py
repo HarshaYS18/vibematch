@@ -125,6 +125,10 @@ def main() -> None:
                     _reconciliation_unbalanced_journals = report.unbalanced_journal_transactions
                     if not report.healthy:
                         _reconciliation_failures += 1
+                except Exception:
+                    _reconciliation_failures += 1
+
+                try:
                     with SessionLocal() as db:
                         finalized_packets = lucky_packet_service.finalize_expired_packets(
                             db,
@@ -132,8 +136,8 @@ def main() -> None:
                         )
                     _lucky_packet_finalizations += finalized_packets
                 except Exception:
-                    _reconciliation_failures += 1
                     _lucky_packet_finalize_failures += 1
+
                 next_reconciliation_at = (
                     time.monotonic()
                     + settings.ECONOMY_RECONCILIATION_INTERVAL_SECONDS
