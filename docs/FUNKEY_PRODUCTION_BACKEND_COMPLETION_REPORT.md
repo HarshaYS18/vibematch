@@ -1,5 +1,7 @@
 # FunKey production backend completion report
 
+> **Historical snapshot — superseded for current topology.** This report documents an earlier production-backend implementation pass before the Chunk 21–32 service/realtime/media/networking migrations. Do not use its runtime topology as current authority. Use `contracts/architecture/authorities.yaml`, `docs/architecture/overview.md`, `docs/architecture/service-boundaries.md`, and `PRODUCTION_RUNBOOK.md` for present repository reality.
+
 ## Scope and status
 
 This report closes the repository implementation pass that started from verified branch checkpoint `9923c34a54e79649cd0195b1afaf159f888ea158`.
