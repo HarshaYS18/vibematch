@@ -73,6 +73,21 @@ async def _proxy(request: Request, relative_path: str) -> Response:
     )
 
 
+@router.get("/inbox/conversations")
+async def proxy_inbox_conversations(request: Request) -> Response:
+    return await _proxy(request, "inbox/conversations")
+
+
+@router.get("/inbox/lock/status")
+async def proxy_inbox_lock_status(request: Request) -> Response:
+    return await _proxy(request, "inbox/lock/status")
+
+
+@router.get("/inbox/backup/status")
+async def proxy_inbox_backup_status(request: Request) -> Response:
+    return await _proxy(request, "inbox/backup/status")
+
+
 @router.api_route(
     "/inbox",
     methods=["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
