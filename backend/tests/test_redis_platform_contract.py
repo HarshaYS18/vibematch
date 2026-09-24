@@ -18,6 +18,8 @@ def _safe_production_settings(**overrides):
         MEDIA_INTERNAL_TOKEN="m" * 40,
         INBOX_INTERNAL_TOKEN="i" * 40,
         ROOM_CONTROL_INTERNAL_TOKEN="r" * 40,
+        IDENTITY_INTERNAL_TOKEN="d" * 40,
+        PROFILE_SOCIAL_INTERNAL_TOKEN="p" * 40,
         INBOX_BACKUP_ENCRYPTION_KEY="b" * 40,
         GOOGLE_AUTH_CLIENT_IDS="client.apps.googleusercontent.com",
         REALTIME_CAPABILITY_PRIVATE_KEY_B64="AAECAwQFBgcICQoLDA0ODxAREhMUFRYXGBkaGxwdHh8",

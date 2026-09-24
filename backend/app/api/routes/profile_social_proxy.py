@@ -26,6 +26,38 @@ async def _proxy(request: Request, relative_path: str) -> Response:
         k:v for k,v in upstream.headers.items() if k.lower() in {"content-type","cache-control","etag","last-modified","x-request-id"}
     })
 
+async def _proxy_profile_me(request: Request) -> Response:
+    return await _proxy(request, "profile-display/me")
+
+
+async def _proxy_profile_user(request: Request, public_user_id: int) -> Response:
+    return await _proxy(request, f"profile-display/users/{public_user_id}")
+
+
+async def _proxy_family_members(request: Request, family_id: str) -> Response:
+    return await _proxy(request, f"families/{family_id}/members")
+
+
+router.add_api_route(
+    "/profile-display/me",
+    _proxy_profile_me,
+    methods=["GET"],
+    name="profile_display_me_proxy",
+)
+router.add_api_route(
+    "/profile-display/users/{public_user_id}",
+    _proxy_profile_user,
+    methods=["GET"],
+    name="profile_display_user_proxy",
+)
+router.add_api_route(
+    "/families/{family_id}/members",
+    _proxy_family_members,
+    methods=["GET"],
+    name="family_members_proxy",
+)
+
+
 for _prefix in ("social", "love-bonds", "families", "profile-display"):
     async def _root(request: Request, prefix: str = _prefix) -> Response:
         return await _proxy(request, prefix)
