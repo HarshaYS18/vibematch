@@ -36,7 +36,22 @@ spec: {minReplicas: 1, maxReplicas: 1}
 ---
 apiVersion: keda.sh/v1alpha1
 kind: ScaledObject
-metadata: {name: funkey-worker}
+metadata: {name: funkey-worker-notification}
+spec: {minReplicaCount: 1, maxReplicaCount: 1}
+---
+apiVersion: keda.sh/v1alpha1
+kind: ScaledObject
+metadata: {name: funkey-worker-media}
+spec: {minReplicaCount: 1, maxReplicaCount: 1}
+---
+apiVersion: keda.sh/v1alpha1
+kind: ScaledObject
+metadata: {name: funkey-worker-fanout}
+spec: {minReplicaCount: 1, maxReplicaCount: 1}
+---
+apiVersion: keda.sh/v1alpha1
+kind: ScaledObject
+metadata: {name: funkey-worker-maintenance}
 spec: {minReplicaCount: 1, maxReplicaCount: 1}
 ---
 apiVersion: apps/v1
