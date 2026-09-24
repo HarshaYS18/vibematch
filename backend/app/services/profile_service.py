@@ -1,12 +1,10 @@
-from datetime import datetime, timedelta
-
 from fastapi import HTTPException
 from sqlalchemy.orm import Session
 
 from app.models.economy import UserWallet
 from app.models.user import User
 from app.models.vip_status import UserVipStatus
-from app.services import economy_level_service, role_badge_service, role_service, store_service
+from app.services import economy_level_service, presence_projection_service, role_badge_service, role_service, store_service
 
 SVIP_NAME_GRADIENTS: dict[int, dict[str, object]] = {
     1: {"key": "svip_1_aqua_violet", "colors": ["#20E3B2", "#7C4DFF", "#E040FB"]},
@@ -92,9 +90,7 @@ def public_profile_payload(db: Session, public_user_id: int) -> dict:
         raise HTTPException(status_code=404, detail="User not found")
     user_roles = role_service.get_user_roles(user)
     primary_role = role_service.get_primary_role(user)
-    is_online = False
-    if user.last_seen_at:
-        is_online = user.last_seen_at >= datetime.utcnow() - timedelta(minutes=2)
+    is_online = presence_projection_service.is_user_online(user.id)
     return {
         "public_user_id": user.public_user_id,
         "display_custom_id": user.display_custom_id,
