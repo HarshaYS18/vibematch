@@ -6,8 +6,8 @@ Provides FunKey's single authenticated application WebSocket while deferring all
 
 ## Responsibilities
 
-- connection lifecycle and reauthorization;
-- authorized room subscriptions;
+- connection lifecycle using short-lived signed connect capabilities;
+- locally verified room-specific subscribe capabilities;
 - user/users/staff/all/room event routing;
 - sharded transient recipient indexes;
 - bounded priority backpressure and dedupe;
@@ -26,7 +26,7 @@ Identity, bans, roles, room membership, seats, chat persistence, Inbox membershi
 
 ## Source of truth
 
-PostgreSQL-backed FastAPI/domain services remain authoritative. Redis/Valkey contains ephemeral fanout, leases, rate/idempotency metadata, and bounded room replay state.
+PostgreSQL-backed domain services remain authoritative. Identity/API issues short-lived signed realtime capabilities; Go verifies those grants locally. Redis/Valkey contains ephemeral fanout, leases, rate/idempotency metadata, and bounded room replay state.
 
 ## Important files
 
@@ -47,9 +47,10 @@ Go:
 - `GET /ready`
 - `GET /metrics`
 
-FastAPI control plane:
-- `POST /api/v1/realtime/verify`
-- `POST /api/v1/realtime/command`
+Control plane:
+- capability mint/public-key endpoints for connect and room grants
+- `POST /api/v1/realtime/command` for authoritative command relay
+- `/api/v1/realtime/verify` exists only as rollback/diagnostic compatibility and is not the normal hot path
 
 The WebSocket protocol is `funkey.v2`. Browser-compatible authentication uses `bearer.<token>` as an additional offered subprotocol; only `funkey.v2` is selected.
 
@@ -61,7 +62,7 @@ Chunk 20 room traffic carries an ephemeral contiguous transport stream/sequence 
 
 ## Commands
 
-Client commands are strictly allowlisted. The gateway forwards authenticated commands to FastAPI and returns transport acknowledgements/errors. FastAPI owns permission checks, idempotency, durable writes, and resulting domain-event publication.
+Client commands are strictly allowlisted. The gateway forwards commands to the owning backend control/domain boundary and returns transport acknowledgements/errors. Domain services own permission checks, idempotency, durable writes, and resulting event publication.
 
 ## Database tables/state owned
 
@@ -74,8 +75,8 @@ Gateway/user/rate keys under `funkey:realtime:gateway:*` plus room leases and Ch
 ## Failure modes
 
 - Redis down: readiness fails; reconnect/resync is required.
-- FastAPI verify down: new connect/subscribe fails closed.
-- FastAPI command down: command errors; no local mutation.
+- capability public-key/issuance path unavailable: new/renewed grants fail closed while already-valid grants remain bounded by expiry.
+- owning command service unavailable: command errors; no local mutation.
 - replay discontinuity: client refreshes authoritative room snapshot.
 - slow consumer: best-effort traffic drops first; required-overflow client closes.
 - planned drain: upgrades stop and clients reconnect to healthy replicas.
