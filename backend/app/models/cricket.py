@@ -3,7 +3,7 @@ from enum import Enum
 
 from sqlalchemy import Boolean, Column, DateTime
 from sqlalchemy import Enum as SqlEnum
-from sqlalchemy import ForeignKey, Integer, JSON, String, Text
+from sqlalchemy import ForeignKey, Integer, JSON, String, Text, UniqueConstraint
 
 from app.database import Base
 
@@ -75,3 +75,26 @@ class CricketMatch(Base):
     result_json = Column(JSON, default=dict, nullable=False)
     created_at = Column(DateTime, default=datetime.utcnow, nullable=False)
     updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow, nullable=False)
+
+
+
+class CricketBallEvent(Base):
+    __tablename__ = "cricket_ball_events"
+    __table_args__ = (
+        UniqueConstraint(
+            "match_id",
+            "sequence",
+            name="uq_cricket_ball_event_match_sequence",
+        ),
+    )
+
+    id = Column(Integer, primary_key=True, index=True)
+    match_id = Column(
+        Integer,
+        ForeignKey("cricket_matches.id", ondelete="CASCADE"),
+        nullable=False,
+        index=True,
+    )
+    sequence = Column(Integer, nullable=False)
+    event_json = Column(JSON, default=dict, nullable=False)
+    created_at = Column(DateTime, default=datetime.utcnow, nullable=False)
