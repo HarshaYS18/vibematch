@@ -260,6 +260,35 @@ services:
       pgbouncer:
         condition: service_healthy
 
+  economy-bulk-worker:
+    profiles: ["app"]
+    build:
+      context: ..
+      dockerfile: apps/economy-service/Dockerfile
+    command: ["python", "/app/apps/economy-service/bulk_worker.py"]
+    environment:
+      <<: *api_environment
+      DB_APPLICATION_NAME: funkey-economy-bulk-worker
+      ECONOMY_DATABASE_URL: postgresql://funkey:funkey_dev_only@pgbouncer:6432/funkey
+      ECONOMY_BULK_HEALTH_PORT: "8090"
+      ECONOMY_BULK_WORKER_DB_POOL_SIZE: "2"
+      ECONOMY_BULK_WORKER_DB_MAX_OVERFLOW: "0"
+    healthcheck:
+      test:
+        - CMD
+        - python
+        - -c
+        - "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8090/ready', timeout=2)"
+      interval: 10s
+      timeout: 3s
+      retries: 10
+      start_period: 5s
+    depends_on:
+      migrate:
+        condition: service_completed_successfully
+      pgbouncer:
+        condition: service_healthy
+
   realtime:
     profiles: ["app"]
     build: {context: .., dockerfile: apps/realtime-gateway/Dockerfile}
