@@ -99,6 +99,12 @@ class InboxMessage(Base):
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True, index=True)
     public_id: Mapped[str] = mapped_column(String(100), unique=True, index=True, nullable=False)
+    source_dedupe_key: Mapped[str | None] = mapped_column(
+        String(180),
+        unique=True,
+        index=True,
+        nullable=True,
+    )
     conversation_id: Mapped[int] = mapped_column(ForeignKey("inbox_conversations.id"), index=True, nullable=False)
     sender_user_id: Mapped[int | None] = mapped_column(ForeignKey("users.id"), index=True, nullable=True)
     sender_name: Mapped[str] = mapped_column(String(120), nullable=False)
