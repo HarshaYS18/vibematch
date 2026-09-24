@@ -30,4 +30,39 @@ void main() {
     expect(compat, isNot(contains("package:http/http.dart")));
     expect(compat, isNot(contains("package:dio/dio.dart")));
   });
+
+  test('features cannot bypass the canonical transport', () {
+    final lib = Directory('${root.path}/lib');
+    final violations = <String>[];
+    for (final entity in lib.listSync(recursive: true)) {
+      if (entity is! File || !entity.path.endsWith('.dart')) continue;
+      final path = entity.path.replaceAll('\\', '/');
+      final source = entity.readAsStringSync();
+      final foundationNetworking = path.contains('/foundation/networking/');
+
+      if (!foundationNetworking &&
+          source.contains("package:http/http.dart")) {
+        violations.add('$path imports package:http');
+      }
+      if (!path.endsWith('/foundation/networking/canonical_network_transport.dart') &&
+          source.contains("package:dio/dio.dart")) {
+        violations.add('$path imports Dio directly');
+      }
+      if (!foundationNetworking && RegExp(r'\\bHttpClient\\b').hasMatch(source)) {
+        violations.add('$path uses HttpClient directly');
+      }
+      if (!path.endsWith('/core/network/api_client.dart') &&
+          source.contains('core/network/api_client.dart')) {
+        violations.add('$path imports legacy ApiClient');
+      }
+    }
+
+    expect(
+      violations,
+      isEmpty,
+      reason: 'REST must flow through AppNetworkClient -> Dio.\n'
+          '${violations.join('\n')}',
+    );
+  });
+
 }
