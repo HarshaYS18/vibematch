@@ -70,3 +70,25 @@ def set_stealth(
             "reason": reason,
         },
     )
+
+
+def get_stealth(*, user_id: int) -> dict[str, Any]:
+    return _request("GET", f"users/{int(user_id)}/stealth")
+
+
+def set_stealth_grant_state(
+    *,
+    user_id: int,
+    enabled: bool,
+    actor_user_id: int,
+    reason: str,
+) -> dict[str, Any]:
+    return _request(
+        "POST",
+        f"admin/users/{int(user_id)}/stealth-grant-state",
+        json_body={
+            "enabled": bool(enabled),
+            "actor_user_id": int(actor_user_id),
+            "reason": reason,
+        },
+    )

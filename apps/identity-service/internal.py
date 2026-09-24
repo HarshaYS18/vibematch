@@ -5,8 +5,9 @@ from sqlalchemy.orm import Session
 from app.core.config import settings
 from app.core.security import decode_access_token
 from app.database import get_db
+from app.models.special_permission import SpecialPermission, SpecialPermissionName
 from app.models.user import User
-from app.services import identity_session_service
+from app.services import event_outbox_service, identity_session_service, special_permission_service
 from app.services.role_service import get_user_roles
 
 router=APIRouter(prefix="/internal/identity",tags=["Identity Internal"])
@@ -15,6 +16,13 @@ class RevokeSessionsRequest(BaseModel):
     user_id: int
     reason: str
     device_id: str | None = None
+
+class SetSpecialPermissionRequest(BaseModel):
+    target_user_id: int
+    actor_user_id: int
+    permission: SpecialPermissionName
+    enabled: bool
+    reason: str
 
 def require_internal_token(x_funkey_internal_token: str | None = Header(default=None)) -> None:
     if not settings.IDENTITY_INTERNAL_TOKEN.strip() or not hmac.compare_digest((x_funkey_internal_token or "").strip(), settings.IDENTITY_INTERNAL_TOKEN.strip()):
@@ -41,3 +49,49 @@ def verify_access_token(payload: VerifyTokenRequest,db: Session=Depends(get_db))
 @router.post("/sessions/revoke",dependencies=[Depends(require_internal_token)])
 def revoke_sessions(payload: RevokeSessionsRequest,db: Session=Depends(get_db)):
     return {"revoked":identity_session_service.revoke_user_sessions(db,user_id=payload.user_id,reason=payload.reason,device_id=payload.device_id)}
+
+
+@router.post("/special-permissions/set",dependencies=[Depends(require_internal_token)])
+def set_special_permission(payload:SetSpecialPermissionRequest,db:Session=Depends(get_db)):
+    actor=db.query(User).filter(User.id==payload.actor_user_id).first()
+    target=db.query(User).filter(User.id==payload.target_user_id).first()
+    if actor is None: raise HTTPException(status_code=404,detail="Actor user not found")
+    if target is None: raise HTTPException(status_code=404,detail="Target user not found")
+    if payload.enabled:
+        special_permission_service.grant_special_permission(
+            db=db,
+            target_user=target,
+            permission=payload.permission,
+            granted_by=actor,
+            reason=payload.reason,
+        )
+    else:
+        rows=(db.query(SpecialPermission).filter(
+            SpecialPermission.user_id==target.id,
+            SpecialPermission.permission==payload.permission,
+            SpecialPermission.is_active.is_(True),
+        ).all())
+        for row in rows:
+            special_permission_service.revoke_special_permission(
+                db=db,
+                special_permission=row,
+                revoked_by=actor,
+                reason=payload.reason,
+            )
+    event_outbox_service.enqueue_event(
+        db,
+        event_type="identity.special_permission.changed.v1",
+        actor_user_id=actor.id,
+        payload={
+            "target_user_id":target.id,
+            "permission":payload.permission.value,
+            "enabled":bool(payload.enabled),
+            "reason":payload.reason,
+        },
+    )
+    db.commit()
+    return {
+        "target_user_id":target.id,
+        "permission":payload.permission.value,
+        "enabled":bool(payload.enabled),
+    }

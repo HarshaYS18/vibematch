@@ -18,6 +18,7 @@ ALTER TABLE device_bans OWNER TO funkey_identity_owner;
 REVOKE ALL ON TABLE users,auth_identities,login_history,identity_devices,identity_sessions,user_roles,special_permissions,user_bans,device_bans FROM PUBLIC;
 GRANT SELECT,INSERT,UPDATE,DELETE ON TABLE users,auth_identities,login_history,identity_devices,identity_sessions,user_roles,special_permissions,user_bans,device_bans TO funkey_identity_runtime;
 GRANT SELECT,INSERT ON TABLE admin_logs TO funkey_identity_runtime;
+GRANT INSERT ON TABLE event_outbox TO funkey_identity_runtime;
 GRANT SELECT ON TABLE users,user_roles,special_permissions,user_bans,device_bans TO funkey_identity_reader;
 DO $$ DECLARE t text; s text; BEGIN
 FOREACH t IN ARRAY ARRAY['users','auth_identities','login_history','identity_devices','identity_sessions','user_roles','special_permissions','user_bans','device_bans'] LOOP

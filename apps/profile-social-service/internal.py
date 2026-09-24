@@ -10,7 +10,7 @@ from app.core.config import settings
 from app.database import get_db
 from app.models.profile_visit import ProfileVisit
 from app.models.profile_display import ProfileDisplayAudit
-from app.services import profile_display_service
+from app.services import event_outbox_service, profile_display_service
 from app.models.user import User
 from app.schemas.user import UserProfileUpdateRequest
 
@@ -25,6 +25,11 @@ class CustomIdRequest(BaseModel):
     display_custom_id: int | None = None
 
 class StealthRequest(BaseModel):
+    enabled: bool
+    actor_user_id: int
+    reason: str = Field(min_length=3, max_length=255)
+
+class StealthGrantStateRequest(BaseModel):
     enabled: bool
     actor_user_id: int
     reason: str = Field(min_length=3, max_length=255)
@@ -102,6 +107,22 @@ def assign_custom_id(user_id: int, payload: CustomIdRequest, db: Session = Depen
     return {"user_id": user_id, "display_custom_id": payload.display_custom_id}
 
 
+@router.get("/users/{user_id}/stealth", dependencies=[Depends(require_internal_token)])
+def get_stealth(user_id: int, db: Session = Depends(get_db)):
+    user = db.query(User).filter(User.id == user_id).first()
+    if user is None:
+        raise HTTPException(status_code=404, detail="User not found")
+    state = profile_display_service.get_or_create_stealth_state(db, user_id)
+    db.commit()
+    db.refresh(state)
+    return {
+        "state_id": state.id,
+        "user_id": user_id,
+        "enabled": bool(state.is_enabled),
+        "updated_at": state.updated_at,
+    }
+
+
 @router.post("/admin/users/{user_id}/stealth", dependencies=[Depends(require_internal_token)])
 def set_stealth(user_id: int, payload: StealthRequest, db: Session = Depends(get_db)):
     user = db.query(User).filter(User.id == user_id).first()
@@ -111,7 +132,6 @@ def set_stealth(user_id: int, payload: StealthRequest, db: Session = Depends(get
     previous = bool(state.is_enabled)
     state.is_enabled = bool(payload.enabled)
     state.granted_by_user_id = payload.actor_user_id
-    state.grant_reason = payload.reason
     state.toggle_reason = payload.reason
     db.add(state)
     db.add(ProfileDisplayAudit(
@@ -122,5 +142,53 @@ def set_stealth(user_id: int, payload: StealthRequest, db: Session = Depends(get
         new_value=str(bool(payload.enabled)).lower(),
         reason=payload.reason,
     ))
+    event_outbox_service.enqueue_event(
+        db,
+        event_type="profile_social.stealth.toggled.v1",
+        actor_user_id=payload.actor_user_id,
+        payload={"user_id":user_id,"enabled":bool(payload.enabled)},
+    )
     db.commit()
-    return {"user_id": user_id, "enabled": bool(state.is_enabled)}
+    db.refresh(state)
+    return {
+        "state_id": state.id,
+        "user_id": user_id,
+        "enabled": bool(state.is_enabled),
+        "updated_at": state.updated_at,
+    }
+
+
+@router.post("/admin/users/{user_id}/stealth-grant-state", dependencies=[Depends(require_internal_token)])
+def set_stealth_grant_state(user_id: int, payload: StealthGrantStateRequest, db: Session = Depends(get_db)):
+    user = db.query(User).filter(User.id == user_id).first()
+    if user is None:
+        raise HTTPException(status_code=404, detail="User not found")
+    state = profile_display_service.get_or_create_stealth_state(db, user_id)
+    state.granted_by_user_id = payload.actor_user_id
+    state.grant_reason = payload.reason
+    if not payload.enabled:
+        state.is_enabled = False
+        state.toggle_reason = payload.reason
+    db.add(state)
+    db.add(ProfileDisplayAudit(
+        actor_user_id=payload.actor_user_id,
+        target_user_id=user_id,
+        action="STEALTH_GRANT_UPDATED",
+        previous_value=None,
+        new_value=str(bool(payload.enabled)).lower(),
+        reason=payload.reason,
+    ))
+    event_outbox_service.enqueue_event(
+        db,
+        event_type="profile_social.stealth_eligibility.changed.v1",
+        actor_user_id=payload.actor_user_id,
+        payload={"user_id":user_id,"enabled":bool(payload.enabled)},
+    )
+    db.commit()
+    db.refresh(state)
+    return {
+        "state_id": state.id,
+        "user_id": user_id,
+        "enabled": bool(state.is_enabled),
+        "updated_at": state.updated_at,
+    }
