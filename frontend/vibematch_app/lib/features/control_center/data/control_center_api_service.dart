@@ -1,3 +1,9 @@
+import 'dart:convert';
+
+import 'package:crypto/crypto.dart';
+import 'package:shared_preferences/shared_preferences.dart';
+import 'package:uuid/uuid.dart';
+
 import '../../../core/network/api_client.dart';
 import '../../auth/data/auth_api_service.dart';
 
@@ -128,16 +134,23 @@ class ControlCenterApiService {
     required String reason,
     int? targetUserId,
   }) async {
+    final body = <String, dynamic>{
+      'target_pool_type': poolType,
+      'amount': amount,
+      'reason': reason,
+      'target_user_id': targetUserId,
+    };
+    final pending = await _pendingMutationIdentity(
+      'super_owner_mint',
+      body,
+    );
+    body['request_id'] = pending.id;
     await _apiClient.postMap(
       '/admin/economy/coins/mint',
       headers: _headers(),
-      body: {
-        'target_pool_type': poolType,
-        'amount': amount,
-        'reason': reason,
-        'target_user_id': ?targetUserId,
-      },
+      body: body,
     );
+    await _clearPendingMutation(pending.key);
   }
 
   Future<void> sendCoinsToAll({
@@ -408,6 +421,27 @@ class ControlCenterApiService {
       },
     );
     return StealthState.fromJson(json);
+  }
+
+  Future<({String key, String id})> _pendingMutationIdentity(
+    String action,
+    Map<String, dynamic> body,
+  ) async {
+    final canonical = jsonEncode(body);
+    final fingerprint = sha256.convert(utf8.encode(canonical)).toString();
+    final key = 'control_center_pending_${action}_$fingerprint';
+    final prefs = await SharedPreferences.getInstance();
+    var id = prefs.getString(key);
+    if (id == null || id.trim().isEmpty) {
+      id = const Uuid().v4();
+      await prefs.setString(key, id);
+    }
+    return (key: key, id: id);
+  }
+
+  Future<void> _clearPendingMutation(String key) async {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.remove(key);
   }
 
   Map<String, String> _headers() {

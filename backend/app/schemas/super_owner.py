@@ -13,6 +13,7 @@ class SuperOwnerMintCoinsRequest(SuperOwnerReasonRequest):
     target_pool_type: str = Field(..., min_length=3, max_length=80)
     amount: int = Field(..., gt=0)
     target_user_id: int | None = None
+    request_id: str | None = Field(default=None, min_length=8, max_length=36)
 
 
 class SuperOwnerSendCoinsAllRequest(SuperOwnerReasonRequest):

@@ -1,3 +1,5 @@
+from uuid import uuid4
+
 from datetime import datetime
 
 from fastapi import APIRouter, Depends, HTTPException
@@ -27,9 +29,9 @@ from app.schemas.super_owner import (
     SuperOwnerVipResponse,
     SuperOwnerWalletResponse,
 )
-from app.services import inbox_lock_service, profile_social_service_client
+from app.services import economy_service_client, inbox_lock_service, profile_social_service_client
 from app.services.audit_log_service import create_admin_log
-from app.services.economy_service import get_or_create_coin_pool, get_or_create_wallet, mint_to_pool
+from app.services.economy_service import get_or_create_coin_pool, get_or_create_wallet
 from app.services.role_service import get_primary_role
 from app.models.role import RoleName
 from app.services.special_permission_service import grant_special_permission
@@ -84,9 +86,43 @@ def list_coin_pools(db: Session = Depends(get_db), current_user: User = Depends(
 @router.post("/admin/economy/coins/mint", response_model=SuperOwnerPoolResponse)
 def mint_coins(payload: SuperOwnerMintCoinsRequest, db: Session = Depends(get_db), current_user: User = Depends(get_current_user)):
     require_super_owner(current_user)
-    pool = mint_to_pool(db=db, actor=current_user, target_pool_type=payload.target_pool_type, target_user_id=payload.target_user_id, amount=payload.amount, reason=payload.reason)
-    create_admin_log(db=db, actor_user_id=current_user.id, target_user_id=payload.target_user_id, action="SUPER_OWNER_COINS_MINTED", resource_type="coin_supply_pool", resource_id=str(pool.id), reason=payload.reason, metadata_json={"amount": payload.amount, "pool_type": payload.target_pool_type})
-    return _pool_response(pool)
+    request_id = (payload.request_id or str(uuid4())).strip()
+    try:
+        result = economy_service_client.mint_supply(
+            request_id=request_id,
+            actor_user_id=current_user.id,
+            target_pool_type=payload.target_pool_type,
+            target_user_id=payload.target_user_id,
+            amount=payload.amount,
+            reason=payload.reason,
+        )
+    except economy_service_client.EconomyServiceUnavailable as exc:
+        raise HTTPException(status_code=503, detail=str(exc)) from exc
+    except economy_service_client.EconomyServiceError as exc:
+        raise HTTPException(status_code=exc.status_code, detail=exc.detail) from exc
+
+    create_admin_log(
+        db=db,
+        actor_user_id=current_user.id,
+        target_user_id=payload.target_user_id,
+        action="SUPER_OWNER_COINS_MINTED",
+        resource_type="coin_supply_pool",
+        resource_id=str(result["id"]),
+        reason=payload.reason,
+        metadata_json={
+            "amount": payload.amount,
+            "pool_type": payload.target_pool_type,
+            "economy_transaction_id": result.get("transaction_id"),
+        },
+    )
+    return SuperOwnerPoolResponse(
+        id=int(result["id"]),
+        pool_type=str(result["pool_type"]),
+        owner_user_id=result.get("owner_user_id"),
+        balance=int(result["balance"]),
+        reserved_balance=int(result.get("reserved_balance") or 0),
+        status=str(result["status"]),
+    )
 
 
 @router.post("/admin/economy/coins/send-all", response_model=SuperOwnerActionResponse)
