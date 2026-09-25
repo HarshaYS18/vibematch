@@ -5,13 +5,21 @@ import '../../data/room_music_controller.dart';
 import '../widgets/room_theme.dart';
 
 class RoomMusicLibrarySheet extends StatefulWidget {
-  const RoomMusicLibrarySheet({super.key});
+  const RoomMusicLibrarySheet({
+    super.key,
+    required this.controller,
+  });
 
-  static Future<void> open(BuildContext context) {
+  final RoomMusicController controller;
+
+  static Future<void> open(
+    BuildContext context, {
+    required RoomMusicController controller,
+  }) {
     return Navigator.of(context, rootNavigator: true).push<void>(
       MaterialPageRoute(
         fullscreenDialog: true,
-        builder: (_) => const RoomMusicLibrarySheet(),
+        builder: (_) => RoomMusicLibrarySheet(controller: controller),
       ),
     );
   }
@@ -35,7 +43,7 @@ class _RoomMusicLibrarySheetState extends State<RoomMusicLibrarySheet>
   String _query = '';
 
   List<RoomMusicTrack> get _addedSongs =>
-      RoomMusicController.instance.state.value.playlist;
+      widget.controller.state.value.playlist;
 
   Set<String> get _addedIds =>
       _addedSongs.map((track) => track.id).toSet();
@@ -110,7 +118,7 @@ class _RoomMusicLibrarySheetState extends State<RoomMusicLibrarySheet>
   Future<void> _deleteSelectedAddedSongs() async {
     final ids = _selectedAddedIds.toList(growable: false);
     for (final id in ids) {
-      await RoomMusicController.instance.removeTrack(id);
+      await widget.controller.removeTrack(id);
     }
 
     if (!mounted) return;
@@ -145,7 +153,7 @@ class _RoomMusicLibrarySheetState extends State<RoomMusicLibrarySheet>
         .where((song) => !_addedIds.contains(song.id))
         .toList(growable: false);
 
-    await RoomMusicController.instance.addTracks(selected);
+    await widget.controller.addTracks(selected);
 
     if (!mounted) return;
     setState(() {
@@ -155,7 +163,7 @@ class _RoomMusicLibrarySheetState extends State<RoomMusicLibrarySheet>
   }
 
   Future<void> _removeAddedSong(RoomMusicTrack song) async {
-    await RoomMusicController.instance.removeTrack(song.id);
+    await widget.controller.removeTrack(song.id);
     if (!mounted) return;
     setState(() {
       _selectedIds.remove(song.id);
@@ -404,7 +412,7 @@ class _RoomMusicLibrarySheetState extends State<RoomMusicLibrarySheet>
     }
 
     return ValueListenableBuilder<RoomMusicState>(
-      valueListenable: RoomMusicController.instance.state,
+      valueListenable: widget.controller.state,
       builder: (context, state, _) {
         return Column(
           children: [
@@ -516,7 +524,7 @@ class _RoomMusicLibrarySheetState extends State<RoomMusicLibrarySheet>
                 }
 
                 if (playlistIndex >= 0) {
-                  RoomMusicController.instance.playIndex(playlistIndex);
+                  widget.controller.playIndex(playlistIndex);
                 }
               },
             );
