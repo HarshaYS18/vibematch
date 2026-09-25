@@ -671,8 +671,20 @@ def send_message(
     invite_room_id: str | None = None,
     attachment_url: str | None = None,
     metadata: dict | None = None,
+    source_dedupe_key: str | None = None,
 ) -> InboxMessage:
     safe_text = text.strip()
+    clean_dedupe_key = (source_dedupe_key or "").strip() or None
+
+    if clean_dedupe_key is not None:
+        existing = (
+            db.query(InboxMessage)
+            .filter(InboxMessage.source_dedupe_key == clean_dedupe_key)
+            .first()
+        )
+        if existing is not None:
+            return existing
+
     message_metadata = dict(metadata or {})
     if message_type == InboxMessageType.ROOM_INVITE.value:
         if invite_room_name:
@@ -683,6 +695,7 @@ def send_message(
 
     message = InboxMessage(
         public_id=_public_id("msg"),
+        source_dedupe_key=clean_dedupe_key,
         conversation_id=conversation.id,
         sender_user_id=sender.id,
         sender_name=_display_name(sender),
@@ -695,7 +708,9 @@ def send_message(
         metadata_json=message_metadata or None,
     )
     if _disappearing_mode_enabled(conversation):
-        expires_at = datetime.utcnow() + timedelta(seconds=_disappearing_ttl_seconds(conversation))
+        expires_at = datetime.utcnow() + timedelta(
+            seconds=_disappearing_ttl_seconds(conversation)
+        )
         message_metadata = dict(message.metadata_json or {})
         message_metadata["disappearing"] = True
         message_metadata["expires_at"] = _utc_iso_z(expires_at)
@@ -709,7 +724,9 @@ def send_message(
 
         conversation_metadata = _conversation_metadata(conversation)
         conversation_metadata["secret_drift_closed_by"] = []
-        conversation_metadata["secret_drift_last_message_at"] = _utc_iso_z(datetime.utcnow())
+        conversation_metadata["secret_drift_last_message_at"] = _utc_iso_z(
+            datetime.utcnow()
+        )
         conversation.metadata_json = conversation_metadata
 
     conversation.updated_at = datetime.utcnow()
@@ -720,7 +737,22 @@ def send_message(
     for participant in conversation.participants:
         if participant.user_id != sender.id:
             participant.unread_count += 1
-    db.commit()
+
+    try:
+        db.commit()
+    except IntegrityError:
+        db.rollback()
+        if clean_dedupe_key is None:
+            raise
+        existing = (
+            db.query(InboxMessage)
+            .filter(InboxMessage.source_dedupe_key == clean_dedupe_key)
+            .first()
+        )
+        if existing is None:
+            raise
+        return existing
+
     db.refresh(message)
     return message
 
