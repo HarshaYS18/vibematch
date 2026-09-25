@@ -25,7 +25,7 @@ class RoomSessionLegacyAdapter {
     final membership = <String, bool>{};
 
     for (final participant in state.presence.values) {
-      final user = _seatUser(participant);
+      final user = toSeatUser(participant);
       participants.add(user);
       membership[user.id] =
           participant.isMember || participant.isAdmin || participant.isHost;
@@ -49,7 +49,7 @@ class RoomSessionLegacyAdapter {
     );
   }
 
-  static SeatUser _seatUser(RoomSessionParticipant participant) {
+  static SeatUser toSeatUser(RoomSessionParticipant participant) {
     final raw = <String, dynamic>{
       ...participant.raw,
       'is_owner': participant.isHost,
@@ -65,6 +65,50 @@ class RoomSessionLegacyAdapter {
       selfMuted: !participant.micEnabled,
       adminMuted: participant.adminMuted,
     );
+  }
+
+
+  static List<SeatUser> presenceUsers(RoomSessionState state) {
+    return state.presence.values
+        .map(toSeatUser)
+        .toList(growable: false);
+  }
+
+  static SeatUser? findPresenceUser(
+    RoomSessionState state,
+    String userId,
+  ) {
+    final aliases = _identityAliases(userId);
+    if (aliases.isEmpty) return null;
+    for (final participant in state.presence.values) {
+      final participantAliases = <String>{
+        participant.backendUserId.toString(),
+        participant.publicUserId.toString(),
+        'user_${participant.publicUserId}',
+        participant.roomUserKey.toLowerCase(),
+      };
+      if (aliases.intersection(participantAliases).isNotEmpty) {
+        return toSeatUser(participant);
+      }
+    }
+    return null;
+  }
+
+  static Set<String> _identityAliases(String rawId) {
+    final value = rawId.trim().toLowerCase();
+    if (value.isEmpty) return const <String>{};
+    final aliases = <String>{value};
+    final match = RegExp(r'(?:^|_)user_(\d+)$').firstMatch(value);
+    if (match != null) {
+      aliases.add(match.group(1)!);
+      aliases.add('user_${match.group(1)!}');
+    }
+    final direct = int.tryParse(value);
+    if (direct != null) {
+      aliases.add(direct.toString());
+      aliases.add('user_$direct');
+    }
+    return aliases;
   }
 }
 
