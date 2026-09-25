@@ -19,25 +19,25 @@ kubernetes = {
 }
 
 services = {
-  postgres_endpoint       = "postgres.example.invalid:5432"
-  redis_primary_endpoint  = "redis.example.invalid:6379"
-  nats_endpoint           = "nats.example.invalid:4222"
-  nats_monitoring_endpoint = "nats-monitoring.example.invalid:8222"
-  object_bucket           = "replace-with-bucket"
-  object_region           = "replace-with-region"
-  cdn_origin              = "https://replace-with-provider-cdn-origin"
-  api_dns                 = "api.staging.funkey.com"
-  websocket_dns           = "realtime.staging.funkey.com"
-  media_dns               = "media.staging.funkey.com"
-  media_dns_suffix        = "media-node.staging.funkey.com"
-  cdn_dns                 = "cdn.staging.funkey.com"
-  waf_policy_ref          = "replace-with-provider-waf-policy"
-  origin_restriction_ref   = "replace-with-provider-origin-restriction"
+  postgres_endpoint              = "postgres.example.invalid:5432"
+  redis_primary_endpoint         = "redis.example.invalid:6379"
+  nats_endpoint                  = "nats.example.invalid:4222"
+  nats_monitoring_endpoint       = "nats-monitoring.example.invalid:8222"
+  object_bucket                  = "replace-with-bucket"
+  object_region                  = "replace-with-region"
+  cdn_origin                     = "https://replace-with-provider-cdn-origin"
+  api_dns                        = "api.staging.funkey.com"
+  websocket_dns                  = "realtime.staging.funkey.com"
+  media_dns                      = "media.staging.funkey.com"
+  media_dns_suffix               = "media-node.staging.funkey.com"
+  cdn_dns                        = "cdn.staging.funkey.com"
+  waf_policy_ref                 = "replace-with-provider-waf-policy"
+  origin_restriction_ref         = "replace-with-provider-origin-restriction"
   edge_security_binding_verified = false
-  certificate_ref         = "replace-with-certificate-reference"
-  secret_manager_ref      = "replace-with-secret-manager-reference"
-  workload_identity_ref   = "replace-with-workload-identity-reference"
-  observability_endpoint  = "https://otel.example.invalid"
+  certificate_ref                = "replace-with-certificate-reference"
+  secret_manager_ref             = "replace-with-secret-manager-reference"
+  workload_identity_ref          = "replace-with-workload-identity-reference"
+  observability_endpoint         = "https://otel.example.invalid"
 }
 
 connection_budget = {

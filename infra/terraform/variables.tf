@@ -45,25 +45,25 @@ variable "kubernetes" {
 variable "services" {
   description = "Externally provisioned managed services and public routes. Keep credentials in a secret manager."
   type = object({
-    postgres_endpoint        = string
-    redis_primary_endpoint   = string
-    nats_endpoint            = string
-    nats_monitoring_endpoint = string
-    object_bucket            = string
-    object_region            = string
-    cdn_origin               = string
-    api_dns                  = string
-    websocket_dns            = string
-    media_dns                = string
-    media_dns_suffix         = string
-    cdn_dns                  = string
-    waf_policy_ref           = string
-    origin_restriction_ref    = string
-    edge_security_binding_verified = bool
-    certificate_ref          = string
-    secret_manager_ref       = string
-    workload_identity_ref    = string
-    observability_endpoint   = string
+    postgres_endpoint               = string
+    redis_primary_endpoint          = string
+    nats_endpoint                   = string
+    nats_monitoring_endpoint        = string
+    object_bucket                   = string
+    object_region                   = string
+    cdn_origin                      = string
+    api_dns                         = string
+    websocket_dns                   = string
+    media_dns                       = string
+    media_dns_suffix                = string
+    cdn_dns                         = string
+    waf_policy_ref                  = string
+    origin_restriction_ref          = string
+    edge_security_binding_verified  = bool
+    certificate_ref                 = string
+    secret_manager_ref              = string
+    workload_identity_ref           = string
+    observability_endpoint          = string
   })
   sensitive = true
 }
