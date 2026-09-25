@@ -175,7 +175,7 @@ def check_infrastructure() -> None:
     )
     staging = require(
         ROOT / "deploy/kubernetes/overlays/staging/kustomization.yaml",
-        ("../../kafka",),
+        ("../../../kafka",),
     )
     production = (ROOT / "deploy/kubernetes/overlays/production/kustomization.yaml").read_text(
         encoding="utf-8"
