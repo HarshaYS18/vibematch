@@ -78,7 +78,12 @@ class _LiveRoomControllerScopeState
 
   @override
   Widget build(BuildContext context) {
-    ref.watch(roomSessionRepositoryProvider(widget.config.roomId));
+    final canonical = ref.watch(
+      roomSessionRepositoryProvider(widget.config.roomId),
+    );
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted) bundle.applyCanonicalRoomState(canonical);
+    });
     return widget.builder(context, bundle);
   }
 }
