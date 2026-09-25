@@ -20,7 +20,14 @@ A soak run reuses the same scenarios with a longer `DURATION` and fixed represen
 `/graphql`. It requires `FUNKEY_TEST_TOKEN`; missing auth aborts the test so
 an empty workload can never create a false-green result.
 
-The controlled promotion gate requires:
+The controlled promotion gate begins with a security-contract preflight. Ad-hoc
+query text must return `PERSISTED_ONLY` (400), an unknown persisted ID must
+return `UNKNOWN_OPERATION` (400), and a known operation without bearer auth
+must return `UNAUTHENTICATED` (401). These are declared expected statuses in
+k6, so correct security rejections do not contaminate the unexpected-failure
+rate. The security-contract correctness rate itself must be 100%.
+
+The positive Home workload then requires:
 
 - HTTP request failures = 0%;
 - k6 failed checks = 0%;
@@ -29,7 +36,8 @@ The controlled promotion gate requires:
 - every required Home field present;
 - Home end-to-end p95 < 250ms and p99 < 500ms;
 - BFF `Server-Timing` present on every accepted response;
-- BFF server p95 < 200ms and p99 < 400ms.
+- BFF server p95 < 200ms and p99 < 400ms;
+- GraphQL security-contract correctness = 100%.
 
 The scenario performs no blanket retry and therefore exposes real transport,
 protocol, owner-service, and tail-latency instability.
