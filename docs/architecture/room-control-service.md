@@ -69,3 +69,8 @@ with the separate call authority.
 
 If Room Control is unavailable these checks fail closed; core must not fall back
 to querying `rooms`, `room_participants` or `room_seat_states` directly.
+
+
+## Room Cricket mutation safety
+
+Cricket tournament/match mutations require Room Control host/admin authorization and serialize on locked durable rows. Ball scoring is append-only in `cricket_ball_events`; `(match_id, sequence)` prevents ordering collisions. First-party clients also send a stable per-ball `event_id`, persisted across ambiguous HTTP retries, and Room Control enforces `(match_id, source_event_id)` uniqueness. This prevents a successful-but-timed-out ball POST from being counted twice without falsely deduplicating two genuinely identical consecutive deliveries.
