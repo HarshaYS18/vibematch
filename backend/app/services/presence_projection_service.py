@@ -192,6 +192,7 @@ def project_user_presence(
         rooms_by_public_id = {room.room_public_id: room for room in rooms}
 
     entered_at: dict[tuple[int, int], datetime] = {}
+    active_memberships: set[tuple[int, int]] = set()
     room_db_ids = {room.id for room in rooms_by_public_id.values()}
     if room_db_ids and room_by_user:
         participants = (
@@ -199,9 +200,14 @@ def project_user_presence(
             .filter(
                 RoomParticipant.user_id.in_(room_by_user.keys()),
                 RoomParticipant.room_id.in_(room_db_ids),
+                RoomParticipant.is_active.is_(True),
             )
             .all()
         )
+        active_memberships = {
+            (participant.user_id, participant.room_id)
+            for participant in participants
+        }
         entered_at = {
             (participant.user_id, participant.room_id): participant.joined_at
             for participant in participants
@@ -213,6 +219,10 @@ def project_user_presence(
             result[user_id] = RealtimePresenceProjection(is_online=False)
             continue
         room = rooms_by_public_id.get(room_by_user.get(user_id, ""))
+        if room is not None and (user_id, room.id) not in active_memberships:
+            # Socket leases decide whether the user is online. Durable Room
+            # Control membership decides whether a room may be disclosed.
+            room = None
         result[user_id] = RealtimePresenceProjection(
             is_online=True,
             room=room,
