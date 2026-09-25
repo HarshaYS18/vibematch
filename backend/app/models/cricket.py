@@ -86,6 +86,11 @@ class CricketBallEvent(Base):
             "sequence",
             name="uq_cricket_ball_event_match_sequence",
         ),
+        UniqueConstraint(
+            "match_id",
+            "source_event_id",
+            name="uq_cricket_ball_event_match_source",
+        ),
     )
 
     id = Column(Integer, primary_key=True, index=True)
@@ -96,5 +101,6 @@ class CricketBallEvent(Base):
         index=True,
     )
     sequence = Column(Integer, nullable=False)
+    source_event_id = Column(String(80), nullable=True)
     event_json = Column(JSON, default=dict, nullable=False)
     created_at = Column(DateTime, default=datetime.utcnow, nullable=False)
