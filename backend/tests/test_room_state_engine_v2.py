@@ -12,6 +12,7 @@ from app.api.routes.rooms import rooms as legacy_rooms
 from app.database import Base
 from app.models.room import Room
 from app.models.room_realtime_state import (
+    RoomChatMessage,
     RoomMemberRequest,
     RoomRealtimeEvent,
     RoomSeatApplication,
@@ -55,6 +56,54 @@ class RoomStateEngineCounterTests(TestCase):
             self.assertEqual((1, 2), (first.room_version, second.room_version))
             self.assertTrue(first.event_id)
             self.assertNotEqual(first.event_id, second.event_id)
+        engine.dispose()
+
+    def test_image_chat_persists_media_url_without_fake_text(self):
+        engine = create_engine(
+            "sqlite://",
+            connect_args={"check_same_thread": False},
+            poolclass=StaticPool,
+        )
+        Base.metadata.create_all(
+            engine,
+            tables=[
+                Room.__table__,
+                RoomChatMessage.__table__,
+                RoomRealtimeEvent.__table__,
+            ],
+        )
+        factory = sessionmaker(bind=engine)
+        with factory() as db:
+            room = Room(
+                room_public_id="VM200002",
+                name="Image Chat",
+                language="English",
+            )
+            db.add(room)
+            db.flush()
+
+            with patch.object(room_action_service, "room_snapshot", return_value={}):
+                room_action_service.create_chat_message(
+                    db,
+                    room,
+                    None,
+                    None,
+                    message_type="image",
+                    media_url="https://cdn.example/room/image.webp",
+                    metadata={"content_type": "image/webp"},
+                )
+
+            message = db.query(RoomChatMessage).one()
+            self.assertEqual("image", message.message_type)
+            self.assertIsNone(message.text)
+            self.assertEqual(
+                "https://cdn.example/room/image.webp",
+                message.media_url,
+            )
+            self.assertEqual(
+                "image/webp",
+                message.metadata_json["content_type"],
+            )
         engine.dispose()
 
     def test_current_request_state_has_dedicated_tables(self):

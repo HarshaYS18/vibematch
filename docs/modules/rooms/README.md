@@ -100,3 +100,18 @@ premium-broadcast presentation state is scoped to the mounted
 `LiveRoomGiftController` and disposed when that room exits. Durable gift,
 wallet and room-event outcomes remain backend/canonical realtime authority.
 Do not introduce static Flutter event buses for room presentation.
+
+
+## Canonical room chat contract
+
+Room chat is durable room state. The canonical REST/realtime command accepts
+text messages with `text`, and image messages with `message_type="image"`,
+`media_url`, and optional `content_type`; image messages do not require fake
+placeholder text. The backend validates HTTP(S) image URLs and persists
+`media_url` in `room_chat_messages`, while `metadata_json` carries
+presentation metadata.
+
+All client success UI must wait for the canonical chat command to succeed.
+Room snapshots/realtime deltas publish `recent_messages`; Flutter must project
+that canonical list into presentation models rather than maintain a second
+durable chat authority.

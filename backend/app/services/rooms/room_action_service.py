@@ -813,7 +813,21 @@ def set_announcement(db: Session, room: Room, actor: User, announcement_text: st
     return room_snapshot(db, room)
 
 
-def create_chat_message(db: Session, room: Room, user: User | None, text: str | None, message_type: str = "text", metadata: dict[str, Any] | None = None) -> dict[str, Any]:
+def create_chat_message(
+    db: Session,
+    room: Room,
+    user: User | None,
+    text: str | None,
+    message_type: str = "text",
+    media_url: str | None = None,
+    metadata: dict[str, Any] | None = None,
+) -> dict[str, Any]:
+    """Persist one durable room chat row.
+
+    PostgreSQL room_chat_messages is authoritative. media_url is stored
+    explicitly for image messages while metadata carries optional presentation
+    details such as content type.
+    """
     participant = _room_participant(db, room, user) if user is not None else None
     can_bypass_guest_block = bool(user is not None and (_is_room_manager(db, room, user) or (participant is not None and participant.is_member)))
     if user is not None and not room.guest_messages_enabled and not can_bypass_guest_block:
@@ -824,7 +838,15 @@ def create_chat_message(db: Session, room: Room, user: User | None, text: str | 
         record_room_event(db, room, "room.chat.blocked", actor_user_id=user.id, payload={"reason": "room_images_disabled"})
         db.flush()
         return room_snapshot(db, room)
-    message = RoomChatMessage(room_id=room.id, room_public_id=room.room_public_id, sender_user_id=user.id if user else None, message_type=message_type, text=text, metadata_json=metadata or {})
+    message = RoomChatMessage(
+        room_id=room.id,
+        room_public_id=room.room_public_id,
+        sender_user_id=user.id if user else None,
+        message_type=message_type,
+        text=text,
+        media_url=media_url,
+        metadata_json=metadata or {},
+    )
     db.add(message)
     db.flush()
     record_room_event(db, room, "room.chat.message_created", actor_user_id=user.id if user else None, payload={"message_id": message.id})

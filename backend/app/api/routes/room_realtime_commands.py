@@ -104,6 +104,41 @@ def _bool(payload: dict[str, Any], key: str, default: bool = False) -> bool:
     return str(value).strip().lower() in {"1", "true", "yes", "on"}
 
 
+def _chat_message_fields(
+    payload: dict[str, Any],
+) -> tuple[str | None, str, str | None]:
+    """Validate canonical user chat fields before durable persistence.
+
+    Text and image messages have different required payloads. Image messages
+    must carry an HTTP(S) media URL; fake placeholder text is never required.
+    """
+
+    message_type = str(payload.get("message_type") or "text").strip().lower()
+    if not message_type:
+        message_type = "text"
+
+    text = str(payload.get("text") or "").strip() or None
+    media_url = str(
+        payload.get("media_url") or payload.get("image_url") or ""
+    ).strip() or None
+
+    if message_type == "image":
+        if media_url is None:
+            raise HTTPException(status_code=400, detail="Image URL cannot be empty")
+        if len(media_url) > 500:
+            raise HTTPException(status_code=400, detail="Image URL is too long")
+        if not media_url.lower().startswith(("https://", "http://")):
+            raise HTTPException(status_code=400, detail="Image URL must use HTTP(S)")
+        content_type = str(payload.get("content_type") or "").strip().lower()
+        if content_type and not content_type.startswith("image/"):
+            raise HTTPException(status_code=400, detail="Invalid image content type")
+        return text, message_type, media_url
+
+    if text is None:
+        raise HTTPException(status_code=400, detail="Message cannot be empty")
+    return text, message_type, None
+
+
 def _room_user_key(user: User | None) -> str:
     return f"user_{user.public_user_id}" if user is not None else ""
 
@@ -597,10 +632,16 @@ def _execute_room_command_in_session(
 
     if event_type in {"room_chat/send", "room/chat"}:
         room_permission_service.require_chat_send(db, room, actor)
-        text = str(payload.get("text") or "").strip()
-        if not text:
-            raise HTTPException(status_code=400, detail="Message cannot be empty")
-        room_action_service.create_chat_message(db, room, actor, text, message_type=str(payload.get("message_type") or "text"), metadata=payload)
+        text, message_type, media_url = _chat_message_fields(payload)
+        room_action_service.create_chat_message(
+            db,
+            room,
+            actor,
+            text,
+            message_type=message_type,
+            media_url=media_url,
+            metadata=payload,
+        )
         return _finish(db, room, emissions, "room.chat.message_created")
 
     if event_type == "room/chat_clear":
@@ -868,8 +909,16 @@ async def background_theme(room_public_id: str, command: RoomBackgroundThemeComm
 
 @router.post("/chat/send")
 async def chat_send(room_public_id: str, command: RoomChatSendCommand, db: Session = Depends(get_db), current_user: User = Depends(get_current_user)):
+    """Persist a canonical text/image chat command and fan out its room delta."""
     room = room_or_404(db, room_public_id)
-    data = await execute_room_command(db, room, current_user, "room_chat/send", {"text": command.text, "message_type": command.message_type})
+    payload = command.model_dump(exclude_none=True)
+    data = await execute_room_command(
+        db,
+        room,
+        current_user,
+        "room_chat/send",
+        payload,
+    )
     return {"room_id": room_public_id, "room": data}
 
 

@@ -44,8 +44,16 @@ class RoomBackgroundThemeCommand(RoomRealtimeBaseCommand):
 
 
 class RoomChatSendCommand(RoomRealtimeBaseCommand):
-    text: str
-    message_type: str = "text"
+    """Canonical durable room-chat command.
+
+    Text messages require text. Image messages require media_url and may omit
+    text; content_type is retained as presentation metadata.
+    """
+
+    text: str | None = Field(default=None, max_length=4000)
+    message_type: str = Field(default="text", max_length=40)
+    media_url: str | None = Field(default=None, max_length=500)
+    content_type: str | None = Field(default=None, max_length=120)
 
 
 class RoomWatchPartyCommand(RoomRealtimeBaseCommand):
