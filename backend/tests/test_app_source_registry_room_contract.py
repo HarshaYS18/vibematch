@@ -18,10 +18,13 @@ class AppSourceRegistryRoomContractTests(unittest.TestCase):
         )
         for path in {
             "/rooms/{room_public_id}/realtime/join",
-            "/rooms/{room_public_id}/realtime/heartbeat",
             "/rooms/{room_public_id}/realtime/leave",
         }:
             self.assertIn(path, writes)
+        self.assertNotIn(
+            "/rooms/{room_public_id}/realtime/heartbeat",
+            writes,
+        )
 
         self.assertIn(
             "/rooms/{room_public_id}/realtime/watch-party/command",
