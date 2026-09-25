@@ -67,55 +67,21 @@ class LuckyPacketRoomEvent {
   }
 }
 
-class LuckyPacketRoomBus {
-  const LuckyPacketRoomBus._();
-
-  static final ValueNotifier<LuckyPacketRoomEvent?> packet =
-      ValueNotifier<LuckyPacketRoomEvent?>(null);
-  static LiveRoomGiftController? _controller;
-  static List<SeatUser> _roomUsers = const <SeatUser>[];
-
-  static void bind({
-    required LiveRoomGiftController controller,
-    required List<SeatUser> roomUsers,
-  }) {
-    _controller = controller;
-    _roomUsers = roomUsers;
-    packet.value = controller.activeLuckyPacket;
-  }
-
-  static void publish(LuckyPacketRoomEvent? event) {
-    packet.value = event;
-  }
-
-  static void claim() {
-    _controller?.claimLuckyPacket(_roomUsers);
-  }
-
-  static void dismissResults() {
-    _controller?.dismissLuckyPacketResults();
-  }
-
-  static void clearController(LiveRoomGiftController controller) {
-    if (_controller != controller) return;
-    _controller = null;
-    _roomUsers = const <SeatUser>[];
-    packet.value = null;
-  }
-}
-
 class LiveRoomGiftController {
   LiveRoomGiftController({
     required SeatUser currentUser,
     required this.onChanged,
     required this.onFinalGiftMessage,
     required this.onToast,
+    bool refreshCoinBalanceOnCreate = true,
   }) : currentUser = LiveRoomMediaSignalingService.instance
            .effectiveCurrentUser(currentUser) {
     _userRealtimeSub = AuthUserRealtimeService.instance.users.listen(
       _handleRealtimeUser,
     );
-    unawaited(refreshCoinBalance());
+    if (refreshCoinBalanceOnCreate) {
+      unawaited(refreshCoinBalance());
+    }
   }
 
   static const int smallGiftFlightThreshold = 200000;
@@ -503,7 +469,6 @@ class LiveRoomGiftController {
     required String message,
     required List<SeatUser> roomUsers,
   }) {
-    LuckyPacketRoomBus.bind(controller: this, roomUsers: roomUsers);
     if (coinBalance < coinAmount) {
       onToast('Not enough coins');
       unawaited(refreshCoinBalance());
@@ -688,7 +653,13 @@ class LiveRoomGiftController {
 
   void _setLuckyPacket(LuckyPacketRoomEvent? packet) {
     activeLuckyPacket = packet;
-    LuckyPacketRoomBus.publish(packet);
+  }
+
+  void applyAuthoritativeLuckyPacket(LuckyPacketRoomEvent? packet) {
+    _luckyPacketTimer?.cancel();
+    _luckyPacketTimer = null;
+    _setLuckyPacket(packet);
+    onChanged();
   }
 
   void _tickLuckyPacket(List<SeatUser> roomUsers) {
@@ -696,7 +667,6 @@ class LiveRoomGiftController {
     if (packet == null) {
       _luckyPacketTimer?.cancel();
       _luckyPacketTimer = null;
-      LuckyPacketRoomBus.publish(null);
       return;
     }
     if (packet.remainingSeconds > 0) {
@@ -978,7 +948,6 @@ class LiveRoomGiftController {
     _lastComboTapBySlideId.clear();
     _luckyPacketTimer?.cancel();
     _luckyPacketTimer = null;
-    LuckyPacketRoomBus.clearController(this);
   }
 }
 
