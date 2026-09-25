@@ -18,6 +18,11 @@ The persisted Home-composite smoke enforces:
 - unexpected GraphQL failures = 0%;
 - GraphQL semantic errors = 0%, including `errors[]` on HTTP 200;
 - required Home fields must all be present;
+- expected security rejections are verified separately: ad-hoc query text
+  `PERSISTED_ONLY` (400), unknown persisted ID `UNKNOWN_OPERATION` (400),
+  and missing bearer auth `UNAUTHENTICATED` (401);
+- expected security rejections are marked expected in k6 and must be 100%
+  contract-correct, so they do not inflate the unexpected-failure metric;
 - end-to-end p95 < 250ms and p99 < 500ms;
 - no blanket retries, sample filtering, reduced concurrency, or inflated
   timeout is used to manufacture a pass.
@@ -37,7 +42,9 @@ M2 adds the measurements required to improve latency from evidence:
 - successful responses emit aggregate `graphql-exec` and `bff`
   `Server-Timing`;
 - smoke validates the Server-Timing contract and gates BFF p95 < 200ms and
-  p99 < 400ms.
+  p99 < 400ms;
+- smoke distinguishes expected security rejections from positive-path failures
+  and requires 100% rejection-contract correctness.
 
 No user ID, room ID, request ID, URL path, token, or GraphQL variable is used
 as a metric label.
