@@ -414,6 +414,34 @@ class LiveRoomMediaSignalingService with WidgetsBindingObserver {
     });
   }
 
+  void requestRoomMembership() {
+    _send('room_member/request');
+  }
+
+  void approveRoomMembership(String targetUserId) {
+    final target = targetUserId.trim();
+    if (target.isEmpty) return;
+    _send('room_member/approve', <String, Object?>{
+      'target_user_id': target,
+    });
+  }
+
+  void rejectRoomMembership(String targetUserId) {
+    final target = targetUserId.trim();
+    if (target.isEmpty) return;
+    _send('room_member/reject', <String, Object?>{
+      'target_user_id': target,
+    });
+  }
+
+  void removeRoomMembership(String targetUserId) {
+    final target = targetUserId.trim();
+    if (target.isEmpty) return;
+    _send('room_member/remove', <String, Object?>{
+      'target_user_id': target,
+    });
+  }
+
   void setRoomApplyOnlyMode(bool enabled) {
     _send('room_settings/apply_mode', <String, Object?>{
       'apply_only_mode_enabled': enabled,
