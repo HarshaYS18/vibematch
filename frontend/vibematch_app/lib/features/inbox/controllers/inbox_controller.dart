@@ -273,29 +273,6 @@ class InboxController extends AutoDisposeNotifier<InboxState> {
     'Calls',
   ];
 
-  List<InboxConversation> _conversations = <InboxConversation>[];
-  String? _conversationNextCursor;
-  bool _loadingMoreConversations = false;
-  final List<InboxReportTask> _reportTasks = <InboxReportTask>[];
-
-  List<InboxConversation> get conversations =>
-      List.unmodifiable(_conversations);
-  bool get hasMoreConversations => _conversationNextCursor != null;
-  bool get isLoadingMoreConversations => _loadingMoreConversations;
-  List<InboxReportTask> get reportTasks => List.unmodifiable(_reportTasks);
-  int get pendingReportTaskCount =>
-      _reportTasks.where((task) => task.isPending).length;
-  int get lockedCount => lockedConversations.length;
-  int get unreadCount =>
-      _conversations.fold<int>(0, (sum, chat) => sum + chat.unreadCount);
-
-  List<InboxConversation> get unlockedConversations => _sortedConversations(
-    _conversations.where((chat) => !chat.isLockedByBackend).toList(),
-  );
-  List<InboxConversation> get lockedConversations => _sortedConversations(
-    _conversations.where((chat) => chat.isLockedByBackend).toList(),
-  );
-
   List<InboxConversation> get visibleConversations {
     final base = unlockedConversations
         .where((chat) => !chat.isArchived)
