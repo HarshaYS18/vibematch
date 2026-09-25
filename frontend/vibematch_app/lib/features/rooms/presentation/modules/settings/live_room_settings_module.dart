@@ -25,6 +25,11 @@ import '../live_room_controller_bundle.dart';
 import '../seats/live_room_seats_module.dart';
 import '../watch_party/live_room_watch_party_entry_module.dart';
 
+/// Coordinates live-room settings sheets and commands for one room bundle.
+///
+/// Canonical settings are read from the scoped bundle and mutations are
+/// delegated to backend/realtime services. Sheet state is ephemeral and this
+/// module owns no persistent settings cache.
 class LiveRoomSettingsModule {
   const LiveRoomSettingsModule._();
 

@@ -10,6 +10,12 @@ import '../../data/live_room_system_event_bus.dart';
 import '../live_room_models.dart';
 import '../live_room_restore_state.dart';
 
+/// Room-scoped chat/system-message projection for one live-room session.
+///
+/// Canonical room membership/settings come from RoomSessionRepository and
+/// realtime events come from the shared application hub. This controller owns
+/// only transient message presentation/deduplication and is disposed with the
+/// room bundle; it must never become a process-global chat authority.
 class LiveRoomMessageController {
   LiveRoomMessageController({
     required String roomId,

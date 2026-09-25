@@ -7,6 +7,10 @@ import '../live_room_models.dart';
 import 'live_room_blocked_list_sheet.dart';
 import 'room_settings_sheet.dart';
 
+/// Presentation wrapper for the room settings bottom sheet.
+///
+/// The room music controller is injected from the mounted room bundle so music
+/// overlay state follows room lifecycle and cannot leak through a singleton.
 class LiveRoomSettingsSheetModule extends StatelessWidget {
   const LiveRoomSettingsSheetModule({
     super.key,

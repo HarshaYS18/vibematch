@@ -8,6 +8,11 @@ import '../modules/live_room_message_composer_module.dart';
 import 'room_seats.dart';
 import 'room_theme.dart';
 
+/// Bottom input/action dock for a single live-room route.
+///
+/// Every action is injected. Image sending is routed to the scoped room
+/// message controller instead of a static active-room controller, keeping this
+/// widget stateless and reusable.
 class RoomInputDock extends StatelessWidget {
   const RoomInputDock({
     super.key,

@@ -23,6 +23,11 @@ import '../seats/live_room_seats_module.dart';
 import '../settings/live_room_settings_module.dart';
 import '../watch_party/live_room_watch_party_entry_module.dart';
 
+/// Composes the visible live-room route from one scoped controller bundle.
+///
+/// Durable room state remains in RoomSessionRepository. Room-scoped
+/// presentation controllers are supplied through LiveRoomControllerBundle;
+/// this module owns no global room state.
 class LiveRoomLayoutModule extends ConsumerWidget {
   const LiveRoomLayoutModule({super.key, required this.bundle});
 

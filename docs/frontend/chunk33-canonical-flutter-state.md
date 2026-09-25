@@ -204,3 +204,13 @@ Flying-gift and premium-broadcast queues are owned by the room-scoped
 explicitly. The queues contain animation-only state, preserve authoritative
 backend/local dedupe, and are disposed on room exit; no process-global gift
 presentation `ValueNotifier` remains.
+
+
+### Source-documentation backfill — room composition
+
+The repair wave now documents ownership/lifecycle directly in
+`live_room_message_controller.dart`, `live_room_layout_module.dart`,
+`live_room_settings_module.dart`, `live_room_input_dock.dart`, and
+`live_room_settings_sheet_module.dart`. These files are presentation/scoped
+coordination layers only; RoomSessionRepository and backend/realtime services
+remain canonical authorities.
