@@ -246,6 +246,7 @@ class LiveRoomControllerBundle {
     );
 
     roomMessageController = LiveRoomMessageController(
+      roomId: roomId,
       currentUser: currentUser,
       restoreState: restoreState?.messageState,
       onChanged: () => notifyRoomChanged(),
@@ -314,6 +315,7 @@ class LiveRoomControllerBundle {
     messageFocusNode.dispose();
     seatController.dispose();
     moderationController.dispose();
+    roomMessageController.dispose();
     presenceController.leave();
     presenceController.dispose();
     roomStateController.dispose();
