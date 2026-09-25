@@ -4,7 +4,7 @@
 
 The GraphQL BFF exists only for composite reads. Home, Profile, Discovery, and creator/admin dashboards can aggregate owning services without Flutter learning internal service topology.
 
-Chunk 37 hardening adds strict SLO measurement and removes avoidable request-path work.
+The Chunk 36 reliability/latency improvement adds strict SLO measurement and removes avoidable request-path work.
 
 ## Non-authority rule
 
