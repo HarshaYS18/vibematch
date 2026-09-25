@@ -27,12 +27,15 @@ class AppShellNavigationState {
 }
 
 class AppShellNavigationController
-    extends StateNotifier<AppShellNavigationState> {
-  AppShellNavigationController()
-      : super(const AppShellNavigationState.initial());
-
+    extends AutoDisposeNotifier<AppShellNavigationState> {
   int _backPressCount = 0;
   Timer? _backPressResetTimer;
+
+  @override
+  AppShellNavigationState build() {
+    ref.onDispose(() => _backPressResetTimer?.cancel());
+    return const AppShellNavigationState.initial();
+  }
 
   bool select(VmMainTab tab) {
     final next = state.select(tab);
@@ -50,16 +53,10 @@ class AppShellNavigationController
     );
     return (3 - _backPressCount).clamp(1, 3);
   }
-
-  @override
-  void dispose() {
-    _backPressResetTimer?.cancel();
-    super.dispose();
-  }
 }
 
-final appShellNavigationProvider = StateNotifierProvider.autoDispose<
-    AppShellNavigationController,
-    AppShellNavigationState>(
-  (ref) => AppShellNavigationController(),
-);
+final appShellNavigationProvider =
+    NotifierProvider.autoDispose<
+      AppShellNavigationController,
+      AppShellNavigationState
+    >(AppShellNavigationController.new);
