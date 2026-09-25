@@ -1,11 +1,12 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_webrtc/flutter_webrtc.dart';
 
 import '../../controllers/inbox_call_controller.dart';
 import '../../data/inbox_call_media_bridge.dart';
 import '../../models/inbox_call_models.dart';
 
-class InboxActiveCallPage extends StatefulWidget {
+class InboxActiveCallPage extends ConsumerStatefulWidget {
   const InboxActiveCallPage({
     super.key,
     required this.callController,
@@ -16,10 +17,10 @@ class InboxActiveCallPage extends StatefulWidget {
   final InboxCallSession initialSession;
 
   @override
-  State<InboxActiveCallPage> createState() => _InboxActiveCallPageState();
+  ConsumerState<InboxActiveCallPage> createState() => _InboxActiveCallPageState();
 }
 
-class _InboxActiveCallPageState extends State<InboxActiveCallPage> {
+class _InboxActiveCallPageState extends ConsumerState<InboxActiveCallPage> {
   final InboxCallMediaBridge _mediaBridge = InboxCallMediaBridge();
   bool _closingFromRemote = false;
   bool _mediaJoining = false;
@@ -29,20 +30,18 @@ class _InboxActiveCallPageState extends State<InboxActiveCallPage> {
   @override
   void initState() {
     super.initState();
-    widget.callController.addListener(_handleCallChanged);
     WidgetsBinding.instance.addPostFrameCallback((_) => _maybeJoinMedia());
   }
 
   @override
   void dispose() {
-    widget.callController.removeListener(_handleCallChanged);
     _mediaBridge.dispose();
     super.dispose();
   }
 
-  void _handleCallChanged() {
+  void _handleCallChanged(InboxCallState callState) {
     if (!mounted || _closingFromRemote) return;
-    final active = widget.callController.activeCall;
+    final active = callState.activeCall;
     if (active != null && active.id == widget.initialSession.id && !active.isTerminal) {
       if (active.isConnected) _maybeJoinMedia();
       return;
@@ -56,7 +55,7 @@ class _InboxActiveCallPageState extends State<InboxActiveCallPage> {
   }
 
   Future<void> _maybeJoinMedia() async {
-    final session = widget.callController.activeCall ?? widget.initialSession;
+    final session = ref.read(inboxCallControllerProvider).activeCall ?? widget.initialSession;
     if (!mounted || _mediaJoining || _mediaReady || !session.isConnected) return;
     final roomId = session.roomId;
     if (roomId == null || roomId.trim().isEmpty) {
@@ -98,14 +97,18 @@ class _InboxActiveCallPageState extends State<InboxActiveCallPage> {
 
   @override
   Widget build(BuildContext context) {
-    return AnimatedBuilder(
-      animation: widget.callController,
-      builder: (context, _) {
-        final session = widget.callController.activeCall ?? widget.initialSession;
-        final connected = session.isConnected;
-        final colors = session.isVideo ? const [Color(0xFF6D5DF6), Color(0xFFFF4F9A)] : const [Color(0xFF12C7B7), Color(0xFF6D5DF6)];
+    ref.listen<InboxCallState>(
+      inboxCallControllerProvider,
+      (previous, next) => _handleCallChanged(next),
+    );
+    final callState = ref.watch(inboxCallControllerProvider);
+    final session = callState.activeCall ?? widget.initialSession;
+    final connected = session.isConnected;
+    final colors = session.isVideo
+        ? const [Color(0xFF6D5DF6), Color(0xFFFF4F9A)]
+        : const [Color(0xFF12C7B7), Color(0xFF6D5DF6)];
 
-        return Scaffold(
+    return Scaffold(
           backgroundColor: const Color(0xFF080512),
           body: SafeArea(
             child: Container(
@@ -163,8 +166,6 @@ class _InboxActiveCallPageState extends State<InboxActiveCallPage> {
             ),
           ),
         );
-      },
-    );
   }
 }
 
