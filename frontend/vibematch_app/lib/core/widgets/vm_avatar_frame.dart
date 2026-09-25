@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 
+import '../../foundation/images/app_image.dart';
+
 class VmAvatarFrameStyle {
   const VmAvatarFrameStyle({
     required this.id,
@@ -86,13 +88,13 @@ class _VmAvatarFrameHostState extends State<VmAvatarFrameHost>
         clipBehavior: Clip.none,
         children: [
           if (imageUrl != null && imageUrl.isNotEmpty)
-            Image.network(
+            AppImage.network(
               imageUrl,
               width: frameSize,
               height: frameSize,
               fit: BoxFit.contain,
               filterQuality: FilterQuality.high,
-              errorBuilder: (context, error, stackTrace) => _GeneratedVmAvatarFrame(
+              fallback: _GeneratedVmAvatarFrame(
                 frame: frame,
                 size: frameSize,
                 controller: _controller,
@@ -100,13 +102,13 @@ class _VmAvatarFrameHostState extends State<VmAvatarFrameHost>
               ),
             )
           else if (assetPath != null && assetPath.isNotEmpty)
-            Image.asset(
+            AppImage.asset(
               assetPath,
               width: frameSize,
               height: frameSize,
               fit: BoxFit.contain,
               filterQuality: FilterQuality.high,
-              errorBuilder: (context, error, stackTrace) => _GeneratedVmAvatarFrame(
+              fallback: _GeneratedVmAvatarFrame(
                 frame: frame,
                 size: frameSize,
                 controller: _controller,

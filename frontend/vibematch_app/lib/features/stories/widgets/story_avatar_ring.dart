@@ -1,6 +1,12 @@
-import 'package:flutter/material.dart';
+import 'dart:async';
 
-class StoryAvatarRing extends StatelessWidget {
+import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+
+import '../../../foundation/images/app_image.dart';
+import '../../../foundation/images/app_image_prefetch.dart';
+
+class StoryAvatarRing extends ConsumerWidget {
   const StoryAvatarRing({
     super.key,
     required this.userId,
@@ -28,7 +34,7 @@ class StoryAvatarRing extends StatelessWidget {
   static bool isStorySeen(String userId) => userId.hashCode.abs() % 5 == 0;
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
     final hasStory = hasActiveStory(userId);
     final seen = isStorySeen(userId);
     final avatar = AnimatedContainer(
@@ -60,6 +66,17 @@ class StoryAvatarRing extends StatelessWidget {
         if (!hasStory) {
           onNoStoryTap?.call();
           return;
+        }
+        final normalizedAvatarUrl = avatarUrl?.trim();
+        if (normalizedAvatarUrl != null && normalizedAvatarUrl.isNotEmpty) {
+          unawaited(
+            ref.read(appImagePrefetchQueueProvider).prefetchNetwork(
+              context,
+              normalizedAvatarUrl,
+              logicalWidth: 36,
+              logicalHeight: 36,
+            ),
+          );
         }
         showGeneralDialog<void>(
           context: context,
@@ -167,11 +184,39 @@ class _InlineStoryViewerState extends State<_InlineStoryViewer> {
                   const SizedBox(height: 12),
                   Row(
                     children: [
-                      CircleAvatar(
-                        radius: 18,
-                        backgroundColor: const Color(0xFF251538),
-                        backgroundImage: avatarUrl == null || avatarUrl.isEmpty ? null : NetworkImage(avatarUrl),
-                        child: avatarUrl == null || avatarUrl.isEmpty ? Text(widget.avatarText, style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w900)) : null,
+                      Container(
+                        width: 36,
+                        height: 36,
+                        clipBehavior: Clip.antiAlias,
+                        decoration: const BoxDecoration(
+                          shape: BoxShape.circle,
+                          color: Color(0xFF251538),
+                        ),
+                        child: avatarUrl == null || avatarUrl.isEmpty
+                            ? Center(
+                                child: Text(
+                                  widget.avatarText,
+                                  style: const TextStyle(
+                                    color: Colors.white,
+                                    fontWeight: FontWeight.w900,
+                                  ),
+                                ),
+                              )
+                            : AppImage.network(
+                                avatarUrl,
+                                width: 36,
+                                height: 36,
+                                fit: BoxFit.cover,
+                                fallback: Center(
+                                  child: Text(
+                                    widget.avatarText,
+                                    style: const TextStyle(
+                                      color: Colors.white,
+                                      fontWeight: FontWeight.w900,
+                                    ),
+                                  ),
+                                ),
+                              ),
                       ),
                       const SizedBox(width: 9),
                       Expanded(child: Text(widget.displayName, maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(color: Colors.white, fontSize: 14, fontWeight: FontWeight.w900))),

@@ -529,6 +529,65 @@ if _ACTIVE_CALL_PAGE.exists():
         )
 
 
+# Chunk 34-M13: canonical image decode sizing + bounded prefetch runtime.
+_APP_IMAGE = APP / "foundation" / "images" / "app_image.dart"
+_IMAGE_PREFETCH = APP / "foundation" / "images" / "app_image_prefetch.dart"
+
+if not _APP_IMAGE.exists():
+    violations.append(
+        "foundation/images/app_image.dart: Chunk 34-M13 canonical AppImage is required"
+    )
+else:
+    app_image_text = _APP_IMAGE.read_text(encoding="utf-8-sig")
+    for marker in (
+        "class AppImage",
+        "AppImageDecodePolicy",
+        "cacheWidth:",
+        "cacheHeight:",
+        "maxDecodeDimension",
+    ):
+        if marker not in app_image_text:
+            violations.append(
+                f"foundation/images/app_image.dart: missing Chunk 34-M13 marker: {marker}"
+            )
+
+if not _IMAGE_PREFETCH.exists():
+    violations.append(
+        "foundation/images/app_image_prefetch.dart: Chunk 34-M13 prefetch queue is required"
+    )
+else:
+    prefetch_text = _IMAGE_PREFETCH.read_text(encoding="utf-8-sig")
+    for marker in (
+        "implements MediaResourceParticipant",
+        "MediaResourceKind.imagePrefetch",
+        "maxConcurrent = 2",
+        "maxQueued = 12",
+        "precacheImage",
+        "provider.evict",
+        "registry.register(queue)",
+    ):
+        if marker not in prefetch_text:
+            violations.append(
+                f"foundation/images/app_image_prefetch.dart: missing Chunk 34-M13 marker: {marker}"
+            )
+
+for hot_image_path in (
+    APP / "features" / "vibes" / "presentation" / "widgets" / "vibe_avatar.dart",
+    APP / "core" / "widgets" / "vm_avatar_frame.dart",
+    APP / "features" / "stories" / "widgets" / "story_avatar_ring.dart",
+):
+    if not hot_image_path.exists():
+        continue
+    hot_image_text = hot_image_path.read_text(encoding="utf-8-sig")
+    rel = hot_image_path.relative_to(ROOT).as_posix()
+    if "AppImage.network" not in hot_image_text:
+        violations.append(f"{rel}: hot network image surface must use AppImage")
+    if "Image.network(" in hot_image_text or "NetworkImage(" in hot_image_text:
+        violations.append(
+            f"{rel}: raw network image decoding is forbidden on guarded hot surfaces"
+        )
+
+
 # Chunk 34-M1: heavyweight media/resource lifecycle coordination must be
 # session-scoped. The coordinator is an app/runtime implementation, not a
 # feature singleton or a new domain-state authority.

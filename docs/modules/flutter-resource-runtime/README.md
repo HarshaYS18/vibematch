@@ -153,3 +153,15 @@ Inbox video calls now expose the local camera as
 preserving call audio, and foreground resumes only if lifecycle performed that
 pause. Memory pressure is non-destructive; session teardown releases the
 camera track.
+
+
+## M13 AppImage + prefetch
+
+High-frequency image surfaces now use the foundation `AppImage` wrapper for
+device-pixel-ratio-aware bounded decoding. A bounded
+`AppImagePrefetchQueue` registers as `MediaResourceKind.imagePrefetch`, with
+2 active and 12 queued requests maximum.
+
+Background, memory pressure and session teardown invalidate speculative queued
+work. In-flight work that finishes after invalidation is evicted. The shared
+Flutter image cache remains independently managed by the M5 participant.

@@ -501,3 +501,57 @@ A user-disabled camera is never auto-enabled by a later foreground transition.
 
 Inbox call session state remains Inbox/backend authority. The resource runtime
 does not answer/end calls or alter call participants.
+
+
+## M13: canonical AppImage and bounded prefetch pipeline
+
+M13 establishes one native Flutter image path for high-frequency network/image
+surfaces without adding a third-party cache package.
+
+### AppImage
+
+`foundation/images/app_image.dart` provides `AppImage.network` and
+`AppImage.asset`. Decode targets are derived from logical render size and
+device pixel ratio, capped by `AppImageDecodePolicy.maxDecodeDimension`.
+This prevents small avatars/frames from decoding full-resolution uploads into
+memory.
+
+The first guarded migrations are:
+
+- Vibes avatars;
+- shared avatar-frame images;
+- Story viewer avatar.
+
+These hot surfaces may no longer use raw `Image.network`/`NetworkImage`.
+
+### Prefetch queue
+
+`AppImagePrefetchQueue` is a foundation-owned
+`MediaResourceKind.imagePrefetch` participant.
+
+It provides:
+
+- at most 2 concurrent prefetch decodes;
+- at most 12 queued requests;
+- URL/request deduplication;
+- decode-sized `ResizeImage` providers;
+- queue invalidation on background, memory pressure and session teardown;
+- post-invalidation eviction for an in-flight prefetch that could not be
+  cancelled.
+
+The queue registers itself through the foundation
+`mediaResourceRegistryProvider` and is created lazily inside the authenticated
+subtree. Story avatar opening is the first real prefetch consumer.
+
+### Relationship to M5
+
+M5 owns Flutter's shared decoded-image cache pressure. M13 owns future/queued
+prefetch work and per-widget decode sizing. They are deliberately separate
+resource kinds so memory pressure can both stop new speculative work and trim
+the shared cache.
+
+### UI and authority
+
+No user-visible layout is changed. Uploaded/profile image URLs remain owned by
+their existing profile/content domains; the image runtime is presentation/cache
+infrastructure only.
