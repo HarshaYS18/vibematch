@@ -58,3 +58,19 @@ Service has zero ready endpoints.
 External secret/certificate automation must create `funkey-api-tls`,
 `funkey-realtime-tls`, and `funkey-media-tls` in namespace `funkey`.
 No private keys are stored in Git.
+
+
+## Stable/canary selector isolation
+
+The stable API workload is `Deployment/funkey-api-stable`. Its immutable
+selector includes both `app=funkey-api` and
+`funkey.io/release-track=stable`; HPA, topology-spread constraints and PDB
+scope only stable pods. The public Service remains `funkey-api`.
+
+A future canary Deployment must use `funkey.io/release-track=canary` and must
+not overlap the stable Deployment selector.
+
+For an existing cluster with the legacy `Deployment/funkey-api`, apply the
+new stable Deployment first, wait for ready `Service/funkey-api` endpoints,
+then let GitOps prune the legacy Deployment. Do not mutate the old Deployment
+selector in place because Kubernetes Deployment selectors are immutable.

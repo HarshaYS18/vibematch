@@ -71,7 +71,22 @@ require(
     K8S / 'overlays' / 'production' / 'kustomization.yaml',
     ('../../gateway',),
 )
-require(K8S / 'base' / 'api.yaml', ('funkey.io/release-track: stable',))
+api_text = require(
+    K8S / 'base' / 'api.yaml',
+    (
+        'name: funkey-api-stable',
+        'matchLabels: {app: funkey-api, funkey.io/release-track: stable}',
+        'selector: {app: funkey-api, funkey.io/release-track: stable}',
+    ),
+)
+if "kind: Deployment\nmetadata:\n  name: funkey-api\n" in api_text:
+    violations.append(
+        'deploy/kubernetes/base/api.yaml: legacy overlapping funkey-api Deployment must stay removed'
+    )
+require(
+    K8S / 'base' / 'autoscaling.yaml',
+    ('scaleTargetRef: {apiVersion: apps/v1, kind: Deployment, name: funkey-api-stable}',),
+)
 require(GATEWAY / 'canary-service.yaml', ('funkey.io/release-track: canary', 'name: funkey-api-canary'))
 
 require(

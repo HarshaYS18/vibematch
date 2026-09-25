@@ -7,7 +7,7 @@ automountServiceAccountToken: false
 apiVersion: apps/v1
 kind: Deployment
 metadata:
-  name: funkey-api
+  name: funkey-api-stable
   labels: {app: funkey-api, funkey.io/release-track: stable}
 spec:
   replicas: 3
@@ -16,7 +16,7 @@ spec:
     type: RollingUpdate
     rollingUpdate: {maxSurge: 1, maxUnavailable: 0}
   selector:
-    matchLabels: {app: funkey-api}
+    matchLabels: {app: funkey-api, funkey.io/release-track: stable}
   template:
     metadata:
       labels: {app: funkey-api, funkey.io/release-track: stable}
@@ -34,11 +34,11 @@ spec:
         - maxSkew: 1
           topologyKey: topology.kubernetes.io/zone
           whenUnsatisfiable: ScheduleAnyway
-          labelSelector: {matchLabels: {app: funkey-api}}
+          labelSelector: {matchLabels: {app: funkey-api, funkey.io/release-track: stable}}
         - maxSkew: 1
           topologyKey: kubernetes.io/hostname
           whenUnsatisfiable: DoNotSchedule
-          labelSelector: {matchLabels: {app: funkey-api}}
+          labelSelector: {matchLabels: {app: funkey-api, funkey.io/release-track: stable}}
       volumes:
         - name: tmp
           emptyDir: {sizeLimit: 256Mi}
@@ -85,7 +85,7 @@ spec:
 apiVersion: policy/v1
 kind: PodDisruptionBudget
 metadata:
-  name: funkey-api
+  name: funkey-api-stable
 spec:
   minAvailable: 2
-  selector: {matchLabels: {app: funkey-api}}
+  selector: {matchLabels: {app: funkey-api, funkey.io/release-track: stable}}

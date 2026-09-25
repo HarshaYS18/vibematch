@@ -64,7 +64,10 @@ void main() {
     expect(ottAdapter, contains('OttRuntimeMode'));
     expect(ottAdapter, contains('CompanionPlaybackAdapter'));
     expect(ottHost, contains('InAppWebViewOttPlaybackHost'));
-    expect(ottHost, isNot(contains('WatchPartyRepository')));
+    expect(
+      ottHost,
+      isNot(contains("import '../../data/watch_party_repository.dart'")),
+    );
     expect(roomRouter, contains('watchPartyRepositoryProvider'));
     expect(repository, isNot(contains('WebSocketChannel')));
     expect(coordinator, isNot(contains('YoutubePlayerController')));

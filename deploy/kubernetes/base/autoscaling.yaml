@@ -3,7 +3,7 @@ kind: HorizontalPodAutoscaler
 metadata:
   name: funkey-api
 spec:
-  scaleTargetRef: {apiVersion: apps/v1, kind: Deployment, name: funkey-api}
+  scaleTargetRef: {apiVersion: apps/v1, kind: Deployment, name: funkey-api-stable}
   minReplicas: 3
   maxReplicas: 30
   behavior:

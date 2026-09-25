@@ -1,6 +1,6 @@
 apiVersion: apps/v1
 kind: Deployment
-metadata: {name: funkey-api}
+metadata: {name: funkey-api-stable}
 spec:
   replicas: 1
   template:

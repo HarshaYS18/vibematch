@@ -41,3 +41,18 @@ The provider WAF/DDoS policy protects the Envoy origin. Envoy strips spoofable i
 ## Documentation map
 
 Every new gateway manifest is described by `deploy/kubernetes/gateway/README.md`. Architecture is documented in `docs/architecture/api-gateway.md`; operations in `docs/runbooks/api-gateway.md`; module ownership in `docs/modules/api-gateway/README.md`.
+
+
+## Repair audit: canary isolation and CI correctness
+
+The post-Chunk-35 anomaly audit closed two defects:
+
+- the Watch Party source-of-truth test now checks for a real repository import
+  rather than failing on an architecture comment that merely names the
+  repository class;
+- the stable API workload is now `funkey-api-stable` with an isolated
+  stable-track selector. The HPA, topology spread and PDB target stable pods
+  only, so future canary pods cannot overlap the stable Deployment controller.
+
+The workload rename is deliberately migration-safe and avoids an in-place
+immutable Deployment-selector mutation.
