@@ -1,6 +1,6 @@
 # Chunk 37 — Kafka Data Platform
 
-**Status: implementation complete; CI and controlled integration/chaos evidence are the closure gates.**
+**Status: closed. Implementation, architecture guards, controlled integration/recovery evidence, and repository CI are green.**
 
 Chunk 37 keeps NATS JetStream as FunKey's operational async bus and adds Kafka
 only for retained analytics, replay, ML/recommendation and data-lake workloads.
@@ -120,3 +120,23 @@ documented.
 A production Kafka provider/account/credentials remain an external deployment
 prerequisite; repository completion is not a claim that a live provider has
 already been provisioned.
+
+
+## Final closure evidence
+
+The final Chunk 37 verification on commit `282071f247893983826bd4b441de59e4b1774742` completed successfully.
+
+- Kafka bridge unit suite: **18/18 passed**
+- Kafka architecture guard: **green**
+- NATS -> Kafka controlled smoke: **100 published / 100 unique observed / 0 silent loss**
+- Controlled smoke throughput: **634.36 events/second** for the 100-event CI sample
+- Kafka outage/recovery exercise: **20 events published while Kafka was stopped / 20 observed after recovery / 0 silent loss**
+- Bridge readiness correctly went unhealthy during Kafka outage and recovered after Kafka restart
+- Infrastructure render/immutable-image checks: **green**
+- Kafka Event Bridge container build: **green**
+- Production Platform: **green**
+- Service Contracts: **green**
+- Frontend architecture guard: **green**
+- Backend Media Architecture: **green**
+
+The controlled CI evidence proves the repository/runtime contract and failure-recovery path. It does not claim production provider capacity; managed production Kafka provisioning, credentials, ACL application and measured production capacity remain external deployment prerequisites.
