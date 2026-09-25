@@ -6,7 +6,7 @@ Check upload-session status, asset `upload_status`/`processing_status`, worker c
 
 ## Direct upload failures
 
-For single PUT, recreate an upload session after expiry. For multipart, never fabricate missing ETags. Completion requires exactly the planned part numbers and then verifies object size/content type.
+For single PUT, recreate an upload session after expiry. For multipart, never fabricate missing ETags. Completion requires exactly the planned part numbers and then verifies object size/content type. If the first completion call may have succeeded but the client saw a timeout/5xx, retry the same session and part list; `NoSuchUpload` is recoverable only when the object can be HEADed and subsequently passes the declared size/content-type checks.
 
 ## Processing failures
 
