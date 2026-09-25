@@ -9,7 +9,12 @@ import '../../data/active_room_context.dart';
 import '../../data/live_room_system_event_bus.dart';
 
 class LuckyWinCelebrationOverlay extends StatefulWidget {
-  const LuckyWinCelebrationOverlay({super.key});
+  const LuckyWinCelebrationOverlay({
+    super.key,
+    this.systemEvents,
+  });
+
+  final Stream<LiveRoomSystemEvent>? systemEvents;
 
   @override
   State<LuckyWinCelebrationOverlay> createState() =>
@@ -40,14 +45,19 @@ class _LuckyWinCelebrationOverlayState
     )..addStatusListener((status) {
         if (status == AnimationStatus.completed) _finishActive();
       });
-    _roomEventSubscription = AppRealtimeHub.shared.events.listen((envelope) {
-      final event = decodeLiveRoomSystemEvent(
-        envelope,
-        roomId: ActiveRoomContext.roomPublicId,
-      );
-      if (event != null) _handleRoomEvent(event);
-    });
-    unawaited(AppRealtimeHub.shared.start());
+    final injectedEvents = widget.systemEvents;
+    if (injectedEvents != null) {
+      _roomEventSubscription = injectedEvents.listen(_handleRoomEvent);
+    } else {
+      _roomEventSubscription = AppRealtimeHub.shared.events.listen((envelope) {
+        final event = decodeLiveRoomSystemEvent(
+          envelope,
+          roomId: ActiveRoomContext.roomPublicId,
+        );
+        if (event != null) _handleRoomEvent(event);
+      });
+      unawaited(AppRealtimeHub.shared.start());
+    }
   }
 
   @override
