@@ -569,14 +569,36 @@
       "migration_status": "Economy Service is the exclusive writer; supply/game pool movements and durable house liabilities are journaled and continuously reconciled"
     },
     {
+      "id": "economy.vip_manual_override",
+      "domain": "economy",
+      "classification": "AUTHORITY",
+      "logical_owner": "economy",
+      "current_deployable": "economy-service",
+      "current_storage": [
+        "postgres:user_vip_overrides"
+      ],
+      "target_storage": [
+        "economy-service PostgreSQL authority"
+      ],
+      "mutated_by": [
+        "economy-service VIP override command"
+      ],
+      "source_states": [],
+      "rebuild_from": [],
+      "change_contract": {
+        "status": "live",
+        "name": "economy.vip_override.changed.v1"
+      },
+      "migration_status": "Post-Chunk-32 repair: audited Owner/Super Owner overrides are idempotent Economy commands"
+    },
+    {
       "id": "economy.vip_projection",
       "domain": "economy",
       "classification": "PROJECTION",
       "logical_owner": "economy",
       "current_deployable": "economy-service + read-only client/profile projections",
       "current_storage": [
-        "postgres:user_vip_statuses",
-        "postgres:user_vip_overrides"
+        "postgres:user_vip_statuses"
       ],
       "target_storage": [
         "economy-derived VIP/SVIP projection with explicit manual override layer"
@@ -590,7 +612,7 @@
         "economy.vip_manual_override"
       ],
       "rebuild_from": [
-        "economy.wallet_ledger recharge/value history + active user_vip_overrides"
+        "economy.wallet_ledger recharge/value history + economy.vip_manual_override"
       ],
       "change_contract": {
         "status": "live",
