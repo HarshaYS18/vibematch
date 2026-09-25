@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../controllers/inbox_controller.dart';
+import '../controllers/inbox_call_controller.dart';
 import '../data/inbox_ai_api_service.dart';
 import '../data/inbox_stories_api_service.dart';
 import '../models/inbox_models.dart';
@@ -19,7 +21,7 @@ import 'widgets/inbox_passcode_sheet.dart';
 import 'widgets/inbox_v3_locked_pull_reveal.dart';
 import 'widgets/report_conversation_sheet.dart';
 
-class InboxPage extends StatefulWidget {
+class InboxPage extends ConsumerStatefulWidget {
   const InboxPage({
     super.key,
     this.openPagesInOverlay = false,
@@ -36,17 +38,17 @@ class InboxPage extends StatefulWidget {
   final ValueChanged<String?>? onActiveConversationChanged;
 
   @override
-  State<InboxPage> createState() => _InboxPageState();
+  ConsumerState<InboxPage> createState() => _InboxPageState();
 }
 
-class _InboxPageState extends State<InboxPage> {
+class _InboxPageState extends ConsumerState<InboxPage> {
   static const _bg = Color(0xFFFAFAFA);
   static const _ink = Color(0xFF111114);
   static const _muted = Color(0xFF71717A);
   static const _blue = Color(0xFF3797F0);
 
-  late final InboxController _controller;
-  late final bool _ownsController;
+  InboxController get _controller =>
+      widget.controller ?? ref.read(inboxControllerProvider.notifier);
   final InboxAiApiService _inboxAiApi = const InboxAiApiService();
   final InboxStoriesApiService _storiesApi = const InboxStoriesApiService();
   final ScrollController _scrollController = ScrollController();
@@ -60,13 +62,12 @@ class _InboxPageState extends State<InboxPage> {
   @override
   void initState() {
     super.initState();
-    _controller = widget.controller ?? InboxController();
-    _ownsController = widget.controller == null;
-    _controller.addListener(_handleControllerChanged);
     _storiesFuture = _storiesApi.loadStories();
-    if (_ownsController) {
+    if (widget.controller == null) {
       WidgetsBinding.instance.addPostFrameCallback((_) {
-        if (mounted) _controller.loadFromBackend();
+        if (mounted) {
+          ref.read(inboxControllerProvider.notifier).loadFromBackend();
+        }
       });
     }
   }
@@ -80,13 +81,7 @@ class _InboxPageState extends State<InboxPage> {
   @override
   void dispose() {
     _scrollController.dispose();
-    _controller.removeListener(_handleControllerChanged);
-    if (_ownsController) _controller.dispose();
     super.dispose();
-  }
-
-  void _handleControllerChanged() {
-    if (mounted) setState(() {});
   }
 
   void _handleRequestedConversationOpen() {
@@ -628,6 +623,9 @@ class _InboxPageState extends State<InboxPage> {
 
   @override
   Widget build(BuildContext context) {
+    ref.watch(inboxControllerProvider);
+    ref.watch(inboxCallControllerProvider);
+
     final visibleConversations = _visibleConversations;
     final page = Stack(
       children: [
