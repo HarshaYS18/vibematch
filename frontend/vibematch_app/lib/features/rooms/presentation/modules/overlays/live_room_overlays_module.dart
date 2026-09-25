@@ -27,6 +27,7 @@ class LiveRoomOverlaysModule {
       giftRevision: bundle.giftRevision,
       giftController: bundle.giftControllerInstance,
       roomMusicController: bundle.roomMusicController,
+      luckyPacketRealtimeService: bundle.luckyPacketRealtimeService,
       roomUsers: bundle.allRoomUsers,
       pendingSeatInviteInviterName: bundle.pendingSeatInvite?.inviterName,
       pendingSeatInviteUser: bundle.pendingSeatInvite?.invitedUser,
