@@ -14,7 +14,7 @@ import '../live_room_restore_state.dart';
 class LiveRoomMessageController {
   LiveRoomMessageController({
     required String roomId,
-    required this.roomSessionRepository,
+    this.roomSessionRepository,
     required SeatUser currentUser,
     required this.onChanged,
     LiveRoomMessageRestoreState? restoreState,
@@ -60,7 +60,7 @@ class LiveRoomMessageController {
   }
 
   final SeatUser currentUser;
-  final RoomSessionRepository roomSessionRepository;
+  final RoomSessionRepository? roomSessionRepository;
   final VoidCallbackLike onChanged;
 
   late List<ChatEntry> messages;
@@ -270,8 +270,10 @@ class LiveRoomMessageController {
     if (existingPending) return;
     final applicant = _sameRoomUserId(applicantUserId, currentUser.id)
         ? currentUser
+        : roomSessionRepository == null
+        ? null
         : RoomSessionLegacyAdapter.findPresenceUser(
-            roomSessionRepository.currentState,
+            roomSessionRepository!.currentState,
             applicantUserId,
           );
     messages.insert(
@@ -291,6 +293,10 @@ class LiveRoomMessageController {
       ),
     );
     onChanged();
+  }
+
+  void applySystemEvent(LiveRoomSystemEvent event) {
+    _handleMediaSystemEvent(event);
   }
 
   void _handleMediaSystemEvent(LiveRoomSystemEvent event) {
