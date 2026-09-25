@@ -1,33 +1,71 @@
 import 'dart:async';
 
-import 'package:flutter/foundation.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../data/inbox_call_api_service.dart';
 import '../models/inbox_call_models.dart';
 import '../models/inbox_models.dart';
 
-class InboxCallController extends ChangeNotifier {
-  InboxCallController({InboxCallApiService? apiService})
-    : _apiService = apiService ?? const InboxCallApiService();
+const Object _inboxCallUnset = Object();
 
-  final InboxCallApiService _apiService;
+class InboxCallState {
+  const InboxCallState({
+    this.activeCall,
+    this.lastSummary,
+    this.busy = false,
+    this.errorMessage,
+  });
+
+  final InboxCallSession? activeCall;
+  final InboxCallSummaryMessage? lastSummary;
+  final bool busy;
+  final String? errorMessage;
+
+  bool get hasActiveCall => activeCall != null;
+
+  InboxCallState copyWith({
+    Object? activeCall = _inboxCallUnset,
+    Object? lastSummary = _inboxCallUnset,
+    bool? busy,
+    Object? errorMessage = _inboxCallUnset,
+  }) {
+    return InboxCallState(
+      activeCall: identical(activeCall, _inboxCallUnset)
+          ? this.activeCall
+          : activeCall as InboxCallSession?,
+      lastSummary: identical(lastSummary, _inboxCallUnset)
+          ? this.lastSummary
+          : lastSummary as InboxCallSummaryMessage?,
+      busy: busy ?? this.busy,
+      errorMessage: identical(errorMessage, _inboxCallUnset)
+          ? this.errorMessage
+          : errorMessage as String?,
+    );
+  }
+}
+
+class InboxCallController extends AutoDisposeNotifier<InboxCallState> {
   static const Duration incomingRingTimeout = Duration(seconds: 45);
-
-  InboxCallSession? _activeCall;
-  InboxCallSummaryMessage? _lastSummary;
+  final InboxCallApiService _apiService = const InboxCallApiService();
   Timer? _missedCallTimer;
-  bool _busy = false;
-  String? _errorMessage;
 
-  InboxCallSession? get activeCall => _activeCall;
-  InboxCallSummaryMessage? get lastSummary => _lastSummary;
-  bool get hasActiveCall => _activeCall != null;
-  bool get busy => _busy;
-  String? get errorMessage => _errorMessage;
+  @override
+  InboxCallState build() {
+    ref.onDispose(_cancelMissedCallTimer);
+    return const InboxCallState();
+  }
+
+  InboxCallSession? get activeCall => state.activeCall;
+  InboxCallSummaryMessage? get lastSummary => state.lastSummary;
+  bool get hasActiveCall => state.hasActiveCall;
+  bool get busy => state.busy;
+  String? get errorMessage => state.errorMessage;
 
   InboxCallSession? activeCallForConversation(String conversationId) {
-    final session = _activeCall;
-    if (session == null || session.conversationId != conversationId) return null;
+    final session = state.activeCall;
+    if (session == null || session.conversationId != conversationId) {
+      return null;
+    }
     return session;
   }
 
@@ -35,7 +73,7 @@ class InboxCallController extends ChangeNotifier {
     required InboxConversation conversation,
     required InboxCallType callType,
   }) async {
-    if (_busy) return _activeCall;
+    if (state.busy) return state.activeCall;
     _setBusy(true);
     try {
       final session = await _apiService.startCall(
@@ -44,15 +82,15 @@ class InboxCallController extends ChangeNotifier {
         peerName: conversation.title,
         peerAvatarText: conversation.avatarText,
       );
-      _activeCall = session;
-      _lastSummary = null;
-      _errorMessage = null;
+      state = state.copyWith(
+        activeCall: session,
+        lastSummary: null,
+        errorMessage: null,
+      );
       _cancelMissedCallTimer();
-      notifyListeners();
       return session;
     } catch (error) {
-      _errorMessage = error.toString();
-      notifyListeners();
+      state = state.copyWith(errorMessage: error.toString());
       return null;
     } finally {
       _setBusy(false);
@@ -60,77 +98,74 @@ class InboxCallController extends ChangeNotifier {
   }
 
   Future<void> acceptActiveCall() async {
-    final session = _activeCall;
-    if (session == null || _busy) return;
+    final session = state.activeCall;
+    if (session == null || state.busy) return;
     _setBusy(true);
     try {
-      _activeCall = await _apiService.acceptCall(session: session);
-      _lastSummary = null;
-      _errorMessage = null;
+      state = state.copyWith(
+        activeCall: await _apiService.acceptCall(session: session),
+        lastSummary: null,
+        errorMessage: null,
+      );
       _cancelMissedCallTimer();
-      notifyListeners();
     } catch (error) {
-      _errorMessage = error.toString();
-      notifyListeners();
+      state = state.copyWith(errorMessage: error.toString());
     } finally {
       _setBusy(false);
     }
   }
 
   Future<void> declineActiveCall({String? reason}) async {
-    final session = _activeCall;
-    if (session == null || _busy) return;
+    final session = state.activeCall;
+    if (session == null || state.busy) return;
     _setBusy(true);
     try {
       final ended = await _apiService.declineCall(
         session: session,
         reason: reason ?? 'declined',
       );
-      _lastSummary = _summaryFromSession(ended);
-      _activeCall = null;
-      _errorMessage = null;
+      state = state.copyWith(
+        lastSummary: _summaryFromSession(ended),
+        activeCall: null,
+        errorMessage: null,
+      );
       _cancelMissedCallTimer();
-      notifyListeners();
     } catch (error) {
-      _errorMessage = error.toString();
-      notifyListeners();
+      state = state.copyWith(errorMessage: error.toString());
     } finally {
       _setBusy(false);
     }
   }
 
   Future<void> endActiveCall({String? reason}) async {
-    final session = _activeCall;
-    if (session == null || _busy) return;
+    final session = state.activeCall;
+    if (session == null || state.busy) return;
     _setBusy(true);
     try {
       final ended = await _apiService.endCall(
         session: session,
         reason: reason ?? 'ended',
       );
-      _lastSummary = _summaryFromSession(ended);
-      _activeCall = null;
-      _errorMessage = null;
+      state = state.copyWith(
+        lastSummary: _summaryFromSession(ended),
+        activeCall: null,
+        errorMessage: null,
+      );
       _cancelMissedCallTimer();
-      notifyListeners();
     } catch (error) {
-      _errorMessage = error.toString();
-      notifyListeners();
+      state = state.copyWith(errorMessage: error.toString());
     } finally {
       _setBusy(false);
     }
   }
 
   void clearCall() {
-    _activeCall = null;
-    _errorMessage = null;
+    state = state.copyWith(activeCall: null, errorMessage: null);
     _cancelMissedCallTimer();
-    notifyListeners();
   }
 
   void clearLastSummary() {
-    _lastSummary = null;
-    notifyListeners();
+    state = state.copyWith(lastSummary: null);
   }
 
   void handleRealtimeEvent({
@@ -148,28 +183,31 @@ class InboxCallController extends ChangeNotifier {
 
     switch (eventName) {
       case 'inbox_call_started':
-        _activeCall = _apiService.callFromRealtimeJson(
+        final session = _apiService.callFromRealtimeJson(
           rawCall,
           peerName: conversation.title,
           peerAvatarText: conversation.avatarText,
           direction: direction,
         );
-        _lastSummary = null;
-        _errorMessage = null;
-        _scheduleMissedCallTimer(_activeCall);
-        notifyListeners();
+        state = state.copyWith(
+          activeCall: session,
+          lastSummary: null,
+          errorMessage: null,
+        );
+        _scheduleMissedCallTimer(session);
         break;
       case 'inbox_call_accepted':
-        _activeCall = _apiService.callFromRealtimeJson(
-          rawCall,
-          peerName: conversation.title,
-          peerAvatarText: conversation.avatarText,
-          direction: _activeCall?.direction ?? direction,
+        state = state.copyWith(
+          activeCall: _apiService.callFromRealtimeJson(
+            rawCall,
+            peerName: conversation.title,
+            peerAvatarText: conversation.avatarText,
+            direction: state.activeCall?.direction ?? direction,
+          ),
+          lastSummary: null,
+          errorMessage: null,
         );
-        _lastSummary = null;
-        _errorMessage = null;
         _cancelMissedCallTimer();
-        notifyListeners();
         break;
       case 'inbox_call_declined':
       case 'inbox_call_ended':
@@ -178,21 +216,24 @@ class InboxCallController extends ChangeNotifier {
           rawCall,
           peerName: conversation.title,
           peerAvatarText: conversation.avatarText,
-          direction: _activeCall?.direction ?? direction,
+          direction: state.activeCall?.direction ?? direction,
         );
-        _lastSummary = _summaryFromSession(session);
-        _activeCall = null;
-        _errorMessage = null;
+        state = state.copyWith(
+          lastSummary: _summaryFromSession(session),
+          activeCall: null,
+          errorMessage: null,
+        );
         _cancelMissedCallTimer();
-        notifyListeners();
         break;
       default:
         break;
     }
   }
 
-  InboxCallSummaryMessage? summaryFromActiveCall({required InboxCallStatus status}) {
-    final session = _activeCall;
+  InboxCallSummaryMessage? summaryFromActiveCall({
+    required InboxCallStatus status,
+  }) {
+    final session = state.activeCall;
     if (session == null) return null;
     return InboxCallSummaryMessage(
       callId: session.id,
@@ -224,20 +265,30 @@ class InboxCallController extends ChangeNotifier {
     if (session == null || !session.isIncoming || !session.isRinging) return;
 
     _missedCallTimer = Timer(incomingRingTimeout, () async {
-      final current = _activeCall;
-      if (current == null || current.id != session.id || !current.isIncoming || !current.isRinging) {
+      final current = state.activeCall;
+      if (current == null ||
+          current.id != session.id ||
+          !current.isIncoming ||
+          !current.isRinging) {
         return;
       }
       try {
         final ended = await _apiService.timeoutRingingCall(session: current);
-        _lastSummary = _summaryFromSession(ended);
+        state = state.copyWith(
+          lastSummary: _summaryFromSession(ended),
+          activeCall: null,
+          errorMessage: null,
+        );
       } catch (error) {
-        _errorMessage = error.toString();
-        _lastSummary = summaryFromActiveCall(status: InboxCallStatus.missed);
+        state = state.copyWith(
+          errorMessage: error.toString(),
+          lastSummary: summaryFromActiveCall(
+            status: InboxCallStatus.missed,
+          ),
+          activeCall: null,
+        );
       } finally {
-        _activeCall = null;
         _cancelMissedCallTimer();
-        notifyListeners();
       }
     });
   }
@@ -247,15 +298,13 @@ class InboxCallController extends ChangeNotifier {
     _missedCallTimer = null;
   }
 
-  @override
-  void dispose() {
-    _cancelMissedCallTimer();
-    super.dispose();
-  }
-
   void _setBusy(bool value) {
-    if (_busy == value) return;
-    _busy = value;
-    notifyListeners();
+    if (state.busy == value) return;
+    state = state.copyWith(busy: value);
   }
 }
+
+final inboxCallControllerProvider =
+    NotifierProvider.autoDispose<InboxCallController, InboxCallState>(
+      InboxCallController.new,
+    );
