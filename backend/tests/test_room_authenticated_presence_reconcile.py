@@ -36,10 +36,6 @@ class AuthenticatedPresenceReconcileTests(TestCase):
                 "user_has_active_room_conflict",
                 return_value=False,
             ),
-            patch.object(
-                room_action_service,
-                "mark_user_room_presence_active",
-            ) as mark_presence,
         ):
             room_action_service.reconcile_authenticated_room_presence(
                 db,
@@ -55,8 +51,15 @@ class AuthenticatedPresenceReconcileTests(TestCase):
             "Room Control must not mutate identity-owned users.last_seen_at",
         )
         entry.assert_called_once_with(db, room, user)
-        mark_presence.assert_called_once_with(db, room, user)
         db.flush.assert_called_once()
+
+    def test_reconcile_does_not_write_legacy_database_presence(self):
+        source = (
+            __import__("pathlib").Path(room_action_service.__file__)
+            .read_text(encoding="utf-8")
+        )
+        self.assertNotIn("mark_user_room_presence_active", source)
+        self.assertNotIn("UserRoomPresence", source)
 
     def test_missing_participant_is_not_created(self):
         db = self._db_with_participant(None)
@@ -68,10 +71,6 @@ class AuthenticatedPresenceReconcileTests(TestCase):
                 room_action_service,
                 "assert_room_entry_allowed",
             ) as entry,
-            patch.object(
-                room_action_service,
-                "mark_user_room_presence_active",
-            ) as mark_presence,
         ):
             room_action_service.reconcile_authenticated_room_presence(
                 db,
@@ -80,7 +79,6 @@ class AuthenticatedPresenceReconcileTests(TestCase):
             )
 
         entry.assert_not_called()
-        mark_presence.assert_not_called()
         db.flush.assert_not_called()
 
 
