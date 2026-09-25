@@ -1,103 +1,162 @@
 import 'dart:async';
 
-import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../features/inbox/controllers/inbox_controller.dart';
-import '../../features/inbox/data/inbox_socket_service.dart';
 import '../../features/inbox/models/inbox_models.dart';
 import '../../realtime/app_realtime_hub.dart';
 
-class AppInboxRuntime extends ChangeNotifier {
-  AppInboxRuntime({
-    required this.realtimeHub,
-    InboxController? controller,
-  }) : controller = controller ?? InboxController(
-          socketService: InboxSocketService(hub: realtimeHub),
-        );
+const Object _inboxRuntimeUnset = Object();
 
-  final AppRealtimeHub realtimeHub;
-  final InboxController controller;
+class AppInboxRuntimeState {
+  const AppInboxRuntimeState({
+    this.started = false,
+    this.realtimeReady = false,
+    this.resyncInFlight = false,
+    this.lastMessageKey,
+    this.foregroundConversation,
+    this.foregroundMessage,
+    this.pendingOpenConversationId,
+    this.pendingOpenRequestNonce = 0,
+    this.activeConversationId,
+  });
 
-  bool _started = false;
-  bool _realtimeReady = false;
-  bool _resyncInFlight = false;
-  String? _lastMessageKey;
-  InboxConversation? _foregroundConversation;
-  InboxMessage? _foregroundMessage;
+  final bool started;
+  final bool realtimeReady;
+  final bool resyncInFlight;
+  final String? lastMessageKey;
+  final InboxConversation? foregroundConversation;
+  final InboxMessage? foregroundMessage;
+  final String? pendingOpenConversationId;
+  final int pendingOpenRequestNonce;
+  final String? activeConversationId;
+
+  AppInboxRuntimeState copyWith({
+    bool? started,
+    bool? realtimeReady,
+    bool? resyncInFlight,
+    Object? lastMessageKey = _inboxRuntimeUnset,
+    Object? foregroundConversation = _inboxRuntimeUnset,
+    Object? foregroundMessage = _inboxRuntimeUnset,
+    Object? pendingOpenConversationId = _inboxRuntimeUnset,
+    int? pendingOpenRequestNonce,
+    Object? activeConversationId = _inboxRuntimeUnset,
+  }) {
+    return AppInboxRuntimeState(
+      started: started ?? this.started,
+      realtimeReady: realtimeReady ?? this.realtimeReady,
+      resyncInFlight: resyncInFlight ?? this.resyncInFlight,
+      lastMessageKey: identical(lastMessageKey, _inboxRuntimeUnset)
+          ? this.lastMessageKey
+          : lastMessageKey as String?,
+      foregroundConversation:
+          identical(foregroundConversation, _inboxRuntimeUnset)
+          ? this.foregroundConversation
+          : foregroundConversation as InboxConversation?,
+      foregroundMessage: identical(foregroundMessage, _inboxRuntimeUnset)
+          ? this.foregroundMessage
+          : foregroundMessage as InboxMessage?,
+      pendingOpenConversationId:
+          identical(pendingOpenConversationId, _inboxRuntimeUnset)
+          ? this.pendingOpenConversationId
+          : pendingOpenConversationId as String?,
+      pendingOpenRequestNonce:
+          pendingOpenRequestNonce ?? this.pendingOpenRequestNonce,
+      activeConversationId:
+          identical(activeConversationId, _inboxRuntimeUnset)
+          ? this.activeConversationId
+          : activeConversationId as String?,
+    );
+  }
+}
+
+class AppInboxRuntime extends AutoDisposeNotifier<AppInboxRuntimeState> {
+  late final AppRealtimeHub _realtimeHub;
   Timer? _dismissTimer;
   StreamSubscription<RealtimeResyncRequest>? _resyncSubscription;
-  String? _pendingOpenConversationId;
-  int _pendingOpenRequestNonce = 0;
-  String? _activeConversationId;
 
-  InboxConversation? get foregroundConversation => _foregroundConversation;
-  InboxMessage? get foregroundMessage => _foregroundMessage;
-  String? get pendingOpenConversationId => _pendingOpenConversationId;
-  int get pendingOpenRequestNonce => _pendingOpenRequestNonce;
+  InboxController get controller =>
+      ref.read(inboxControllerProvider.notifier);
+
+  @override
+  AppInboxRuntimeState build() {
+    _realtimeHub = ref.read(appRealtimeHubProvider);
+    ref.listen<InboxState>(
+      inboxControllerProvider,
+      (previous, next) => _handleInboxChanged(next),
+    );
+    ref.onDispose(() {
+      _dismissTimer?.cancel();
+      unawaited(_resyncSubscription?.cancel());
+    });
+    return const AppInboxRuntimeState();
+  }
 
   Future<void> start() async {
-    if (_started) return;
-    _started = true;
-    controller.addListener(_handleControllerChanged);
-    _resyncSubscription ??= realtimeHub.resyncRequests.listen(
+    if (state.started) return;
+    state = state.copyWith(started: true);
+    _resyncSubscription ??= _realtimeHub.resyncRequests.listen(
       (request) => unawaited(_handleResync(request)),
     );
-    await realtimeHub.start();
+    await _realtimeHub.start();
     await controller.loadFromBackend();
-    _lastMessageKey = _latestIncomingKey();
-    _realtimeReady = true;
-    notifyListeners();
+    state = state.copyWith(
+      lastMessageKey: _latestIncomingKey(
+        ref.read(inboxControllerProvider).conversations,
+      ),
+      realtimeReady: true,
+    );
   }
 
   Future<void> ensureRealtimeConnected() async {
-    await realtimeHub.start();
+    await _realtimeHub.start();
     await controller.ensureRealtimeConnected();
   }
 
   Future<void> _handleResync(RealtimeResyncRequest request) async {
-    if (!_started || _resyncInFlight) return;
+    if (!state.started || state.resyncInFlight) return;
     if (request.stream != '*' && !request.stream.startsWith('app:')) return;
 
-    _resyncInFlight = true;
+    state = state.copyWith(resyncInFlight: true);
     try {
       await controller.loadFromBackend();
       final observed = request.observedSequence;
       if (observed != null && observed > 0 && request.stream != '*') {
-        realtimeHub.markResynced(request.stream, observed);
+        _realtimeHub.markResynced(request.stream, observed);
       }
     } finally {
-      _resyncInFlight = false;
+      state = state.copyWith(resyncInFlight: false);
     }
   }
 
   void setActiveConversation(String? conversationId) {
-    if (_activeConversationId == conversationId) return;
-    _activeConversationId = conversationId;
-    notifyListeners();
+    if (state.activeConversationId == conversationId) return;
+    state = state.copyWith(activeConversationId: conversationId);
   }
 
   void openForegroundNotification() {
-    final conversation = _foregroundConversation;
+    final conversation = state.foregroundConversation;
     _dismissTimer?.cancel();
-    if (conversation != null) {
-      _pendingOpenConversationId = conversation.id;
-      _pendingOpenRequestNonce += 1;
-    }
-    _foregroundConversation = null;
-    _foregroundMessage = null;
-    notifyListeners();
+    state = state.copyWith(
+      pendingOpenConversationId: conversation?.id,
+      pendingOpenRequestNonce: conversation == null
+          ? state.pendingOpenRequestNonce
+          : state.pendingOpenRequestNonce + 1,
+      foregroundConversation: null,
+      foregroundMessage: null,
+    );
   }
 
   void dismissForegroundNotification() {
     _dismissTimer?.cancel();
-    _foregroundConversation = null;
-    _foregroundMessage = null;
-    notifyListeners();
+    state = state.copyWith(
+      foregroundConversation: null,
+      foregroundMessage: null,
+    );
   }
 
-  String? _latestIncomingKey() {
-    for (final conversation in controller.conversations) {
+  String? _latestIncomingKey(List<InboxConversation> conversations) {
+    for (final conversation in conversations) {
       if (conversation.messages.isEmpty) continue;
       final message = conversation.messages.last;
       if (message.isMine) continue;
@@ -112,58 +171,40 @@ class AppInboxRuntime extends ChangeNotifier {
   ) =>
       '${conversation.id}:${message.id ?? message.text}:${message.time}';
 
-  void _handleControllerChanged() {
-    if (!_realtimeReady) {
-      notifyListeners();
-      return;
-    }
+  void _handleInboxChanged(InboxState inbox) {
+    if (!state.realtimeReady) return;
 
-    for (final conversation in controller.conversations) {
+    for (final conversation in inbox.conversations) {
       if (conversation.messages.isEmpty ||
           conversation.isMuted ||
           conversation.isLockedByBackend ||
-          conversation.id == _activeConversationId) {
+          conversation.id == state.activeConversationId) {
         continue;
       }
 
       final message = conversation.messages.last;
       if (message.isMine) continue;
       final key = _messageKey(conversation, message);
-      if (key == _lastMessageKey) continue;
+      if (key == state.lastMessageKey) continue;
 
-      _lastMessageKey = key;
-      _foregroundConversation = conversation;
-      _foregroundMessage = message;
+      state = state.copyWith(
+        lastMessageKey: key,
+        foregroundConversation: conversation,
+        foregroundMessage: message,
+      );
       _dismissTimer?.cancel();
       _dismissTimer = Timer(const Duration(seconds: 4), () {
-        _foregroundConversation = null;
-        _foregroundMessage = null;
-        notifyListeners();
+        state = state.copyWith(
+          foregroundConversation: null,
+          foregroundMessage: null,
+        );
       });
-      notifyListeners();
       return;
     }
-
-    notifyListeners();
-  }
-
-  @override
-  void dispose() {
-    _dismissTimer?.cancel();
-    unawaited(_resyncSubscription?.cancel());
-    controller.removeListener(_handleControllerChanged);
-    controller.dispose();
-    super.dispose();
   }
 }
 
 final appInboxRuntimeProvider =
-    ChangeNotifierProvider.autoDispose<AppInboxRuntime>((ref) {
-  final hub = ref.read(appRealtimeHubProvider);
-  return AppInboxRuntime(
-    realtimeHub: hub,
-    controller: InboxController(
-      socketService: InboxSocketService(hub: hub),
-    ),
-  );
-});
+    NotifierProvider.autoDispose<AppInboxRuntime, AppInboxRuntimeState>(
+      AppInboxRuntime.new,
+    );
