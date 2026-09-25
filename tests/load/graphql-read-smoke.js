@@ -14,6 +14,7 @@ const unexpectedFailureRate = new Rate('graphql_unexpected_failure_rate');
 const semanticErrorRate = new Rate('graphql_semantic_error_rate');
 const homeCompositeDuration = new Trend('graphql_home_composite_duration', true);
 const bffServerDuration = new Trend('graphql_bff_server_duration', true);
+const securityContractRate = new Rate('graphql_security_contract_rate');
 
 export const options = {
   vus: Number(__ENV.VUS || 5),
@@ -26,17 +27,9 @@ export const options = {
     graphql_semantic_error_rate: ['rate==0'],
     graphql_home_composite_duration: ['p(95)<250', 'p(99)<500'],
     graphql_bff_server_duration: ['p(95)<200', 'p(99)<400'],
+    graphql_security_contract_rate: ['rate==1'],
   },
 };
-
-export function setup() {
-  if (!token) {
-    throw new Error(
-      'FUNKEY_TEST_TOKEN is required; authenticated GraphQL smoke must never pass by doing no work.',
-    );
-  }
-  return {};
-}
 
 function decodeGraphqlResponse(response) {
   try {
@@ -44,6 +37,73 @@ function decodeGraphqlResponse(response) {
   } catch (_) {
     return null;
   }
+}
+
+function graphqlErrorCode(response) {
+  const body = decodeGraphqlResponse(response);
+  const first =
+    body && Array.isArray(body.errors) && body.errors.length > 0
+      ? body.errors[0]
+      : null;
+  return first && first.extensions ? first.extensions.code : null;
+}
+
+function expectRejection(payload, expectedStatus, expectedCode, authToken) {
+  const headers = { 'Content-Type': 'application/json' };
+  if (authToken) {
+    headers.Authorization = `Bearer ${authToken}`;
+  }
+
+  const response = http.post(
+    `${base}/graphql`,
+    JSON.stringify(payload),
+    {
+      headers,
+      timeout: '3s',
+      responseCallback: http.expectedStatuses(expectedStatus),
+      tags: {
+        workload: 'graphql-security-preflight',
+        expected_code: expectedCode,
+      },
+    },
+  );
+  const contractCorrect =
+    response.status === expectedStatus &&
+    graphqlErrorCode(response) === expectedCode;
+
+  securityContractRate.add(contractCorrect, { expected_code: expectedCode });
+  check(response, {
+    [`Expected GraphQL rejection ${expectedCode}`]: () => contractCorrect,
+  });
+}
+
+export function setup() {
+  if (!token) {
+    throw new Error(
+      'FUNKEY_TEST_TOKEN is required; authenticated GraphQL smoke must never pass by doing no work.',
+    );
+  }
+
+  expectRejection(
+    { query: 'query ForbiddenAdHoc { __typename }' },
+    400,
+    'PERSISTED_ONLY',
+    token,
+  );
+  expectRejection(
+    { id: '0'.repeat(64), variables: {} },
+    400,
+    'UNKNOWN_OPERATION',
+    token,
+  );
+  expectRejection(
+    { id: PersistedGraphqlOperations.homeComposite, variables: {} },
+    401,
+    'UNAUTHENTICATED',
+    '',
+  );
+
+  return {};
 }
 
 function parseBffServerTiming(response) {
