@@ -1,187 +1,122 @@
 import 'package:flutter_test/flutter_test.dart';
-import 'package:vibematch_app/features/rooms/data/live_room_membership_service.dart';
+import 'package:vibematch_app/room_session/domain/room_session_state.dart';
+
+Map<String, dynamic> _snapshot({
+  required List<Map<String, dynamic>> participants,
+  required List<Map<String, dynamic>> roster,
+  List<Map<String, dynamic>> pending = const <Map<String, dynamic>>[],
+}) {
+  return <String, dynamic>{
+    'room_id': 'VM100',
+    'state_version': 10,
+    'participants': participants,
+    'membership_roster': roster,
+    'pending_room_member_requests': pending,
+    'seats': const <Map<String, dynamic>>[],
+  };
+}
 
 void main() {
-  setUp(LiveRoomMembershipService.clearAll);
-  tearDown(LiveRoomMembershipService.clearAll);
-
-  test('normalizes room participant aliases to one membership identity', () {
-    LiveRoomMembershipService.applyBackendMembershipSnapshot(
-      roomId: 'VM100',
-      roomMemberByUserId: const {'user_6418001001': true},
+  test('durable membership is separate from online presence', () {
+    final state = RoomSessionState.fromSnapshot(
+      _snapshot(
+        participants: const <Map<String, dynamic>>[
+          <String, dynamic>{
+            'backend_user_id': 1,
+            'public_user_id': 101,
+            'is_active': true,
+            'is_room_member': false,
+          },
+        ],
+        roster: const <Map<String, dynamic>>[
+          <String, dynamic>{
+            'backend_user_id': 2,
+            'public_user_id': 202,
+            'is_room_member': true,
+          },
+        ],
+      ),
+      connection: RoomSessionConnection.connected,
     );
 
-    expect(
-      LiveRoomMembershipService.isRoomMember(
-        roomId: 'VM100',
-        userId: '6418001001',
+    expect(state.presence.containsKey(1), isTrue);
+    expect(state.members.contains(1), isFalse);
+    expect(state.presence.containsKey(2), isFalse);
+    expect(state.members.contains(2), isTrue);
+  });
+
+  test('backend roster removal clears canonical membership on next snapshot', () {
+    final first = RoomSessionState.fromSnapshot(
+      _snapshot(
+        participants: const <Map<String, dynamic>>[],
+        roster: const <Map<String, dynamic>>[
+          <String, dynamic>{
+            'backend_user_id': 2,
+            'public_user_id': 202,
+            'is_room_member': true,
+          },
+        ],
       ),
-      isTrue,
+      connection: RoomSessionConnection.connected,
     );
-    expect(
-      LiveRoomMembershipService.isRoomMember(
-        roomId: 'VM100',
-        userId: 'USER_6418001001',
+    final second = RoomSessionState.fromSnapshot(
+      _snapshot(
+        participants: const <Map<String, dynamic>>[],
+        roster: const <Map<String, dynamic>>[],
       ),
-      isTrue,
+      connection: RoomSessionConnection.connected,
+    );
+
+    expect(first.members.contains(2), isTrue);
+    expect(second.members.contains(2), isFalse);
+  });
+
+  test('pending membership requests are canonical room activity state', () {
+    final state = RoomSessionState.fromSnapshot(
+      _snapshot(
+        participants: const <Map<String, dynamic>>[],
+        roster: const <Map<String, dynamic>>[],
+        pending: const <Map<String, dynamic>>[
+          <String, dynamic>{
+            'backend_user_id': 7,
+            'public_user_id': 707,
+            'display_name': 'Pending User',
+          },
+        ],
+      ),
+      connection: RoomSessionConnection.connected,
+    );
+
+    final pending =
+        state.activities['pending_room_member_requests'] as List<dynamic>;
+    expect(pending, hasLength(1));
+    expect(
+      (pending.single as Map<String, dynamic>)['public_user_id'],
+      707,
     );
   });
 
-  test('backend removal replaces previously confirmed room-member state', () {
-    LiveRoomMembershipService.applyBackendMembershipSnapshot(
-      roomId: 'VM100',
-      roomMemberByUserId: const {'6418001001': true},
-    );
-    LiveRoomMembershipService.applyBackendMembershipSnapshot(
-      roomId: 'VM100',
-      roomMemberByUserId: const {'user_6418001001': false},
-    );
-
-    expect(
-      LiveRoomMembershipService.statusFor(
-        roomId: 'VM100',
-        userId: '6418001001',
+  test('membership aliases remain available on canonical roster entry', () {
+    final state = RoomSessionState.fromSnapshot(
+      _snapshot(
+        participants: const <Map<String, dynamic>>[],
+        roster: const <Map<String, dynamic>>[
+          <String, dynamic>{
+            'backend_user_id': 7,
+            'public_user_id': 707,
+            'is_room_member': true,
+            'is_room_admin': true,
+          },
+        ],
       ),
-      LiveRoomMembershipStatus.guest,
-    );
-  });
-
-  test('participant snapshot does not erase a temporary pending request', () {
-    LiveRoomMembershipService.markPending(
-      roomId: 'VM100',
-      userId: '6418001001',
-    );
-    LiveRoomMembershipService.applyBackendMembershipSnapshot(
-      roomId: 'VM100',
-      roomMemberByUserId: const {'user_6418001001': false},
+      connection: RoomSessionConnection.connected,
     );
 
-    expect(
-      LiveRoomMembershipService.isPending(
-        roomId: 'VM100',
-        userId: '6418001001',
-      ),
-      isTrue,
-    );
-
-    LiveRoomMembershipService.applyBackendMembershipSnapshot(
-      roomId: 'VM100',
-      roomMemberByUserId: const {'user_6418001001': true},
-    );
-    expect(
-      LiveRoomMembershipService.isRoomMember(
-        roomId: 'VM100',
-        userId: '6418001001',
-      ),
-      isTrue,
-    );
-  });
-
-  test('complete backend roster clears stale confirmed membership', () {
-    LiveRoomMembershipService.applyBackendMembershipSnapshot(
-      roomId: 'VM100',
-      roomMemberByUserId: const {'6418001001': true},
-    );
-
-    LiveRoomMembershipService.applyBackendMembershipSnapshot(
-      roomId: 'VM100',
-      roomMemberByUserId: const <String, bool>{},
-      completeRoster: true,
-    );
-
-    expect(
-      LiveRoomMembershipService.statusFor(
-        roomId: 'VM100',
-        userId: '6418001001',
-      ),
-      LiveRoomMembershipStatus.guest,
-    );
-  });
-
-  test('complete backend roster preserves pending request UI state', () {
-    LiveRoomMembershipService.markPending(
-      roomId: 'VM100',
-      userId: '6418001001',
-    );
-
-    LiveRoomMembershipService.applyBackendMembershipSnapshot(
-      roomId: 'VM100',
-      roomMemberByUserId: const <String, bool>{},
-      completeRoster: true,
-    );
-
-    expect(
-      LiveRoomMembershipService.isPending(
-        roomId: 'VM100',
-        userId: '6418001001',
-      ),
-      isTrue,
-    );
-  });
-
-  test('authoritative pending snapshot clears a resolved pending request', () {
-    LiveRoomMembershipService.markPending(
-      roomId: 'VM100',
-      userId: '6418001001',
-    );
-
-    LiveRoomMembershipService.applyBackendPendingSnapshot(
-      roomId: 'VM100',
-      pendingUserIds: const <String>{},
-    );
-
-    expect(
-      LiveRoomMembershipService.statusFor(
-        roomId: 'VM100',
-        userId: '6418001001',
-      ),
-      LiveRoomMembershipStatus.guest,
-    );
-  });
-
-  test('authoritative pending snapshot does not downgrade confirmed membership', () {
-    LiveRoomMembershipService.applyBackendMembershipSnapshot(
-      roomId: 'VM100',
-      roomMemberByUserId: const {'6418001001': true},
-    );
-
-    LiveRoomMembershipService.applyBackendPendingSnapshot(
-      roomId: 'VM100',
-      pendingUserIds: const <String>{},
-    );
-
-    expect(
-      LiveRoomMembershipService.isRoomMember(
-        roomId: 'VM100',
-        userId: 'user_6418001001',
-      ),
-      isTrue,
-    );
-  });
-
-  test('authoritative pending snapshot normalizes public user aliases', () {
-    LiveRoomMembershipService.applyBackendPendingSnapshot(
-      roomId: 'VM100',
-      pendingUserIds: const {'user_6418001001'},
-    );
-
-    expect(
-      LiveRoomMembershipService.isPending(
-        roomId: 'VM100',
-        userId: '6418001001',
-      ),
-      isTrue,
-    );
-  });
-
-  test('clearAll removes account-scoped room membership projection', () {
-    LiveRoomMembershipService.applyBackendMembershipSnapshot(
-      roomId: 'VM100',
-      roomMemberByUserId: const {'6418001001': true},
-    );
-
-    LiveRoomMembershipService.clearAll();
-
-    expect(LiveRoomMembershipService.snapshots.value, isEmpty);
+    final entry = state.membershipRoster[7];
+    expect(entry, isNotNull);
+    expect(entry!.backendUserId, 7);
+    expect(entry.publicUserId, 707);
+    expect(entry.isMember, isTrue);
+    expect(entry.isAdmin, isTrue);
   });
 }
