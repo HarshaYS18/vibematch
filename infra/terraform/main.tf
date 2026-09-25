@@ -37,6 +37,7 @@ resource "terraform_data" "deployment_contract" {
           var.services.media_dns,
           var.services.cdn_dns,
           var.services.waf_policy_ref,
+          var.services.origin_restriction_ref,
           var.services.certificate_ref,
           var.services.secret_manager_ref,
           var.services.workload_identity_ref,
@@ -62,6 +63,13 @@ resource "terraform_data" "deployment_contract" {
         lower(var.services.cdn_dns) == "cdn.funkey.com",
       ])
       error_message = "Production public DNS must use the canonical Chunk 35 FunKey edge hostnames."
+    }
+    precondition {
+      condition = (
+        var.environment != "production" ||
+        var.services.edge_security_binding_verified
+      )
+      error_message = "Production requires an operator-verified WAF and origin-restriction binding before apply."
     }
   }
 }

@@ -96,3 +96,15 @@ CI creates an ephemeral pinned kind cluster, installs the same CRDs, and runs
 server-side dry-run against the rendered Gateway resources and optional
 SecurityPolicy example. Plain `kubectl kustomize` rendering is retained but is
 not considered sufficient schema validation.
+
+
+## WAF/origin bypass protection
+
+The provider-neutral repository cannot attach a cloud-specific WAF by itself.
+Production Terraform therefore requires three pieces of evidence before apply:
+the provider WAF policy reference, the origin-restriction reference, and an
+explicit verified-binding attestation.
+
+The origin restriction must prevent clients from reaching the Envoy public
+origin around the WAF/CDN. Never set the verification flag merely to satisfy
+Terraform; verify the provider attachment and bypass protection first.

@@ -58,6 +58,8 @@ variable "services" {
     media_dns_suffix         = string
     cdn_dns                  = string
     waf_policy_ref           = string
+    origin_restriction_ref    = string
+    edge_security_binding_verified = bool
     certificate_ref          = string
     secret_manager_ref       = string
     workload_identity_ref    = string

@@ -80,3 +80,15 @@ v1.36.4 kind cluster.
 Production install instructions now consume the same version file, so the
 controller, CRDs, CI schema and operator procedure cannot silently drift to an
 unreviewed `latest` release.
+
+
+## Repair audit: enforceable WAF/origin binding
+
+The initial Chunk 35 Terraform contract required a WAF reference but could not
+distinguish an attached policy from an unused identifier. The repaired
+production preflight now also requires an origin-restriction reference and an
+explicit verified binding flag.
+
+This preserves provider neutrality while preventing the repository from
+claiming production edge protection when the provider binding has not actually
+been completed.

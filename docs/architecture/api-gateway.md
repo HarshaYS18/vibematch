@@ -63,3 +63,17 @@ the dedicated media-control origin.
 Uploads, admin media routes, and internal media-node heartbeat/drain endpoints
 do not become reachable through the public media hostname merely because they
 share the core service process.
+
+
+## Provider WAF and origin-lock contract
+
+FunKey keeps the Terraform core provider-neutral, so it does not claim to
+provision a cloud-specific WAF. Production is still fail-closed: the deployment
+contract requires a real WAF policy reference, a real origin-restriction
+reference, and an explicit operator attestation that both are attached.
+
+The origin restriction is as important as the WAF itself. Public clients must
+not be able to bypass the provider edge and reach the Envoy load balancer
+directly. The attestation flag is intentionally false in the example variables
+and must only be enabled by the provider-binding layer/operator after
+verification.

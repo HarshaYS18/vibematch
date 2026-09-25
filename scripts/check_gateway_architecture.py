@@ -108,7 +108,24 @@ require(
     TERRAFORM / 'main.tf',
     ('"api.funkey.com"', '"realtime.funkey.com"', '"media.funkey.com"', '"cdn.funkey.com"'),
 )
-require(TERRAFORM / 'variables.tf', ('media_dns', 'cdn_dns', 'waf_policy_ref'))
+require(
+    TERRAFORM / 'variables.tf',
+    (
+        'media_dns',
+        'cdn_dns',
+        'waf_policy_ref',
+        'origin_restriction_ref',
+        'edge_security_binding_verified',
+    ),
+)
+require(
+    TERRAFORM / 'main.tf',
+    (
+        'var.services.origin_restriction_ref',
+        'var.services.edge_security_binding_verified',
+        'operator-verified WAF and origin-restriction binding',
+    ),
+)
 
 vm_config = require(
     FLUTTER / 'core' / 'network' / 'vm_api_config.dart',

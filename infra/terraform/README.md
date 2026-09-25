@@ -19,3 +19,18 @@ media-node addressing used after canonical room-media assignment. It must never
 be a Kubernetes service suffix. `waf_policy_ref` binds the provider's
 CDN/WAF/DDoS policy protecting the Envoy Gateway origin. The repository does
 not store provider credentials or WAF secrets.
+
+
+## Production edge-security attestation
+
+This Terraform directory remains provider-neutral and therefore does not invent
+a cloud-specific WAF resource. Production preflight is nevertheless fail-closed:
+
+- `waf_policy_ref` must identify the real provider WAF/DDoS policy;
+- `origin_restriction_ref` must identify the provider control that prevents
+  direct public bypass of the Envoy origin;
+- `edge_security_binding_verified` must be explicitly set to `true` only
+  after an operator/provider binding has attached both controls.
+
+A mere string reference is not treated as proof of attachment. Production
+`terraform plan/apply` fails while the verification flag is false.
