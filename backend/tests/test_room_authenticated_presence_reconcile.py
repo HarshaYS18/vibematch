@@ -53,6 +53,20 @@ class AuthenticatedPresenceReconcileTests(TestCase):
         entry.assert_called_once_with(db, room, user)
         db.flush.assert_called_once()
 
+    def test_presence_projection_requires_active_membership(self):
+        from pathlib import Path
+
+        source = (
+            Path(__file__).resolve().parents[1]
+            / "app/services/presence_projection_service.py"
+        ).read_text(encoding="utf-8")
+        self.assertIn("RoomParticipant.is_active.is_(True)", source)
+        self.assertIn("active_memberships", source)
+        self.assertIn(
+            "(user_id, room.id) not in active_memberships",
+            source,
+        )
+
     def test_reconcile_does_not_write_legacy_database_presence(self):
         source = (
             __import__("pathlib").Path(room_action_service.__file__)
