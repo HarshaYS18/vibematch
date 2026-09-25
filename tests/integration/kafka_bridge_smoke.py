@@ -28,9 +28,19 @@ async def main() -> None:
         bootstrap_servers="127.0.0.1:19092",
         group_id=f"funkey-bridge-smoke-{run_id}",
         enable_auto_commit=False,
-        auto_offset_reset="latest",
+        auto_offset_reset="earliest",
     )
     await consumer.start()
+    # Force group assignment/offset initialization before publishing. Without
+    # this, a fresh "latest" style consumer can race the first bridge writes.
+    assignment_deadline = time.monotonic() + 15
+    while not consumer.assignment() and time.monotonic() < assignment_deadline:
+        await consumer.getmany(timeout_ms=250, max_records=1)
+    if not consumer.assignment():
+        raise RuntimeError("Kafka smoke consumer did not receive a partition assignment")
+    for partition in consumer.assignment():
+        await consumer.position(partition)
+
     nc = await nats.connect("nats://127.0.0.1:4222")
     js = nc.jetstream(timeout=3)
     started = time.monotonic()
@@ -71,7 +81,14 @@ async def main() -> None:
         observed: set[str] = set()
         deadline = time.monotonic() + 30
         while expected - observed and time.monotonic() < deadline:
-            message = await asyncio.wait_for(consumer.getone(), timeout=5)
+            remaining = max(0.1, deadline - time.monotonic())
+            try:
+                message = await asyncio.wait_for(
+                    consumer.getone(),
+                    timeout=min(2.0, remaining),
+                )
+            except TimeoutError:
+                continue
             decoded = json.loads(message.value)
             if decoded.get("payload", {}).get("smoke_run_id") != run_id:
                 continue
