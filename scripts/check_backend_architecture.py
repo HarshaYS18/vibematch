@@ -1471,6 +1471,7 @@ def _validate_post_chunk32_repair_wave(errors: list[str]) -> None:
         ROOT / "backend" / "alembic" / "versions" / "20260925_0100_normalize_cricket_ball_events.py",
         ROOT / "backend" / "alembic" / "versions" / "20260925_0200_user_vip_overrides.py",
         ROOT / "backend" / "alembic" / "versions" / "20260925_0300_inbox_source_dedupe_key.py",
+        ROOT / "backend" / "alembic" / "versions" / "20260925_0400_cricket_ball_event_identity.py",
         ROOT / "backend" / "tests" / "test_cricket_authority_repair.py",
         ROOT / "backend" / "tests" / "test_rankings_read_only_projection.py",
         ROOT / "backend" / "tests" / "test_vibes_inbox_fanout_idempotency.py",
@@ -1565,6 +1566,7 @@ def _validate_post_chunk32_repair_wave(errors: list[str]) -> None:
             "with_for_update()",
             "CricketBallEvent(",
             "func.max(CricketBallEvent.sequence)",
+            "CricketBallEvent.source_event_id == source_event_id",
         ):
             if required_token not in text:
                 errors.append("Cricket authority/serialization invariant missing: " + required_token)
@@ -1663,6 +1665,7 @@ def _validate_post_chunk32_repair_wave(errors: list[str]) -> None:
         ("20260925_0100_normalize_cricket_ball_events.py", 'down_revision = "20260924_1200"'),
         ("20260925_0200_user_vip_overrides.py", 'down_revision = "20260925_0100"'),
         ("20260925_0300_inbox_source_dedupe_key.py", 'down_revision = "20260925_0200"'),
+        ("20260925_0400_cricket_ball_event_identity.py", 'down_revision = "20260925_0300"'),
     )
     versions = ROOT / "backend" / "alembic" / "versions"
     for filename, expected in migration_chain:
