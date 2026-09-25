@@ -1,9 +1,10 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../controllers/inbox_controller.dart';
 import '../../models/inbox_models.dart';
 
-class CsReportTasksPage extends StatefulWidget {
+class CsReportTasksPage extends ConsumerStatefulWidget {
   const CsReportTasksPage({
     super.key,
     required this.controller,
@@ -14,26 +15,10 @@ class CsReportTasksPage extends StatefulWidget {
   final VoidCallback onBackTap;
 
   @override
-  State<CsReportTasksPage> createState() => _CsReportTasksPageState();
+  ConsumerState<CsReportTasksPage> createState() => _CsReportTasksPageState();
 }
 
-class _CsReportTasksPageState extends State<CsReportTasksPage> {
-  @override
-  void initState() {
-    super.initState();
-    widget.controller.addListener(_handleChanged);
-  }
-
-  @override
-  void dispose() {
-    widget.controller.removeListener(_handleChanged);
-    super.dispose();
-  }
-
-  void _handleChanged() {
-    if (mounted) setState(() {});
-  }
-
+class _CsReportTasksPageState extends ConsumerState<CsReportTasksPage> {
   void _toast(String message) {
     ScaffoldMessenger.of(context)
       ..clearSnackBars()
@@ -63,6 +48,7 @@ class _CsReportTasksPageState extends State<CsReportTasksPage> {
 
   @override
   Widget build(BuildContext context) {
+    ref.watch(inboxControllerProvider);
     final tasks = widget.controller.reportTasks;
 
     return Scaffold(
