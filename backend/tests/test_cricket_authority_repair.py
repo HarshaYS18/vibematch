@@ -90,6 +90,32 @@ class CricketAuthorityRepairTests(TestCase):
             model,
         )
 
+    def test_cricket_ball_retries_have_stable_source_identity(self):
+        model = (
+            ROOT / "backend/app/models/cricket.py"
+        ).read_text(encoding="utf-8")
+        schema = (
+            ROOT / "backend/app/schemas/rooms/cricket.py"
+        ).read_text(encoding="utf-8")
+        service = (
+            ROOT / "backend/app/services/rooms/cricket_service.py"
+        ).read_text(encoding="utf-8")
+        migration = (
+            ROOT / "backend/alembic/versions/20260925_0400_cricket_ball_event_identity.py"
+        ).read_text(encoding="utf-8")
+        flutter = (
+            ROOT
+            / "frontend/vibematch_app/lib/features/rooms/data/cricket_room_api_service.dart"
+        ).read_text(encoding="utf-8")
+
+        self.assertIn("source_event_id", model)
+        self.assertIn("uq_cricket_ball_event_match_source", model)
+        self.assertIn("event_id: str | None", schema)
+        self.assertIn("CricketBallEvent.source_event_id == source_event_id", service)
+        self.assertIn("uq_cricket_ball_event_match_source", migration)
+        self.assertIn("cricket_ball_pending:", flutter)
+        self.assertIn("payload['event_id'] = eventId", flutter)
+
     def test_room_control_owns_all_cricket_tables(self):
         ownership = (
             ROOT / "deploy/postgres/room-control-ownership.sql"
