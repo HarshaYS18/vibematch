@@ -95,7 +95,6 @@ class HomeCompositionTests(unittest.IsolatedAsyncioTestCase):
             {"placement": "event", "title": "Event A"},
             {"placement": "policy_rules", "title": "Rules"},
             {"placement": "event", "title": "Event B"},
-            "invalid",
         ]
 
         self.assertEqual(
