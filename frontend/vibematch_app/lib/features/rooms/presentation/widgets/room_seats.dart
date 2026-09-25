@@ -6,12 +6,11 @@ import 'room_avatar_frames.dart';
 import 'room_theme.dart';
 import 'seat_speaking_wave.dart';
 
-final ValueNotifier<int> roomSeatActionDismissSignal = ValueNotifier<int>(0);
-
-void dismissRoomSeatActionPill() {
-  roomSeatActionDismissSignal.value++;
-}
-
+/// Seat layout for one mounted room.
+///
+/// Seat selection is owned by the room-scoped LiveRoomSeatController. Overlay
+/// menu resources are widget-local and are removed directly by this state;
+/// no process-global dismissal signal is used.
 class RoomSeatLayout extends StatefulWidget {
   const RoomSeatLayout({
     super.key,
@@ -61,12 +60,6 @@ class _RoomSeatLayoutState extends State<RoomSeatLayout> {
   _SeatMetrics? _lastMetrics;
 
   @override
-  void initState() {
-    super.initState();
-    roomSeatActionDismissSignal.addListener(_hideMenu);
-  }
-
-  @override
   void didUpdateWidget(covariant RoomSeatLayout oldWidget) {
     super.didUpdateWidget(oldWidget);
     if (oldWidget.selectedSeatIndex != widget.selectedSeatIndex) _hiddenMenuSeat = null;
@@ -75,7 +68,6 @@ class _RoomSeatLayoutState extends State<RoomSeatLayout> {
 
   @override
   void dispose() {
-    roomSeatActionDismissSignal.removeListener(_hideMenu);
     _removeOverlayMenu();
     super.dispose();
   }
@@ -138,7 +130,7 @@ class _RoomSeatLayoutState extends State<RoomSeatLayout> {
   }
 
   void _runMenuAction(VoidCallback action) {
-    dismissRoomSeatActionPill();
+    _hideMenu();
     action();
   }
 
@@ -187,13 +179,13 @@ class _RoomSeatLayoutState extends State<RoomSeatLayout> {
     final user = seat.user;
     if (user == null) {
       if (widget.applyOnlyModeEnabled && !widget.canManageSeats && !seat.locked) {
-        dismissRoomSeatActionPill();
+        _hideMenu();
         widget.onApply(index);
         return;
       }
       widget.onSeatTap(index);
     } else {
-      dismissRoomSeatActionPill();
+      _hideMenu();
       widget.onUserTap(index);
     }
   }

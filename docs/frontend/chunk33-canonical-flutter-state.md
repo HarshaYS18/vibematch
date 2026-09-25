@@ -321,3 +321,24 @@ as an alternate durable-chat authority.
 Regression coverage verifies the backend REST route, the exact repository
 request/reconciliation behavior, and source-level absence of the retired
 global/local clear paths. No room UI styling or layout changed.
+
+
+### Micro-chunk 33-M5 — top-level mutable Flutter state guard completion
+
+The whole-app architecture guard already rejects both static and top-level
+`ValueNotifier`/`ChangeNotifier` authorities. M5 resolved the final
+violations it exposed instead of adding an allowlist.
+
+- `room_theme.dart` no longer stores the selected background in
+  `activeRoomBackgroundTheme`; selection flows through the owning room state
+  and explicit picker callback.
+- `room_seats.dart` no longer uses `roomSeatActionDismissSignal`. Seat-menu
+  overlays are widget-local, while cross-widget dismissal is routed through
+  the mounted room's `LiveRoomSeatController.clearSelectedSeat()`.
+- `RoomInputDock`, `LiveRoomBody`, and `LiveRoomLayoutModule` pass that
+  scoped callback explicitly.
+- Source-of-truth regression coverage prevents either retired global from being
+  reintroduced.
+
+The guard has no exception for these files. UI appearance and interaction
+layout remain unchanged.

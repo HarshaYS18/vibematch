@@ -375,9 +375,11 @@ const List<RoomBackgroundTheme> ownedRoomBackgroundThemes = [
 
 const List<RoomBackgroundTheme> mockRoomBackgroundThemes = ownedRoomBackgroundThemes;
 
-final ValueNotifier<RoomBackgroundTheme> activeRoomBackgroundTheme =
-    ValueNotifier<RoomBackgroundTheme>(defaultRoomBackgroundTheme);
-
+/// Renders the room background selected by the owning room state.
+///
+/// Background selection is supplied explicitly through [theme] or picker
+/// callbacks. This file intentionally owns no process-global mutable notifier;
+/// the canonical room background remains part of the scoped room state.
 class RoomBackground extends StatelessWidget {
   const RoomBackground({super.key, this.theme = defaultRoomBackgroundTheme});
 
@@ -579,7 +581,6 @@ class RoomBackgroundPickerSheet extends StatelessWidget {
                       RoomToast.show(context, access.label);
                       return;
                     }
-                    activeRoomBackgroundTheme.value = theme;
                     onThemeSelected(theme);
                     Navigator.pop(context);
                   },

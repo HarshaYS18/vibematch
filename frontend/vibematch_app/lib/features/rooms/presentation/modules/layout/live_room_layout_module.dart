@@ -183,6 +183,7 @@ class LiveRoomLayoutModule extends ConsumerWidget {
           onEmojiTap: () => LiveRoomChatModule.openEmojiTray(bundle),
           onSendTap: () => LiveRoomChatModule.sendMessage(bundle),
           onImageMessage: bundle.roomMessageController.sendImageMessage,
+          onDismissSeatActions: bundle.seatController.clearSelectedSeat,
           onMicTap: () => LiveRoomChatModule.toggleMic(bundle),
           onGamesTap: () => LiveRoomGamesEntryModule.openGamesSheet(bundle),
           onGiftTap: () => LiveRoomGiftsModule.openGiftPanel(bundle),

@@ -72,6 +72,7 @@ class LiveRoomBody extends StatelessWidget {
     required this.onEmojiTap,
     required this.onSendTap,
     required this.onImageMessage,
+    required this.onDismissSeatActions,
     required this.onMicTap,
     required this.onGamesTap,
     required this.onGiftTap,
@@ -137,6 +138,9 @@ class LiveRoomBody extends StatelessWidget {
     required String imageUrl,
     required String contentType,
   }) onImageMessage;
+
+  /// Dismisses seat actions through the room-scoped seat controller.
+  final VoidCallback onDismissSeatActions;
   final VoidCallback onMicTap;
   final VoidCallback onGamesTap;
   final VoidCallback onGiftTap;
@@ -296,6 +300,7 @@ class LiveRoomBody extends StatelessWidget {
                     onEmojiTap: onEmojiTap,
                     onSendTap: onSendTap,
                     onImageMessage: onImageMessage,
+                    onDismissSeatActions: onDismissSeatActions,
                     onMicTap: onMicTap,
                     onGamesTap: onGamesTap,
                     onGiftTap: onGiftTap,

@@ -79,4 +79,29 @@ void main() {
     expect(feed, isNot(contains('roomChatClearSignal')));
   });
 
+
+  test('Chunk 33 room UI has no process-global notifier coordination', () {
+    final theme = File(
+      'lib/features/rooms/presentation/widgets/room_theme.dart',
+    ).readAsStringSync();
+    final seats = File(
+      'lib/features/rooms/presentation/widgets/room_seats.dart',
+    ).readAsStringSync();
+    final dock = File(
+      'lib/features/rooms/presentation/widgets/live_room_input_dock.dart',
+    ).readAsStringSync();
+    final layout = File(
+      'lib/features/rooms/presentation/modules/layout/live_room_layout_module.dart',
+    ).readAsStringSync();
+
+    expect(theme, isNot(contains('activeRoomBackgroundTheme')));
+    expect(seats, isNot(contains('roomSeatActionDismissSignal')));
+    expect(seats, isNot(contains('dismissRoomSeatActionPill')));
+    expect(dock, contains('final VoidCallback onDismissSeatActions'));
+    expect(
+      layout,
+      contains('onDismissSeatActions: bundle.seatController.clearSelectedSeat'),
+    );
+  });
+
 }
