@@ -4,13 +4,11 @@ import '../../features/auth/data/auth_api_service.dart';
 import '../../features/auth/models/current_user.dart';
 import '../domain/session_state.dart';
 
-class SessionRepository extends StateNotifier<SessionState> {
-  SessionRepository({
-    AuthApiService authApiService = const AuthApiService(),
-  })  : _authApiService = authApiService,
-        super(const SessionState.unknown());
+class SessionRepository extends Notifier<SessionState> {
+  final AuthApiService _authApiService = const AuthApiService();
 
-  final AuthApiService _authApiService;
+  @override
+  SessionState build() => const SessionState.unknown();
 
   Future<CurrentUser> restore() async {
     state = const SessionState(status: SessionStatus.restoring);
@@ -77,6 +75,6 @@ class SessionRepository extends StateNotifier<SessionState> {
 }
 
 final sessionRepositoryProvider =
-    StateNotifierProvider<SessionRepository, SessionState>(
-  (ref) => SessionRepository(),
-);
+    NotifierProvider<SessionRepository, SessionState>(
+      SessionRepository.new,
+    );
