@@ -94,7 +94,10 @@ async def monitor_source_lag(js, settings: Settings, stop: asyncio.Event) -> Non
 async def monitor_kafka(settings: Settings, stop: asyncio.Event) -> None:
     """Keep readiness tied to live broker metadata, not merely producer startup."""
     while not stop.is_set():
-        admin = AIOKafkaAdminClient(\n            **settings.kafka_client_kwargs(),\n            request_timeout_ms=3000,\n        )
+        admin = AIOKafkaAdminClient(
+            **settings.kafka_client_kwargs(),
+            request_timeout_ms=3000,
+        )
         try:
             await admin.start()
             while not stop.is_set():
