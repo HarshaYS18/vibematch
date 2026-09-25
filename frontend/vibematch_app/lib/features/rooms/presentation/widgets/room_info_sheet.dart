@@ -2,14 +2,8 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
 import '../../../../core/ui/vm_motion.dart';
-import '../../data/live_room_membership_service.dart';
 import '../live_room_models.dart';
 import 'room_theme.dart';
-
-final ValueNotifier<String> roomBroadcastAnnouncementNotifier =
-    ValueNotifier<String>(
-      'Welcome to the room. Respect everyone and enjoy the vibe.',
-    );
 
 enum _RoomInfoTab { roomInfo, admins, members }
 
@@ -68,10 +62,9 @@ class _RoomInfoSheetState extends State<RoomInfoSheet> {
 
   bool _isApprovedRoomMember(SeatUser user) {
     if (user.id.trim().isEmpty || user.isHost) return false;
-    return LiveRoomMembershipService.isRoomMember(
-      roomId: widget.roomId,
-      userId: user.id,
-    );
+    if (user.isRoomAdmin) return true;
+    final role = user.roleLabel.trim().toLowerCase();
+    return role == 'member' || role == 'room member';
   }
 
   @override
@@ -79,7 +72,6 @@ class _RoomInfoSheetState extends State<RoomInfoSheet> {
     super.initState();
     _pageController = PageController(initialPage: _selectedTab.index);
     _syncLocalUsersFromWidget();
-    LiveRoomMembershipService.snapshots.addListener(_onMembershipChanged);
   }
 
   @override
@@ -93,13 +85,8 @@ class _RoomInfoSheetState extends State<RoomInfoSheet> {
 
   @override
   void dispose() {
-    LiveRoomMembershipService.snapshots.removeListener(_onMembershipChanged);
     _pageController.dispose();
     super.dispose();
-  }
-
-  void _onMembershipChanged() {
-    if (mounted) setState(() {});
   }
 
   void _syncLocalUsersFromWidget() {
@@ -179,10 +166,6 @@ class _RoomInfoSheetState extends State<RoomInfoSheet> {
 
   @override
   Widget build(BuildContext context) {
-    if (roomBroadcastAnnouncementNotifier.value.trim().isEmpty) {
-      roomBroadcastAnnouncementNotifier.value = widget.broadcastAnnouncement;
-    }
-
     final sheetHeight = MediaQuery.sizeOf(context).height * 0.37;
     final admins = _admins;
     final availableAdminUsers = _availableAdminUsers;
@@ -476,22 +459,16 @@ class _RoomInfoPage extends StatelessWidget {
         _InfoCard(
           icon: Icons.campaign_rounded,
           title: 'Broad Announcement',
-          child: ValueListenableBuilder<String>(
-            valueListenable: roomBroadcastAnnouncementNotifier,
-            builder: (context, announcement, child) {
-              final cleanAnnouncement = announcement.trim().isEmpty
-                  ? fallbackAnnouncement
-                  : announcement.trim();
-              return Text(
-                cleanAnnouncement,
-                style: const TextStyle(
-                  color: Color(0xFF5D5068),
-                  fontSize: 12.2,
-                  fontWeight: FontWeight.w700,
-                  height: 1.28,
-                ),
-              );
-            },
+          child: Text(
+            fallbackAnnouncement.trim().isEmpty
+                ? 'Welcome to the room. Respect everyone and enjoy the vibe.'
+                : fallbackAnnouncement.trim(),
+            style: const TextStyle(
+              color: Color(0xFF5D5068),
+              fontSize: 12.2,
+              fontWeight: FontWeight.w700,
+              height: 1.28,
+            ),
           ),
         ),
       ],
