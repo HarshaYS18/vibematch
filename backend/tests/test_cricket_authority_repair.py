@@ -14,7 +14,7 @@ class CricketAuthorityRepairTests(TestCase):
         user = Mock(id=7)
         room = Mock(id=3, room_public_id="VM123")
         with (
-            patch.object(cricket_service, "get_room_by_public_id", return_value=room),
+            patch.object(cricket_service, "get_room_model_by_public_id", return_value=room),
             patch.object(
                 cricket_service.room_permission_service,
                 "require_room_admin",
@@ -39,7 +39,7 @@ class CricketAuthorityRepairTests(TestCase):
         user = Mock(id=7)
         room = Mock(id=3, room_public_id="VM123")
         with (
-            patch.object(cricket_service, "get_room_by_public_id", return_value=room),
+            patch.object(cricket_service, "get_room_model_by_public_id", return_value=room),
             patch.object(
                 cricket_service.room_permission_service,
                 "require_room_admin",
@@ -58,6 +58,13 @@ class CricketAuthorityRepairTests(TestCase):
         self.assertIs(resolved, room)
         require_view.assert_called_once_with(db, room, user)
         require_admin.assert_not_called()
+
+    def test_cricket_permission_guard_uses_room_model_not_response_dto(self):
+        source = (
+            ROOT / "backend/app/services/rooms/cricket_service.py"
+        ).read_text(encoding="utf-8")
+        self.assertIn("get_room_model_by_public_id", source)
+        self.assertNotIn("get_room_by_public_id", source)
 
     def test_core_cricket_routes_are_proxy_only(self):
         source = (
