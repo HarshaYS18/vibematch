@@ -196,6 +196,21 @@ services:
       opensearch: {condition: service_healthy}
       nats: {condition: service_healthy}
 
+  recommendation-service:
+    profiles: ["recommendation"]
+    build: {context: .., dockerfile: apps/recommendation-service/Dockerfile}
+    environment:
+      KAFKA_BOOTSTRAP_SERVERS: kafka:9092
+      KAFKA_SECURITY_PROTOCOL: PLAINTEXT
+      RECOMMENDATION_REDIS_URL: redis://cache-redis:6379/0
+      RECOMMENDATION_PORT: "8094"
+      RECOMMENDATION_FEED_TTL_SECONDS: "21600"
+      RECOMMENDATION_KAFKA_GROUP: funkey-recommendation-v1
+    ports: ["127.0.0.1:8094:8094"]
+    depends_on:
+      kafka: {condition: service_healthy}
+      cache-redis: {condition: service_healthy}
+
   kafka-event-bridge:
     profiles: ["data"]
     build: {context: .., dockerfile: apps/kafka-event-bridge/Dockerfile}

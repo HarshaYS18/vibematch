@@ -65,6 +65,18 @@ OpenSearch is exposed only on `127.0.0.1:19200` and the Search service on
 `127.0.0.1:8093`. Search depends on the canonical `FUNKEY_EVENTS` JetStream
 stream and is a disposable projection.
 
+## Recommendation profile
+
+Recommendation uses the existing cache Redis plus the Kafka data profile:
+
+```powershell
+docker compose -f infra/docker-compose.yml --profile data up -d --wait kafka
+docker compose -f infra/docker-compose.yml --profile recommendation up --build -d recommendation-service
+```
+
+The local Recommendation API is `127.0.0.1:8094`. Feed state is disposable
+and can be flushed/rebuilt from Kafka.
+
 ## Key local ports
 
 - core API: 8000
@@ -79,6 +91,7 @@ stream and is a disposable projection.
 - Game Platform: 8089
 - Notification: 8090
 - Search: 8093
+- Recommendation: 8094
 - OpenSearch (search profile): 19200
 - backend_media: 4100
 

@@ -16,6 +16,7 @@ resources:
   - graphql-bff.yaml
   - kafka-event-bridge.yaml
   - search.yaml
+  - recommendation.yaml
   - realtime.yaml
   - worker.yaml
   - autoscaling.yaml

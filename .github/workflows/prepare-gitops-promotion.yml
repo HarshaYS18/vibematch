@@ -47,6 +47,9 @@ on:
       search_image:
         description: Immutable Search service image (name@sha256:digest)
         required: true
+      recommendation_image:
+        description: Immutable Recommendation service image (name@sha256:digest)
+        required: true
       realtime_image:
         description: Immutable realtime image (name@sha256:digest)
         required: true
@@ -83,6 +86,7 @@ jobs:
             --worker "${{ inputs.worker_image }}" \
             --kafka-event-bridge "${{ inputs.kafka_event_bridge_image }}" \
             --search "${{ inputs.search_image }}" \
+            --recommendation "${{ inputs.recommendation_image }}" \
             --realtime "${{ inputs.realtime_image }}" \
             --media "${{ inputs.media_image }}"
       - uses: azure/setup-kubectl@v4

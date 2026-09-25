@@ -21,6 +21,7 @@ _IMAGE_KEYS = (
     "worker",
     "kafka_event_bridge",
     "search",
+    "recommendation",
     "realtime",
     "media",
 )
@@ -38,6 +39,7 @@ _IMAGE_NAMES = {
     "worker": "funkey-worker",
     "kafka_event_bridge": "funkey-kafka-event-bridge",
     "search": "funkey-search",
+    "recommendation": "funkey-recommendation",
     "realtime": "funkey-realtime",
     "media": "funkey-media",
 }

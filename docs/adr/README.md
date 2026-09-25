@@ -20,3 +20,4 @@ These decisions describe the target and invariants; they do not assert every imp
 - [ADR-016: Room State Engine v2](ADR-016-room-state-engine-v2.md)
 - [ADR-017: Kafka for long-retained analytics and replay](ADR-017-kafka-data-platform.md)
 - [ADR-018: OpenSearch as rebuildable search projection](ADR-018-search-opensearch-projection.md)
+- [ADR-019: Recommendation as disposable projection](ADR-019-recommendation-projection.md)

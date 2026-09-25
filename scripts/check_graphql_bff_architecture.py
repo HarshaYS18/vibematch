@@ -157,7 +157,7 @@ require(
 )
 require(
     ROOT / '.github' / 'workflows' / 'production-platform.yml',
-    ('funkey-graphql-bff', 'manifest.count("@sha256:") < 15', 'graphql-bff:'),
+    ('funkey-graphql-bff', 'manifest.count("@sha256:") < 16', 'graphql-bff:'),
 )
 
 require(
