@@ -173,3 +173,38 @@ spec:
           labels: {severity: ticket}
           annotations:
             summary: Media node remains draining with active peers
+    - name: funkey-kafka-data-platform
+      rules:
+        - alert: FunKeyKafkaBridgeDown
+          expr: funkey_kafka_bridge_ready < 1
+          for: 5m
+          labels: {severity: page}
+          annotations:
+            summary: Kafka analytics bridge is not ready; inspect NATS/Kafka connectivity
+        - alert: FunKeyKafkaBridgeSourceBacklog
+          expr: funkey_kafka_bridge_source_pending > 10000
+          for: 10m
+          labels: {severity: page}
+          annotations:
+            summary: Kafka bridge JetStream durable backlog is above 10000 events
+        - alert: FunKeyKafkaBridgePublishFailures
+          expr: increase(funkey_kafka_bridge_events_total{result="publish_failed"}[10m]) > 0
+          for: 5m
+          labels: {severity: page}
+          annotations:
+            summary: Kafka analytics bridge is failing publications; JetStream lag may grow
+        - alert: FunKeyKafkaBridgeP95PublishLatencyHigh
+          expr: |
+            histogram_quantile(
+              0.95,
+              sum by (le) (rate(funkey_kafka_bridge_publish_duration_seconds_bucket[10m]))
+            ) > 0.5
+          for: 15m
+          labels: {severity: ticket}
+          annotations:
+            summary: Kafka bridge publish p95 is above 500ms
+        - alert: FunKeyKafkaBridgePoisonEvents
+          expr: increase(funkey_kafka_bridge_events_total{result="dead_lettered"}[15m]) > 0
+          labels: {severity: page}
+          annotations:
+            summary: Kafka bridge quarantined one or more source events

@@ -31,7 +31,7 @@ Sentry is optional at Flutter build time through `SENTRY_DSN`, `SENTRY_ENVIRONME
 
 ## Initial objectives
 
-Existing Prometheus rules cover API errors/latency, database pool pressure, realtime subscription/capacity, worker DLQ, media registry, and an API query-count regression signal. These are initial guardrails, not measured capacity claims; tune only from staging/load-test evidence.
+Existing Prometheus rules cover API errors/latency, database pool pressure, realtime subscription/capacity, worker DLQ, media registry, Kafka bridge readiness/publication/latency/DLQ, and an API query-count regression signal. These are initial guardrails, not measured capacity claims; tune only from staging/load-test evidence.
 
 See `docs/runbooks/observability-degraded.md` and `docs/architecture/observability-platform.md`.
 

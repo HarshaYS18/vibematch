@@ -4,3 +4,6 @@ metadata: {name: funkey-config}
 data:
   APP_ENV: staging
   MEDIA_CDN_BASE_URL: https://cdn.staging.funkey.com/media
+  KAFKA_BOOTSTRAP_SERVERS: funkey-kafka-bootstrap:9092
+  KAFKA_SECURITY_PROTOCOL: PLAINTEXT
+  KAFKA_TOPIC_REPLICATION_FACTOR: "3"

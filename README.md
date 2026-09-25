@@ -28,6 +28,7 @@ Core compatibility API :8000            TURN / backend_media :4100
 PostgreSQL/PgBouncer -> durable authority
 Redis/Valkey roles     -> cache / realtime presence+replay / media registry
 NATS JetStream         -> durable operational async work
+Kafka                   -> retained analytics / replay / ML data, never RPC authority
 Object storage/CDN     -> media/game bytes, never business authority
 ```
 
@@ -39,10 +40,12 @@ Object storage/CDN     -> media/game bytes, never business authority
   lifecycle but calls Economy for wager/settlement.
 - Go realtime owns transport/routing/presence/replay only.
 - `backend_media` owns mediasoup/WebRTC transport only.
-- Redis, NATS, Flutter caches and future search/analytics systems are never
+- Redis, NATS, Kafka, Flutter caches and search/analytics projections are never
   durable business truth.
 - Media v2 uses direct object-store uploads while PostgreSQL owns control state.
 - Flutter REST traffic converges on `AppNetworkClient -> CanonicalNetworkTransport -> Dio`.
+
+Kafka is fed only through the transactional-outbox -> NATS -> Kafka Event Bridge path. See `docs/architecture/kafka-data-platform.md` and `docs/modules/kafka-event-bridge/README.md` for retention, replay and failure semantics.
 
 See `docs/architecture/authority-registry.md`,
 `contracts/architecture/authorities.yaml`, and

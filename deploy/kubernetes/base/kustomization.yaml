@@ -14,6 +14,7 @@ resources:
   - game-platform.yaml
   - notification.yaml
   - graphql-bff.yaml
+  - kafka-event-bridge.yaml
   - realtime.yaml
   - worker.yaml
   - autoscaling.yaml

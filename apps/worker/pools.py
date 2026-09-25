@@ -67,8 +67,8 @@ POOLS: dict[str, PoolSpec] = {
         }),
         max_in_flight=4,
     ),
-    # Chunk 37 activates the Kafka analytics bridge. It is intentionally
-    # unsubscribed now so analytics events cannot be acknowledged and lost.
+    # Kafka analytics is handled by the separate Chunk 37 bridge. Keep this
+    # historical worker boundary inactive to prevent a second analytics owner.
     "analytics": PoolSpec("analytics", (), frozenset(), max_in_flight=8, active=False),
 }
 

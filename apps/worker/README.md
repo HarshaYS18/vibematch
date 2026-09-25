@@ -2,7 +2,7 @@
 
 Chunk 30 turns the previous catch-all worker into explicit JetStream execution pools using one immutable image.
 
-Pools: `general` (transactional outbox relay), `notification`, `media`, `fanout`, `maintenance`, and a dormant `analytics` boundary for Chunk 37. Each event type has one pool owner. Unexpected events are dead-lettered instead of silently acknowledged.
+Pools: `general` (transactional outbox relay), `notification`, `media`, `fanout`, and `maintenance`. The historical `analytics` pool remains deliberately inactive; Chunk 37 uses the separate `kafka-event-bridge` so operational workers never acknowledge analytics copies. Each operational event type has one pool owner. Unexpected events are dead-lettered instead of silently acknowledged.
 
 Handlers have bounded in-flight concurrency and JetStream ack-pending limits. Source messages are acknowledged only after successful idempotent handling; retryable failures use bounded NAK/backoff and terminal failures publish to `funkey.dlq.<event-type>` first.
 

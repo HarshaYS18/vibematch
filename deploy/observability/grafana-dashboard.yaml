@@ -22,6 +22,9 @@ data:
         {"type":"timeseries","title":"Media peers and rooms","targets":[{"expr":"sum(funkey_media_peers)","legendFormat":"peers"},{"expr":"sum(funkey_media_rooms)","legendFormat":"rooms"}],"gridPos":{"x":0,"y":24,"w":12,"h":8}},
         {"type":"timeseries","title":"DB checked-out connections","targets":[{"expr":"sum(funkey_db_pool_checked_out)"}],"gridPos":{"x":12,"y":24,"w":12,"h":8}},
         {"type":"timeseries","title":"DB queries per request","targets":[{"expr":"sum(rate(funkey_http_db_queries_total[5m])) / clamp_min(sum(rate(funkey_http_requests_total[5m])), 0.001)"}],"gridPos":{"x":0,"y":32,"w":12,"h":8}},
-        {"type":"timeseries","title":"OTel Collector accepted spans","targets":[{"expr":"sum(rate(otelcol_receiver_accepted_spans[5m]))"}],"gridPos":{"x":12,"y":32,"w":12,"h":8}}
+        {"type":"timeseries","title":"OTel Collector accepted spans","targets":[{"expr":"sum(rate(otelcol_receiver_accepted_spans[5m]))"}],"gridPos":{"x":12,"y":32,"w":12,"h":8}},
+        {"type":"timeseries","title":"Kafka bridge throughput","targets":[{"expr":"sum(rate(funkey_kafka_bridge_events_total{result=\"published\"}[5m]))","legendFormat":"published"},{"expr":"sum(rate(funkey_kafka_bridge_events_total{result=\"publish_failed\"}[5m]))","legendFormat":"failed"}],"gridPos":{"x":0,"y":40,"w":12,"h":8}},
+        {"type":"timeseries","title":"Kafka bridge p95 publish latency","targets":[{"expr":"histogram_quantile(0.95, sum by (le) (rate(funkey_kafka_bridge_publish_duration_seconds_bucket[5m])))"}],"gridPos":{"x":12,"y":40,"w":12,"h":8}},
+        {"type":"timeseries","title":"Kafka bridge source backlog","targets":[{"expr":"sum(funkey_kafka_bridge_source_pending)","legendFormat":"pending"},{"expr":"sum(funkey_kafka_bridge_source_ack_pending)","legendFormat":"ack-pending"},{"expr":"sum(funkey_kafka_bridge_source_redelivered)","legendFormat":"redelivered"}],"gridPos":{"x":0,"y":48,"w":24,"h":8}}
       ]
     }

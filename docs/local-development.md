@@ -10,8 +10,7 @@ Install Docker Desktop, Python, Node.js, Go and Flutter as needed. Copy untracke
 environment templates and never commit real secrets.
 
 Local infrastructure in `infra/docker-compose.yml` provides PostgreSQL/PgBouncer
-development topology, three Redis/Valkey roles and NATS JetStream. Kubernetes is
-not required for routine local feature work.
+development topology, three Redis/Valkey roles and NATS JetStream. Kafka is opt-in through the `data` Compose profile so normal feature work does not pay its startup cost. Kubernetes is not required for routine local feature work.
 
 ## PowerShell convenience workflow
 
@@ -40,6 +39,19 @@ realtime is the canonical application WebSocket, not a shadow component.
 
 Do not run convenience and Compose stacks on overlapping ports unless mappings
 are changed.
+
+## Kafka analytics profile
+
+Chunk 37 keeps Kafka optional for routine development:
+
+```powershell
+docker compose -f infra/docker-compose.yml --profile data up --build -d --wait nats kafka
+docker compose -f infra/docker-compose.yml --profile data run --rm kafka-topics
+docker compose -f infra/docker-compose.yml --profile data up --build -d --wait kafka-event-bridge
+```
+
+Local Kafka uses one KRaft node with auto topic creation disabled. Kafka is exposed only on `127.0.0.1:19092`; the bridge health endpoint is `127.0.0.1:8092`. Stop it with `docker compose -f infra/docker-compose.yml --profile data down -v` when finished.
+
 
 ## Key local ports
 

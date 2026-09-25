@@ -35,8 +35,14 @@ on:
       notification_image:
         description: Immutable Notification image (name@sha256:digest)
         required: true
+      graphql_bff_image:
+        description: Immutable GraphQL BFF image (name@sha256:digest)
+        required: true
       worker_image:
         description: Immutable worker image (name@sha256:digest)
+        required: true
+      kafka_event_bridge_image:
+        description: Immutable Kafka Event Bridge image (name@sha256:digest)
         required: true
       realtime_image:
         description: Immutable realtime image (name@sha256:digest)
@@ -70,7 +76,9 @@ jobs:
             --economy "${{ inputs.economy_image }}" \
             --game-platform "${{ inputs.game_platform_image }}" \
             --notification "${{ inputs.notification_image }}" \
+            --graphql-bff "${{ inputs.graphql_bff_image }}" \
             --worker "${{ inputs.worker_image }}" \
+            --kafka-event-bridge "${{ inputs.kafka_event_bridge_image }}" \
             --realtime "${{ inputs.realtime_image }}" \
             --media "${{ inputs.media_image }}"
       - uses: azure/setup-kubectl@v4

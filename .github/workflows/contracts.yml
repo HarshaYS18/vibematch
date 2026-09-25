@@ -9,6 +9,7 @@ on:
     paths:
       - 'contracts/**'
       - 'scripts/check_contracts.py'
+      - 'scripts/check_kafka_data_platform.py'
       - 'docs/architecture/service-contracts.md'
       - '.github/workflows/contracts.yml'
 
@@ -31,6 +32,8 @@ jobs:
           github_token: ${{ github.token }}
       - name: Run repository contract checks
         run: python scripts/check_contracts.py
+      - name: Enforce Kafka data-platform contracts
+        run: python scripts/check_kafka_data_platform.py
       - name: Enforce canonical proto formatting
         working-directory: contracts/proto
         run: buf format -d --exit-code

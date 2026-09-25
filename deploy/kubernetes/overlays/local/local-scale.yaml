@@ -90,3 +90,17 @@ apiVersion: autoscaling/v2
 kind: HorizontalPodAutoscaler
 metadata: {name: funkey-graphql-bff}
 spec: {minReplicas: 1, maxReplicas: 1}
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata: {name: funkey-kafka-event-bridge}
+spec:
+  replicas: 0
+  template:
+    spec:
+      nodeSelector: null
+---
+apiVersion: autoscaling/v2
+kind: HorizontalPodAutoscaler
+metadata: {name: funkey-kafka-event-bridge}
+$patch: delete

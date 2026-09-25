@@ -18,3 +18,4 @@ These decisions describe the target and invariants; they do not assert every imp
 - [ADR-014: PostgreSQL transaction pooling and credential boundaries](ADR-014-postgresql-pooling-boundaries.md)
 - [ADR-015: Redis role isolation and ephemeral-state policy](ADR-015-redis-role-isolation.md)
 - [ADR-016: Room State Engine v2](ADR-016-room-state-engine-v2.md)
+- [ADR-017: Kafka for long-retained analytics and replay](ADR-017-kafka-data-platform.md)

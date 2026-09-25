@@ -16,6 +16,7 @@ on:
       - 'scripts/check_contracts.py'
       - 'scripts/check_gateway_architecture.py'
       - 'scripts/check_graphql_bff_architecture.py'
+      - 'scripts/check_kafka_data_platform.py'
       - 'scripts/prepare_gitops_promotion.py'
       - '.github/workflows/contracts.yml'
       - '.github/workflows/production-platform.yml'
@@ -64,9 +65,10 @@ jobs:
       - run: terraform -chdir=infra/terraform fmt -check -recursive
       - run: terraform -chdir=infra/terraform init -backend=false
       - run: terraform -chdir=infra/terraform validate
-      - run: python -m py_compile scripts/prepare_gitops_promotion.py scripts/check_contracts.py scripts/check_gateway_architecture.py scripts/check_graphql_bff_architecture.py
+      - run: python -m py_compile scripts/prepare_gitops_promotion.py scripts/check_contracts.py scripts/check_gateway_architecture.py scripts/check_graphql_bff_architecture.py scripts/check_kafka_data_platform.py
       - run: python scripts/check_gateway_architecture.py
       - run: python scripts/check_graphql_bff_architecture.py
+      - run: python scripts/check_kafka_data_platform.py
       - uses: azure/setup-kubectl@v4
         with:
           version: v1.36.4
@@ -99,11 +101,11 @@ jobs:
           python - <<'PY'
           from pathlib import Path
           manifest = Path("/tmp/funkey-production.yaml").read_text()
-          for image in ("funkey-api", "funkey-inbox", "funkey-vibes", "funkey-room-control", "funkey-identity", "funkey-profile-social", "funkey-economy", "funkey-game-platform", "funkey-notification", "funkey-graphql-bff", "funkey-worker", "funkey-realtime", "funkey-media"):
+          for image in ("funkey-api", "funkey-inbox", "funkey-vibes", "funkey-room-control", "funkey-identity", "funkey-profile-social", "funkey-economy", "funkey-game-platform", "funkey-notification", "funkey-graphql-bff", "funkey-worker", "funkey-kafka-event-bridge", "funkey-realtime", "funkey-media"):
               if f"{image}:dev" in manifest:
                   raise SystemExit(f"production render still contains mutable dev image: {image}")
-          if manifest.count("@sha256:") < 13:
-              raise SystemExit("production render must pin all 13 backend workloads by digest")
+          if manifest.count("@sha256:") < 14:
+              raise SystemExit("production render must pin all 14 backend workloads by digest")
           PY
       - name: Parse load and chaos harnesses
         shell: bash
@@ -118,6 +120,7 @@ jobs:
       - uses: actions/checkout@v4
       - run: docker build -f backend/Dockerfile -t funkey-api:ci .
       - run: docker build -f apps/worker/Dockerfile -t funkey-worker:ci .
+      - run: docker build -f apps/kafka-event-bridge/Dockerfile -t funkey-kafka-event-bridge:ci .
       - run: docker build -f apps/inbox-service/Dockerfile -t funkey-inbox:ci .
       - run: docker build -f apps/vibes-service/Dockerfile -t funkey-vibes:ci .
       - run: docker build -f apps/room-control-service/Dockerfile -t funkey-room-control:ci .
@@ -152,6 +155,71 @@ jobs:
         run: python -m unittest discover -s tests -p 'test_*.py'
       - name: Enforce GraphQL BFF architecture
         run: python scripts/check_graphql_bff_architecture.py
+
+  kafka-data-platform:
+    name: Kafka data platform
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.13'
+      - name: Install Kafka bridge runtime
+        run: pip install -r apps/kafka-event-bridge/requirements.txt
+      - name: Compile Kafka platform
+        run: python -m compileall -q apps/kafka-event-bridge scripts/check_kafka_data_platform.py tests/integration/kafka_bridge_smoke.py
+      - name: Run Kafka bridge unit tests
+        working-directory: apps/kafka-event-bridge
+        run: python -m unittest discover -s tests -p 'test_*.py' -v
+      - name: Enforce Kafka architecture
+        run: python scripts/check_kafka_data_platform.py
+      - name: Build Kafka bridge image
+        run: docker build -f apps/kafka-event-bridge/Dockerfile -t funkey-kafka-event-bridge:ci .
+      - name: Start disposable NATS and KRaft
+        run: docker compose -f infra/docker-compose.yml --profile data up -d --wait nats kafka
+      - name: Provision canonical Kafka topics
+        run: docker compose -f infra/docker-compose.yml --profile data run --rm kafka-topics
+      - name: Seed operational JetStream
+        shell: bash
+        run: |
+          python - <<'PY'
+          import asyncio
+          import nats
+
+          async def main():
+              nc = await nats.connect("nats://127.0.0.1:4222")
+              js = nc.jetstream(timeout=3)
+              try:
+                  await js.stream_info("FUNKEY_EVENTS")
+              except Exception:
+                  await js.add_stream(
+                      name="FUNKEY_EVENTS",
+                      subjects=["funkey.events.>"],
+                      max_age=7 * 86400,
+                  )
+              try:
+                  await js.stream_info("FUNKEY_DLQ")
+              except Exception:
+                  await js.add_stream(
+                      name="FUNKEY_DLQ",
+                      subjects=["funkey.dlq.>"],
+                      max_age=30 * 86400,
+                  )
+              await nc.drain()
+
+          asyncio.run(main())
+          PY
+      - name: Start Kafka event bridge
+        run: docker compose -f infra/docker-compose.yml --profile data up -d --wait kafka-event-bridge
+      - name: Run NATS to Kafka integration smoke
+        run: python tests/integration/kafka_bridge_smoke.py
+      - name: Capture Kafka bridge logs
+        if: failure()
+        run: docker compose -f infra/docker-compose.yml --profile data logs --tail=300 kafka kafka-event-bridge
+      - name: Cleanup Kafka integration
+        if: always()
+        run: docker compose -f infra/docker-compose.yml --profile data down -v --remove-orphans
 
   security-source:
     runs-on: ubuntu-latest

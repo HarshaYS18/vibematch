@@ -109,6 +109,43 @@ def check_event_contracts() -> None:
         if payload.get("type") != "object":
             _fail(f"{path.relative_to(ROOT)}: event schema root type must be object")
 
+    topic_catalogue = EVENT_ROOT / "kafka-topics-v1.json"
+    if topic_catalogue.exists():
+        try:
+            catalogue = json.loads(topic_catalogue.read_text(encoding="utf-8"))
+        except json.JSONDecodeError as exc:
+            _fail(f"{topic_catalogue.relative_to(ROOT)}: invalid JSON: {exc}")
+        if catalogue.get("schema_version") != 1:
+            _fail("Kafka topic catalogue schema_version must be 1")
+        topics = catalogue.get("topics")
+        if not isinstance(topics, list) or not topics:
+            _fail("Kafka topic catalogue must contain topics")
+        names = [item.get("name") for item in topics if isinstance(item, dict)]
+        if len(names) != len(set(names)):
+            _fail("Kafka topic names must be unique")
+        for item in topics:
+            if not isinstance(item, dict):
+                _fail("Kafka topic catalogue entries must be objects")
+            if not str(item.get("name") or "").startswith("funkey."):
+                _fail("Kafka topic names must use the funkey.* namespace")
+            if int(item.get("partitions") or 0) < 1:
+                _fail("Kafka topic partitions must be positive")
+            if int(item.get("retention_ms") or 0) < 1:
+                _fail("Kafka topic retention_ms must be positive")
+            if item.get("data_classification") not in {"internal_analytics", "restricted_analytics"}:
+                _fail("Kafka topic data_classification is required")
+
+    acl_policy = EVENT_ROOT / "kafka-acl-policy-v1.json"
+    if acl_policy.exists():
+        try:
+            acl = json.loads(acl_policy.read_text(encoding="utf-8"))
+        except json.JSONDecodeError as exc:
+            _fail(f"{acl_policy.relative_to(ROOT)}: invalid JSON: {exc}")
+        if acl.get("schema_version") != 1:
+            _fail("Kafka ACL policy schema_version must be 1")
+        if not isinstance(acl.get("principals"), list) or not acl["principals"]:
+            _fail("Kafka ACL policy must define principals")
+
 
 def main() -> int:
     check_proto_contracts()

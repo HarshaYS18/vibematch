@@ -17,7 +17,9 @@ _IMAGE_KEYS = (
     "economy",
     "game_platform",
     "notification",
+    "graphql_bff",
     "worker",
+    "kafka_event_bridge",
     "realtime",
     "media",
 )
@@ -31,7 +33,9 @@ _IMAGE_NAMES = {
     "economy": "funkey-economy",
     "game_platform": "funkey-game-platform",
     "notification": "funkey-notification",
+    "graphql_bff": "funkey-graphql-bff",
     "worker": "funkey-worker",
+    "kafka_event_bridge": "funkey-kafka-event-bridge",
     "realtime": "funkey-realtime",
     "media": "funkey-media",
 }

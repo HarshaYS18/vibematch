@@ -1,15 +1,17 @@
 # FunKey module index
 
 Use this index to find the current owner, contracts, runbooks and architecture
-for the repository through Chunk 32. A service name here means the deployable
-exists; future Search/Recommendation/Analytics/GraphQL targets remain design
-boundaries until their chunks land.
+for the repository through Chunk 37. A service name here means the deployable
+exists. GraphQL read composition and the Kafka analytics bridge are now deployed
+platform boundaries; Search/Recommendation product services remain later chunks.
 
 ## Deployables
 
 - [core-api](modules/core-api/README.md)
 - [Go realtime gateway](../apps/realtime-gateway/README.md)
 - [Worker Platform](modules/worker/README.md)
+- [GraphQL Read BFF](modules/graphql-read-bff/README.md)
+- [Kafka Event Bridge](modules/kafka-event-bridge/README.md)
 - [Inbox Service](architecture/inbox-service.md)
 - [Vibes Service](architecture/vibes-service.md)
 - [Room Control Service](architecture/room-control-service.md)
@@ -44,8 +46,7 @@ boundaries until their chunks land.
 
 - [database](modules/database/README.md)
 - [cache / Redis](modules/cache/README.md)
-- [events / NATS](modules/events/README.md)
-- [observability](modules/observability/README.md)
+- [events / NATS](modules/events/README.md)\n- [observability](modules/observability/README.md)
 - [security](modules/security/README.md)
 - [infrastructure](modules/infrastructure/README.md)
 - [Kubernetes](modules/kubernetes/README.md)
@@ -63,7 +64,7 @@ boundaries until their chunks land.
 - [State classification](architecture/state-classification.md)
 - [Service contracts](architecture/service-contracts.md)
 - [PostgreSQL platform](architecture/postgresql-platform.md)
-- [Redis / Valkey platform](architecture/redis-valkey-platform.md)
+- [Redis / Valkey platform](architecture/redis-valkey-platform.md)\n- [Kafka data platform](architecture/kafka-data-platform.md)
 - [Room State Engine v2](architecture/room-state-engine-v2.md)
 - [Go realtime v2](architecture/go-realtime-platform-v2.md)
 - [Media v2](architecture/media-v2-upload.md)

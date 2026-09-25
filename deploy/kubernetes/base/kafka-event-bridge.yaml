@@ -1,0 +1,90 @@
+apiVersion: v1
+kind: ServiceAccount
+metadata: {name: funkey-kafka-event-bridge}
+automountServiceAccountToken: false
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: funkey-kafka-event-bridge
+  labels: {app: funkey-kafka-event-bridge}
+spec:
+  selector: {app: funkey-kafka-event-bridge}
+  ports:
+    - {name: health, port: 8092, targetPort: health}
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: funkey-kafka-event-bridge
+  labels: {app: funkey-kafka-event-bridge}
+spec:
+  replicas: 2
+  revisionHistoryLimit: 5
+  strategy: {type: RollingUpdate, rollingUpdate: {maxSurge: 1, maxUnavailable: 0}}
+  selector: {matchLabels: {app: funkey-kafka-event-bridge}}
+  template:
+    metadata:
+      labels: {app: funkey-kafka-event-bridge}
+      annotations: {prometheus.io/scrape: "true", prometheus.io/path: /metrics, prometheus.io/port: "8092"}
+    spec:
+      serviceAccountName: funkey-kafka-event-bridge
+      automountServiceAccountToken: false
+      terminationGracePeriodSeconds: 90
+      nodeSelector: {funkey.io/workload: application}
+      securityContext: {runAsNonRoot: true, seccompProfile: {type: RuntimeDefault}}
+      containers:
+        - name: bridge
+          image: funkey-kafka-event-bridge:dev
+          ports: [{name: health, containerPort: 8092}]
+          envFrom:
+            - {configMapRef: {name: funkey-config}}
+          env:
+            - name: KAFKA_USERNAME
+              valueFrom: {secretKeyRef: {name: funkey-kafka-secrets, key: kafka_username, optional: true}}
+            - name: KAFKA_PASSWORD
+              valueFrom: {secretKeyRef: {name: funkey-kafka-secrets, key: kafka_password, optional: true}}
+          resources:
+            requests: {cpu: 150m, memory: 192Mi}
+            limits: {cpu: "1", memory: 512Mi}
+          startupProbe: {httpGet: {path: /live, port: health}, failureThreshold: 30, periodSeconds: 2}
+          livenessProbe: {httpGet: {path: /live, port: health}, periodSeconds: 20}
+          readinessProbe: {httpGet: {path: /ready, port: health}, periodSeconds: 5}
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            capabilities: {drop: [ALL]}
+---
+apiVersion: policy/v1
+kind: PodDisruptionBudget
+metadata: {name: funkey-kafka-event-bridge}
+spec:
+  minAvailable: 1
+  selector: {matchLabels: {app: funkey-kafka-event-bridge}}
+---
+apiVersion: autoscaling/v2
+kind: HorizontalPodAutoscaler
+metadata: {name: funkey-kafka-event-bridge}
+spec:
+  scaleTargetRef: {apiVersion: apps/v1, kind: Deployment, name: funkey-kafka-event-bridge}
+  minReplicas: 2
+  maxReplicas: 12
+  behavior:
+    scaleDown: {stabilizationWindowSeconds: 300}
+  metrics:
+    - type: Resource
+      resource:
+        name: cpu
+        target: {type: Utilization, averageUtilization: 65}
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata: {name: funkey-kafka-event-bridge-ingress}
+spec:
+  podSelector: {matchLabels: {app: funkey-kafka-event-bridge}}
+  policyTypes: [Ingress]
+  ingress:
+    - from:
+        - namespaceSelector:
+            matchLabels: {funkey.io/observability-access: "true"}
+      ports: [{protocol: TCP, port: 8092}]

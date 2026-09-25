@@ -1,6 +1,6 @@
 # Chunk 36 — GraphQL Read BFF
 
-**Status: implementation and reliability/latency improvement complete; CI is the final closure gate.**
+**Status: closed. Implementation, CI and authenticated disposable-session smoke are green.**
 
 ## Delivered
 
@@ -129,7 +129,27 @@ Chunk 36 closes only when:
 - GraphQL BFF and platform container builds are green
 - security-source checks remain green
 - the k6 harness parses cleanly
-- a real staging smoke with valid test credentials satisfies the zero-error and latency thresholds before production promotion
+- the authenticated disposable-session smoke satisfies the zero-error and latency thresholds; a live staging promotion run still requires a staging-only credential/provider environment
+
+## Final measured smoke evidence
+
+The authenticated disposable-session smoke completed with:
+
+- k6 checks: **100% (728/728)**
+- HTTP failures: **0.00%**
+- unexpected GraphQL failures: **0.00%**
+- GraphQL semantic errors: **0.00%**
+- security-contract checks: **100% (3/3)**
+- HomeComposite p95: **95.51ms**
+- HomeComposite p99: **207.03ms**
+- BFF server p95: **92.81ms**
+- BFF server p99: **205.46ms**
+- HomeComposite average: **37.3ms**
+- BFF average: **36.09ms**
+
+This evidence came from the disposable session environment created inside CI.
+It proves the controlled application path, not public-Internet/mobile latency.
+A live staging promotion smoke remains a separate environment validation.
 
 ## Documentation invariant
 

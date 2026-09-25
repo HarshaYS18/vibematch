@@ -7,6 +7,7 @@ resources:
   - ../../gateway
 patches:
   - path: config.yaml
+  - path: kafka-bridge-scale.yaml
 images:
   - name: funkey-api
     newName: ghcr.io/harshays18/vibematch/funkey-api
@@ -40,6 +41,9 @@ images:
     digest: sha256:0000000000000000000000000000000000000000000000000000000000000000
   - name: funkey-worker
     newName: ghcr.io/harshays18/vibematch/funkey-worker
+    digest: sha256:0000000000000000000000000000000000000000000000000000000000000000
+  - name: funkey-kafka-event-bridge
+    newName: ghcr.io/harshays18/vibematch/funkey-kafka-event-bridge
     digest: sha256:0000000000000000000000000000000000000000000000000000000000000000
   - name: funkey-realtime
     newName: ghcr.io/harshays18/vibematch/funkey-realtime

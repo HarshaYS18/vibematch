@@ -5,6 +5,7 @@ resources:
   - ../../media
   - ../../jobs
   - ../../gateway
+  - ../../kafka
 patches:
   - path: config.yaml
   - target:

@@ -55,6 +55,9 @@ jobs:
           - name: worker
             dockerfile: apps/worker/Dockerfile
             context: .
+          - name: kafka-event-bridge
+            dockerfile: apps/kafka-event-bridge/Dockerfile
+            context: .
           - name: realtime
             dockerfile: apps/realtime-gateway/Dockerfile
             context: .
