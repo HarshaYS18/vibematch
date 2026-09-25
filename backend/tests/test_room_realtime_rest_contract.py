@@ -43,6 +43,7 @@ class RoomRealtimeRestContractTests(unittest.TestCase):
         self.assertIn((f"{prefix}/heartbeat", "POST"), routes)
         self.assertIn((f"{prefix}/leave", "POST"), routes)
         self.assertIn((f"{prefix}/watch-party/command", "POST"), routes)
+        self.assertIn((f"{prefix}/chat/clear", "POST"), routes)
 
     def test_image_chat_command_allows_media_without_placeholder_text(self):
         command = RoomChatSendCommand(

@@ -226,14 +226,6 @@ class LiveRoomMessageController {
     onChanged();
   }
 
-  void clearChatForEveryone() {
-    messages.clear();
-    _giftMessageUpdatedAt.clear();
-    insertPersistentSystemMessage(
-      'Chat cleared for everyone by ${currentUser.name}',
-    );
-  }
-
   void requestJoin() {
     final alreadyRequested = joinRequestUsers.any(
       (user) => user.id == currentUser.id,

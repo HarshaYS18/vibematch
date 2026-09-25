@@ -513,10 +513,6 @@ class LiveRoomMediaSignalingService with WidgetsBindingObserver {
     _send('room/system_message', <String, Object?>{'message': safeMessage});
   }
 
-  void broadcastChatCleared() {
-    _send('room/chat_clear', <String, Object?>{});
-  }
-
   void sendRoomChat(String text) {
     final safeText = text.trim();
     if (safeText.isEmpty) return;

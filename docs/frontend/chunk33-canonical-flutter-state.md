@@ -302,3 +302,22 @@ The adapter also normalizes an empty backend `message_type` to text and the
 regression suite verifies startup preservation, connected replacement,
 text/image ordering, metadata projection, and repeated identical canonical
 messages. No UI appearance changes are introduced.
+
+
+### Micro-chunk 33-M4 — room-scoped canonical chat clearing
+
+Chat clearing now has one mutation path:
+`LiveRoomSettingsModule -> RoomSessionRepository.clearChat() ->
+POST /rooms/{room}/realtime/chat/clear -> backend room/chat_clear ->
+canonical recent_messages`.
+
+The settings action awaits the canonical command and reports success only after
+the reconciled snapshot returns. The legacy
+`LiveRoomMediaSignalingService.broadcastChatCleared()` transport command and
+`LiveRoomMessageController.clearChatForEveryone()` local-list mutation were
+removed, so neither the media singleton nor a presentation controller can act
+as an alternate durable-chat authority.
+
+Regression coverage verifies the backend REST route, the exact repository
+request/reconciliation behavior, and source-level absence of the retired
+global/local clear paths. No room UI styling or layout changed.

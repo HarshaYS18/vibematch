@@ -53,4 +53,30 @@ void main() {
     expect(successIndex, greaterThan(awaitIndex));
   });
 
+
+  test('Chunk 33 chat clear has one canonical room-scoped mutation path', () {
+    final settings = File(
+      'lib/features/rooms/presentation/modules/settings/live_room_settings_module.dart',
+    ).readAsStringSync();
+    final repository = File(
+      'lib/room_session/data/room_session_repository.dart',
+    ).readAsStringSync();
+    final media = File(
+      'lib/features/rooms/data/live_room_media_signaling_service.dart',
+    ).readAsStringSync();
+    final messages = File(
+      'lib/features/rooms/presentation/controllers/live_room_message_controller.dart',
+    ).readAsStringSync();
+    final feed = File(
+      'lib/features/rooms/presentation/widgets/room_chat.dart',
+    ).readAsStringSync();
+
+    expect(repository, contains('Future<RoomSessionState> clearChat()'));
+    expect(repository, contains('/realtime/chat/clear'));
+    expect(settings, contains('await bundle.roomSessionRepository.clearChat();'));
+    expect(media, isNot(contains('broadcastChatCleared')));
+    expect(messages, isNot(contains('clearChatForEveryone')));
+    expect(feed, isNot(contains('roomChatClearSignal')));
+  });
+
 }

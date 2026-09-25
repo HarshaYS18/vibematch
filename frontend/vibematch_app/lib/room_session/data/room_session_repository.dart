@@ -230,6 +230,18 @@ class RoomSessionRepository
     );
   }
 
+  /// Clears durable room chat through the canonical backend command.
+  ///
+  /// The returned room snapshot is reconciled immediately. Presentation must
+  /// react to canonical recent_messages becoming empty instead of mutating a
+  /// local chat list or broadcasting through the media transport singleton.
+  Future<RoomSessionState> clearChat() {
+    return _postCanonical(
+      '/rooms/$_roomId/realtime/chat/clear',
+      const <String, dynamic>{},
+    );
+  }
+
   Future<RoomSessionState> activityCommand({
     required String action,
     int? expectedRevision,

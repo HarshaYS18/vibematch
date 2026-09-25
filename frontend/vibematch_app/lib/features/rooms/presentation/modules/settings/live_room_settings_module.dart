@@ -69,9 +69,18 @@ class LiveRoomSettingsModule {
           bundle: bundle,
           sheetContext: sheetContext,
         ),
-        onClearChatTap: () {
-          LiveRoomMediaSignalingService.instance.broadcastChatCleared();
-          RoomToast.show(bundle.context, 'Chat clear broadcasted');
+        onClearChatTap: () async {
+          try {
+            await bundle.roomSessionRepository.clearChat();
+            if (!bundle.mounted) return;
+            RoomToast.show(bundle.context, 'Chat cleared for everyone');
+          } catch (error) {
+            if (!bundle.mounted) return;
+            RoomToast.show(
+              bundle.context,
+              error.toString().replaceFirst('Exception: ', ''),
+            );
+          }
         },
         canCloseRoom: bundle.currentUser.isHost,
         onToggleRoomImages: (value) {

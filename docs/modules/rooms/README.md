@@ -115,3 +115,16 @@ All client success UI must wait for the canonical chat command to succeed.
 Room snapshots/realtime deltas publish `recent_messages`; Flutter must project
 that canonical list into presentation models rather than maintain a second
 durable chat authority.
+
+
+## Canonical chat clearing
+
+Clearing room chat is a durable administrative room mutation. The canonical
+client path is `POST /rooms/{room_public_id}/realtime/chat/clear`, which
+executes the existing `room/chat_clear` command under backend room-admin
+authorization. The backend marks active `room_chat_messages` deleted and
+returns a new authoritative snapshot whose `recent_messages` is empty.
+
+Flutter must call this through the room-scoped `RoomSessionRepository` and
+reconcile the returned snapshot. Media signaling, widget-local lists, and
+process-global notifier/event-bus state must not clear durable chat.

@@ -398,6 +398,40 @@ void main() {
     );
   });
 
+  test('clear chat posts canonical command and reconciles empty chat', () async {
+    final initial = _room(46, <int>[1, 2])
+      ..['recent_messages'] = <Map<String, dynamic>>[
+        <String, dynamic>{
+          'id': 88,
+          'message_type': 'text',
+          'text': 'remove me',
+        },
+      ];
+    final network = _FakeNetworkClient(initial);
+    final harness = _RoomHarness(network);
+    addTearDown(harness.dispose);
+    final repository = harness.repository;
+
+    await repository.join();
+    expect(repository.state.chat, isNotEmpty);
+
+    network.calls.clear();
+    network.postedBodies.clear();
+    network.snapshot = _room(47, <int>[1, 2])
+      ..['recent_messages'] = <Map<String, dynamic>>[];
+
+    final state = await repository.clearChat();
+
+    expect(
+      network.calls,
+      <String>['POST /rooms/VM123/realtime/chat/clear'],
+    );
+    expect(network.postedBodies.single, const <String, dynamic>{});
+    expect(state.stateVersion, 47);
+    expect(state.chat, isEmpty);
+    expect(repository.state.chat, isEmpty);
+  });
+
   test('activity command stays on canonical room repository', () async {
     final server = _FakeNetworkClient(_room(45, <int>[1, 2]));
     final harness = _RoomHarness(server);

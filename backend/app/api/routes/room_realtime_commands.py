@@ -922,6 +922,28 @@ async def chat_send(room_public_id: str, command: RoomChatSendCommand, db: Sessi
     return {"room_id": room_public_id, "room": data}
 
 
+@router.post("/chat/clear")
+async def chat_clear(
+    room_public_id: str,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """Clear durable room chat through the canonical room command path.
+
+    Authorization and deletion semantics are owned by execute_room_command;
+    the returned snapshot contains authoritative recent_messages after clear.
+    """
+    room = room_or_404(db, room_public_id)
+    data = await execute_room_command(
+        db,
+        room,
+        current_user,
+        "room/chat_clear",
+        {},
+    )
+    return {"room_id": room_public_id, "room": data}
+
+
 @router.post("/watch-party/command")
 async def watch_party_command(
     room_public_id: str,
