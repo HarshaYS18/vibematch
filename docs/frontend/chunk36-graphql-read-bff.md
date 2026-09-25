@@ -1,6 +1,6 @@
 # Chunk 36 — GraphQL Read BFF
 
-**Status: implementation complete; CI is the final closure gate.**
+**Status: implementation and reliability/latency improvement complete; CI is the final closure gate.**
 
 ## Delivered
 
@@ -11,53 +11,126 @@
 - request-scoped DataLoader batching/deduplication
 - 2.5s owner-service deadlines and bounded concurrency
 - forwarded bearer auth, request ID and trace context
-- OpenTelemetry operation/upstream spans and Prometheus counters
+- OpenTelemetry operation/upstream spans and Prometheus metrics
 - GraphQL partial-data field errors
 - exact Envoy `/graphql` route with dedicated timeout/rate/payload policy
 - Kubernetes Deployment/Service/PDB/HPA/NetworkPolicy and immutable image publishing
 - Flutter persisted-read client with no GraphQL package
-- Home chrome cut over from three REST reads to one composite without UI changes
+- Home chrome cut over from three client REST reads to one persisted composite without UI changes
 - canonical Python/Dart operation-ID contract and architecture guard
 
 ## Authority invariant
 
-GraphQL is read composition only. Writes stay on existing REST/gRPC command APIs and domain services remain authoritative.
+GraphQL remains read composition only. Writes stay on existing REST/gRPC command APIs and domain services remain authoritative. The BFF owns no database schema, durable cache, wallet state, room authority, or realtime authority.
 
-## Closure test
+## Chunk 36 reliability and latency improvement
 
-Chunk 36 is complete only when BFF unit/boundary tests, frontend guard, infrastructure/Gateway render, container build and repository architecture guard are green.
+This hardening belongs to **Chunk 36**. It is not a new chunk.
+
+### Zero-unexpected-failure smoke contract
+
+The authenticated Home persisted-read smoke now requires:
+
+- HTTP unexpected failure rate = **0%**
+- k6 failed-check rate = **0%**
+- unexpected GraphQL failure rate = **0%**
+- GraphQL semantic-error rate = **0%**, including `errors[]` carried by HTTP 200
+- every required Home field present
+- end-to-end p95 < **250ms**
+- end-to-end p99 < **500ms**
+- BFF `Server-Timing` p95 < **200ms**
+- BFF `Server-Timing` p99 < **400ms**
+
+A missing `FUNKEY_TEST_TOKEN` is a hard configuration failure, so an empty authenticated workload cannot create a false-green result.
+
+### Expected security rejections are separated from real failures
+
+Before positive load begins, the smoke verifies three negative/security contracts:
+
+- ad-hoc query text -> `PERSISTED_ONLY` / HTTP 400
+- unknown persisted ID -> `UNKNOWN_OPERATION` / HTTP 400
+- known operation without bearer auth -> `UNAUTHENTICATED` / HTTP 401
+
+k6 marks those statuses as expected. Their contract-correctness metric must be **100%**, while they do not contaminate the unexpected HTTP failure rate.
+
+### Request hot-path improvements
+
+The improvement reduces avoidable work instead of merely tightening thresholds:
+
+- persisted-operation security inspection and schema validation are compiled once at process startup rather than repeated on every accepted request
+- unsafe or schema-invalid persisted documents fail startup
+- Home event and policy banners share one request-scoped authoritative `/home-banners` read instead of two duplicate owner requests
+- the BFF partitions the active banner list by placement in memory
+- no Home banner result survives the request, so there is no cross-request stale cache or authority drift
+- Home owner HTTP requests are reduced from three to two: `my-created-room` plus one banner read
+- the upstream client retains bounded concurrency and no automatic retry masking
+
+### Latency observability
+
+Chunk 36 now exposes bounded-cardinality telemetry needed to find actual bottlenecks:
+
+- `funkey_graphql_operation_duration_seconds` by immutable operation name and `ok|error`
+- `funkey_graphql_upstream_duration_seconds` by fixed owner-service name and `ok|error`
+- response `Server-Timing` with aggregate GraphQL execution and BFF duration
+- OpenTelemetry operation/upstream spans remain available for trace-level diagnosis
+
+User IDs, room IDs, request IDs, bearer tokens, GraphQL variables, and dynamic URL paths are forbidden as metric labels.
+
+### Protocol/error hardening
+
+Home banner composition rejects malformed owner payloads as `UPSTREAM_PROTOCOL` rather than silently converting bad owner data into apparently valid empty results.
+
+Owner-service contract tests verify:
+
+- bearer auth propagation
+- `X-Request-ID` propagation
+- traceparent propagation
+- query parameter propagation
+- timeout -> `UPSTREAM_TIMEOUT`
+- owner 401/403 -> GraphQL `FORBIDDEN`
+- invalid JSON -> `UPSTREAM_PROTOCOL`
+
+### Benchmark integrity
+
+The smoke does **not** manufacture a pass by:
+
+- blanket retries
+- lowering VU concurrency
+- excluding slow samples
+- inflating timeouts
+- ignoring GraphQL `errors[]`
+- treating security rejections as unexpected transport failures
+
+The 100ms figure remains an engineering fast-path target where realistic, not a universal end-to-end requirement that would mix mobile RTT, gateway cost, GraphQL composition and owner-service work.
 
 ## Closure audit repairs
 
-The final deployment audit closed four integration drifts before Chunk 36
-completion:
+The final deployment audit also closed the earlier integration drifts:
 
-- staging now rewrites the dedicated GraphQL HTTPRoute to
-  `api.staging.funkey.com`;
-- production now pins the GraphQL BFF image by digest and the immutable-image
-  gate requires all 13 backend workloads;
-- local development scales the BFF/HPA to one replica and removes the
-  production node selector;
-- the frontend workflow no longer duplicates GraphQL path filters and now runs
-  the persisted-read guard when the shared contract changes on push.
+- staging rewrites the dedicated GraphQL HTTPRoute to `api.staging.funkey.com`
+- production pins the GraphQL BFF image by digest and the immutable-image gate requires all 13 backend workloads
+- local development scales the BFF/HPA to one replica and removes the production node selector
+- the frontend workflow avoids duplicate GraphQL path filters and runs the persisted-read guard when the shared contract changes
 
 These are enforced by `check_graphql_bff_architecture.py`.
 
 ## Gateway guard compatibility
 
-Chunk 36 updates the earlier Chunk 35 buffer-count invariant from two to three
-intentional non-streaming policies. The guard now explicitly verifies that the
-realtime WebSocket policy remains unbuffered rather than relying only on a
-global count.
+Chunk 36 updates the earlier Chunk 35 buffer-count invariant from two to three intentional non-streaming policies. The guard explicitly verifies that the realtime WebSocket policy remains unbuffered rather than relying only on a global count.
 
-## Composite-read load budget
+## Closure test
 
-Chunk 36 introduced `tests/load/graphql-read-smoke.js` for the persisted Home
-composite. The Chunk 36 reliability/latency improvement hardens that promotion
-signal: authenticated execution is mandatory, unexpected/semantic failure rates
-must be exactly 0%, p95 must stay below 250ms, and p99 below 500ms. The test does not use blanket retries and
-validates GraphQL `errors[]` even when transport status is HTTP 200.
+Chunk 36 closes only when:
 
-These controlled-smoke thresholds are intentionally stricter than the original
-Chunk 36 <2% / 1500ms gate and are not a universal latency promise for every
-FunKey operation or global mobile path.
+- GraphQL BFF unit, runtime, owner-contract and boundary tests are green
+- the architecture guard is green
+- frontend architecture checks are green
+- infrastructure/Gateway render checks are green
+- GraphQL BFF and platform container builds are green
+- security-source checks remain green
+- the k6 harness parses cleanly
+- a real staging smoke with valid test credentials satisfies the zero-error and latency thresholds before production promotion
+
+## Documentation invariant
+
+Any later change to GraphQL failure semantics, latency thresholds, metric labels, startup validation, Home read composition, or owner-service failure mapping must update this document, `tests/load/README.md`, BFF/module architecture docs, tests, and the GraphQL runbook in the same change.
