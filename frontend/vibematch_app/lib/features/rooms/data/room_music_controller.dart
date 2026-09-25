@@ -10,9 +10,7 @@ import '../../media/data/media_upload_service.dart';
 import 'live_room_media_signaling_service.dart';
 
 class RoomMusicController {
-  RoomMusicController._();
-
-  static final RoomMusicController instance = RoomMusicController._();
+  RoomMusicController();
 
   static const String _playlistKey = 'vibematch_room_music_playlist_v1';
 
@@ -250,6 +248,12 @@ class RoomMusicController {
     } finally {
       _stoppingBecauseRoomExit = false;
     }
+  }
+
+  Future<void> dispose() async {
+    await stopBecauseControllerExitedRoom();
+    _stopProgressTimer();
+    state.dispose();
   }
 
   void showOverlay() {
