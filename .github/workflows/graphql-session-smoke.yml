@@ -26,7 +26,20 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          docker compose -f infra/docker-compose.yml --profile app up --build -d             postgres pgbouncer cache-redis realtime-redis media-redis nats             migrate identity api
+          cat >/tmp/graphql-session-compose.override.yml <<'YAML'
+          services:
+            api:
+              environment:
+                database_url: postgresql://funkey:funkey_dev_only@postgres:5432/funkey
+                DB_POOLER_MODE: direct
+            identity:
+              environment:
+                database_url: postgresql://funkey:funkey_dev_only@postgres:5432/funkey
+                IDENTITY_DATABASE_URL: postgresql://funkey:funkey_dev_only@postgres:5432/funkey
+                DB_POOLER_MODE: direct
+          YAML
+
+          docker compose -f infra/docker-compose.yml -f /tmp/graphql-session-compose.override.yml --profile app up --build -d             postgres cache-redis realtime-redis media-redis nats             migrate identity api
 
           for attempt in $(seq 1 60); do
             if curl -fsS http://127.0.0.1:8000/health >/dev/null; then
@@ -35,8 +48,8 @@ jobs:
             sleep 5
           done
 
-          docker compose -f infra/docker-compose.yml --profile app ps
-          docker compose -f infra/docker-compose.yml --profile app logs --tail=200 api identity
+          docker compose -f infra/docker-compose.yml -f /tmp/graphql-session-compose.override.yml --profile app ps
+          docker compose -f infra/docker-compose.yml -f /tmp/graphql-session-compose.override.yml --profile app logs --tail=200 api identity
           echo "::error::Local FunKey API did not become live."
           exit 1
 
@@ -73,7 +86,7 @@ jobs:
             echo "::error::Disposable dev-login returned HTTP ${STATUS}."
             cat "${AUTH_FILE}"
             echo
-            docker compose -f infra/docker-compose.yml --profile app logs --tail=200 api identity
+            docker compose -f infra/docker-compose.yml -f /tmp/graphql-session-compose.override.yml --profile app logs --tail=200 api identity
             exit 1
           fi
 
@@ -98,4 +111,4 @@ jobs:
         shell: bash
         run: |
           docker rm -f funkey-graphql-bff-session >/dev/null 2>&1 || true
-          docker compose -f infra/docker-compose.yml --profile app down -v --remove-orphans || true
+          docker compose -f infra/docker-compose.yml -f /tmp/graphql-session-compose.override.yml --profile app down -v --remove-orphans || true
