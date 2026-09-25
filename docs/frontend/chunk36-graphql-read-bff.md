@@ -27,7 +27,6 @@ GraphQL is read composition only. Writes stay on existing REST/gRPC command APIs
 
 Chunk 36 is complete only when BFF unit/boundary tests, frontend guard, infrastructure/Gateway render, container build and repository architecture guard are green.
 
-
 ## Closure audit repairs
 
 The final deployment audit closed four integration drifts before Chunk 36
@@ -44,7 +43,6 @@ completion:
 
 These are enforced by `check_graphql_bff_architecture.py`.
 
-
 ## Gateway guard compatibility
 
 Chunk 36 updates the earlier Chunk 35 buffer-count invariant from two to three
@@ -52,10 +50,14 @@ intentional non-streaming policies. The guard now explicitly verifies that the
 realtime WebSocket policy remains unbuffered rather than relying only on a
 global count.
 
-
 ## Composite-read load budget
 
-Chunk 36 includes `tests/load/graphql-read-smoke.js` for the persisted Home
-composite. The staging smoke threshold requires less than 2% failed requests
-and p95 below 1500ms, providing an explicit composition-latency signal in
-addition to unit, architecture, and container gates.
+Chunk 36 introduced `tests/load/graphql-read-smoke.js` for the persisted Home
+composite. Chunk 37 hardens that promotion signal: authenticated execution is
+mandatory, unexpected/semantic failure rates must be exactly 0%, p95 must stay
+below 250ms, and p99 below 500ms. The test does not use blanket retries and
+validates GraphQL `errors[]` even when transport status is HTTP 200.
+
+These controlled-smoke thresholds are intentionally stricter than the original
+Chunk 36 <2% / 1500ms gate and are not a universal latency promise for every
+FunKey operation or global mobile path.

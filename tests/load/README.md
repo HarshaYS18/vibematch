@@ -6,8 +6,7 @@ Run `pwsh scripts/task.ps1 load-test-smoke` after `pwsh scripts/task.ps1 dev`. F
 
 Run increasing stages only after the preceding stage passes: local correctness, 1k, 10k, 50k, 100k, 250k, 500k, then 1M concurrent users. These are test stages, not supported capacity claims. Each stage needs distributed generators, representative room sizes, churn, reconnect storms, and sustained duration. Record RPS per API pod, WebSockets and messages per gateway, DB connections per pod, Redis ops/sec, JetStream events/sec, and rooms/peers/bandwidth per media node. Stop scaling when p95 latency, error budget, reconnect success, queue age, or dependency saturation crosses its observed safe limit.
 
-The smoke thresholds in scripts are local correctness checks. They are not production SLOs. Media heartbeat/drain and Redis failure exercises belong in a disposable staging cluster with the chaos suite; issuing synthetic node heartbeats against production can corrupt assignments.
-
+The smoke thresholds in scripts are controlled correctness/promotion gates. They are not universal production SLOs. Media heartbeat/drain and Redis failure exercises belong in a disposable staging cluster with the chaos suite; issuing synthetic node heartbeats against production can corrupt assignments.
 
 ## Reconnect and soak execution
 
@@ -15,15 +14,28 @@ The smoke thresholds in scripts are local correctness checks. They are not produ
 
 A soak run reuses the same scenarios with a longer `DURATION` (for example several hours) and fixed representative concurrency. Do not promote a measured capacity number until HTTP, realtime, worker backlog, Redis, PostgreSQL, JetStream, media CPU/bandwidth, TURN relay use, and client reconnect success were captured from the same environment.
 
-
 ## GraphQL persisted-read smoke
 
 `graphql-read-smoke.js` exercises the real persisted Home composite at
-`/graphql`. It requires `FUNKEY_TEST_TOKEN`; without a token the scenario
-only sleeps and does not generate authenticated load.
+`/graphql`. It requires `FUNKEY_TEST_TOKEN`. Missing authentication now aborts
+the test instead of silently sleeping, so an empty workload can never produce
+a false-green promotion result.
 
-The smoke budget is intentionally stricter than the Gateway's 10-second hard
-deadline: less than 2% request failures and p95 below 1500ms. These are
-promotion/smoke thresholds, not a universal production SLO. Run this scenario
-against staging with representative owner-service latency before raising BFF
-HPA or concurrency limits.
+The controlled smoke gate requires all of the following:
+
+- zero HTTP request failures;
+- zero failed k6 checks;
+- zero unexpected GraphQL failures;
+- zero GraphQL semantic errors, including `errors[]` returned with HTTP 200;
+- p95 Home-composite latency below 250ms;
+- p99 Home-composite latency below 500ms.
+
+The Home response is also required to contain `myRoom`, `eventBanners`, and
+`policyBanners`, while allowing legitimate null field values. The test performs
+no blanket retry and therefore exposes real transport, protocol, owner-service,
+and tail-latency instability.
+
+These thresholds are intentionally aggressive for a controlled same-region
+promotion smoke. They do not imply that every FunKey operation, mobile network,
+or global user path must complete within 250ms. Operation-specific SLOs remain
+the production rule.

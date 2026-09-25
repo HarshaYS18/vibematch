@@ -99,8 +99,11 @@ require(
     ROOT / 'tests' / 'load' / 'graphql-read-smoke.js',
     (
         'PersistedGraphqlOperations',
-        'p(95)<1500',
-        'rate<0.02',
+        'p(95)<250',
+        'p(99)<500',
+        'rate==0',
+        'graphql_semantic_error_rate',
+        'graphql_unexpected_failure_rate',
         '/graphql',
     ),
 )
@@ -110,6 +113,7 @@ for doc in (
     BFF / 'tests' / 'README.md',
     ROOT / 'contracts' / 'graphql' / 'README.md',
     ROOT / 'docs' / 'frontend' / 'chunk36-graphql-read-bff.md',
+    ROOT / 'docs' / 'frontend' / 'chunk37-graphql-slo-hardening.md',
     ROOT / 'docs' / 'architecture' / 'graphql-read-bff.md',
     ROOT / 'docs' / 'modules' / 'graphql-read-bff' / 'README.md',
     ROOT / 'docs' / 'runbooks' / 'graphql-read-bff.md',
