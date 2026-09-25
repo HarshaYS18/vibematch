@@ -46,6 +46,20 @@ spec:
 ---
 apiVersion: keda.sh/v1alpha1
 kind: ScaledObject
+metadata: {name: funkey-kafka-event-bridge}
+spec:
+  scaleTargetRef: {name: funkey-kafka-event-bridge}
+  pollingInterval: 15
+  cooldownPeriod: 300
+  minReplicaCount: 2
+  maxReplicaCount: 12
+  fallback: {failureThreshold: 3, replicas: 3}
+  triggers:
+    - type: nats-jetstream
+      metadata: {natsServerMonitoringEndpoint: nats-monitoring.example.invalid:8222, account: $G, stream: FUNKEY_EVENTS, consumer: funkey-kafka-bridge-v1, lagThreshold: "1000", activationLagThreshold: "100"}
+---
+apiVersion: keda.sh/v1alpha1
+kind: ScaledObject
 metadata: {name: funkey-worker-notification}
 spec:
   scaleTargetRef: {name: funkey-worker-notification}
