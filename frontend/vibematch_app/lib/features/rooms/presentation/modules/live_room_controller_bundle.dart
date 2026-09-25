@@ -233,6 +233,10 @@ class LiveRoomControllerBundle {
     }
   }
 
+  void removeRoomMembership(SeatUser user) {
+    LiveRoomMediaSignalingService.instance.removeRoomMembership(user.id);
+  }
+
   List<SeatUser> get allRoomUsers {
     return usersController.buildAllRoomUsers(
       seatedUsers: roomUsers,
