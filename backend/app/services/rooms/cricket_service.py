@@ -24,7 +24,7 @@ from app.schemas.rooms.cricket import (
     CricketTournamentUpdateRequest,
 )
 from app.services.permissions import room_permission_service
-from app.services.rooms.room_service import get_room_by_public_id
+from app.services.rooms.room_service import get_room_model_by_public_id
 
 
 def _require_room(
@@ -34,7 +34,7 @@ def _require_room(
     *,
     admin: bool,
 ):
-    room = get_room_by_public_id(db=db, room_public_id=room_public_id)
+    room = get_room_model_by_public_id(db, room_public_id)
     if room is None:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
