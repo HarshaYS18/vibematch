@@ -112,15 +112,6 @@ class _InboxChatPageState extends ConsumerState<InboxChatPage> {
     });
   }
 
-  void _jumpToBottom() {
-    if (!_scrollController.hasClients) return;
-    _scrollController.animateTo(
-      _scrollController.position.maxScrollExtent,
-      duration: const Duration(milliseconds: 220),
-      curve: Curves.easeOutCubic,
-    );
-  }
-
   void _sendActivity(String activity) {
     if (_lastActivity == activity) return;
     _lastActivity = activity;
