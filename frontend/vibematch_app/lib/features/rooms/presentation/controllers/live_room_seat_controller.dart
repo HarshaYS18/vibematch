@@ -366,9 +366,6 @@ class LiveRoomSeatController {
     return _seatUserFromPeer(peer: peer);
   }
 
-  int? _publicUserIdFromRoomUserId(String userId) =>
-      _publicUserIdFromAny(userId);
-
   void _publishParticipantRole(SeatUser user) {
     if (_sameRoomUserId(user.id, currentUser.id)) {
       currentUser = _mergePresenceIntoCurrentUser(user);
