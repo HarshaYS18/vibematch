@@ -36,6 +36,7 @@ class LiveRoomSettingsModule {
       isScrollControlled: true,
       builder: (sheetContext, setSheetState) => LiveRoomSettingsSheetModule(
         roomId: bundle.roomId,
+        roomMusicController: bundle.roomMusicController,
         privacyMode: bundle.privacyMode,
         roomImagesEnabled: bundle.roomImagesEnabled,
         guestMessagesEnabled: bundle.guestMessagesEnabled,

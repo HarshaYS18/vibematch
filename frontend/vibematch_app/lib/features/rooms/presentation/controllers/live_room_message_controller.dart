@@ -579,8 +579,5 @@ class LiveRoomMessageController {
   void dispose() {
     unawaited(_eventSubscription?.cancel());
     _eventSubscription = null;
-    if (identical(_activeController, this)) {
-      _activeController = null;
-    }
   }
 }

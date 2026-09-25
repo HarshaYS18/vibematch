@@ -11,6 +11,7 @@ class LiveRoomSettingsSheetModule extends StatelessWidget {
   const LiveRoomSettingsSheetModule({
     super.key,
     this.roomId = 'VM257808',
+    required this.roomMusicController,
     required this.privacyMode,
     required this.roomImagesEnabled,
     required this.guestMessagesEnabled,
@@ -37,6 +38,7 @@ class LiveRoomSettingsSheetModule extends StatelessWidget {
   });
 
   final String roomId;
+  final RoomMusicController roomMusicController;
   final RoomPrivacyMode privacyMode;
   final bool roomImagesEnabled;
   final bool guestMessagesEnabled;
@@ -76,7 +78,7 @@ class LiveRoomSettingsSheetModule extends StatelessWidget {
   void _openMusicModule(BuildContext context) {
     Navigator.of(context).pop();
     Future<void>.delayed(const Duration(milliseconds: 80), () {
-      RoomMusicController.instance.showOverlay();
+      roomMusicController.showOverlay();
     });
   }
 

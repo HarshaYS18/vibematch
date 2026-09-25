@@ -66,6 +66,7 @@ class LiveRoomBody extends StatelessWidget {
     required this.onInboxTap,
     required this.onEmojiTap,
     required this.onSendTap,
+    required this.onImageMessage,
     required this.onMicTap,
     required this.onGamesTap,
     required this.onGiftTap,
@@ -125,6 +126,10 @@ class LiveRoomBody extends StatelessWidget {
   final VoidCallback onInboxTap;
   final VoidCallback onEmojiTap;
   final VoidCallback onSendTap;
+  final void Function({
+    required String imageUrl,
+    required String contentType,
+  }) onImageMessage;
   final VoidCallback onMicTap;
   final VoidCallback onGamesTap;
   final VoidCallback onGiftTap;
@@ -289,6 +294,7 @@ class LiveRoomBody extends StatelessWidget {
                     onInboxTap: onInboxTap,
                     onEmojiTap: onEmojiTap,
                     onSendTap: onSendTap,
+                    onImageMessage: onImageMessage,
                     onMicTap: onMicTap,
                     onGamesTap: onGamesTap,
                     onGiftTap: onGiftTap,

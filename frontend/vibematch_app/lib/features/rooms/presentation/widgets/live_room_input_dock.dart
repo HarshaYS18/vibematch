@@ -2,7 +2,6 @@ import 'package:flutter/material.dart';
 
 import '../../../../core/ui/vm_motion.dart';
 import '../../../media/data/media_upload_service.dart';
-import '../controllers/live_room_message_controller.dart';
 import '../modules/live_room_games_module.dart';
 import '../modules/live_room_gift_module.dart';
 import '../modules/live_room_message_composer_module.dart';
@@ -20,6 +19,7 @@ class RoomInputDock extends StatelessWidget {
     required this.onInboxTap,
     required this.onEmojiTap,
     required this.onSendTap,
+    required this.onImageMessage,
     required this.onMicTap,
     required this.onGamesTap,
     required this.onGiftTap,
@@ -34,6 +34,10 @@ class RoomInputDock extends StatelessWidget {
   final VoidCallback onInboxTap;
   final VoidCallback onEmojiTap;
   final VoidCallback onSendTap;
+  final void Function({
+    required String imageUrl,
+    required String contentType,
+  }) onImageMessage;
   final VoidCallback onMicTap;
   final VoidCallback onGamesTap;
   final VoidCallback onGiftTap;
@@ -54,7 +58,7 @@ class RoomInputDock extends StatelessWidget {
     try {
       RoomToast.show(context, 'Uploading image...');
       final upload = await const MediaUploadService().pickAndUploadChatImage();
-      LiveRoomMessageController.sendActiveRoomImageMessage(
+      onImageMessage(
         imageUrl: upload.url,
         contentType: upload.contentType,
       );
