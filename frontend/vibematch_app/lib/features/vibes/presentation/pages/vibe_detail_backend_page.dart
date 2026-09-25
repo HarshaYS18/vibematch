@@ -162,7 +162,7 @@ class _VibeDetailBackendPageState
             replyingTo: detail.replyingTo,
             onRefresh: controller.loadComments,
             onRetry: controller.loadComments,
-            onSend: () => unawaited(_runAction(_sendComment)),
+            onSend: () async => _runAction(_sendComment),
             onCancelReply: _cancelReply,
             onReplyTap: _startReply,
             onLikeTap: (comment) => unawaited(
