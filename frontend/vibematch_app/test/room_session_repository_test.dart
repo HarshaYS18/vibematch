@@ -1,4 +1,6 @@
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:vibematch_app/foundation/di/app_dependencies.dart';
 import 'package:vibematch_app/foundation/networking/app_network_client.dart';
 import 'package:vibematch_app/room_session/data/room_session_repository.dart';
 import 'package:vibematch_app/room_session/domain/room_session_state.dart';
@@ -85,6 +87,34 @@ class _FakeNetworkClient extends DioAppNetworkClient {
   void close() {}
 }
 
+class _RoomHarness {
+  _RoomHarness(_FakeNetworkClient network)
+      : container = ProviderContainer(
+          overrides: <Override>[
+            appNetworkClientProvider.overrideWithValue(network),
+            roomSessionAccessTokenProvider.overrideWithValue('token'),
+          ],
+        ) {
+    subscription = container.listen<RoomSessionState>(
+      roomSessionRepositoryProvider('VM123'),
+      (previous, next) {},
+      fireImmediately: true,
+    );
+    repository = container.read(
+      roomSessionRepositoryProvider('VM123').notifier,
+    );
+  }
+
+  final ProviderContainer container;
+  late final ProviderSubscription<RoomSessionState> subscription;
+  late final RoomSessionRepository repository;
+
+  void dispose() {
+    subscription.close();
+    container.dispose();
+  }
+}
+
 Map<String, dynamic> _room(int version, List<int> users) {
   return <String, dynamic>{
     'room_id': 'VM123',
@@ -127,11 +157,9 @@ Map<String, dynamic> _room(int version, List<int> users) {
 void main() {
   test('join is one canonical request returning full room state', () async {
     final network = _FakeNetworkClient(_room(1, <int>[1, 2]));
-    final repository = RoomSessionRepository(
-      roomId: 'VM123',
-      networkClient: network,
-      accessTokenProvider: () => 'token',
-    );
+    final harness = _RoomHarness(network);
+    addTearDown(harness.dispose);
+    final repository = harness.repository;
 
     final state = await repository.join(lockPassword: 'secret');
 
@@ -146,11 +174,9 @@ void main() {
 
   test('reconnect performs one snapshot read without REST heartbeat', () async {
     final network = _FakeNetworkClient(_room(10, <int>[1, 2]));
-    final repository = RoomSessionRepository(
-      roomId: 'VM123',
-      networkClient: network,
-      accessTokenProvider: () => 'token',
-    );
+    final harness = _RoomHarness(network);
+    addTearDown(harness.dispose);
+    final repository = harness.repository;
 
     await repository.join();
     network.snapshot = _room(11, <int>[1, 2, 3]);
@@ -186,11 +212,9 @@ void main() {
         <String, dynamic>{'id': 'm1', 'text': 'keep me'},
       ];
     final network = _FakeNetworkClient(initial);
-    final repository = RoomSessionRepository(
-      roomId: 'VM123',
-      networkClient: network,
-      accessTokenProvider: () => 'token',
-    );
+    final harness = _RoomHarness(network);
+    addTearDown(harness.dispose);
+    final repository = harness.repository;
 
     await repository.join();
     final nextParticipants = _room(31, <int>[1, 2, 3])['participants'];
@@ -210,11 +234,9 @@ void main() {
 
   test('gateway envelope delegates room-state-v2 delta to repository', () async {
     final network = _FakeNetworkClient(_room(35, <int>[1]));
-    final repository = RoomSessionRepository(
-      roomId: 'VM123',
-      networkClient: network,
-      accessTokenProvider: () => 'token',
-    );
+    final harness = _RoomHarness(network);
+    addTearDown(harness.dispose);
+    final repository = harness.repository;
     await repository.join();
 
     final state = repository.reconcileRealtimeEvent(<String, dynamic>{
@@ -241,16 +263,12 @@ void main() {
 
   test('two client projections converge across join leave reconnect', () async {
     final server = _FakeNetworkClient(_room(20, <int>[1]));
-    final clientA = RoomSessionRepository(
-      roomId: 'VM123',
-      networkClient: server,
-      accessTokenProvider: () => 'token-a',
-    );
-    final clientB = RoomSessionRepository(
-      roomId: 'VM123',
-      networkClient: server,
-      accessTokenProvider: () => 'token-b',
-    );
+    final harnessA = _RoomHarness(server);
+    final harnessB = _RoomHarness(server);
+    addTearDown(harnessA.dispose);
+    addTearDown(harnessB.dispose);
+    final clientA = harnessA.repository;
+    final clientB = harnessB.repository;
 
     await clientA.join();
 
@@ -276,16 +294,12 @@ void main() {
 
   test('two clients converge after a seat transition', () async {
     final server = _FakeNetworkClient(_room(40, <int>[1, 2]));
-    final clientA = RoomSessionRepository(
-      roomId: 'VM123',
-      networkClient: server,
-      accessTokenProvider: () => 'token-a',
-    );
-    final clientB = RoomSessionRepository(
-      roomId: 'VM123',
-      networkClient: server,
-      accessTokenProvider: () => 'token-b',
-    );
+    final harnessA = _RoomHarness(server);
+    final harnessB = _RoomHarness(server);
+    addTearDown(harnessA.dispose);
+    addTearDown(harnessB.dispose);
+    final clientA = harnessA.repository;
+    final clientB = harnessB.repository;
 
     await clientA.join();
     await clientB.join();
@@ -332,11 +346,9 @@ void main() {
 
   test('activity command stays on canonical room repository', () async {
     final server = _FakeNetworkClient(_room(45, <int>[1, 2]));
-    final repository = RoomSessionRepository(
-      roomId: 'VM123',
-      networkClient: server,
-      accessTokenProvider: () => 'token',
-    );
+    final harness = _RoomHarness(server);
+    addTearDown(harness.dispose);
+    final repository = harness.repository;
     await repository.join();
     await repository.activityCommand(
       action: 'START',
@@ -352,11 +364,9 @@ void main() {
 
   test('older realtime snapshot cannot roll canonical state backward', () {
     final network = _FakeNetworkClient(_room(50, <int>[1, 2, 3]));
-    final repository = RoomSessionRepository(
-      roomId: 'VM123',
-      networkClient: network,
-      accessTokenProvider: () => 'token',
-    );
+    final harness = _RoomHarness(network);
+    addTearDown(harness.dispose);
+    final repository = harness.repository;
 
     repository.reconcileSnapshot(
       _room(50, <int>[1, 2, 3]),
