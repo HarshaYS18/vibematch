@@ -7,6 +7,7 @@ import '../../../../room_session/domain/room_session_state.dart';
 import '../../data/room_session_legacy_adapter.dart';
 import '../../data/chat_moderation_api_service.dart';
 import '../../data/live_room_media_signaling_service.dart';
+import '../../data/room_music_controller.dart';
 import '../../data/live_room_presence_repository.dart';
 import '../controllers/live_room_gift_controller.dart';
 import '../controllers/live_room_message_controller.dart';
@@ -101,6 +102,7 @@ class LiveRoomControllerBundle {
   late final LiveRoomMessageController roomMessageController;
   late final LiveRoomModerationController moderationController;
   late final LiveRoomPresenceController presenceController;
+  late final RoomMusicController roomMusicController;
 
   final LiveRoomUsersController usersController =
       const LiveRoomUsersController();
@@ -285,6 +287,9 @@ class LiveRoomControllerBundle {
         restoreState?.seatState.layoutId ??
         '5x2';
 
+    roomMusicController = RoomMusicController();
+    unawaited(roomMusicController.attachRoom(config.roomId));
+
     messageController = LiveRoomMentionTextController();
     if (restoreState != null && restoreState.messageDraft.trim().isNotEmpty) {
       messageController.text = restoreState.messageDraft;
@@ -360,6 +365,7 @@ class LiveRoomControllerBundle {
     roomMessageController.dispose();
     presenceController.leave();
     presenceController.dispose();
+    unawaited(roomMusicController.dispose());
     roomStateController.dispose();
     roomRevision.dispose();
     giftRevision.dispose();
