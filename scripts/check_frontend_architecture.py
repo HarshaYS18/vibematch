@@ -856,6 +856,51 @@ if _APP_SHELL.exists():
         )
 
 
+# Chunk 35: Flutter may know only public edge origins. Cluster-internal
+# services and service-discovery DNS belong to Kubernetes/backend configuration.
+_VM_API_CONFIG = APP / "core" / "network" / "vm_api_config.dart"
+if not _VM_API_CONFIG.exists():
+    violations.append(
+        "core/network/vm_api_config.dart: Chunk 35 public endpoint contract is required"
+    )
+else:
+    vm_api_text = _VM_API_CONFIG.read_text(encoding="utf-8-sig")
+    for marker in (
+        "https://api.funkey.com",
+        "wss://realtime.funkey.com/ws",
+        "https://media.funkey.com",
+        "https://cdn.funkey.com",
+        "VM_MEDIA_BASE_URL",
+        "VM_CDN_BASE_URL",
+    ):
+        if marker not in vm_api_text:
+            violations.append(
+                f"core/network/vm_api_config.dart: missing Chunk 35 public edge marker: {marker}"
+            )
+
+_FORBIDDEN_FLUTTER_SERVICE_DISCOVERY = (
+    ".svc.cluster.local",
+    "http://funkey-api:",
+    "http://funkey-inbox:",
+    "http://funkey-vibes:",
+    "http://funkey-room-control:",
+    "http://funkey-identity:",
+    "http://funkey-profile-social:",
+    "http://funkey-economy:",
+    "http://funkey-game-platform:",
+    "http://funkey-notification:",
+    "http://funkey-realtime:",
+)
+for path in APP.rglob("*.dart"):
+    flutter_text = path.read_text(encoding="utf-8-sig")
+    rel = path.relative_to(ROOT).as_posix()
+    for forbidden_endpoint in _FORBIDDEN_FLUTTER_SERVICE_DISCOVERY:
+        if forbidden_endpoint in flutter_text:
+            violations.append(
+                f"{rel}: Flutter must not discover internal service endpoint {forbidden_endpoint}"
+            )
+
+
 # Chunk 21: one physical application WebSocket.
 #
 # Application features subscribe through AppRealtimeHub. Raw websocket creation

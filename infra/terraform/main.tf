@@ -34,6 +34,9 @@ resource "terraform_data" "deployment_contract" {
           var.services.object_bucket,
           var.services.api_dns,
           var.services.websocket_dns,
+          var.services.media_dns,
+          var.services.cdn_dns,
+          var.services.waf_policy_ref,
           var.services.certificate_ref,
           var.services.secret_manager_ref,
           var.services.workload_identity_ref,
@@ -50,6 +53,15 @@ resource "terraform_data" "deployment_contract" {
         var.kubernetes.node_pools["media"].min_nodes >= 3,
       ])
       error_message = "Production node pools do not meet the minimum high-availability floor."
+    }
+    precondition {
+      condition = var.environment != "production" || alltrue([
+        lower(var.services.api_dns) == "api.funkey.com",
+        lower(var.services.websocket_dns) == "realtime.funkey.com",
+        lower(var.services.media_dns) == "media.funkey.com",
+        lower(var.services.cdn_dns) == "cdn.funkey.com",
+      ])
+      error_message = "Production public DNS must use the canonical Chunk 35 FunKey edge hostnames."
     }
   }
 }

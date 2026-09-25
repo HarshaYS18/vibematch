@@ -3,3 +3,4 @@ kind: ConfigMap
 metadata: {name: funkey-config}
 data:
   APP_ENV: production
+  MEDIA_CDN_BASE_URL: https://cdn.funkey.com/media

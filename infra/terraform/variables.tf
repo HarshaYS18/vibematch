@@ -54,7 +54,10 @@ variable "services" {
     cdn_origin               = string
     api_dns                  = string
     websocket_dns            = string
+    media_dns                = string
     media_dns_suffix         = string
+    cdn_dns                  = string
+    waf_policy_ref           = string
     certificate_ref          = string
     secret_manager_ref       = string
     workload_identity_ref    = string

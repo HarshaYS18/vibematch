@@ -5,3 +5,17 @@ No cloud provider is selected in this repository. This Terraform root validates 
 Copy `terraform.tfvars.example` outside the repository and replace every placeholder with real provider outputs. Do not commit the completed file or credentials. Run `terraform fmt -check -recursive`, `terraform init -backend=false`, and `terraform validate` here. A real provider module should provision private networking, managed PostgreSQL with PITR, highly available single-primary Redis/Valkey for Lua media registry operations, durable JetStream, private S3-compatible storage with versioning, CDN, DNS/TLS, secret manager, workload identity, observability, and Kubernetes/node autoscaler pools. Provider selection, account IDs, domains, and access permissions are external prerequisites.
 
 The sample budget is 30 API pods × 5 connections + 20 Inbox pods × 5 + 20 Vibes pods × 5 + 20 Room Control pods × 3 + 20 workers × 3 + 60 reserve = 530 connections within a 600 connection database limit. Replace these with measured and configured values; the sample is an invariant demonstration, not a capacity claim. Production deployment must also account for connection pooler mode, read replicas, failover headroom, and migration/admin sessions.
+
+
+## Chunk 35 public edge contract
+
+The provider binding must supply four stable public hostnames: API, application
+realtime, media control/discovery, and CDN. Production is intentionally pinned
+to `api.funkey.com`, `realtime.funkey.com`, `media.funkey.com`, and
+`cdn.funkey.com`.
+
+`media_dns_suffix` remains separate: it describes provider-specific public
+media-node addressing used after canonical room-media assignment. It must never
+be a Kubernetes service suffix. `waf_policy_ref` binds the provider's
+CDN/WAF/DDoS policy protecting the Envoy Gateway origin. The repository does
+not store provider credentials or WAF secrets.
