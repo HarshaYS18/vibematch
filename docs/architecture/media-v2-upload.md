@@ -7,7 +7,7 @@ Chunk 31 replaces large API-proxied media uploads with an upload-session control
 1. Flutter creates an authenticated `/api/v1/media/upload-sessions` session with purpose, filename, MIME type and declared byte length.
 2. Production returns either a presigned single PUT or a bounded multipart plan. Local development returns a streamed local endpoint.
 3. Flutter streams file ranges directly; it does not buffer large video/audio files into memory.
-4. `/complete` finalizes multipart state when needed, HEADs the object, verifies exact size and declared content type, and only then changes the asset to `PROCESSING`.
+4. `/complete` finalizes multipart state when needed, HEADs the object, verifies exact size and declared content type, and only then changes the asset to `PROCESSING`. If object-store completion succeeded but the DB commit/HTTP response failed, a retry may receive S3 `NoSuchUpload`; the service HEADs the object and treats the existing object as completion proof before running the same size/type verification.
 5. The same transaction enqueues `media.uploaded` through the PostgreSQL outbox.
 6. The media worker downloads to bounded temporary disk, creates derivatives, persists variant metadata, and only then emits moderation work when required.
 7. The client polls owner-scoped status until the media becomes usable or reaches a terminal failure/review state.
@@ -28,4 +28,4 @@ Large Vibes/video and room-music paths use `XFile.openRead` and streamed PUTs. I
 
 ## Failure rules
 
-No source event is acknowledged before processing succeeds. Failed derivative generation ends in `PROCESSING_FAILED` and is retryable through JetStream delivery. Moderation occurs after derivatives so video moderation can use the generated poster. Completion verification failure marks the asset rejected and schedules deletion.
+No source event is acknowledged before processing succeeds. Failed derivative generation ends in `PROCESSING_FAILED` and is retryable through JetStream delivery. Moderation occurs after derivatives so video moderation can use the generated poster. Completion verification failure marks the asset rejected and schedules deletion. Multipart retry recovery never trusts `NoSuchUpload` alone: the completed object must exist and still pass exact size/content-type verification.
