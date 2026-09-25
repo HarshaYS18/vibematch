@@ -272,3 +272,24 @@ This chunk does not:
 Redis/horizontal realtime scaling should reuse the canonical room realtime
 control plane if it is needed later; it must not become a second WatchSession
 source of truth.
+
+
+## Chunk 34 resource lifecycle integration
+
+The embedded OTT WebView is now registered as a feature-owned heavyweight
+resource through `foundation/runtime/media_resource_lifecycle.dart`.
+
+`LiveRoomOttWatchPartySheet` owns the host/adapter and registers
+`WatchPartyWebViewResourceParticipant` only after
+`InAppWebViewOttPlaybackHost` reports a concrete WebView controller. Normal
+sheet disposal unregisters the resource before provider teardown.
+
+App backgrounding triggers a best-effort local pause. Foreground does not
+directly resume playback; the existing authoritative room snapshot refresh and
+`WatchPartyCoordinator` reconciliation decide whether playback should resume.
+Memory pressure does not destroy/reload the provider WebView. Session teardown
+may release the WebView host.
+
+This lifecycle integration does not change provider authentication, DRM,
+capability probing, companion fallback, private-room enforcement or canonical
+WatchSession ownership.

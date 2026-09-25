@@ -237,6 +237,75 @@ if _REMOTE_GAME_PLAYER.exists():
             )
 
 
+# Chunk 34-M8: embedded OTT Watch Party WebViews register through the
+# foundation lifecycle port and never import the concrete App coordinator.
+_WATCH_PARTY_WEBVIEW_RESOURCE = (
+    APP
+    / "watch_party"
+    / "providers"
+    / "web"
+    / "watch_party_webview_resource_participant.dart"
+)
+if not _WATCH_PARTY_WEBVIEW_RESOURCE.exists():
+    violations.append(
+        "watch_party/providers/web/watch_party_webview_resource_participant.dart: Chunk 34-M8 participant is required"
+    )
+else:
+    watch_resource_text = _WATCH_PARTY_WEBVIEW_RESOURCE.read_text(
+        encoding="utf-8-sig"
+    )
+    for marker in (
+        "implements MediaResourceParticipant",
+        "MediaResourceKind.watchPartyWebView",
+        "await _host.pause()",
+        "await _host.dispose()",
+    ):
+        if marker not in watch_resource_text:
+            violations.append(
+                "watch_party/providers/web/watch_party_webview_resource_participant.dart: "
+                f"missing Chunk 34-M8 lifecycle marker: {marker}"
+            )
+
+_OTT_WATCH_SHEET = (
+    APP
+    / "features"
+    / "rooms"
+    / "presentation"
+    / "modules"
+    / "watch_party"
+    / "live_room_ott_watch_party_sheet.dart"
+)
+if _OTT_WATCH_SHEET.exists():
+    ott_sheet_text = _OTT_WATCH_SHEET.read_text(encoding="utf-8-sig")
+    for marker in (
+        "mediaResourceRegistryProvider",
+        "WatchPartyWebViewResourceParticipant",
+        "registry.register(_webResourceParticipant)",
+        "registry.unregister(",
+        "onReady: _onWebHostReady",
+    ):
+        if marker not in ott_sheet_text:
+            violations.append(
+                "features/rooms/presentation/modules/watch_party/live_room_ott_watch_party_sheet.dart: "
+                f"missing Chunk 34-M8 resource marker: {marker}"
+            )
+
+_OTT_WEB_HOST = (
+    APP / "watch_party" / "providers" / "web" / "ott_web_playback_host.dart"
+)
+if _OTT_WEB_HOST.exists():
+    ott_host_text = _OTT_WEB_HOST.read_text(encoding="utf-8-sig")
+    for marker in (
+        "OttWebPlaybackReadyHandler? onReady",
+        "_onReady?.call();",
+    ):
+        if marker not in ott_host_text:
+            violations.append(
+                "watch_party/providers/web/ott_web_playback_host.dart: "
+                f"missing Chunk 34-M8 readiness marker: {marker}"
+            )
+
+
 # Chunk 34-M1: heavyweight media/resource lifecycle coordination must be
 # session-scoped. The coordinator is an app/runtime implementation, not a
 # feature singleton or a new domain-state authority.

@@ -309,3 +309,48 @@ No bearer token is exposed to remote HTML, no second WebSocket is created, and
 game financial/durable state remains backend authority. The feature imports the
 foundation registry port only; the architecture guard continues to reject
 imports of the concrete App coordinator.
+
+
+## M8: OTT Watch Party WebView lifecycle
+
+M8 migrates the embedded Netflix, Prime Video and JioHotstar WebView surface
+through the M6 foundation resource registry.
+
+### Ownership boundary
+
+The room sheet continues to own the local provider adapter and
+`InAppWebViewOttPlaybackHost`. Canonical Watch Party state, revision checks,
+controller identity, timeline and commands remain in
+`WatchPartyRepository`/backend. The lifecycle participant does not become a
+second Watch Party authority.
+
+### Registration timing
+
+`InAppWebViewOttPlaybackHost` now exposes an optional readiness callback that
+fires after a concrete platform WebView controller exists. The room sheet
+registers `WatchPartyWebViewResourceParticipant` only from that callback.
+
+This also covers WebView remounts after companion fallback. If the participant
+is already registered, the remounted WebView is resynchronized to the
+registry's current foreground state.
+
+Normal sheet disposal unregisters the participant before
+`WatchPartyCoordinator.dispose()` tears down the provider adapter/host.
+
+### Lifecycle behavior
+
+- background/inactive app state: best-effort pause of embedded OTT playback;
+- foreground: no forced local play; canonical room reconciliation decides
+  whether playback should resume;
+- memory pressure: deliberately non-destructive because destroying/reloading an
+  active provider WebView can interrupt entitlement/session playback;
+- authenticated-session teardown: release/dispose the WebView host.
+
+The existing sheet resume flow still refreshes the authoritative room snapshot,
+restores provider state and reconciles the canonical timeline.
+
+### DRM/provider safety
+
+M8 adds no provider bypass, cookie extraction, DRM handling or credential
+sharing. Existing runtime capability probing and companion fallback behavior
+remain unchanged.

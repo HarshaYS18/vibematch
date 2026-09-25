@@ -75,6 +75,37 @@ void main() {
     expect(guard, contains('APP / "watch_party"'));
   });
 
+  test('OTT WebView lifecycle uses the foundation resource registry', () {
+    final sheet = File(
+      'lib/features/rooms/presentation/modules/watch_party/'
+      'live_room_ott_watch_party_sheet.dart',
+    ).readAsStringSync();
+    final host = File(
+      'lib/watch_party/providers/web/ott_web_playback_host.dart',
+    ).readAsStringSync();
+    final participant = File(
+      'lib/watch_party/providers/web/'
+      'watch_party_webview_resource_participant.dart',
+    ).readAsStringSync();
+
+    expect(sheet, contains('mediaResourceRegistryProvider'));
+    expect(sheet, contains('WatchPartyWebViewResourceParticipant'));
+    expect(sheet, contains('registry.register(_webResourceParticipant)'));
+    expect(sheet, contains('registry.unregister('));
+    expect(sheet, isNot(contains('media_resource_coordinator.dart')));
+
+    expect(host, contains('OttWebPlaybackReadyHandler? onReady'));
+    expect(host, contains('_onReady?.call();'));
+
+    expect(
+      participant,
+      contains("foundation/runtime/media_resource_lifecycle.dart"),
+    );
+    expect(participant, contains('MediaResourceKind.watchPartyWebView'));
+    expect(participant, contains('await _host.pause()'));
+    expect(participant, contains('await _host.dispose()'));
+  });
+
   test('OTT integration does not contain protected-provider bypasses', () {
     final roots = <File>[
       File('lib/watch_party/providers/web/html5_video_playback_driver.dart'),

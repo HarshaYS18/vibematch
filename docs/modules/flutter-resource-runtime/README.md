@@ -98,3 +98,15 @@ unregisters it before normal runtime disposal/retry.
 The participant forwards app lifecycle and memory-pressure notifications through
 the existing host-event bridge and releases the runtime on authenticated-session
 teardown. It does not own rounds, bets, settlement or game session state.
+
+
+## M8 OTT Watch Party WebView
+
+Embedded Netflix, Prime Video and JioHotstar WebViews now register through the
+foundation lifecycle port using `WatchPartyWebViewResourceParticipant`.
+
+Registration occurs only after a concrete WebView controller exists. Background
+lifecycle best-effort pauses embedded playback; foreground does not force play
+because canonical Watch Party reconciliation remains authoritative. Memory
+pressure is non-destructive, and authenticated-session teardown releases the
+host.

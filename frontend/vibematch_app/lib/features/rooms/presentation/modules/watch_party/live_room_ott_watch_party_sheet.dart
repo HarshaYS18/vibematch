@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../../../foundation/di/app_dependencies.dart';
+import '../../../../../foundation/runtime/media_resource_lifecycle.dart';
 import '../../../../../room_session/data/room_session_repository.dart';
 import '../../../../../session/data/session_repository.dart';
 import '../../../../../watch_party/application/watch_party_coordinator.dart';
@@ -14,10 +15,17 @@ import '../../../../../watch_party/providers/jiohotstar/jiohotstar_provider_adap
 import '../../../../../watch_party/providers/netflix/netflix_provider_adapter.dart';
 import '../../../../../watch_party/providers/prime_video/prime_video_provider_adapter.dart';
 import '../../../../../watch_party/providers/web/ott_provider_definition.dart';
+import '../../../../../watch_party/providers/web/ott_web_playback_host.dart';
+import '../../../../../watch_party/providers/web/watch_party_webview_resource_participant.dart';
 import '../../../../../watch_party/providers/web/supported_web_playback_adapter.dart';
 import '../../live_room_models.dart';
 import '../../widgets/room_theme.dart';
 
+/// Room-scoped OTT Watch Party surface.
+///
+/// Durable Watch Party state remains in WatchPartyRepository/backend. This
+/// widget owns only the local provider adapter/WebView runtime and registers
+/// that heavyweight runtime through the foundation resource lifecycle port.
 class LiveRoomOttWatchPartySheet extends ConsumerStatefulWidget {
   const LiveRoomOttWatchPartySheet({
     super.key,
@@ -42,9 +50,12 @@ class LiveRoomOttWatchPartySheet extends ConsumerStatefulWidget {
 class _LiveRoomOttWatchPartySheetState
     extends ConsumerState<LiveRoomOttWatchPartySheet>
     with WidgetsBindingObserver {
+  late final InAppWebViewOttPlaybackHost _webHost;
+  late final WatchPartyWebViewResourceParticipant _webResourceParticipant;
   late final SupportedWebPlaybackAdapter _adapter;
   late final WatchPartyCoordinator _coordinator;
   late final TextEditingController _contentController;
+  MediaResourceRegistry? _webResourceRegistry;
 
   Timer? _syncTimer;
   WatchPartyState? _latestState;
@@ -61,7 +72,16 @@ class _LiveRoomOttWatchPartySheetState
     super.initState();
     WidgetsBinding.instance.addObserver(this);
     _contentController = TextEditingController();
-    _adapter = _buildAdapter(widget.provider);
+    _webHost = InAppWebViewOttPlaybackHost(
+      provider: widget.provider,
+      onReady: _onWebHostReady,
+    );
+    _webResourceParticipant = WatchPartyWebViewResourceParticipant(
+      resourceId:
+          'watch-party:webview:${widget.roomId}:${widget.provider.id}',
+      host: _webHost,
+    );
+    _adapter = _buildAdapter(widget.provider, host: _webHost);
     _coordinator = WatchPartyCoordinator(adapter: _adapter);
     _syncTimer = Timer.periodic(
       const Duration(seconds: 2),
@@ -69,29 +89,71 @@ class _LiveRoomOttWatchPartySheetState
     );
   }
 
-  SupportedWebPlaybackAdapter _buildAdapter(OttProviderDefinition provider) {
+  SupportedWebPlaybackAdapter _buildAdapter(
+    OttProviderDefinition provider, {
+    required OttWebPlaybackHost host,
+  }) {
     final telemetry = ref.read(appTelemetryProvider);
     Future<void> remountBarrier() => WidgetsBinding.instance.endOfFrame;
 
     if (provider.id == OttProviderCatalog.netflix.id) {
       return NetflixProviderAdapter(
+        host: host,
         telemetry: telemetry,
         remountBarrier: remountBarrier,
       );
     }
     if (provider.id == OttProviderCatalog.primeVideo.id) {
       return PrimeVideoProviderAdapter(
+        host: host,
         telemetry: telemetry,
         remountBarrier: remountBarrier,
       );
     }
     if (provider.id == OttProviderCatalog.jioHotstar.id) {
       return JioHotstarProviderAdapter(
+        host: host,
         telemetry: telemetry,
         remountBarrier: remountBarrier,
       );
     }
     throw StateError('Unsupported OTT provider: ${provider.id}');
+  }
+
+  void _onWebHostReady() {
+    unawaited(_attachWebResource());
+  }
+
+  Future<void> _attachWebResource() async {
+    if (!mounted) return;
+    final existingRegistry = _webResourceRegistry;
+    if (existingRegistry != null) {
+      await _webResourceParticipant.onForegroundChanged(
+        existingRegistry.isForeground,
+      );
+      return;
+    }
+
+    final registry = ref.read(mediaResourceRegistryProvider);
+    if (registry == null) return;
+
+    try {
+      registry.register(_webResourceParticipant);
+      _webResourceRegistry = registry;
+      await _webResourceParticipant.onForegroundChanged(registry.isForeground);
+    } catch (error) {
+      debugPrint('[FK:W:WatchPartyResource:Register] $error');
+    }
+  }
+
+  void _detachWebResource() {
+    final registry = _webResourceRegistry;
+    _webResourceRegistry = null;
+    if (registry == null) return;
+    registry.unregister(
+      _webResourceParticipant.resourceId,
+      expectedParticipant: _webResourceParticipant,
+    );
   }
 
   @override
@@ -120,6 +182,7 @@ class _LiveRoomOttWatchPartySheetState
   @override
   void dispose() {
     WidgetsBinding.instance.removeObserver(this);
+    _detachWebResource();
     _syncTimer?.cancel();
     _contentController.dispose();
     unawaited(_coordinator.dispose());

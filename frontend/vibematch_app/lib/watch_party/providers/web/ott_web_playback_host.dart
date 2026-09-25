@@ -11,6 +11,10 @@ import 'ott_javascript_bridge.dart';
 import 'ott_playback_probe_result.dart';
 import 'ott_provider_definition.dart';
 
+/// Provider-independent embedded OTT playback surface.
+///
+/// The host owns only local WebView execution. WatchPartyRepository/backend
+/// remain authoritative for synchronized Watch Party state.
 abstract interface class OttWebPlaybackHost {
   Stream<OttJavascriptEvent> get events;
 
@@ -26,10 +30,19 @@ abstract interface class OttWebPlaybackHost {
   Future<void> dispose();
 }
 
+typedef OttWebPlaybackReadyHandler = void Function();
+
+/// Concrete embedded OTT WebView host.
+///
+/// [onReady] fires whenever a concrete platform WebView controller is created,
+/// including remounts after companion fallback. It is used only for lifecycle
+/// registration and never changes canonical Watch Party state.
 class InAppWebViewOttPlaybackHost implements OttWebPlaybackHost {
   InAppWebViewOttPlaybackHost({
     required OttProviderDefinition provider,
-  }) : _provider = provider {
+    OttWebPlaybackReadyHandler? onReady,
+  }) : _provider = provider,
+       _onReady = onReady {
     _driver = Html5VideoPlaybackDriver(
       evaluate: _evaluate,
       providerId: provider.id,
@@ -37,6 +50,7 @@ class InAppWebViewOttPlaybackHost implements OttWebPlaybackHost {
   }
 
   final OttProviderDefinition _provider;
+  final OttWebPlaybackReadyHandler? _onReady;
   final StreamController<OttJavascriptEvent> _events =
       StreamController<OttJavascriptEvent>.broadcast();
   final GlobalKey _webViewKey = GlobalKey();
@@ -74,6 +88,7 @@ class InAppWebViewOttPlaybackHost implements OttWebPlaybackHost {
             return null;
           },
         );
+        _onReady?.call();
       },
       onLoadStart: (controller, url) {
         _lastLoadError = null;
