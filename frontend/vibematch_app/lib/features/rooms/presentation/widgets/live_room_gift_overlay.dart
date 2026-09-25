@@ -30,6 +30,7 @@ class LiveRoomGiftOverlay extends StatefulWidget {
     this.onLuckyPacketGetTap,
     this.onLuckyPacketResultsDismiss,
     this.currentUserId,
+    this.systemEvents,
   });
 
   final List<GiftSlide> slides;
@@ -42,6 +43,7 @@ class LiveRoomGiftOverlay extends StatefulWidget {
   final VoidCallback? onLuckyPacketGetTap;
   final VoidCallback? onLuckyPacketResultsDismiss;
   final String? currentUserId;
+  final Stream<LiveRoomSystemEvent>? systemEvents;
 
   @override
   State<LiveRoomGiftOverlay> createState() => _LiveRoomGiftOverlayState();
@@ -65,14 +67,19 @@ class _LiveRoomGiftOverlayState extends State<LiveRoomGiftOverlay> {
   @override
   void initState() {
     super.initState();
-    _backendGiftSubscription = AppRealtimeHub.shared.events.listen((envelope) {
-      final event = decodeLiveRoomSystemEvent(
-        envelope,
-        roomId: ActiveRoomContext.roomPublicId,
-      );
-      if (event != null) _handleBackendRoomEvent(event);
-    });
-    unawaited(AppRealtimeHub.shared.start());
+    final injectedEvents = widget.systemEvents;
+    if (injectedEvents != null) {
+      _backendGiftSubscription = injectedEvents.listen(_handleBackendRoomEvent);
+    } else {
+      _backendGiftSubscription = AppRealtimeHub.shared.events.listen((envelope) {
+        final event = decodeLiveRoomSystemEvent(
+          envelope,
+          roomId: ActiveRoomContext.roomPublicId,
+        );
+        if (event != null) _handleBackendRoomEvent(event);
+      });
+      unawaited(AppRealtimeHub.shared.start());
+    }
   }
 
   @override
