@@ -40,7 +40,13 @@ Verify Home, Profile, Discovery, and authorized Creator/Admin composites; partia
 
 Before promotion after BFF/upstream changes, run the persisted GraphQL smoke against staging with a disposable authenticated test account.
 
-The controlled Home-composite gate is:
+The smoke first verifies three expected security rejections: ad-hoc query text
+must return `PERSISTED_ONLY` (400), an unknown operation ID must return
+`UNKNOWN_OPERATION` (400), and a known operation without bearer auth must
+return `UNAUTHENTICATED` (401). k6 marks those statuses as expected, and
+their contract-correctness rate must be 100%.
+
+The positive Home-composite gate is:
 
 - HTTP request failure rate = 0%;
 - k6 check failure rate = 0%;
@@ -49,7 +55,8 @@ The controlled Home-composite gate is:
 - end-to-end p95 < 250ms;
 - end-to-end p99 < 500ms;
 - BFF server p95 < 200ms;
-- BFF server p99 < 400ms.
+- BFF server p99 < 400ms;
+- GraphQL security-contract correctness = 100%.
 
 A missing `FUNKEY_TEST_TOKEN` is a hard configuration failure. Every failed sample is evidence to investigate, not something to hide with retries.
 
