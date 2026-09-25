@@ -24,6 +24,7 @@ class MediaResourceCoordinator implements MediaResourceRegistry {
   bool _isForeground = true;
   bool _disposed = false;
 
+  @override
   bool get isForeground => _isForeground;
   bool get isDisposed => _disposed;
   int get registeredResourceCount => _participants.length;
@@ -64,6 +65,7 @@ class MediaResourceCoordinator implements MediaResourceRegistry {
   /// registration returns true. Reusing an id for a different participant is
   /// rejected so two heavy resources cannot silently share one lifecycle
   /// identity.
+  @override
   bool register(MediaResourceParticipant participant) {
     _ensureOpen();
     final id = participant.resourceId.trim();
@@ -89,6 +91,7 @@ class MediaResourceCoordinator implements MediaResourceRegistry {
   ///
   /// [expectedParticipant] protects against a stale widget unregistering a
   /// newer participant that reused the same stable id after remount.
+  @override
   bool unregister(
     String resourceId, {
     MediaResourceParticipant? expectedParticipant,
@@ -106,6 +109,7 @@ class MediaResourceCoordinator implements MediaResourceRegistry {
   }
 
   /// Broadcasts foreground/background transitions once per actual transition.
+  @override
   Future<void> setForeground(bool isForeground) async {
     _ensureOpen();
     if (_isForeground == isForeground) return;
@@ -118,6 +122,7 @@ class MediaResourceCoordinator implements MediaResourceRegistry {
 
   /// Asks every currently registered heavy resource to trim warm/reconstructable
   /// memory without changing any canonical domain state.
+  @override
   Future<void> handleMemoryPressure() async {
     _ensureOpen();
     final participants = _snapshotParticipants();

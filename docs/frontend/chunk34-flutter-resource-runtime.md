@@ -601,3 +601,11 @@ call startup performs best-effort teardown, and the image-prefetch provider
 explicitly declares its scoped registry dependency.
 
 No further Chunk 34 micro-chunk remains after M14.
+
+
+## Post-closure analyzer hygiene
+
+A follow-up CI cleanup after Chunk 35 added the missing interface `@override`
+annotations to `MediaResourceCoordinator` and normalized the budget error
+message to Dart string interpolation. This change is analyzer-only and does not
+alter lifecycle behavior, resource budgets, ownership, or pressure ordering.

@@ -37,7 +37,7 @@ abstract final class MediaResourceBudgetPolicy {
   static MediaResourceBudget forKind(MediaResourceKind kind) {
     final budget = budgets[kind];
     if (budget == null) {
-      throw StateError('Missing media resource budget for ' + kind.name + '.');
+      throw StateError('Missing media resource budget for ${kind.name}.');
     }
     return budget;
   }
