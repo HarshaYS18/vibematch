@@ -582,7 +582,8 @@ for hot_image_path in (
     rel = hot_image_path.relative_to(ROOT).as_posix()
     if "AppImage.network" not in hot_image_text:
         violations.append(f"{rel}: hot network image surface must use AppImage")
-    if "Image.network(" in hot_image_text or "NetworkImage(" in hot_image_text:
+    raw_hot_image_text = hot_image_text.replace("AppImage.network(", "")
+    if "Image.network(" in raw_hot_image_text or "NetworkImage(" in raw_hot_image_text:
         violations.append(
             f"{rel}: raw network image decoding is forbidden on guarded hot surfaces"
         )

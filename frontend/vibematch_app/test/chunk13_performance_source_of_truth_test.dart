@@ -28,8 +28,9 @@ void main() {
     expect(prefetch, contains('precacheImage'));
     for (final hotSurface in <String>[vibeAvatar, avatarFrame, storyAvatar]) {
       expect(hotSurface, contains('AppImage.network'));
-      expect(hotSurface, isNot(contains('Image.network(')));
-      expect(hotSurface, isNot(contains('NetworkImage(')));
+      final rawSurface = hotSurface.replaceAll('AppImage.network(', '');
+      expect(rawSurface, isNot(contains('Image.network(')));
+      expect(rawSurface, isNot(contains('NetworkImage(')));
     }
   });
 }
