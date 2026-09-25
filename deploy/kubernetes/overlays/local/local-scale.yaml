@@ -100,7 +100,7 @@ spec:
     spec:
       nodeSelector: null
 ---
-apiVersion: autoscaling/v2
-kind: HorizontalPodAutoscaler
+apiVersion: keda.sh/v1alpha1
+kind: ScaledObject
 metadata: {name: funkey-kafka-event-bridge}
 $patch: delete
