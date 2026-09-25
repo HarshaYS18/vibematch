@@ -428,3 +428,11 @@ been deleted.
 
 The media facade continues to carry transient Cricket Mode start/end signaling,
 but it no longer originates durable room-background mutations.
+
+
+### Post-M6 repair R4 — Cricket picker global background removal
+
+The Cricket background picker still wrote to the retired
+`activeRoomBackgroundTheme` global before invoking its room-scoped callback.
+R4 removes that write. The picker now emits the selected theme only through
+`onThemeSelected`, and the owning room state controller persists/reconciles it.

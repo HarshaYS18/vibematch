@@ -172,3 +172,9 @@ Room background changes are durable settings. Call
 `RoomSettingsRepository.updateBackground` and reconciles canonical state.
 Do not send a second background mutation through
 `LiveRoomMediaSignalingService`.
+
+
+### Cricket background picker
+
+`CricketRoomBackgroundPickerSheet` is presentation-only. It returns the chosen
+theme through its injected callback and must not mutate global background state.

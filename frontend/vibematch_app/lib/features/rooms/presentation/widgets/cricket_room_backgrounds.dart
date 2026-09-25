@@ -51,6 +51,10 @@ bool isCricketRoomBackground(RoomBackgroundTheme theme) {
       theme.id.startsWith('cricket_');
 }
 
+/// Picks a Cricket Mode theme for the owning room.
+///
+/// Selection is emitted to the room-scoped callback; this widget never mutates
+/// a process-global active background projection.
 class CricketRoomBackgroundPickerSheet extends StatefulWidget {
   const CricketRoomBackgroundPickerSheet({
     super.key,
@@ -176,7 +180,6 @@ class _CricketRoomBackgroundPickerSheetState
                       theme: theme,
                       selected: selected,
                       onTap: () {
-                        activeRoomBackgroundTheme.value = theme;
                         widget.onThemeSelected(theme);
                         Navigator.pop(context);
                       },
