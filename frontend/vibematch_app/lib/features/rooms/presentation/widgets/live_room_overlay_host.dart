@@ -1,6 +1,7 @@
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 
+import '../../data/room_music_controller.dart';
 import '../controllers/live_room_gift_controller.dart';
 import '../live_room_models.dart';
 import '../modules/room_music_overlay.dart';
@@ -17,6 +18,7 @@ class LiveRoomOverlayHost extends StatelessWidget {
     required this.onDismissVibeSync,
     required this.giftRevision,
     required this.giftController,
+    required this.roomMusicController,
     required this.roomUsers,
     required this.pendingSeatInviteInviterName,
     required this.pendingSeatInviteUser,
@@ -29,6 +31,7 @@ class LiveRoomOverlayHost extends StatelessWidget {
   final VoidCallback onDismissVibeSync;
   final ValueListenable<int> giftRevision;
   final LiveRoomGiftController? giftController;
+  final RoomMusicController roomMusicController;
   final List<SeatUser> roomUsers;
   final String? pendingSeatInviteInviterName;
   final SeatUser? pendingSeatInviteUser;
@@ -48,7 +51,7 @@ class LiveRoomOverlayHost extends StatelessWidget {
       children: [
         VibeSyncRoomOverlay(state: vibeSyncState, onDismiss: onDismissVibeSync),
         const LiveRoomRemoteAudioRenderers(),
-        const RoomMusicOverlayHost(),
+        RoomMusicOverlayHost(controller: roomMusicController),
         ValueListenableBuilder<int>(
           valueListenable: giftRevision,
           builder: (context, value, child) {
