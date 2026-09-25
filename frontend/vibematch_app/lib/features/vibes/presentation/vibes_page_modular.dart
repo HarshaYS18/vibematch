@@ -3,8 +3,8 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
-import '../controllers/vibescontroller.dart';
-import '../controllers/vibes_navigationcontroller.dart';
+import '../controllers/vibes_controller.dart';
+import '../controllers/vibes_navigation_controller.dart';
 import '../models/vibe_models.dart';
 import 'sections/vibes_feed_section.dart';
 import 'widgets/vibe_card_modular.dart';
