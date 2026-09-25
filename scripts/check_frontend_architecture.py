@@ -306,6 +306,68 @@ if _OTT_WEB_HOST.exists():
             )
 
 
+# Chunk 34-M9: the existing canonical RoomMediaEngine registers through the
+# foundation lifecycle port. The media singleton remains engine owner because
+# minimized rooms can outlive the route widget.
+_ROOM_WEBRTC_RESOURCE = (
+    APP / "room_media" / "runtime" / "room_media_resource_participant.dart"
+)
+if not _ROOM_WEBRTC_RESOURCE.exists():
+    violations.append(
+        "room_media/runtime/room_media_resource_participant.dart: Chunk 34-M9 participant is required"
+    )
+else:
+    room_webrtc_text = _ROOM_WEBRTC_RESOURCE.read_text(encoding="utf-8-sig")
+    for marker in (
+        "implements MediaResourceParticipant",
+        "MediaResourceKind.roomWebRtc",
+        "await _engine.reconnect()",
+        "await _engine.leave()",
+    ):
+        if marker not in room_webrtc_text:
+            violations.append(
+                "room_media/runtime/room_media_resource_participant.dart: "
+                f"missing Chunk 34-M9 lifecycle marker: {marker}"
+            )
+    if "_engine.dispose()" in room_webrtc_text:
+        violations.append(
+            "room_media/runtime/room_media_resource_participant.dart: session release must leave reusable singleton engine, not terminally dispose it"
+        )
+
+_ROOM_MEDIA_SIGNALING = (
+    APP / "features" / "rooms" / "data" / "live_room_media_signaling_service.dart"
+)
+if _ROOM_MEDIA_SIGNALING.exists():
+    signaling_text = _ROOM_MEDIA_SIGNALING.read_text(encoding="utf-8-sig")
+    for marker in (
+        "MediaResourceRegistry? resourceRegistry",
+        "RoomMediaResourceParticipant",
+        "_configureMediaResourceLifecycle",
+        "_detachMediaResourceLifecycle",
+        "if (_mediaResourceRegistry == null)",
+    ):
+        if marker not in signaling_text:
+            violations.append(
+                "features/rooms/data/live_room_media_signaling_service.dart: "
+                f"missing Chunk 34-M9 lifecycle marker: {marker}"
+            )
+
+_ROOM_PRESENCE_SHELL = (
+    APP / "features" / "rooms" / "presentation" / "live_room_presence_shell_page.dart"
+)
+if _ROOM_PRESENCE_SHELL.exists():
+    room_shell_text = _ROOM_PRESENCE_SHELL.read_text(encoding="utf-8-sig")
+    for marker in (
+        "mediaResourceRegistryProvider",
+        "resourceRegistry: ref.read(mediaResourceRegistryProvider)",
+    ):
+        if marker not in room_shell_text:
+            violations.append(
+                "features/rooms/presentation/live_room_presence_shell_page.dart: "
+                f"missing Chunk 34-M9 room-media registry marker: {marker}"
+            )
+
+
 # Chunk 34-M1: heavyweight media/resource lifecycle coordination must be
 # session-scoped. The coordinator is an app/runtime implementation, not a
 # feature singleton or a new domain-state authority.

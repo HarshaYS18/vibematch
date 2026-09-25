@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 
 import '../../../core/ui/vm_motion.dart';
 import '../../../foundation/realtime/realtime_event_envelope.dart';
+import '../../../foundation/runtime/media_resource_lifecycle.dart';
 import '../../../realtime/app_realtime_hub.dart';
 import '../../../main.dart';
 import '../../auth/models/current_user.dart';
@@ -12,6 +13,7 @@ import '../presentation/modules/cricket_room_mode_signal.dart';
 import '../presentation/widgets/cricket_room_backgrounds.dart';
 import '../presentation/widgets/room_theme.dart';
 import '../../../room_media/domain/room_media_engine.dart';
+import '../../../room_media/runtime/room_media_resource_participant.dart';
 import '../../../room_media/room_media_engine_factory.dart';
 import 'live_room_log.dart';
 import 'live_room_foreground_service.dart';
@@ -36,6 +38,12 @@ class LiveRoomMediaSignalingService with WidgetsBindingObserver {
 
   final RoomMediaEngine _mediaEngine;
   final AppRealtimeHub _appRealtimeHub = AppRealtimeHub.shared;
+
+  // Chunk 34-M9: lifecycle registration follows the actual room-media
+  // connection, not the room widget lifetime. This is required because a room
+  // may stay connected while minimized after its route widget is disposed.
+  MediaResourceRegistry? _mediaResourceRegistry;
+  RoomMediaResourceParticipant? _mediaResourceParticipant;
 
   StreamSubscription<RealtimeEventEnvelope>? _realtimeSubscription;
 
@@ -95,18 +103,28 @@ class LiveRoomMediaSignalingService with WidgetsBindingObserver {
 
     if (_appInForeground) {
       _scheduleReconnect(reason: 'app resumed');
-      _runMediaAction(
-        _mediaEngine.reconnect(),
-        label: 'resume room audio',
-      );
+      // Production AppShell lifecycle recovery flows through the registered
+      // resource participant. Keep a direct fallback only for isolated/test
+      // contexts where no resource registry is available.
+      if (_mediaResourceRegistry == null) {
+        _runMediaAction(
+          _mediaEngine.reconnect(),
+          label: 'resume room audio fallback',
+        );
+      }
     }
   }
 
-  void configureRoom({required String roomId, required String roomName}) {
+  void configureRoom({
+    required String roomId,
+    required String roomName,
+    MediaResourceRegistry? resourceRegistry,
+  }) {
     final nextRoomId = roomId.trim().isEmpty ? 'VM257808' : roomId.trim();
 
     _roomId = nextRoomId;
     _roomName = roomName.trim().isEmpty ? 'Live Room' : roomName.trim();
+    _configureMediaResourceLifecycle(nextRoomId, resourceRegistry);
 
     if (roomSnapshot.value?.roomId != nextRoomId) {
       roomSnapshot.value = null;
@@ -114,6 +132,52 @@ class LiveRoomMediaSignalingService with WidgetsBindingObserver {
       seatInvite.value = null;
       _seatAuthorityGate.cancelPendingSeat();
     }
+  }
+
+  void _configureMediaResourceLifecycle(
+    String roomId,
+    MediaResourceRegistry? resourceRegistry,
+  ) {
+    final nextResourceId = 'room-webrtc:$roomId';
+    final currentParticipant = _mediaResourceParticipant;
+    if (identical(_mediaResourceRegistry, resourceRegistry) &&
+        currentParticipant?.resourceId == nextResourceId) {
+      return;
+    }
+
+    _detachMediaResourceLifecycle();
+    if (resourceRegistry == null) return;
+
+    final participant = RoomMediaResourceParticipant(
+      resourceId: nextResourceId,
+      engine: _mediaEngine,
+    );
+    try {
+      resourceRegistry.register(participant);
+      _mediaResourceRegistry = resourceRegistry;
+      _mediaResourceParticipant = participant;
+      unawaited(
+        participant
+            .onForegroundChanged(resourceRegistry.isForeground)
+            .catchError((Object error) {
+              _warn('room media lifecycle sync failed: $error');
+            }),
+      );
+    } catch (error) {
+      _warn('room media lifecycle registration failed: $error');
+    }
+  }
+
+  void _detachMediaResourceLifecycle() {
+    final registry = _mediaResourceRegistry;
+    final participant = _mediaResourceParticipant;
+    _mediaResourceRegistry = null;
+    _mediaResourceParticipant = null;
+    if (registry == null || participant == null) return;
+    registry.unregister(
+      participant.resourceId,
+      expectedParticipant: participant,
+    );
   }
 
   void setActiveLoggedInUser(CurrentUser user) {
@@ -487,6 +551,7 @@ class LiveRoomMediaSignalingService with WidgetsBindingObserver {
 
   Future<void> leaveRoom() async {
     _shouldStayConnected = false;
+    _detachMediaResourceLifecycle();
     _seatAuthorityGate.cancelPendingSeat();
     // RoomSessionRepository owns the durable room/leave mutation. This facade
     // only tears down the shared room subscription and media plane.
@@ -524,6 +589,7 @@ class LiveRoomMediaSignalingService with WidgetsBindingObserver {
     _peerId = null;
     roomSnapshot.value = null;
     seatInvite.value = null;
+    _detachMediaResourceLifecycle();
 
     await _mediaEngine.leave();
     await _realtimeSubscription?.cancel();

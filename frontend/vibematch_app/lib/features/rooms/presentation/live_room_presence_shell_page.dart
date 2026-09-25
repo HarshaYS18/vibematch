@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../core/ui/vm_motion.dart';
+import '../../../foundation/runtime/media_resource_lifecycle.dart';
 import '../../../room_session/data/room_session_repository.dart';
 import '../../../room_session/domain/room_session_state.dart';
 import '../../auth/models/current_user.dart';
@@ -67,9 +68,13 @@ class _LiveRoomPresenceShellPageState
   @override
   void initState() {
     super.initState();
+    // Room media survives route disposal while minimized, so the signaling
+    // owner receives the session registry and keeps registration until actual
+    // room leave rather than tying it to this widget's dispose().
     LiveRoomMediaSignalingService.instance.configureRoom(
       roomId: widget.roomId,
       roomName: widget.roomName,
+      resourceRegistry: ref.read(mediaResourceRegistryProvider),
     );
     _roomSessionRepository = ref.read(
       roomSessionRepositoryProvider(widget.roomId).notifier,

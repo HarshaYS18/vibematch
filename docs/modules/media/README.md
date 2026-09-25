@@ -91,3 +91,21 @@ Review security boundaries, schema changes, resource limits, autoscaling signals
 ## Known migration status
 
 Canonical TypeScript media plane active; scaling requires network-specific validation.
+
+
+## Flutter room-media resource lifecycle
+
+Chunk 34-M9 does not create a second media engine. Flutter's existing
+`LiveRoomMediaSignalingService` remains the owner of the single
+`RoomMediaEngine`, while `RoomMediaResourceParticipant` exposes that engine
+to the authenticated AppShell's foundation resource registry.
+
+Foreground recovery calls `RoomMediaEngine.reconnect()`; background and
+memory-pressure events do not tear down active transports. Authenticated-session
+release calls `leave()` rather than terminal `dispose()`, because the engine
+is held by a reusable compatibility singleton.
+
+Registration follows actual room media configure/leave lifetime so minimized
+rooms remain lifecycle-managed even if their route widget is disposed. Durable
+room membership, seats and permissions remain FastAPI/`RoomSessionRepository`
+authority.

@@ -46,6 +46,37 @@ void main() {
     expect(renderer, isNot(contains('kIsWeb')));
   });
 
+  test('Chunk 34-M9 room WebRTC lifecycle uses the foundation registry', () {
+    final signaling = File(
+      'lib/features/rooms/data/live_room_media_signaling_service.dart',
+    ).readAsStringSync();
+    final shell = File(
+      'lib/features/rooms/presentation/live_room_presence_shell_page.dart',
+    ).readAsStringSync();
+    final participant = File(
+      'lib/room_media/runtime/room_media_resource_participant.dart',
+    ).readAsStringSync();
+
+    expect(signaling, contains('MediaResourceRegistry? resourceRegistry'));
+    expect(signaling, contains('RoomMediaResourceParticipant'));
+    expect(signaling, contains('_configureMediaResourceLifecycle'));
+    expect(signaling, contains('_detachMediaResourceLifecycle'));
+    expect(signaling, contains('if (_mediaResourceRegistry == null)'));
+    expect(signaling, isNot(contains('media_resource_coordinator.dart')));
+
+    expect(shell, contains('mediaResourceRegistryProvider'));
+    expect(shell, contains('resourceRegistry: ref.read(mediaResourceRegistryProvider)'));
+
+    expect(
+      participant,
+      contains("foundation/runtime/media_resource_lifecycle.dart"),
+    );
+    expect(participant, contains('MediaResourceKind.roomWebRtc'));
+    expect(participant, contains('await _engine.reconnect()'));
+    expect(participant, contains('await _engine.leave()'));
+    expect(participant, isNot(contains('_engine.dispose()')));
+  });
+
   test('room feature code cannot bypass RoomMediaEngine', () {
     final root = Directory('lib/features/rooms');
     final leaks = <String>[];

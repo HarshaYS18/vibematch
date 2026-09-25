@@ -354,3 +354,53 @@ restores provider state and reconciles the canonical timeline.
 M8 adds no provider bypass, cookie extraction, DRM handling or credential
 sharing. Existing runtime capability probing and companion fallback behavior
 remain unchanged.
+
+
+## M9: Room WebRTC lifecycle
+
+M9 migrates the existing canonical `RoomMediaEngine` into the session resource
+runtime without creating a second WebRTC/mediasoup owner.
+
+### Ownership and minimized rooms
+
+`LiveRoomMediaSignalingService` already owns the single
+`RoomMediaEngine`. M9 keeps that ownership intact and injects the foundation
+`MediaResourceRegistry` into the service when a live-room presence shell is
+configured.
+
+Registration is intentionally tied to the media service's actual room
+configure/leave lifecycle rather than the room widget's dispose lifecycle.
+FunKey can minimize a room while keeping media connected; route disposal must
+therefore not unregister WebRTC prematurely.
+
+### Resource participant
+
+`RoomMediaResourceParticipant` lives under `room_media/runtime` and depends
+only on the foundation lifecycle contract.
+
+- foreground: reconnect the active engine when it has an active/joining media
+  session;
+- background: no forced mute/leave, preserving the user's seat/mic intent and
+  existing foreground-service behavior;
+- memory pressure: non-destructive, because dropping active WebRTC transports
+  would break the live room;
+- authenticated-session release: call `leave()`, not terminal `dispose()`,
+  because the compatibility singleton owns a reusable engine instance across
+  future authenticated sessions.
+
+### Foreground cutover
+
+In authenticated AppShell operation, media reconnect now flows through:
+
+`AppShell → MediaResourceCoordinator → RoomMediaResourceParticipant → RoomMediaEngine.reconnect()`.
+
+`LiveRoomMediaSignalingService` retains its application-realtime reconnect
+logic. Its old direct media-engine foreground reconnect is now only a fallback
+when no foundation resource registry exists, preserving isolated tests/previews
+without double reconnecting production room media.
+
+### Authority
+
+Room membership, seats and permissions remain
+`RoomSessionRepository`/backend authority. The media engine continues to own
+only mediasoup/WebRTC transport and local media intent.

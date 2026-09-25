@@ -110,3 +110,15 @@ lifecycle best-effort pauses embedded playback; foreground does not force play
 because canonical Watch Party reconciliation remains authoritative. Memory
 pressure is non-destructive, and authenticated-session teardown releases the
 host.
+
+
+## M9 Room WebRTC
+
+The existing room `RoomMediaEngine` is now represented by
+`RoomMediaResourceParticipant`. The room signaling owner registers it through
+the foundation lifecycle port and keeps registration alive while a room is
+minimized.
+
+Foreground lifecycle reconnects the active WebRTC engine. Background and memory
+pressure are non-destructive. Session teardown calls `leave()` rather than
+terminally disposing the reusable singleton-owned engine.
