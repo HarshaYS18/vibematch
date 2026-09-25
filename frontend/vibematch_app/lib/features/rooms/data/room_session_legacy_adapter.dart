@@ -6,16 +6,19 @@ import '../../../room_session/data/room_session_repository.dart';
 import '../../../room_session/domain/room_session_state.dart';
 import '../presentation/live_room_models.dart';
 import 'live_room_media_signaling_service.dart';
-import 'live_room_membership_service.dart';
 import 'live_room_presence_repository.dart';
 
+/// Pure read-only presentation adapter.
+///
+/// Chunk 33 removed all legacy cache writes. RoomSessionRepository is the only
+/// mutable room-session authority; this adapter only maps canonical state into
+/// legacy presentation shapes while those widgets are still being retired.
 class RoomSessionLegacyAdapter {
   const RoomSessionLegacyAdapter._();
 
   static LiveRoomPresenceSnapshot toPresenceSnapshot(
     RoomSessionState state, {
     int? currentPublicUserId,
-    bool publishLegacyCaches = false,
   }) {
     final participants = <SeatUser>[];
     SeatUser? joinedUser;
@@ -24,19 +27,19 @@ class RoomSessionLegacyAdapter {
     for (final participant in state.presence.values) {
       final user = _seatUser(participant);
       participants.add(user);
-      membership[user.id] = participant.isMember;
+      membership[user.id] =
+          participant.isMember || participant.isAdmin || participant.isHost;
       if (participant.publicUserId == currentPublicUserId) {
         joinedUser = user.copyWith(isCurrentUser: true);
       }
     }
 
-    // Durable offline members stay members even when absent from presence.
     for (final entry in state.membershipRoster.values) {
       membership['user_${entry.publicUserId}'] =
           entry.isMember || entry.isAdmin || entry.isHost;
     }
 
-    final snapshot = LiveRoomPresenceSnapshot(
+    return LiveRoomPresenceSnapshot(
       roomId: state.roomId,
       onlineCount: state.onlineCount,
       participants: List<SeatUser>.unmodifiable(participants),
@@ -44,11 +47,6 @@ class RoomSessionLegacyAdapter {
       joinedUser: joinedUser,
       shouldShowEnteredMessage: false,
     );
-
-    if (publishLegacyCaches) {
-      publishLegacy(state, snapshot: snapshot);
-    }
-    return snapshot;
   }
 
   static SeatUser _seatUser(RoomSessionParticipant participant) {
@@ -56,53 +54,25 @@ class RoomSessionLegacyAdapter {
       ...participant.raw,
       'is_owner': participant.isHost,
       'is_member': participant.isMember,
+      'is_room_member': participant.isMember,
       'is_room_admin': participant.isAdmin,
+      'mic_enabled': participant.micEnabled,
+      'admin_muted': participant.adminMuted,
     };
-    final canonical = LiveRoomPresenceSnapshot.participantToSeatUser(raw);
-    final existing =
-        LiveRoomPresenceRepository.userByRoomUserId(canonical.id);
-
-    if (existing == null) return canonical;
-    return existing.copyWith(
-      name: canonical.name,
-      roleLabel: canonical.roleLabel,
-      avatarUrl: canonical.avatarUrl,
+    return LiveRoomPresenceSnapshot.participantToSeatUser(raw).copyWith(
       isHost: participant.isHost,
       isRoomAdmin: participant.isAdmin || participant.isHost,
       selfMuted: !participant.micEnabled,
       adminMuted: participant.adminMuted,
     );
   }
-
-  static void publishLegacy(
-    RoomSessionState state, {
-    LiveRoomPresenceSnapshot? snapshot,
-  }) {
-    final resolved =
-        snapshot ??
-        toPresenceSnapshot(
-          state,
-          publishLegacyCaches: false,
-        );
-    LiveRoomPresenceRepository.publishParticipants(
-      resolved.participants,
-      roomId: state.roomId,
-    );
-    LiveRoomMembershipService.applyBackendMembershipSnapshot(
-      roomId: state.roomId,
-      roomMemberByUserId: resolved.roomMemberByUserId,
-      completeRoster: true,
-      onlineCount: state.onlineCount,
-    );
-  }
 }
 
-/// Chunk 21 compatibility bridge.
+/// Temporary transport projection bridge.
 ///
-/// RoomSessionRepository remains the canonical room-state authority. The Go
-/// application socket supplies v2 deltas and bounded replay; this bridge only
-/// projects the reconciled canonical state into legacy UI/media adapters while
-/// those consumers are being retired.
+/// Realtime deltas are reconciled into RoomSessionRepository first. The bridge
+/// only forwards the resulting canonical room map to the media compatibility
+/// layer; it never writes another participant/membership/settings cache.
 class RoomSessionLegacyRealtimeBridge {
   RoomSessionLegacyRealtimeBridge({
     required this.roomId,
@@ -148,8 +118,6 @@ class RoomSessionLegacyRealtimeBridge {
     final next = repository.reconcileRealtimeEvent(event.raw);
     if (next.stateVersion == previousVersion &&
         next.eventSequence == previousEventSequence) {
-      // Non-state room events (system messages, invites, etc.) are handled by
-      // the compatibility media/event facade. There is nothing to project.
       return;
     }
     _project(next);
@@ -203,7 +171,6 @@ class RoomSessionLegacyRealtimeBridge {
   }
 
   void _project(RoomSessionState state) {
-    RoomSessionLegacyAdapter.publishLegacy(state);
     mediaSignalingService.applyCanonicalRoomState(state.room);
   }
 
