@@ -119,3 +119,11 @@ Replacement stable pods become healthy in wave 0 before the Service/HPA/PDB
 switch in wave 1, and existing `PruneLast` semantics remove the old
 Deployment last. This closes the endpoint-gap risk of an unordered selector
 migration.
+
+
+### Chunk 36 compatibility update
+
+The Gateway guard now permits exactly three buffered non-streaming surfaces:
+general API, media-control, and the dedicated GraphQL read route. The realtime
+WebSocket policy is checked separately and remains forbidden from using request
+buffering.

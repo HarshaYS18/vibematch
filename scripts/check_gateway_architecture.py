@@ -83,8 +83,15 @@ policies_text = require(
     GATEWAY / 'policies.yaml',
     ('kind: ClientTrafficPolicy', 'requestID: Generate', 'kind: BackendTrafficPolicy', 'rateLimit:', 'requestBuffer:', 'limit: 10Mi', 'idleTimeout: 3600s'),
 )
-if policies_text.count('requestBuffer:') != 2:
-    violations.append('gateway/policies.yaml: request buffering must be limited to API and media-control routes')
+if policies_text.count('requestBuffer:') != 3:
+    violations.append(
+        'gateway/policies.yaml: request buffering must be limited to API, media-control, and GraphQL routes'
+    )
+realtime_policy = policies_text.split('name: funkey-realtime-traffic', 1)[1].split('---', 1)[0]
+if 'requestBuffer:' in realtime_policy:
+    violations.append(
+        'gateway/policies.yaml: realtime WebSocket route must never use request buffering'
+    )
 
 require(
     GATEWAY / 'security-policy.example.yaml',

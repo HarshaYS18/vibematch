@@ -43,3 +43,11 @@ completion:
   the persisted-read guard when the shared contract changes on push.
 
 These are enforced by `check_graphql_bff_architecture.py`.
+
+
+## Gateway guard compatibility
+
+Chunk 36 updates the earlier Chunk 35 buffer-count invariant from two to three
+intentional non-streaming policies. The guard now explicitly verifies that the
+realtime WebSocket policy remains unbuffered rather than relying only on a
+global count.

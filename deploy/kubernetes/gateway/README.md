@@ -36,9 +36,11 @@ the deployment/runbook documentation still require this public hostname.
 ## Security and traffic behavior
 
 Envoy generates a fresh `X-Request-ID` at the edge and strips client-supplied
-internal trust headers before routing. API and media-control requests have body
-limits; WebSocket traffic does not use request buffering because buffering is
-incompatible with upgrades/streaming.
+internal trust headers before routing. API, media-control, and the exact
+GraphQL read route have bounded request buffering; WebSocket traffic does not
+use request buffering because buffering is incompatible with
+upgrades/streaming. GraphQL additionally applies a stricter 16KiB application
+payload cap inside the BFF.
 
 Local rate limits are an early overload/abuse guard; application/domain rate
 limits remain authoritative. The upstream provider WAF/DDoS service is required
