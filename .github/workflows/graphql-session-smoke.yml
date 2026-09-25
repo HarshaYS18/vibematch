@@ -37,9 +37,14 @@ jobs:
                 database_url: postgresql://funkey:funkey_dev_only@postgres:5432/funkey
                 IDENTITY_DATABASE_URL: postgresql://funkey:funkey_dev_only@postgres:5432/funkey
                 DB_POOLER_MODE: direct
+            room-control:
+              environment:
+                database_url: postgresql://funkey:funkey_dev_only@postgres:5432/funkey
+                ROOM_CONTROL_DATABASE_URL: postgresql://funkey:funkey_dev_only@postgres:5432/funkey
+                DB_POOLER_MODE: direct
           YAML
 
-          docker compose -f infra/docker-compose.yml -f /tmp/graphql-session-compose.override.yml --profile app up --build -d             postgres cache-redis realtime-redis media-redis nats             migrate identity api
+          docker compose -f infra/docker-compose.yml -f /tmp/graphql-session-compose.override.yml --profile app up --build -d             postgres cache-redis realtime-redis media-redis nats             migrate identity room-control api
 
           for attempt in $(seq 1 60); do
             if curl -fsS http://127.0.0.1:8000/health >/dev/null; then
