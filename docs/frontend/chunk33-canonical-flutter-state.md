@@ -271,3 +271,18 @@ another room's presentation through process-global Flutter state.
 The architecture guard now rejects top-level
 `ValueNotifier`/`ChangeNotifier` state as well as static notifier state.
 Regression coverage verifies text/image projection order and image metadata.
+
+
+### Micro-chunk 33-M2 — awaited Flutter image-send path
+
+Flutter image sending is now protected by focused regression coverage. The
+room-scoped `LiveRoomMessageController` awaits
+`RoomSessionRepository.sendChatMessage(messageType: 'image', ...)`, and the
+input dock awaits that controller future before showing the success toast.
+
+`room_session_repository_test.dart` verifies the exact canonical
+`/realtime/chat/send` request body and reconciliation of the returned image
+message. `room_session_source_of_truth_test.dart` guards the awaited
+controller/dock chain and prevents a regression to singleton/local-only chat
+sending. No UI styling or interaction layout changes are part of this
+micro-chunk.

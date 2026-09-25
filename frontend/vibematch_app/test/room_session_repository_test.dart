@@ -1,3 +1,9 @@
+// Canonical RoomSessionRepository regression coverage.
+//
+// These tests verify that room mutations use the repository's authenticated
+// canonical REST path and reconcile the returned RoomSessionState. Image chat
+// assertions intentionally cover payload shape so UI code cannot silently
+// fall back to a transport singleton or local-only message authority.
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:vibematch_app/foundation/di/app_dependencies.dart';
@@ -11,6 +17,7 @@ class _FakeNetworkClient extends DioAppNetworkClient {
   Map<String, dynamic> snapshot;
   List<String> omittedSections = const <String>[];
   final List<String> calls = <String>[];
+  final List<Object?> postedBodies = <Object?>[];
 
   @override
   Future<Map<String, dynamic>> getMap(
@@ -47,6 +54,7 @@ class _FakeNetworkClient extends DioAppNetworkClient {
     String? idempotencyKey,
   }) async {
     calls.add('POST $path');
+    postedBodies.add(body);
     return <String, dynamic>{
       'room_id': 'VM123',
       'room': snapshot,
@@ -342,6 +350,52 @@ void main() {
     expect(clientA.state.presence[2]!.seatIndex, 1);
     expect(clientA.state.seats[1]!.occupantBackendUserId, 2);
     expect(clientB.state.seats[1]!.occupantBackendUserId, 2);
+  });
+
+  test('image chat posts canonical media payload and reconciles snapshot', () async {
+    final network = _FakeNetworkClient(_room(44, <int>[1, 2]));
+    final harness = _RoomHarness(network);
+    addTearDown(harness.dispose);
+    final repository = harness.repository;
+
+    await repository.join();
+    network.calls.clear();
+    network.postedBodies.clear();
+    network.snapshot = _room(45, <int>[1, 2])
+      ..['recent_messages'] = <Map<String, dynamic>>[
+        <String, dynamic>{
+          'id': 77,
+          'message_type': 'image',
+          'text': null,
+          'media_url': 'https://cdn.example/room/image.webp',
+          'metadata': <String, dynamic>{'content_type': 'image/webp'},
+        },
+      ];
+
+    final state = await repository.sendChatMessage(
+      messageType: 'image',
+      mediaUrl: 'https://cdn.example/room/image.webp',
+      contentType: 'image/webp',
+    );
+
+    expect(
+      network.calls,
+      <String>['POST /rooms/VM123/realtime/chat/send'],
+    );
+    expect(
+      network.postedBodies.single,
+      <String, dynamic>{
+        'message_type': 'image',
+        'media_url': 'https://cdn.example/room/image.webp',
+        'content_type': 'image/webp',
+      },
+    );
+    expect(state.stateVersion, 45);
+    expect(state.chat.single['message_type'], 'image');
+    expect(
+      state.chat.single['media_url'],
+      'https://cdn.example/room/image.webp',
+    );
   });
 
   test('activity command stays on canonical room repository', () async {
