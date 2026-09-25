@@ -16,7 +16,7 @@ Chunk 30 moves OpenAI image moderation, physical object deletion, retention clea
 
 ## Retry and idempotency
 
-Explicit JetStream ack, bounded max delivery, bounded pool concurrency, event-specific DLQ, and stable owner job IDs are required. Google Drive uploads tag files with the durable backup job ID and query that property before retrying creation.
+Explicit JetStream ack, bounded max delivery, bounded pool concurrency, event-specific DLQ, and stable owner job IDs are required. A handler-level processed marker is written only after every required side effect succeeds. Multi-target fanout must give each external effect its own stable dedupe identity. Vibes mention Inbox messages use `InboxMessage.source_dedupe_key`, so a retry after partial fanout cannot duplicate already-created messages and must not swallow a failed Inbox delivery. Google Drive uploads tag files with the durable backup job ID and query that property before retrying creation.
 
 ## Scaling
 
