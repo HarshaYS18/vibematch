@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 
 import '../../../../core/ui/vm_motion.dart';
 import '../widgets/room_theme.dart';
+import 'cricket_room_mode_signal.dart';
 
 const RoomBackgroundTheme cricketFloodlightArenaBackgroundTheme =
     RoomBackgroundTheme(

@@ -854,31 +854,10 @@ class LiveRoomMediaSignalingService with WidgetsBindingObserver {
       }
 
       if (type == 'room_cricket/state') {
-        final roomId = payload['room_id']?.toString() ?? _roomId ?? '';
-        final cricketState = payload['cricket_state'];
-        final active =
-            payload['active'] == true ||
-            (cricketState is Map<String, dynamic> &&
-                cricketState['active'] == true);
-
-        final rawSetup =
-            payload['setup'] ??
-            (cricketState is Map<String, dynamic>
-                ? cricketState['setup']
-                : null);
-
-        if (active && rawSetup is Map<String, dynamic>) {
-          final setup = CricketQuickMatchSetup.fromJson(rawSetup);
-          final safeRoomId = roomId.isEmpty ? setup.roomId : roomId;
-          CricketRoomModeSignal.activateWithSetup(
-            roomId: safeRoomId,
-            setup: setup,
-          );
-        } else {
-          final safeRoomId = roomId;
-          CricketRoomModeSignal.deactivate(safeRoomId);
-        }
-
+        // Cricket presentation state is owned by the mounted
+        // LiveRoomControllerBundle. The shared media transport must not write
+        // process-global UI state; scoped realtime subscribers project this
+        // event into their own room controller.
         return;
       }
 

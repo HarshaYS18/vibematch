@@ -1,5 +1,5 @@
 import '../widgets/room_theme.dart';
-import 'cricket_room_mode_module.dart';
+import 'cricket_mode_module.dart';
 
 /// Stateless Cricket Mode theme helpers.
 ///

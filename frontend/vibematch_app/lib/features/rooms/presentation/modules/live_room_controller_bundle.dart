@@ -2,6 +2,8 @@ import 'dart:async';
 
 import 'package:flutter/material.dart';
 
+import '../../../../foundation/realtime/realtime_event_envelope.dart';
+import '../../../../realtime/app_realtime_hub.dart';
 import '../../../../room_session/data/room_session_repository.dart';
 import '../../../../room_session/domain/room_session_state.dart';
 import '../../data/room_session_legacy_adapter.dart';
@@ -26,6 +28,7 @@ import '../live_room_restore_state.dart';
 import '../widgets/room_theme.dart';
 import '../widgets/vibesync_room_module.dart';
 import 'cricket_room_mode_module.dart';
+import 'cricket_room_mode_signal.dart';
 
 typedef LiveRoomContextGetter = BuildContext Function();
 typedef LiveRoomMountedGetter = bool Function();
@@ -86,14 +89,18 @@ class LiveRoomControllerBundle {
     required this.roomSessionRepository,
     required LiveRoomContextGetter contextGetter,
     required LiveRoomMountedGetter mountedGetter,
+    AppRealtimeHub? realtimeHub,
   }) : _contextGetter = contextGetter,
        _mountedGetter = mountedGetter,
+       _realtimeHub = realtimeHub ?? AppRealtimeHub.shared,
        _backendOnlineCount = config.onlineCount;
 
   final LiveRoomControllerConfig config;
   final RoomSessionRepository roomSessionRepository;
   final LiveRoomContextGetter _contextGetter;
   final LiveRoomMountedGetter _mountedGetter;
+  final AppRealtimeHub _realtimeHub;
+  StreamSubscription<RealtimeEventEnvelope>? _cricketEventSubscription;
   int _backendOnlineCount;
 
   late final LiveRoomMentionTextController messageController;
@@ -296,6 +303,9 @@ class LiveRoomControllerBundle {
       roomId: config.roomId,
       roomName: config.roomName,
     );
+    _cricketEventSubscription =
+        _realtimeHub.events.listen(_handleCricketRealtimeEvent);
+    unawaited(_realtimeHub.start());
 
     messageController = LiveRoomMentionTextController();
     if (restoreState != null && restoreState.messageDraft.trim().isNotEmpty) {
@@ -381,6 +391,8 @@ class LiveRoomControllerBundle {
       );
     }
 
+    unawaited(_cricketEventSubscription?.cancel());
+    _cricketEventSubscription = null;
     luckyPacketRealtimeService.dispose();
     giftControllerInstance?.dispose();
     messageController.dispose();
@@ -396,6 +408,54 @@ class LiveRoomControllerBundle {
     roomStateController.dispose();
     roomRevision.dispose();
     giftRevision.dispose();
+  }
+
+  void _handleCricketRealtimeEvent(RealtimeEventEnvelope envelope) {
+    if (disposed) return;
+    final decoded = envelope.toLegacyEvent();
+    if (decoded['type']?.toString() != 'room_cricket/state') return;
+
+    final rawPayload = decoded['payload'];
+    final payload = rawPayload is Map
+        ? rawPayload.cast<String, dynamic>()
+        : <String, dynamic>{};
+    final eventRoomId =
+        payload['room_id']?.toString().trim() ??
+        decoded['room_id']?.toString().trim() ??
+        '';
+    if (eventRoomId.isNotEmpty &&
+        roomId.trim().isNotEmpty &&
+        eventRoomId != roomId.trim()) {
+      return;
+    }
+
+    final rawCricketState = payload['cricket_state'];
+    final cricketState = rawCricketState is Map
+        ? rawCricketState.cast<String, dynamic>()
+        : const <String, dynamic>{};
+    final active = payload['active'] == true || cricketState['active'] == true;
+    final rawSetup = payload['setup'] ?? cricketState['setup'];
+
+    if (active && rawSetup is Map) {
+      final setup = CricketQuickMatchSetup.fromJson(
+        rawSetup.cast<String, dynamic>(),
+      );
+      if (!cricketModeController.active) {
+        preCricketLayoutId ??= seatController.layoutId;
+        preCricketBackgroundTheme ??= selectedBackgroundTheme;
+      }
+      cricketModeController.startRoomMode(
+        currentLayoutId: preCricketLayoutId ?? seatController.layoutId,
+        currentBackground:
+            preCricketBackgroundTheme ?? selectedBackgroundTheme,
+        setup: setup,
+      );
+      return;
+    }
+
+    if (!active && cricketModeController.active) {
+      cricketModeController.endRoomMode();
+    }
   }
 
   Set<String> _identityAliases(String rawId) {
