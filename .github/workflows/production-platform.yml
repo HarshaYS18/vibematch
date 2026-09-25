@@ -13,17 +13,27 @@ on:
       - 'infra/**'
       - 'tests/load/**'
       - 'tests/chaos/**'
+      - 'tests/integration/**'
       - 'scripts/check_contracts.py'
       - 'scripts/check_gateway_architecture.py'
       - 'scripts/check_graphql_bff_architecture.py'
       - 'scripts/check_kafka_data_platform.py'
       - 'scripts/prepare_gitops_promotion.py'
+      - 'docs/platform/chunk37-kafka-data-platform.md'
+      - 'docs/architecture/kafka-data-platform.md'
+      - 'docs/modules/kafka-event-bridge/**'
+      - 'docs/runbooks/kafka-data-platform.md'
+      - 'docs/adr/ADR-017-kafka-data-platform.md'
       - '.github/workflows/contracts.yml'
       - '.github/workflows/production-platform.yml'
       - '.github/workflows/prepare-gitops-promotion.yml'
 
 permissions:
   contents: read
+
+concurrency:
+  group: production-platform-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
 
 jobs:
   go-gateway:
