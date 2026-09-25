@@ -105,6 +105,13 @@ def check_bridge() -> None:
         ),
     )
     require(
+        BRIDGE / "config.py",
+        (
+            'self.app_env == "production"',
+            "production Kafka requires KAFKA_SECURITY_PROTOCOL=SASL_SSL",
+        ),
+    )
+    require(
         BRIDGE / "contracts.py",
         (
             "FORBIDDEN_PAYLOAD_KEYS",
@@ -186,6 +193,15 @@ def check_infrastructure() -> None:
     if "funkey-kafka-event-bridge" not in production:
         raise SystemExit("production overlay must pin Kafka bridge image by digest")
 
+    require(
+        ROOT / "deploy/kubernetes/base/autoscaling.yaml",
+        (
+            "name: funkey-kafka-event-bridge",
+            "consumer: funkey-kafka-bridge-v1",
+            'lagThreshold: "1000"',
+            'activationLagThreshold: "100"',
+        ),
+    )
     require(
         ROOT / "deploy/kafka/kafka.yaml",
         (
