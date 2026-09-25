@@ -10,6 +10,7 @@ import '../core/ui/vm_toast.dart';
 import '../features/auth/models/current_user.dart';
 import '../features/home/presentation/home_page_modular.dart';
 import '../game_platform/data/game_manifest_repository.dart';
+import '../features/inbox/controllers/inbox_controller.dart';
 import '../features/inbox/presentation/inbox_page.dart';
 import '../features/inbox/presentation/widgets/inbox_foreground_notification_banner.dart';
 import '../features/profile/presentation/me_page.dart';
@@ -116,7 +117,7 @@ class _AppShellState extends ConsumerState<AppShell>
     await realtime.start();
 
     await Future.wait<void>([
-      ref.read(appInboxRuntimeProvider).start(),
+      ref.read(appInboxRuntimeProvider.notifier).start(),
       ref.read(appWalletRuntimeProvider).start(),
     ]);
   }
@@ -146,7 +147,7 @@ class _AppShellState extends ConsumerState<AppShell>
 
       await ref.read(appRealtimeHubProvider).start();
       await Future.wait<void>([
-        ref.read(appInboxRuntimeProvider).ensureRealtimeConnected(),
+        ref.read(appInboxRuntimeProvider.notifier).ensureRealtimeConnected(),
         ref.read(appWalletRuntimeProvider).start(),
       ]);
     } catch (error) {
@@ -177,8 +178,7 @@ class _AppShellState extends ConsumerState<AppShell>
   }
 
   void _openGlobalForegroundNotification() {
-    final inbox = ref.read(appInboxRuntimeProvider);
-    inbox.openForegroundNotification();
+    ref.read(appInboxRuntimeProvider.notifier).openForegroundNotification();
     _selectTab(VmMainTab.inbox);
   }
 
@@ -210,7 +210,10 @@ class _AppShellState extends ConsumerState<AppShell>
 
     final navigation = ref.watch(appShellNavigationProvider);
     final identity = ref.watch(identityRepositoryProvider);
-    final inbox = ref.watch(appInboxRuntimeProvider);
+    final inboxRuntimeState = ref.watch(appInboxRuntimeProvider);
+    final inboxRuntime = ref.read(appInboxRuntimeProvider.notifier);
+    final inboxState = ref.watch(inboxControllerProvider);
+    final inboxController = ref.read(inboxControllerProvider.notifier);
     final activeUser = identity.user ?? widget.currentUser;
 
     ref.listen<CurrentUser?>(
@@ -234,10 +237,10 @@ class _AppShellState extends ConsumerState<AppShell>
       ),
       InboxPage(
         key: const PageStorageKey<String>('main-inbox'),
-        controller: inbox.controller,
-        openConversationId: inbox.pendingOpenConversationId,
-        openConversationRequestNonce: inbox.pendingOpenRequestNonce,
-        onActiveConversationChanged: inbox.setActiveConversation,
+        controller: inboxController,
+        openConversationId: inboxRuntimeState.pendingOpenConversationId,
+        openConversationRequestNonce: inboxRuntimeState.pendingOpenRequestNonce,
+        onActiveConversationChanged: inboxRuntime.setActiveConversation,
       ),
       MePage(
         key: const PageStorageKey<String>('main-me'),
@@ -260,17 +263,17 @@ class _AppShellState extends ConsumerState<AppShell>
               pages: pages,
             ),
             const _LiveRoomMiniBubbleLayer(),
-            if (inbox.foregroundConversation != null &&
-                inbox.foregroundMessage != null)
+            if (inboxRuntimeState.foregroundConversation != null &&
+                inboxRuntimeState.foregroundMessage != null)
               Positioned(
                 left: 0,
                 right: 0,
                 top: 0,
                 child: InboxForegroundNotificationBanner(
-                  conversation: inbox.foregroundConversation!,
-                  message: inbox.foregroundMessage!,
+                  conversation: inboxRuntimeState.foregroundConversation!,
+                  message: inboxRuntimeState.foregroundMessage!,
                   onTap: _openGlobalForegroundNotification,
-                  onClose: inbox.dismissForegroundNotification,
+                  onClose: inboxRuntime.dismissForegroundNotification,
                 ),
               ),
           ],
@@ -278,7 +281,7 @@ class _AppShellState extends ConsumerState<AppShell>
         bottomNavigationBar: _VibeBottomNav(
           selectedTab: navigation.selectedTab,
           showOwnerControls: activeUser.canSeeOwnerControls,
-          inboxUnreadCount: inbox.controller.unreadCount,
+          inboxUnreadCount: inboxState.unreadCount,
           onTabSelected: _selectTab,
         ),
       ),
