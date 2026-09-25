@@ -15,3 +15,8 @@ Scale only the affected pool. The Chunk 30 maxima are notification 5, media 5, f
 During deploy, stop fetching, allow up to `WORKER_SHUTDOWN_GRACE_SECONDS` for in-flight work, then drain NATS. Verify no retired catch-all `vibes.>` consumer remains.
 
 Chunk 31 replaces raw API media upload and introduces processing variants/transcoding. Chunk 37 activates analytics with the NATS-to-Kafka bridge.
+
+
+## Vibes mention fanout recovery
+
+A `vibes.post.published` event is not marked processed until Notification and required Inbox mention effects succeed. Notification intents and Inbox messages carry per-recipient stable dedupe identities. If Inbox is unavailable, leave the event retryable; after recovery replay the original event identity. Never insert a processed marker manually to clear the backlog, because that would permanently skip the missing Inbox side effect.
