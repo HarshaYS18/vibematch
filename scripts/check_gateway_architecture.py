@@ -104,6 +104,7 @@ api_text = require(
         'name: funkey-api-stable',
         'matchLabels: {app: funkey-api, funkey.io/release-track: stable}',
         'selector: {app: funkey-api, funkey.io/release-track: stable}',
+        'argocd.argoproj.io/sync-wave: "0"',
     ),
 )
 if "kind: Deployment\nmetadata:\n  name: funkey-api\n" in api_text:
@@ -112,7 +113,10 @@ if "kind: Deployment\nmetadata:\n  name: funkey-api\n" in api_text:
     )
 require(
     K8S / 'base' / 'autoscaling.yaml',
-    ('scaleTargetRef: {apiVersion: apps/v1, kind: Deployment, name: funkey-api-stable}',),
+    (
+        'scaleTargetRef: {apiVersion: apps/v1, kind: Deployment, name: funkey-api-stable}',
+        'argocd.argoproj.io/sync-wave: "1"',
+    ),
 )
 require(GATEWAY / 'canary-service.yaml', ('funkey.io/release-track: canary', 'name: funkey-api-canary'))
 

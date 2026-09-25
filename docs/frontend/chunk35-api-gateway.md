@@ -110,3 +110,12 @@ architecture guard now rejects empty namespace selectors.
 The repair audit also verifies the upstream Envoy v1.9.1 control-plane
 Deployment name and waits on `deployment/envoy-gateway`, preventing a false
 installation timeout caused by a release-name-derived Deployment.
+
+
+### Zero-downtime selector migration
+
+The stable Deployment migration now carries explicit Argo CD sync waves.
+Replacement stable pods become healthy in wave 0 before the Service/HPA/PDB
+switch in wave 1, and existing `PruneLast` semantics remove the old
+Deployment last. This closes the endpoint-gap risk of an unordered selector
+migration.

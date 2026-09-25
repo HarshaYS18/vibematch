@@ -9,6 +9,8 @@ kind: Deployment
 metadata:
   name: funkey-api-stable
   labels: {app: funkey-api, funkey.io/release-track: stable}
+  annotations:
+    argocd.argoproj.io/sync-wave: "0"
 spec:
   replicas: 3
   revisionHistoryLimit: 5
@@ -78,6 +80,8 @@ apiVersion: v1
 kind: Service
 metadata:
   name: funkey-api
+  annotations:
+    argocd.argoproj.io/sync-wave: "1"
 spec:
   selector: {app: funkey-api, funkey.io/release-track: stable}
   ports: [{name: http, port: 8000, targetPort: http}]
@@ -86,6 +90,8 @@ apiVersion: policy/v1
 kind: PodDisruptionBudget
 metadata:
   name: funkey-api-stable
+  annotations:
+    argocd.argoproj.io/sync-wave: "1"
 spec:
   minAvailable: 2
   selector: {matchLabels: {app: funkey-api, funkey.io/release-track: stable}}

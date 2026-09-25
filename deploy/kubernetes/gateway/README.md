@@ -129,3 +129,16 @@ The Helm release is named `funkey-envoy-gateway`, but Envoy Gateway v1.9.1
 creates the control-plane Deployment as `envoy-gateway`. The install script
 waits on that upstream Deployment name rather than deriving it from the release
 name.
+
+
+### GitOps migration ordering
+
+The stable Deployment rename is ordered with Argo CD sync waves:
+
+1. `funkey-api-stable` is wave 0 and must become healthy;
+2. the stable Service, HPA and PDB switch in wave 1;
+3. existing GitOps `PruneLast=true` removes the legacy Deployment only after
+   the replacement is serving.
+
+This avoids a transient zero-endpoint window while still preventing canary pods
+from matching the stable Service.
