@@ -313,7 +313,7 @@ class HomeNavigationController {
       backgroundColor: Colors.transparent,
       isScrollControlled: true,
       builder: (_) => HomeLanguageSheet(
-        languages: controller.languages,
+        languages: controller.availableLanguages,
         selectedLanguage: controller.selectedLanguage,
         onLanguageSelected: (language) {
           controller.selectLanguage(language);
