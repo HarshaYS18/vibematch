@@ -53,9 +53,9 @@ global count.
 ## Composite-read load budget
 
 Chunk 36 introduced `tests/load/graphql-read-smoke.js` for the persisted Home
-composite. Chunk 37 hardens that promotion signal: authenticated execution is
-mandatory, unexpected/semantic failure rates must be exactly 0%, p95 must stay
-below 250ms, and p99 below 500ms. The test does not use blanket retries and
+composite. The Chunk 36 reliability/latency improvement hardens that promotion
+signal: authenticated execution is mandatory, unexpected/semantic failure rates
+must be exactly 0%, p95 must stay below 250ms, and p99 below 500ms. The test does not use blanket retries and
 validates GraphQL `errors[]` even when transport status is HTTP 200.
 
 These controlled-smoke thresholds are intentionally stricter than the original
