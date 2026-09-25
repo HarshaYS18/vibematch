@@ -103,3 +103,10 @@ The repair keeps default-deny ingress and narrows allowed sources to
 same-namespace service calls, the exact Envoy data-plane namespace only for
 public backends, and explicitly labeled observability namespaces. The
 architecture guard now rejects empty namespace selectors.
+
+
+### Operator install-script correction
+
+The repair audit also verifies the upstream Envoy v1.9.1 control-plane
+Deployment name and waits on `deployment/envoy-gateway`, preventing a false
+installation timeout caused by a release-name-derived Deployment.

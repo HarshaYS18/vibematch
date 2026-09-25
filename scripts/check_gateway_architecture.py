@@ -175,7 +175,12 @@ require(
 )
 require(
     GATEWAY / 'install-envoy-gateway.sh',
-    ('gateway-crds-helm', 'crds.gatewayAPI.channel=standard', 'crds.enabled=false'),
+    (
+        'gateway-crds-helm',
+        'crds.gatewayAPI.channel=standard',
+        'crds.enabled=false',
+        'deployment/envoy-gateway',
+    ),
 )
 require(
     ROOT / 'scripts' / 'validate_gateway_schema.sh',

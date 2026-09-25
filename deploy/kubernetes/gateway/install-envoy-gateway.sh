@@ -22,4 +22,4 @@ fi
 
 helm upgrade --install funkey-envoy-gateway   oci://docker.io/envoyproxy/gateway-helm   --version "${ENVOY_GATEWAY_VERSION}"   --namespace envoy-gateway-system   --create-namespace   --set crds.enabled=false
 
-kubectl wait --namespace envoy-gateway-system   --for=condition=Available   deployment/funkey-envoy-gateway   --timeout=300s
+kubectl wait --namespace envoy-gateway-system   --for=condition=Available   deployment/envoy-gateway   --timeout=300s

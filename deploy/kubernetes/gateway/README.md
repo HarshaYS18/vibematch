@@ -121,3 +121,11 @@ Internal-only domain services do not admit Envoy directly. Observability access
 requires an explicit `funkey.io/observability-access=true` namespace label.
 An empty `namespaceSelector: {}` is forbidden by the Chunk 35 architecture
 guard.
+
+
+### Envoy control-plane readiness target
+
+The Helm release is named `funkey-envoy-gateway`, but Envoy Gateway v1.9.1
+creates the control-plane Deployment as `envoy-gateway`. The install script
+waits on that upstream Deployment name rather than deriving it from the release
+name.
