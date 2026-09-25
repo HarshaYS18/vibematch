@@ -9,6 +9,12 @@ import 'room_chat.dart';
 import 'room_seats.dart';
 import 'room_top_bar.dart';
 
+/// Renders one mounted room session from explicitly scoped controllers.
+///
+/// Durable room authority stays in RoomSessionRepository through the owning
+/// LiveRoomControllerBundle. This widget may observe route-local presentation
+/// controllers (such as Cricket Mode), but it must never create process-global
+/// room state or mutate a second room-state authority.
 class LiveRoomBody extends StatelessWidget {
   const LiveRoomBody({
     super.key,
@@ -161,15 +167,13 @@ class LiveRoomBody extends StatelessWidget {
     return AnimatedBuilder(
       animation: cricketModeController,
       builder: (context, child) {
-        final cricketController =
-            cricketModeController.active ? cricketModeController : null;
-        final cricketModeActive = cricketController != null;
+        final cricketController = cricketModeController;
+        final cricketModeActive = cricketController.active;
         final effectiveSeats = cricketModeActive ? _cricketSeats() : seats;
         final activeUser =
             LiveRoomMediaSignalingService.instance.activeLoggedInSeatUser;
         final canManageCricket =
             cricketModeActive &&
-            cricketController != null &&
             activeUser != null &&
             CricketRoomModeModule.canScore(
               seats: effectiveSeats,
@@ -255,7 +259,7 @@ class LiveRoomBody extends StatelessWidget {
                           children: [
                             if (cricketModeActive)
                               AnimatedBuilder(
-                                animation: cricketController!,
+                                animation: cricketController,
                                 builder: (context, child) =>
                                     CricketRoomModeModule.fixedScoreboard(
                                       state: cricketController.match,
@@ -299,7 +303,7 @@ class LiveRoomBody extends StatelessWidget {
               ),
               if (cricketModeActive)
                 AnimatedBuilder(
-                  animation: cricketController!,
+                  animation: cricketController,
                   builder: (context, child) {
                     return CricketRoomControlsModule(
                       controller: cricketController,

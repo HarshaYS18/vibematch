@@ -12,6 +12,10 @@ import 'widgets/vibes_feed_tabs.dart';
 import 'widgets/vibes_header.dart';
 import 'widgets/vibes_status_widgets.dart';
 
+/// Main Vibes feed route.
+///
+/// Riverpod owns feed/domain state. Route-local visual coordination, including
+/// which inline action pill is open, is owned and disposed by this page.
 class VibesPage extends ConsumerStatefulWidget {
   const VibesPage({super.key, required this.playbackGate});
 
@@ -22,11 +26,19 @@ class VibesPage extends ConsumerStatefulWidget {
 }
 
 class _VibesPageState extends ConsumerState<VibesPage> {
+  final ValueNotifier<String?> _actionPillKey = ValueNotifier<String?>(null);
+
   @override
   void initState() {
     super.initState();
     unawaited(ref.read(vibesControllerProvider.notifier).loadFeed());
     WidgetsBinding.instance.addPostFrameCallback((_) => widget.playbackGate.notifyFeedScrolled());
+  }
+
+  @override
+  void dispose() {
+    _actionPillKey.dispose();
+    super.dispose();
   }
 
   Future<void> _toggleLike(VibeItem vibe) async {
@@ -122,6 +134,7 @@ class _VibesPageState extends ConsumerState<VibesPage> {
                   isLoading: vibes.isLoading,
                   hasError: vibes.loadErrorMessage != null,
                   playbackGate: widget.playbackGate,
+                  actionPillKey: _actionPillKey,
                   onProfileTap: (vibe) => VibesNavigationController.showAction(context, '${vibe.authorName} profile will open.'),
                   onLikeTap: _toggleLike,
                   onCommentTap: (vibe) => VibesNavigationController.openVibeDetail(context: context, controller: controller, vibe: vibe, playbackGate: widget.playbackGate),

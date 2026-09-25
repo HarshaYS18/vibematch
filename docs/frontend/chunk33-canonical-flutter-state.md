@@ -159,3 +159,21 @@ Chunk 33 is complete only when:
 This document is the canonical design record for Chunk 33. Completion status is
 updated only after the final architecture guard and CI pass on the final Chunk
 33 head.
+
+
+## Repair-wave documentation rule
+
+Every Chunk 33 implementation file changed by the repair wave must carry
+maintainer-facing documentation in the same commit. At minimum, the code must
+state its ownership/source-of-truth and lifecycle responsibilities; the
+relevant architecture/module document must be updated whenever the ownership
+model changes.
+
+### Scoped presentation state completed in this repair wave
+
+- Live-room Cricket presentation is owned by the mounted
+  `LiveRoomControllerBundle`; no process-global Cricket notifier is allowed.
+- Room chat image/music wiring uses explicit room-scoped controller references.
+- Vibes inline action-pill coordination is owned by `VibesPage` and disposed
+  with that route. It is intentionally UI-local and is not Riverpod domain
+  state.

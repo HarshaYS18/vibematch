@@ -5,6 +5,10 @@ import '../widgets/vibe_card_modular.dart';
 import '../widgets/vibe_media_playback_gate.dart';
 import '../widgets/vibes_status_widgets.dart';
 
+/// Builds the visible Vibes feed from immutable controller state.
+///
+/// [actionPillKey] is page-scoped presentation state shared only by cards in
+/// this feed instance; it is not domain state and must not outlive the page.
 class VibesFeedSection extends StatelessWidget {
   const VibesFeedSection({
     super.key,
@@ -13,6 +17,7 @@ class VibesFeedSection extends StatelessWidget {
     required this.isLoading,
     required this.hasError,
     required this.playbackGate,
+    required this.actionPillKey,
     required this.onProfileTap,
     required this.onLikeTap,
     required this.onCommentTap,
@@ -26,6 +31,7 @@ class VibesFeedSection extends StatelessWidget {
   final bool isLoading;
   final bool hasError;
   final VibeMediaPlaybackGate playbackGate;
+  final ValueNotifier<String?> actionPillKey;
   final ValueChanged<VibeItem> onProfileTap;
   final ValueChanged<VibeItem> onLikeTap;
   final ValueChanged<VibeItem> onCommentTap;
@@ -47,6 +53,7 @@ class VibesFeedSection extends StatelessWidget {
         return VibeCardModular(
           vibe: vibe,
           playbackGate: playbackGate,
+          actionPillKey: actionPillKey,
           onProfileTap: () => onProfileTap(vibe),
           onLikeTap: () => onLikeTap(vibe),
           onCommentTap: () => onCommentTap(vibe),
