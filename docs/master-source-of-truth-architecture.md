@@ -349,27 +349,18 @@ Therefore room seats, room settings, mic state, locks, chat history, gifts, room
 
 ## Current implementation status on this branch
 
-Implemented foundation:
+The original foundation checklist in this document has been completed or superseded by the Chunk 20–32 architecture work and the post-audit repair wave. Current enforceable reality is:
 
-- persistent room seats: `room_seat_states`
-- persistent room events: `room_realtime_events`
-- persistent room chat messages: `room_chat_messages`
-- canonical room participant identity snapshot fields in backend room snapshots
-- room state snapshot service
-- room action service
-- room permission service foundation
-- websocket route backed by DB/service snapshots
-- REST command router for room realtime actions
-- raw socket disconnect does not mutate saved room state
+- PostgreSQL remains durable business truth, with extracted domain mutation authority isolated by service/database role.
+- Room Control owns durable room definition, membership, permissions, seats, Watch Party/activity state, and Room Cricket tournament/match/ball state.
+- Go realtime is the single application WebSocket transport and owns only ephemeral routing/presence/replay. Connected liveness is represented by bounded Redis/Valkey leases and is intersected with durable Room Control membership before room metadata is disclosed.
+- Flutter `RoomSessionRepository` is the canonical client room-state authority; feature networking converges on `AppNetworkClient -> CanonicalNetworkTransport -> Dio`.
+- Inbox, Vibes, Identity, Profile/Social, Economy, Game Platform and Notification execute mutations inside their owning deployables. Core is a compatibility/composite-read facade at extracted boundaries.
+- Economy is the exclusive value writer and owns effective VIP/SVIP projection plus audited manual VIP overrides.
+- Room Cricket mutations are permission-gated, serialized and retry-idempotent through normalized ball events and per-delivery event IDs.
+- NATS JetStream async work uses retry/DLQ/idempotent effect patterns; processed markers are written only after required side effects succeed.
+- Media v2 uses direct object-store upload plus authoritative PostgreSQL control state; multipart completion recovers safely from ambiguous successful object-store completion.
+- Architecture, migration, ownership, security, backend, Flutter, Go, media, infrastructure and container gates are enforced in CI.
 
-Still needed:
+For machine-enforceable current ownership, use `contracts/architecture/authorities.yaml`. For current deployable boundaries, use `docs/architecture/service-boundaries.md`. Historical implementation notes elsewhere in this document should not override those contracts.
 
-- token-auth command endpoints instead of temporary `user_id` in body
-- Redis pub/sub implementation behind `RealtimeEventBus`
-- full audit logging for every room action
-- frontend repository wiring to always load snapshots first
-- event replay/offline delivery
-- implement `user_master_state_service` and master-state endpoints
-- create aggregate/read models for contribution totals, VIP/SVIP, levels, room state, wallet summary
-- same source-of-truth registry applied to wallet, gifts, inbox, Vibes, profile, store, games, cricket, watch party
-- convert remaining local-only room UI actions into backend command + broadcast + snapshot-confirmed actions
