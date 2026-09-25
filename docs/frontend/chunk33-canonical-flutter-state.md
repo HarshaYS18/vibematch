@@ -186,3 +186,12 @@ The equipped store gradient is no longer held in a static
 owner, reads through `AppKeyValueStore`, and is invalidated by
 `InventoryController` after equip/unequip mutations. Display widgets consume
 that provider and fall back safely while it reloads.
+
+
+### Love Bond ownership
+
+Love Bond request/inventory client state is now owned by
+`loveBondRealtimeProvider` as immutable `LoveBondRealtimeState`. Backend APIs
+remain authoritative. Public-profile presentation watches the provider and
+pure card-mapping helpers receive explicit request snapshots; no static
+`ValueNotifier` relationship cache remains.
