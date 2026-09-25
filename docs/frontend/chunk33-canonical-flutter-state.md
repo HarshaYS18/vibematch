@@ -177,3 +177,12 @@ model changes.
 - Vibes inline action-pill coordination is owned by `VibesPage` and disposed
   with that route. It is intentionally UI-local and is not Riverpod domain
   state.
+
+
+### Gradient-name ownership
+
+The equipped store gradient is no longer held in a static
+`ValueNotifier`. `GradientNameSyncController` is the session-scoped Riverpod
+owner, reads through `AppKeyValueStore`, and is invalidated by
+`InventoryController` after equip/unequip mutations. Display widgets consume
+that provider and fall back safely while it reloads.

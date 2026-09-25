@@ -1,5 +1,6 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../../shared/gradient_names/gradient_name_sync_service.dart';
 import '../data/store_api_service.dart';
 import '../models/store_models.dart';
 
@@ -52,6 +53,11 @@ class InventoryState {
   }
 }
 
+/// Owns the signed-in user's store inventory for the mounted inventory flow.
+///
+/// Backend inventory is canonical. After equipment changes, dependent
+/// session-wide presentation providers (such as the equipped gradient name)
+/// are invalidated so they re-read their persisted canonical projection.
 class InventoryController extends AutoDisposeNotifier<InventoryState> {
   final StoreApiService _api = const StoreApiService();
 
@@ -96,6 +102,7 @@ class InventoryController extends AutoDisposeNotifier<InventoryState> {
         equipped: !item.isEquipped,
       );
       await load();
+      ref.invalidate(equippedGradientNameStyleProvider);
       return updated.isEquipped
           ? '${updated.name} equipped'
           : '${updated.name} unequipped';

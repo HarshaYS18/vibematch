@@ -1,43 +1,35 @@
 import 'dart:convert';
 
-import 'package:flutter/foundation.dart';
-import 'package:shared_preferences/shared_preferences.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../foundation/di/app_dependencies.dart';
 import 'gradient_name_style.dart';
 
-class GradientNameSyncService {
-  const GradientNameSyncService._();
-
+/// Riverpod owner for the current user's equipped store gradient-name style.
+///
+/// Source of truth: the persisted canonical inventory payload written under
+/// [inventoryKey]. This controller owns no process-global mutable notifier and
+/// is invalidated after inventory equipment changes. Consumers should read
+/// [equippedGradientNameStyleProvider] instead of caching a second copy.
+class GradientNameSyncController extends AsyncNotifier<GradientNameStyle?> {
   static const String inventoryKey = 'vm_store.inventory';
 
-  static final ValueNotifier<GradientNameStyle?> equippedStyle =
-      ValueNotifier<GradientNameStyle?>(null);
-
-  static bool _loadedOnce = false;
-  static bool _loading = false;
-
-  static Future<void> ensureLoaded() async {
-    if (_loadedOnce || _loading) return;
-    await refreshFromStorage();
+  @override
+  Future<GradientNameStyle?> build() async {
+    final store = await ref.watch(appKeyValueStoreProvider.future);
+    return resolveEquippedGradient(store.readString(inventoryKey));
   }
 
-  static Future<void> refreshFromStorage() async {
-    if (_loading) return;
-    _loading = true;
-    try {
-      final prefs = await SharedPreferences.getInstance();
-      equippedStyle.value = resolveEquippedGradient(prefs.getString(inventoryKey));
-      _loadedOnce = true;
-    } finally {
-      _loading = false;
-    }
+  /// Re-reads the persisted inventory after an external inventory mutation.
+  Future<void> refreshFromStorage() async {
+    state = const AsyncLoading<GradientNameStyle?>();
+    state = await AsyncValue.guard(() async {
+      final store = await ref.read(appKeyValueStoreProvider.future);
+      return resolveEquippedGradient(store.readString(inventoryKey));
+    });
   }
 
-  static Future<void> clearEquippedStyle() async {
-    equippedStyle.value = null;
-    await refreshFromStorage();
-  }
-
+  /// Resolves the most recent non-expired equipped gradient-name inventory item.
   static GradientNameStyle? resolveEquippedGradient(String? raw) {
     if (raw == null || raw.trim().isEmpty) return null;
     try {
@@ -49,12 +41,18 @@ class GradientNameSyncService {
         final itemId = entry['item_id']?.toString() ?? '';
         final equipped = entry['is_equipped'] == true;
         if (!equipped || !itemId.startsWith('gradient_name_')) continue;
+
         final expiresRaw = entry['expires_at']?.toString();
         if (expiresRaw != null && expiresRaw.trim().isNotEmpty) {
           final expiresAt = DateTime.tryParse(expiresRaw);
-          if (expiresAt != null && DateTime.now().isAfter(expiresAt)) continue;
+          if (expiresAt != null && DateTime.now().isAfter(expiresAt)) {
+            continue;
+          }
         }
-        final styleId = itemId.replaceFirst('gradient_name_', '').replaceFirst('_30d', '');
+
+        final styleId = itemId
+            .replaceFirst('gradient_name_', '')
+            .replaceFirst('_30d', '');
         final style = GradientNameStyle.byId(styleId);
         if (style.id != GradientNameStyle.defaultName.id) return style;
       }
@@ -64,3 +62,12 @@ class GradientNameSyncService {
     return null;
   }
 }
+
+/// App-scope provider for equipped gradient-name presentation state.
+///
+/// It is intentionally non-auto-dispose because the equipped identity style is
+/// session-wide UI state reused across profile, room and social surfaces.
+final equippedGradientNameStyleProvider =
+    AsyncNotifierProvider<GradientNameSyncController, GradientNameStyle?>(
+      GradientNameSyncController.new,
+    );

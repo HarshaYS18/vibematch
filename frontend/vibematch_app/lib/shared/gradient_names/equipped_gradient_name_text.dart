@@ -1,10 +1,16 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import 'gradient_name_style.dart';
 import 'gradient_name_sync_service.dart';
 import 'gradient_name_text.dart';
 
-class EquippedGradientNameText extends StatefulWidget {
+/// Displays a user name using the session-scoped equipped gradient when enabled.
+///
+/// The equipped style is read from [equippedGradientNameStyleProvider]. This
+/// widget owns no persistence or global cache; while the provider is loading or
+/// unavailable it renders the supplied role/fallback style.
+class EquippedGradientNameText extends ConsumerWidget {
   const EquippedGradientNameText(
     this.text, {
     super.key,
@@ -29,52 +35,21 @@ class EquippedGradientNameText extends StatefulWidget {
   final bool useEquippedStoreStyle;
 
   @override
-  State<EquippedGradientNameText> createState() => _EquippedGradientNameTextState();
-}
-
-class _EquippedGradientNameTextState extends State<EquippedGradientNameText> {
-  @override
-  void initState() {
-    super.initState();
-    GradientNameSyncService.equippedStyle.addListener(_onGradientStyleChanged);
-    if (widget.useEquippedStoreStyle) {
-      GradientNameSyncService.ensureLoaded();
-    }
-  }
-
-  @override
-  void didUpdateWidget(covariant EquippedGradientNameText oldWidget) {
-    super.didUpdateWidget(oldWidget);
-    if (oldWidget.useEquippedStoreStyle != widget.useEquippedStoreStyle &&
-        widget.useEquippedStoreStyle) {
-      GradientNameSyncService.ensureLoaded();
-    }
-  }
-
-  @override
-  void dispose() {
-    GradientNameSyncService.equippedStyle.removeListener(_onGradientStyleChanged);
-    super.dispose();
-  }
-
-  void _onGradientStyleChanged() {
-    if (mounted) setState(() {});
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    final fallback = widget.fallbackStyle ?? GradientNameStyle.byRole(widget.role);
-    final syncedStyle = widget.useEquippedStoreStyle
-        ? GradientNameSyncService.equippedStyle.value
+  Widget build(BuildContext context, WidgetRef ref) {
+    final fallback =
+        fallbackStyle ?? GradientNameStyle.byRole(role);
+    final syncedStyle = useEquippedStoreStyle
+        ? ref.watch(equippedGradientNameStyleProvider).asData?.value
         : null;
+
     return GradientNameText(
-      widget.text,
+      text,
       style: syncedStyle ?? fallback,
-      textStyle: widget.textStyle,
-      maxLines: widget.maxLines,
-      overflow: widget.overflow,
-      textAlign: widget.textAlign,
-      semanticsLabel: widget.semanticsLabel,
+      textStyle: textStyle,
+      maxLines: maxLines,
+      overflow: overflow,
+      textAlign: textAlign,
+      semanticsLabel: semanticsLabel,
     );
   }
 }
