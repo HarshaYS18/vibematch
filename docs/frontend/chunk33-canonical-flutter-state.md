@@ -225,3 +225,12 @@ Ownership/lifecycle documentation is also embedded in
 `cricket_stumps_flow_safe_module.dart`. Cricket mutable runtime is
 room/widget-scoped; canonical room and backend cricket state remain external
 authorities.
+
+
+### Love Bond consumer migration
+
+Inbox, signed-in profile synchronization, public-profile synchronization, and
+relationship panels now access `loveBondRealtimeProvider` through their
+Riverpod scope. No compatibility callsite restores the retired static
+`LoveBondRealtimeService`; consumers either read immutable provider state or
+invoke the provider notifier for backend synchronization/actions.

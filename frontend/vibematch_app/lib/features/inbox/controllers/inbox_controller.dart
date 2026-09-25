@@ -933,6 +933,8 @@ class InboxController extends AutoDisposeNotifier<InboxState> {
     } catch (_) {}
   }
 
+  /// Accepts an inbox Love Bond request through the session-scoped
+  /// [loveBondRealtimeProvider], then refreshes canonical inbox data.
   Future<void> acceptLoveBondRequest({
     required String conversationId,
     required InboxMessage message,
@@ -950,7 +952,7 @@ class InboxController extends AutoDisposeNotifier<InboxState> {
     );
 
     try {
-      await LoveBondRealtimeService.acceptRequestOnBackend(
+      await ref.read(loveBondRealtimeProvider.notifier).acceptRequestOnBackend(
         requestId: requestId,
         receiverPublicUserId: 0,
       );
@@ -984,7 +986,7 @@ class InboxController extends AutoDisposeNotifier<InboxState> {
     );
 
     try {
-      await LoveBondRealtimeService.rejectRequestOnBackend(
+      await ref.read(loveBondRealtimeProvider.notifier).rejectRequestOnBackend(
         requestId: requestId,
         receiverPublicUserId: 0,
       );
