@@ -7,9 +7,11 @@ reviewed immutable image digests.
 ## Traffic paths
 
 ```text
-HTTPS API -> edge/WAF/LB -> ingress -> core compatibility and extracted domain services
-Application WebSocket -> WS ingress -> Go realtime gateway (funkey.v2)
-Media signaling/RTC -> discovery -> backend_media SFU; restricted networks -> TURN
+HTTPS API -> CDN/WAF/DDoS -> Envoy Gateway -> core compatibility / extracted services
+Application WebSocket -> Envoy Gateway -> Go realtime gateway (funkey.v2)
+Media control/discovery -> Envoy Gateway -> core control plane -> assigned backend_media node
+Media RTP/RTC -> assigned public SFU or TURN (never HTTP Gateway)
+Static/media delivery -> cdn.funkey.com -> provider CDN/object origin
 Direct media upload -> signed object-store URL; control/status -> Media v2 API
 ```
 
@@ -47,3 +49,11 @@ media upload/RTC and Economy reconciliation.
 
 Record image digests, migration head, ownership SQL version, manifest commit,
 provider configuration version, smoke results, alert health and measured capacity.
+
+## Chunk 35 Gateway contract
+
+Production dynamic traffic uses Kubernetes Gateway API with Envoy Gateway. Public hostnames are `api.funkey.com`, `realtime.funkey.com`, and `media.funkey.com`; `cdn.funkey.com` stays at the upstream provider CDN/WAF. The gateway is routing/lifecycle infrastructure only and does not become a business authority.
+
+API requests are version-routed before the core compatibility fallback. Realtime `/ws` is upgrade-safe and has no request buffering. Media control is a stable public alias for discovery/control; mediasoup/TURN data-plane addresses remain assignment-derived. The API canary backend starts at zero weight.
+
+The provider WAF/DDoS layer must protect the Envoy origin. Optional Envoy `SecurityPolicy` external authorization is defense in depth and is activated only after a real ext-auth service is deployed.
