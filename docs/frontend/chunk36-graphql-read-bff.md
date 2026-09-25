@@ -26,3 +26,20 @@ GraphQL is read composition only. Writes stay on existing REST/gRPC command APIs
 ## Closure test
 
 Chunk 36 is complete only when BFF unit/boundary tests, frontend guard, infrastructure/Gateway render, container build and repository architecture guard are green.
+
+
+## Closure audit repairs
+
+The final deployment audit closed four integration drifts before Chunk 36
+completion:
+
+- staging now rewrites the dedicated GraphQL HTTPRoute to
+  `api.staging.funkey.com`;
+- production now pins the GraphQL BFF image by digest and the immutable-image
+  gate requires all 13 backend workloads;
+- local development scales the BFF/HPA to one replica and removes the
+  production node selector;
+- the frontend workflow no longer duplicates GraphQL path filters and now runs
+  the persisted-read guard when the shared contract changes on push.
+
+These are enforced by `check_graphql_bff_architecture.py`.

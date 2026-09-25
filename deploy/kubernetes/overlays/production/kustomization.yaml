@@ -35,6 +35,9 @@ images:
   - name: funkey-notification
     newName: ghcr.io/harshays18/vibematch/funkey-notification
     digest: sha256:0000000000000000000000000000000000000000000000000000000000000000
+  - name: funkey-graphql-bff
+    newName: ghcr.io/harshays18/vibematch/funkey-graphql-bff
+    digest: sha256:0000000000000000000000000000000000000000000000000000000000000000
   - name: funkey-worker
     newName: ghcr.io/harshays18/vibematch/funkey-worker
     digest: sha256:0000000000000000000000000000000000000000000000000000000000000000

@@ -60,3 +60,12 @@ the NetworkPolicy and architecture guard in the same change.
 The public Gateway exposes only exact `/graphql` to this Service. The BFF HPA is CPU-based, starts at three replicas, and the PDB keeps two available. Its NetworkPolicy admits same-namespace callers, Envoy, and explicitly labeled observability namespaces.
 
 GraphQL request bodies are edge-buffered at 64KiB but the service rejects bodies above 16KiB. The route deadline is 10 seconds, backend deadline 8 seconds, and each owning-service read has a 2.5-second timeout with bounded parallelism.
+
+
+### Chunk 36 environment overlays
+
+Production must provide an immutable digest for `funkey-graphql-bff` exactly
+like every other backend workload. Staging rewrites the GraphQL HTTPRoute host
+to `api.staging.funkey.com`. Local development runs a single BFF replica and
+pins its HPA to one replica; no production application-node selector is
+required locally.

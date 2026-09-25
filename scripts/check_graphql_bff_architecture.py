@@ -78,6 +78,23 @@ require(K8S / 'base' / 'network-policy.yaml', ('name: funkey-graphql-bff-ingress
 routes = require(GATEWAY / 'routes.yaml', ('name: funkey-graphql', 'type: Exact, value: /graphql', 'name: funkey-graphql-bff', 'request: 10s', 'backendRequest: 8s'))
 policies = require(GATEWAY / 'policies.yaml', ('name: funkey-graphql-traffic', 'limit: 64Ki', 'requests: 200'))
 
+require(
+    K8S / 'overlays' / 'staging' / 'kustomization.yaml',
+    ('name: funkey-graphql', 'api.staging.funkey.com'),
+)
+require(
+    K8S / 'overlays' / 'production' / 'kustomization.yaml',
+    ('name: funkey-graphql-bff', 'ghcr.io/harshays18/vibematch/funkey-graphql-bff'),
+)
+require(
+    K8S / 'overlays' / 'local' / 'local-scale.yaml',
+    ('name: funkey-graphql-bff', 'minReplicas: 1, maxReplicas: 1'),
+)
+require(
+    ROOT / '.github' / 'workflows' / 'production-platform.yml',
+    ('funkey-graphql-bff', 'manifest.count("@sha256:") < 13', 'graphql-bff:'),
+)
+
 for doc in (
     BFF / 'README.md',
     BFF / 'tests' / 'README.md',

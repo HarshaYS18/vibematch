@@ -8,8 +8,6 @@ on:
       - 'scripts/check_frontend_baseline.py'
       - 'scripts/check_graphql_bff_architecture.py'
       - 'contracts/graphql/**'
-      - 'scripts/check_graphql_bff_architecture.py'
-      - 'contracts/graphql/**'
       - '.github/workflows/frontend-architecture.yml'
   push:
     branches:
@@ -19,6 +17,8 @@ on:
       - 'frontend/vibematch_app/**'
       - 'scripts/check_frontend_architecture.py'
       - 'scripts/check_frontend_baseline.py'
+      - 'scripts/check_graphql_bff_architecture.py'
+      - 'contracts/graphql/**'
 
 jobs:
   architecture:

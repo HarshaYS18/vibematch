@@ -26,6 +26,15 @@ patches:
       group: gateway.networking.k8s.io
       version: v1
       kind: HTTPRoute
+      name: funkey-graphql
+    patch: |-
+      - op: replace
+        path: /spec/hostnames/0
+        value: api.staging.funkey.com
+  - target:
+      group: gateway.networking.k8s.io
+      version: v1
+      kind: HTTPRoute
       name: funkey-api
     patch: |-
       - op: replace

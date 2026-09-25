@@ -102,8 +102,8 @@ jobs:
           for image in ("funkey-api", "funkey-inbox", "funkey-vibes", "funkey-room-control", "funkey-identity", "funkey-profile-social", "funkey-economy", "funkey-game-platform", "funkey-notification", "funkey-graphql-bff", "funkey-worker", "funkey-realtime", "funkey-media"):
               if f"{image}:dev" in manifest:
                   raise SystemExit(f"production render still contains mutable dev image: {image}")
-          if manifest.count("@sha256:") < 12:
-              raise SystemExit("production render must pin all backend workloads by digest")
+          if manifest.count("@sha256:") < 13:
+              raise SystemExit("production render must pin all 13 backend workloads by digest")
           PY
       - name: Parse load and chaos harnesses
         shell: bash
