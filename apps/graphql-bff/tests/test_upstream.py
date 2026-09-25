@@ -14,7 +14,7 @@ class UpstreamClientTests(unittest.IsolatedAsyncioTestCase):
     async def test_get_json_forwards_auth_request_and_trace_context(self):
         captured = {}
 
-        def handler(request: httpx.Request) -> httpx.Response:
+        async def handler(request: httpx.Request) -> httpx.Response:
             captured["authorization"] = request.headers.get("authorization")
             captured["request_id"] = request.headers.get("x-request-id")
             captured["traceparent"] = request.headers.get("traceparent")
@@ -43,7 +43,7 @@ class UpstreamClientTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(captured["query"], "limit=7")
 
     async def test_timeout_maps_to_graphql_timeout_error(self):
-        def handler(request: httpx.Request) -> httpx.Response:
+        async def handler(request: httpx.Request) -> httpx.Response:
             raise httpx.ReadTimeout("simulated timeout", request=request)
 
         metadata = RequestMetadata(
@@ -62,7 +62,7 @@ class UpstreamClientTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(raised.exception.extensions["service"], "core")
 
     async def test_owner_auth_failure_maps_to_forbidden(self):
-        def handler(_request: httpx.Request) -> httpx.Response:
+        async def handler(_request: httpx.Request) -> httpx.Response:
             return httpx.Response(401, json={"detail": "unauthorized"})
 
         metadata = RequestMetadata(
@@ -81,7 +81,7 @@ class UpstreamClientTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(raised.exception.extensions["status"], 401)
 
     async def test_invalid_owner_json_maps_to_protocol_error(self):
-        def handler(_request: httpx.Request) -> httpx.Response:
+        async def handler(_request: httpx.Request) -> httpx.Response:
             return httpx.Response(
                 200,
                 content=b"not-json",
