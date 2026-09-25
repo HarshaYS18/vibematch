@@ -100,6 +100,18 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
+          CORE_FILE="$(mktemp)"
+          CORE_STATUS="$(curl -sS -o "${CORE_FILE}" -w '%{http_code}' \
+            -H "Authorization: Bearer ${FUNKEY_TEST_TOKEN}" \
+            http://127.0.0.1:8000/api/v1/rooms/my-created-room)"
+          if [ "${CORE_STATUS}" != "200" ]; then
+            echo "::warning::Direct Home owner probe returned HTTP ${CORE_STATUS}."
+            cat "${CORE_FILE}"
+            echo
+            docker compose -f infra/docker-compose.yml -f /tmp/graphql-session-compose.override.yml --profile app logs --tail=120 api identity
+          fi
+          rm -f "${CORE_FILE}"
+
           PROBE_FILE="$(mktemp)"
           curl -sS \
             -H "Authorization: Bearer ${FUNKEY_TEST_TOKEN}" \
