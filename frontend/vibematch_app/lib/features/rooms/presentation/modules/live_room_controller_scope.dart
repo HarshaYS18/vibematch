@@ -3,7 +3,6 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../../room_session/data/room_session_repository.dart';
 
-import 'gifts/live_room_gifts_module.dart';
 import 'lifecycle/live_room_lifecycle_module.dart';
 import 'live_room_controller_bundle.dart';
 import 'seats/live_room_seats_module.dart';
@@ -40,10 +39,6 @@ class _LiveRoomControllerScopeState
       contextGetter: () => context,
       mountedGetter: () => mounted,
     );
-    bundle.syncLuckyPacketBeforeRoomRevision = () {
-      LiveRoomGiftsModule.bindLuckyPacketBusIfReady(bundle);
-    };
-
     bundle.initialize(
       onRoomStateChanged: () =>
           LiveRoomLifecycleModule.onRoomStateChanged(bundle),
