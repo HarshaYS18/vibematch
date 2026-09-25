@@ -22,21 +22,14 @@ class LiveRoomGiftsModule {
     );
   }
 
-  static void bindLuckyPacketBusIfReady(LiveRoomControllerBundle bundle) {
-    final controller = bundle.giftControllerInstance;
-    if (controller == null) return;
-    controller.ensureDefaultReceiver(bundle.roomUsers);
-    LuckyPacketRoomBus.bind(
-      controller: controller,
-      roomUsers: bundle.allRoomUsers,
-    );
-  }
-
   static void openGiftPanel(LiveRoomControllerBundle bundle) {
     LiveRoomLifecycleModule.clearFocus(bundle);
+    final controller = controllerFor(bundle);
+    controller.refreshCoinBalance();
     LiveRoomGiftActionsModule.openGiftPanel(
       context: bundle.context,
-      giftController: controllerFor(bundle),
+      giftController: controller,
+      luckyPacketService: bundle.luckyPacketRealtimeService,
       roomUsers: bundle.roomUsers,
     );
   }
