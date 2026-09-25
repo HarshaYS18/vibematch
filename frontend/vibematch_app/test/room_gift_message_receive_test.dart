@@ -26,6 +26,7 @@ void main() {
       isCurrentUser: true,
     );
     final controller = LiveRoomMessageController(
+      roomId: 'LUCKYROOM',
       currentUser: currentUser,
       onChanged: () => changes++,
       restoreState: const LiveRoomMessageRestoreState(
@@ -34,7 +35,7 @@ void main() {
       ),
     );
 
-    LiveRoomSystemEventBus.publish(
+    controller.applySystemEvent(
       LiveRoomSystemEvent.fromJson(<String, dynamic>{
         'id': 'gift_77_6418000022',
         'event_type': 'room_gift_sent',
@@ -88,6 +89,7 @@ void main() {
       isCurrentUser: true,
     );
     final controller = LiveRoomMessageController(
+      roomId: 'LUCKYROOM',
       currentUser: currentUser,
       onChanged: () {},
       restoreState: const LiveRoomMessageRestoreState(
@@ -96,7 +98,7 @@ void main() {
       ),
     );
 
-    LiveRoomSystemEventBus.publish(
+    controller.applySystemEvent(
       LiveRoomSystemEvent.fromJson(<String, dynamic>{
         'id': 'gift_99_7000000002',
         'event_type': 'room_gift_sent',
@@ -142,6 +144,7 @@ void main() {
       isCurrentUser: true,
     );
     final controller = LiveRoomMessageController(
+      roomId: 'LUCKYROOM',
       currentUser: currentUser,
       onChanged: () {},
       restoreState: const LiveRoomMessageRestoreState(
@@ -160,7 +163,7 @@ void main() {
       ),
     );
 
-    LiveRoomSystemEventBus.publish(
+    controller.applySystemEvent(
       LiveRoomSystemEvent.fromJson(<String, dynamic>{
         'id': 'gift_combo_7000000001_2',
         'event_type': 'room_gift_sent',
