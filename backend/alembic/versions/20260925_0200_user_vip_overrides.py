@@ -40,7 +40,6 @@ def upgrade() -> None:
             ondelete="SET NULL",
         ),
         sa.PrimaryKeyConstraint("id"),
-        sa.UniqueConstraint("user_id", name="uq_user_vip_overrides_user_id"),
     )
     op.create_index(
         "ix_user_vip_overrides_id",
