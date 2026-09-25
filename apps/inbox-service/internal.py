@@ -38,6 +38,7 @@ class DirectMessageRequest(BaseModel):
     message_type: str = Field(default="text", max_length=40)
     attachment_url: str | None = Field(default=None, max_length=700)
     metadata: dict = Field(default_factory=dict)
+    source_dedupe_key: str | None = Field(default=None, min_length=1, max_length=180)
 
 
 class MessagePatchRequest(BaseModel):
@@ -98,6 +99,7 @@ def send_direct_message(
         message_type=payload.message_type,
         attachment_url=payload.attachment_url,
         metadata=dict(payload.metadata or {}),
+        source_dedupe_key=payload.source_dedupe_key,
     )
     return {
         "conversation_id": conversation.public_id,
