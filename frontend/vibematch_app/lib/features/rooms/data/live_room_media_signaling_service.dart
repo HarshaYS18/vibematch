@@ -1,6 +1,3 @@
-import 'live_room_system_event_bus.dart';
-import 'live_room_settings_event_bus.dart';
-import 'live_room_seat_application_event_bus.dart';
 import 'dart:async';
 
 import 'package:flutter/material.dart';
@@ -807,8 +804,6 @@ class LiveRoomMediaSignalingService with WidgetsBindingObserver {
       }
 
       if (type == 'room/system_event') {
-        LiveRoomSystemEventBus.publish(LiveRoomSystemEvent.fromJson(payload));
-
         return;
       }
       if (type == 'room_admin/updated') {
@@ -835,17 +830,10 @@ class LiveRoomMediaSignalingService with WidgetsBindingObserver {
         return;
       }
       if (type == 'seat_application/received') {
-        LiveRoomSeatApplicationEventBus.publish(
-          LiveRoomSeatApplicationEvent.fromJson(payload),
-        );
         return;
       }
 
       if (type == 'room_settings/updated') {
-        LiveRoomSettingsEventBus.publish(
-          LiveRoomSettingsEvent.fromJson(payload),
-        );
-
         final roomData = payload['room'];
         if (roomData is Map<String, dynamic>) {
           roomSnapshot.value = LiveMediaRoomSnapshot.fromJson(roomData);
@@ -876,41 +864,10 @@ class LiveRoomMediaSignalingService with WidgetsBindingObserver {
             roomId: safeRoomId,
             setup: setup,
           );
-          activeRoomBackgroundTheme.value =
-              cricketFloodlightArenaBackgroundTheme;
-          LiveRoomSettingsEventBus.publish(
-            LiveRoomSettingsEvent(
-              id: DateTime.now().microsecondsSinceEpoch.toString(),
-              roomId: safeRoomId,
-              applyOnlyModeEnabled: false,
-              roomImagesEnabled: true,
-              guestMessagesEnabled: true,
-              actorUserId: payload['actor_user_id']?.toString() ?? '',
-              actorName: payload['actor_name']?.toString() ?? 'Cricket Mode',
-              backgroundThemeId:
-                  payload['background_theme_id']?.toString() ??
-                  cricketFloodlightArenaBackgroundTheme.id,
-            ),
-          );
-        } else {
+} else {
           final safeRoomId = roomId;
           CricketRoomModeSignal.deactivate(safeRoomId);
-          activeRoomBackgroundTheme.value = defaultRoomBackgroundTheme;
-          LiveRoomSettingsEventBus.publish(
-            LiveRoomSettingsEvent(
-              id: DateTime.now().microsecondsSinceEpoch.toString(),
-              roomId: safeRoomId,
-              applyOnlyModeEnabled: false,
-              roomImagesEnabled: true,
-              guestMessagesEnabled: true,
-              actorUserId: payload['actor_user_id']?.toString() ?? '',
-              actorName: payload['actor_name']?.toString() ?? 'Cricket Mode',
-              backgroundThemeId:
-                  payload['background_theme_id']?.toString() ??
-                  defaultRoomBackgroundTheme.id,
-            ),
-          );
-        }
+}
 
         return;
       }
