@@ -15,7 +15,6 @@ import '../../../room_media/domain/room_media_engine.dart';
 import '../../../room_media/room_media_engine_factory.dart';
 import 'live_room_log.dart';
 import 'live_room_foreground_service.dart';
-import 'live_room_presence_repository.dart';
 import 'seat_authority_gate.dart';
 
 class LiveRoomMediaSignalingService with WidgetsBindingObserver {
@@ -165,11 +164,8 @@ class LiveRoomMediaSignalingService with WidgetsBindingObserver {
     final roomId = _roomId;
     final shouldSyncActiveRoom =
         roomId != null &&
-        (roomSnapshot.value?.roomId == roomId ||
-            LiveRoomPresenceRepository.currentRoomId == roomId ||
-            _joined);
+        (roomSnapshot.value?.roomId == roomId || _joined);
     if (shouldSyncActiveRoom) {
-      LiveRoomPresenceRepository.publishParticipant(_activeLoggedInSeatUser!);
       _overlayCurrentUserProfileInSnapshot(_activeLoggedInSeatUser!);
     }
 
@@ -835,20 +831,6 @@ class LiveRoomMediaSignalingService with WidgetsBindingObserver {
         return;
       }
       if (type == 'room_admin/updated') {
-        final targetUserId = payload['target_user_id']?.toString() ?? '';
-        final targetName = payload['target_name']?.toString() ?? '';
-        final roomId = payload['room_id']?.toString() ?? _roomId ?? '';
-        final isRoomAdmin = payload['is_room_admin'] == true;
-
-        if (targetUserId.isNotEmpty) {
-          LiveRoomPresenceRepository.updateParticipantRoomAdmin(
-            roomId: roomId,
-            userId: targetUserId,
-            displayName: targetName,
-            isRoomAdmin: isRoomAdmin,
-          );
-        }
-
         final roomData = payload['room'];
         if (roomData is Map<String, dynamic>) {
           roomSnapshot.value = LiveMediaRoomSnapshot.fromJson(roomData);
@@ -892,10 +874,10 @@ class LiveRoomMediaSignalingService with WidgetsBindingObserver {
             roomId: safeRoomId,
             setup: setup,
           );
-} else {
+        } else {
           final safeRoomId = roomId;
           CricketRoomModeSignal.deactivate(safeRoomId);
-}
+        }
 
         return;
       }
@@ -1049,64 +1031,60 @@ class LiveRoomMediaSignalingService with WidgetsBindingObserver {
     );
   }
 
-  void _publishProfileUpdateFromPayload(Map<String, dynamic> payload) {
+  void _publishProfileUpdateFromPayload(
+    Map<String, dynamic> payload,
+  ) {
     final userId = payload['user_id']?.toString() ?? '';
     if (userId.isEmpty) return;
+    final snapshot = roomSnapshot.value;
+    if (snapshot == null) return;
 
-    final existing = LiveRoomPresenceRepository.userByRoomUserId(userId);
-    final isHost = payload['is_host'] == true || payload['isHost'] == true;
+    final isHost =
+        payload['is_host'] == true || payload['isHost'] == true;
     final isRoomAdmin =
-        payload['is_room_admin'] == true || payload['isRoomAdmin'] == true;
-    final displayName = _text(
-      payload['display_name'] ?? payload['displayName'],
-    );
-    final roleLabel = _text(payload['role_label'] ?? payload['roleLabel']);
-    final avatarUrl = _text(payload['avatar_url'] ?? payload['avatarUrl']);
-    final nextUser =
-        (existing ??
-                SeatUser(
-                  id: userId,
-                  name: displayName ?? 'Vibe User',
-                  roleLabel: isHost
-                      ? 'Channel Host'
-                      : isRoomAdmin
-                      ? 'Admin'
-                      : roleLabel ?? 'Member',
-                  familyName: '',
-                  relationshipText: '',
-                  vipLevel: 0,
-                  sendingLevel: 0,
-                  receivingLevel: 0,
-                  sentExp: 0,
-                  receivedExp: 0,
-                  medals: const <String>[],
-                  avatarColors: const <Color>[
-                    Color(0xFF12C7B7),
-                    Color(0xFF6D5DF6),
-                  ],
-                ))
-            .copyWith(
-              name: displayName,
-              roleLabel: isHost
-                  ? 'Channel Host'
-                  : isRoomAdmin
-                  ? 'Admin'
-                  : roleLabel,
-              avatarUrl: avatarUrl,
-              clearAvatarUrl: avatarUrl == null,
-              vipLevel: _int(payload['vip_level'] ?? payload['vipLevel']),
-              svipLevel: _int(payload['svip_level'] ?? payload['svipLevel']),
-              sendingLevel: _int(
-                payload['sending_level'] ?? payload['sendingLevel'],
-              ),
-              receivingLevel: _int(
-                payload['receiving_level'] ?? payload['receivingLevel'],
-              ),
-              isHost: isHost,
-              isRoomAdmin: isRoomAdmin || isHost,
-            );
+        payload['is_room_admin'] == true ||
+        payload['isRoomAdmin'] == true;
+    final displayName =
+        _text(payload['display_name'] ?? payload['displayName']);
+    final roleLabel =
+        _text(payload['role_label'] ?? payload['roleLabel']);
+    final avatarUrl =
+        _text(payload['avatar_url'] ?? payload['avatarUrl']);
 
-    LiveRoomPresenceRepository.publishParticipant(nextUser);
+    roomSnapshot.value = LiveMediaRoomSnapshot(
+      roomId: snapshot.roomId,
+      stateVersion: snapshot.stateVersion,
+      peerCount: snapshot.peerCount,
+      lockedSeatIndexes: snapshot.lockedSeatIndexes,
+      peers: snapshot.peers.map((peer) {
+        if (peer.userId != userId) return peer;
+        return peer.copyWith(
+          displayName: displayName,
+          isHost: isHost,
+          isRoomAdmin: isRoomAdmin || isHost,
+          roleLabel: isHost
+              ? 'Channel Host'
+              : isRoomAdmin
+              ? 'Admin'
+              : roleLabel,
+          avatarUrl: avatarUrl,
+          clearAvatarUrl: avatarUrl == null,
+          vipLevel: _int(
+            payload['vip_level'] ?? payload['vipLevel'],
+          ),
+          svipLevel: _int(
+            payload['svip_level'] ?? payload['svipLevel'],
+          ),
+          sendingLevel: _int(
+            payload['sending_level'] ?? payload['sendingLevel'],
+          ),
+          receivingLevel: _int(
+            payload['receiving_level'] ??
+                payload['receivingLevel'],
+          ),
+        );
+      }).toList(growable: false),
+    );
   }
 
   LiveMediaRoomSnapshot? _overlayAdminMute(
