@@ -114,7 +114,7 @@ def check_bridge() -> None:
     )
     require(
         BRIDGE / "consumer.py",
-        ("enable_auto_commit=False", "await consumer.commit()", "funkey.analytics.dlq.v1"),
+        ("enable_auto_commit=False", "await consumer.commit({", "OffsetAndMetadata", "funkey.analytics.dlq.v1"),
     )
     require(
         BRIDGE / "replay.py",
