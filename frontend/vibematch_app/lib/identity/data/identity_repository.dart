@@ -4,13 +4,11 @@ import '../../features/auth/data/auth_api_service.dart';
 import '../../features/auth/models/current_user.dart';
 import '../domain/identity_state.dart';
 
-class IdentityRepository extends StateNotifier<IdentityState> {
-  IdentityRepository({
-    AuthApiService authApiService = const AuthApiService(),
-  })  : _authApiService = authApiService,
-        super(const IdentityState.empty());
+class IdentityRepository extends Notifier<IdentityState> {
+  final AuthApiService _authApiService = const AuthApiService();
 
-  final AuthApiService _authApiService;
+  @override
+  IdentityState build() => const IdentityState.empty();
 
   void accept(CurrentUser user) {
     state = IdentityState.fromUser(user);
@@ -47,6 +45,6 @@ class IdentityRepository extends StateNotifier<IdentityState> {
 }
 
 final identityRepositoryProvider =
-    StateNotifierProvider<IdentityRepository, IdentityState>(
-  (ref) => IdentityRepository(),
-);
+    NotifierProvider<IdentityRepository, IdentityState>(
+      IdentityRepository.new,
+    );
