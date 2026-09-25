@@ -310,7 +310,6 @@ class _LiveRoomMusicPlayerModuleState extends State<LiveRoomMusicPlayerModule> {
       durationMs: _duration.inMilliseconds,
       emittedAt: DateTime.now(),
     );
-    LiveRoomMusicControlBus.publish(event);
     await LiveRoomMusicSignalingService.instance.sendControl(
       roomId: event.roomId,
       action: event.action,
@@ -685,17 +684,6 @@ class RoomMusicTrack {
     final mb = sizeBytes / (1024 * 1024);
     if (mb >= 1) return '${mb.toStringAsFixed(1)} MB';
     return '${(sizeBytes / 1024).toStringAsFixed(0)} KB';
-  }
-}
-
-class LiveRoomMusicControlBus {
-  LiveRoomMusicControlBus._();
-
-  static final ValueNotifier<LiveRoomMusicControlEvent?> latestEvent =
-      ValueNotifier<LiveRoomMusicControlEvent?>(null);
-
-  static void publish(LiveRoomMusicControlEvent event) {
-    latestEvent.value = event;
   }
 }
 
