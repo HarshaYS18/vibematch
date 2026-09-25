@@ -120,12 +120,15 @@ class _LiveRoomPresenceShellPageState
 
   void _restorePresenceWithoutFreshJoin() {
     _seedIdentityFromRestoreState();
-    final cachedParticipants =
-        LiveRoomPresenceRepository.currentParticipantsForRoom(widget.roomId);
+    final restoredParticipants = <SeatUser>[
+      for (final seat in widget.restoreState?.seatState.seats ??
+          const <RoomSeat>[])
+        if (seat.user != null) seat.user!,
+    ];
     _snapshot = LiveRoomPresenceSnapshot(
       roomId: widget.roomId,
       onlineCount: widget.initialOnlineCount,
-      participants: cachedParticipants,
+      participants: List<SeatUser>.unmodifiable(restoredParticipants),
     );
     _joining = false;
     _presenceEstablished = true;
