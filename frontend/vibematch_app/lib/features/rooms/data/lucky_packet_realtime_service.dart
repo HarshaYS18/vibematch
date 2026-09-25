@@ -1,5 +1,6 @@
 import 'dart:async';
 
+import '../../../realtime/app_realtime_hub.dart';
 import '../presentation/controllers/live_room_gift_controller.dart';
 import 'active_room_context.dart';
 import 'live_room_media_signaling_service.dart';
@@ -17,17 +18,32 @@ class LuckyPacketRealtimeService {
   final LuckyPacketApiService _api = const LuckyPacketApiService();
   final Set<String> _handledEventIds = <String>{};
   Timer? _timer;
-  VoidCallbackLike? _eventListener;
+  StreamSubscription<dynamic>? _eventSubscription;
   bool _attached = false;
   bool _finalizeInFlight = false;
 
   void attach() {
     if (!_attached) {
       _attached = true;
-      _eventListener = _handleSystemEvent;
-      LiveRoomSystemEventBus.latestEvent.addListener(_eventListener!);
+      _eventSubscription = AppRealtimeHub.shared.events.listen((envelope) {
+        final event = decodeLiveRoomSystemEvent(
+          envelope,
+          roomId: ActiveRoomContext.roomPublicId,
+        );
+        if (event != null) _handleSystemEvent(event);
+      });
+      unawaited(AppRealtimeHub.shared.start());
     }
     unawaited(refreshActive());
+  }
+
+  void detach() {
+    _attached = false;
+    unawaited(_eventSubscription?.cancel());
+    _eventSubscription = null;
+    _timer?.cancel();
+    _timer = null;
+    _handledEventIds.clear();
   }
 
   Future<LuckyPacketApiResult> create({
@@ -86,9 +102,8 @@ class LuckyPacketRealtimeService {
     LuckyPacketRoomBus.publish(null);
   }
 
-  void _handleSystemEvent() {
-    final event = LiveRoomSystemEventBus.latestEvent.value;
-    if (event == null || !_handledEventIds.add(event.id)) return;
+  void _handleSystemEvent(LiveRoomSystemEvent event) {
+    if (!_handledEventIds.add(event.id)) return;
     if (event.type != 'lucky_packet_created' &&
         event.type != 'lucky_packet_claimed' &&
         event.type != 'lucky_packet_results') {
