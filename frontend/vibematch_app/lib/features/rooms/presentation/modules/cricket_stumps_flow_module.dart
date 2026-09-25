@@ -4,6 +4,10 @@ import '../widgets/room_theme.dart';
 import 'cricket_room_mode_signal.dart';
 import 'cricket_stumps_flow_safe_module.dart';
 
+/// Public entry point for the Cricket match setup flow.
+///
+/// Setup results are emitted through injected callbacks to the owning room
+/// controller. This module retains no match state after the sheet closes.
 class CricketStumpsFlowModule {
   const CricketStumpsFlowModule._();
 

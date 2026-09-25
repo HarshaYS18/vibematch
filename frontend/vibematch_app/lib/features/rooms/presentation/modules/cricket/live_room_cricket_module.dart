@@ -11,6 +11,11 @@ import '../cricket_stumps_flow_module.dart';
 import '../lifecycle/live_room_lifecycle_module.dart';
 import '../live_room_controller_bundle.dart';
 
+/// Bridges room settings/actions to the room-scoped Cricket Mode runtime.
+///
+/// Cricket presentation lives in the bundle's CricketRoomModeController while
+/// backend cricket APIs and canonical room events remain authoritative. This
+/// module stores no process-global match state.
 class LiveRoomCricketModule {
   const LiveRoomCricketModule._();
 

@@ -8,6 +8,11 @@ import '../../data/room_session_legacy_adapter.dart';
 import '../live_room_models.dart';
 import '../live_room_restore_state.dart';
 
+/// Room-scoped seat presentation and command controller.
+///
+/// Canonical occupancy is projected from RoomSessionRepository. Media
+/// transport supplies compatibility/audio details only; local fields are
+/// transient command/UI state and are disposed with the mounted room.
 class LiveRoomSeatController {
   LiveRoomSeatController({
     required SeatUser currentUser,

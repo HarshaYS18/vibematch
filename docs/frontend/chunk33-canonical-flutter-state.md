@@ -214,3 +214,14 @@ The repair wave now documents ownership/lifecycle directly in
 `live_room_settings_sheet_module.dart`. These files are presentation/scoped
 coordination layers only; RoomSessionRepository and backend/realtime services
 remain canonical authorities.
+
+
+### Source-documentation backfill — room controllers and Cricket
+
+Ownership/lifecycle documentation is also embedded in
+`live_room_seat_controller.dart`, `live_room_controller_bundle.dart`,
+`cricket/live_room_cricket_module.dart`, `cricket_mode_module.dart`,
+`cricket_stumps_flow_module.dart`, and
+`cricket_stumps_flow_safe_module.dart`. Cricket mutable runtime is
+room/widget-scoped; canonical room and backend cricket state remain external
+authorities.

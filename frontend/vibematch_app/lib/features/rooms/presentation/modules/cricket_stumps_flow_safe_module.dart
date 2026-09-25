@@ -9,6 +9,11 @@ import '../widgets/cricket_room_backgrounds.dart';
 import '../widgets/room_theme.dart';
 import 'cricket_room_mode_signal.dart';
 
+/// Stateful Cricket setup sheet with backend-persisted toss/lineup commands.
+///
+/// Draft form fields are widget-local. Completed setup is emitted to the
+/// caller, which activates the room-scoped Cricket runtime; no static signal
+/// or global controller is mutated here.
 class CricketStumpsFlowSafeModule {
   const CricketStumpsFlowSafeModule._();
 

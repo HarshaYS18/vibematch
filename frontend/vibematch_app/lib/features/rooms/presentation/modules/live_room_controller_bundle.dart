@@ -83,6 +83,11 @@ const SeatUser roomIdentityFallback = SeatUser(
   isCurrentUser: true,
 );
 
+/// Lifetime container for controllers belonging to one mounted live room.
+///
+/// RoomSessionRepository is the canonical room-state authority. Controllers
+/// held here own room-scoped presentation/command resources and are created
+/// and disposed with the route so none becomes process-global state.
 class LiveRoomControllerBundle {
   LiveRoomControllerBundle({
     required this.config,

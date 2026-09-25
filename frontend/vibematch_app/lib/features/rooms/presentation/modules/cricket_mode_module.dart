@@ -37,6 +37,11 @@ const List<RoomBackgroundTheme> cricketModeBackgroundThemes = [
   cricketRoyalPitchBackgroundTheme,
 ];
 
+/// Cricket scoring/presentation models for scoped room or widget runtimes.
+///
+/// The deterministic models in this file may be shared, but mutable controller
+/// instances must be owned by a mounted room/widget and never by a static
+/// registry or signal.
 enum CricketMatchStatus { setup, live, inningsBreak, completed }
 
 enum CricketExtraType { wide, noBall, bye, legBye, penalty }
