@@ -1,5 +1,7 @@
 import 'dart:async';
 
+import '../../../../foundation/realtime/realtime_event_envelope.dart';
+import '../../../../realtime/app_realtime_hub.dart';
 import '../../data/live_room_media_signaling_service.dart';
 import '../../data/live_room_presence_repository.dart';
 import '../../data/live_room_restrictions_service.dart';
@@ -10,16 +12,20 @@ import '../live_room_restore_state.dart';
 
 class LiveRoomMessageController {
   LiveRoomMessageController({
+    required String roomId,
     required SeatUser currentUser,
     required this.onChanged,
     LiveRoomMessageRestoreState? restoreState,
-  }) : currentUser = LiveRoomMediaSignalingService.instance
+    AppRealtimeHub? realtimeHub,
+  }) : _roomId = roomId.trim(),
+       _realtimeHub = realtimeHub ?? AppRealtimeHub.shared,
+       currentUser = LiveRoomMediaSignalingService.instance
            .effectiveCurrentUser(currentUser) {
     messages = List<ChatEntry>.from(restoreState?.messages ?? mockChatEntries);
     joinRequestUsers.addAll(restoreState?.joinRequestUsers ?? const []);
-    _activeController?._detachSystemEventListener();
+    _eventSubscription = _realtimeHub.events.listen(_handleRealtimeEvent);
+    unawaited(_realtimeHub.start());
     _activeController = this;
-    _attachSystemEventListener();
   }
 
   static const Duration _roomSettingsSystemMessageDuration = Duration(
@@ -58,8 +64,9 @@ class LiveRoomMessageController {
   final List<SeatUser> joinRequestUsers = <SeatUser>[];
   final Set<String> _handledSystemEventIds = <String>{};
   final Map<String, DateTime> _giftMessageUpdatedAt = <String, DateTime>{};
-  VoidCallbackLike? _systemEventListener;
-  VoidCallbackLike? _seatApplicationListener;
+  final String _roomId;
+  final AppRealtimeHub _realtimeHub;
+  StreamSubscription<RealtimeEventEnvelope>? _eventSubscription;
 
   bool get _currentUserCanBypassGuestMessageBlock =>
       currentUser.isHost || currentUser.isRoomAdmin;
@@ -193,34 +200,44 @@ class LiveRoomMessageController {
     onChanged();
   }
 
-  void _attachSystemEventListener() {
-    _systemEventListener = _handleLatestMediaSystemEvent;
-    LiveRoomSystemEventBus.latestEvent.addListener(_systemEventListener!);
-    _seatApplicationListener = _handleLatestSeatApplicationEvent;
-    LiveRoomSeatApplicationEventBus.latestEvent.addListener(
-      _seatApplicationListener!,
-    );
-  }
+  void _handleRealtimeEvent(RealtimeEventEnvelope envelope) {
+    final decoded = envelope.toLegacyEvent();
+    final type = decoded['type']?.toString() ?? '';
+    final rawPayload = decoded['payload'];
+    final payload = rawPayload is Map
+        ? rawPayload.cast<String, dynamic>()
+        : <String, dynamic>{};
 
-  void _detachSystemEventListener() {
-    final listener = _systemEventListener;
-    if (listener != null) {
-      LiveRoomSystemEventBus.latestEvent.removeListener(listener);
+    final eventRoomId =
+        payload['room_id']?.toString().trim() ??
+        payload['room_public_id']?.toString().trim() ??
+        decoded['room_id']?.toString().trim() ??
+        decoded['room_public_id']?.toString().trim() ??
+        '';
+    if (eventRoomId.isNotEmpty &&
+        _roomId.isNotEmpty &&
+        eventRoomId != _roomId) {
+      return;
     }
-    _systemEventListener = null;
-    final seatApplicationListener = _seatApplicationListener;
-    if (seatApplicationListener != null) {
-      LiveRoomSeatApplicationEventBus.latestEvent.removeListener(
-        seatApplicationListener,
+
+    if (type == 'room/system_event') {
+      _handleMediaSystemEvent(LiveRoomSystemEvent.fromJson(payload));
+      return;
+    }
+    if (type == 'seat_application/received') {
+      _handleSeatApplicationEvent(
+        LiveRoomSeatApplicationEvent.fromJson(payload),
       );
     }
-    _seatApplicationListener = null;
   }
 
-  void _handleLatestSeatApplicationEvent() {
-    final event = LiveRoomSeatApplicationEventBus.latestEvent.value;
-    if (event == null || _handledSystemEventIds.contains(event.id)) return;
-    if (event.seatIndex < 0) return;
+  void _handleSeatApplicationEvent(
+    LiveRoomSeatApplicationEvent event,
+  ) {
+    if (_handledSystemEventIds.contains(event.id) ||
+        event.seatIndex < 0) {
+      return;
+    }
     _handledSystemEventIds.add(event.id);
     _insertSeatApplicationRequest(
       applicantUserId: event.applicantUserId,
@@ -270,9 +287,8 @@ class LiveRoomMessageController {
     onChanged();
   }
 
-  void _handleLatestMediaSystemEvent() {
-    final event = LiveRoomSystemEventBus.latestEvent.value;
-    if (event == null || _handledSystemEventIds.contains(event.id)) return;
+  void _handleMediaSystemEvent(LiveRoomSystemEvent event) {
+    if (_handledSystemEventIds.contains(event.id)) return;
     _handledSystemEventIds.add(event.id);
 
     if (event.isRoomChatMessage) {
@@ -563,5 +579,13 @@ class LiveRoomMessageController {
       final removed = messages.remove(entry);
       if (removed) onChanged();
     });
+  }
+
+  void dispose() {
+    unawaited(_eventSubscription?.cancel());
+    _eventSubscription = null;
+    if (identical(_activeController, this)) {
+      _activeController = null;
+    }
   }
 }
