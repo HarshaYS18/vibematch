@@ -66,9 +66,19 @@ jobs:
           EMAIL="funkey-smoke-${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT}@example.com"
           DEVICE="ci-session-${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT}"
 
-          AUTH_RESPONSE="$(curl -fsS             -H 'Content-Type: application/json'             -d "{\"email\":\"${EMAIL}\",\"username\":\"ci_smoke_${GITHUB_RUN_ID}\",\"display_name\":\"CI Smoke\",\"device_id\":\"${DEVICE}\"}"             http://127.0.0.1:8000/api/v1/auth/dev-login)"
+          AUTH_FILE="$(mktemp)"
+          STATUS="$(curl -sS -o "${AUTH_FILE}" -w '%{http_code}'             -H 'Content-Type: application/json'             -d "{\"email\":\"${EMAIL}\",\"username\":\"ci_smoke_${GITHUB_RUN_ID}\",\"display_name\":\"CI Smoke\",\"device_id\":\"${DEVICE}\"}"             http://127.0.0.1:8000/api/v1/auth/dev-login)"
 
-          TOKEN="$(python -c 'import json,sys; print(json.load(sys.stdin)["access_token"])' <<<"${AUTH_RESPONSE}")"
+          if [ "${STATUS}" != "200" ]; then
+            echo "::error::Disposable dev-login returned HTTP ${STATUS}."
+            cat "${AUTH_FILE}"
+            echo
+            docker compose -f infra/docker-compose.yml --profile app logs --tail=200 api identity
+            exit 1
+          fi
+
+          TOKEN="$(python -c 'import json,sys; print(json.load(sys.stdin)["access_token"])' <"${AUTH_FILE}")"
+          rm -f "${AUTH_FILE}"
           test -n "${TOKEN}"
           echo "::add-mask::${TOKEN}"
           echo "FUNKEY_TEST_TOKEN=${TOKEN}" >> "${GITHUB_ENV}"
