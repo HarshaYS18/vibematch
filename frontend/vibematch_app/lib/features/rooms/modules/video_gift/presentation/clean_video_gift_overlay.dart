@@ -87,11 +87,15 @@ class _CleanVideoGiftCardState extends ConsumerState<_CleanVideoGiftCard> {
       await controller.setLooping(false);
       await controller.setVolume(1.0);
       await controller.play();
-      if (!mounted) return;
+      if (!mounted) {
+        await _disposeController();
+        return;
+      }
       setState(() => _ready = true);
       await _attachResource();
     } catch (_) {
-      _finish();
+      await _disposeController();
+      if (mounted) _finish();
     }
   }
 

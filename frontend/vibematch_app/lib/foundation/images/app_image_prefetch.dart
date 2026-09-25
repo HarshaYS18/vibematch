@@ -169,19 +169,22 @@ class _PrefetchRequest {
 
 /// Lazy session/subtree queue. Inside AppShell this sees the overridden
 /// MediaResourceRegistry and registers itself as imagePrefetch.
-final appImagePrefetchQueueProvider = Provider<AppImagePrefetchQueue>((ref) {
-  final queue = AppImagePrefetchQueue();
-  final registry = ref.watch(mediaResourceRegistryProvider);
-  if (registry != null) {
-    registry.register(queue);
-  }
+final appImagePrefetchQueueProvider = Provider<AppImagePrefetchQueue>(
+  (ref) {
+    final queue = AppImagePrefetchQueue();
+    final registry = ref.watch(mediaResourceRegistryProvider);
+    if (registry != null) {
+      registry.register(queue);
+    }
 
-  ref.onDispose(() {
-    registry?.unregister(
-      queue.resourceId,
-      expectedParticipant: queue,
-    );
-    unawaited(queue.release());
-  });
-  return queue;
-});
+    ref.onDispose(() {
+      registry?.unregister(
+        queue.resourceId,
+        expectedParticipant: queue,
+      );
+      unawaited(queue.release());
+    });
+    return queue;
+  },
+  dependencies: [mediaResourceRegistryProvider],
+);

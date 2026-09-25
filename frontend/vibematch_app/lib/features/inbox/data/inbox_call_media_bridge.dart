@@ -13,6 +13,7 @@ import '../../audio_mediasoup/data/mediasoup_socket_service.dart';
 import '../../audio_mediasoup/models/mediasoup_producer_state.dart';
 import '../../audio_mediasoup/models/mediasoup_room_state.dart';
 import '../models/inbox_call_models.dart';
+import 'runtime/call_audio_input_resource_participant.dart';
 import 'runtime/camera_input_resource_participant.dart';
 
 class InboxRemoteVideoStream {
@@ -36,6 +37,7 @@ class InboxCallMediaBridge {
 
   final MediasoupSocketService _socketService;
   final MediaResourceRegistry? _resourceRegistry;
+  CallAudioInputResourceParticipant? _audioInputResourceParticipant;
   CameraInputResourceParticipant? _cameraResourceParticipant;
   final StreamController<String> _logController = StreamController<String>.broadcast();
   final ValueNotifier<MediaStream?> localVideoStream = ValueNotifier<MediaStream?>(null);
@@ -99,6 +101,11 @@ class InboxCallMediaBridge {
       _log(session.isVideo ? 'video call media ready' : 'voice call media ready');
     } catch (error) {
       _lastError = error.toString();
+      try {
+        await leave();
+      } catch (_) {
+        // Preserve the original media-start failure.
+      }
       rethrow;
     } finally {
       _joining = false;
@@ -134,6 +141,7 @@ class InboxCallMediaBridge {
   }
 
   Future<void> leave() async {
+    _detachAudioInputResource();
     _detachCameraResource();
     _joinedSession = null;
     await _newProducerSub?.cancel();
@@ -208,8 +216,57 @@ class InboxCallMediaBridge {
     });
     _localStream = stream;
     localVideoStream.value = session.isVideo ? stream : null;
+    if (stream.getAudioTracks().isNotEmpty) {
+      await _attachAudioInputResource(session);
+    }
     if (session.isVideo && stream.getVideoTracks().isNotEmpty) {
       await _attachCameraResource(session);
+    }
+  }
+
+  Future<void> _attachAudioInputResource(InboxCallSession session) async {
+    if (_audioInputResourceParticipant != null) return;
+    final registry = _resourceRegistry;
+    if (registry == null) return;
+
+    final participant = CallAudioInputResourceParticipant(
+      resourceId: 'call-audio-input:${session.id}',
+      releaseInput: _releaseAudioInputForSession,
+    );
+    try {
+      if (!registry.register(participant)) return;
+      _audioInputResourceParticipant = participant;
+      await participant.onForegroundChanged(registry.isForeground);
+    } catch (_) {
+      registry.unregister(
+        participant.resourceId,
+        expectedParticipant: participant,
+      );
+    }
+  }
+
+  void _detachAudioInputResource() {
+    final registry = _resourceRegistry;
+    final participant = _audioInputResourceParticipant;
+    _audioInputResourceParticipant = null;
+    if (registry == null || participant == null) return;
+    registry.unregister(
+      participant.resourceId,
+      expectedParticipant: participant,
+    );
+  }
+
+  Future<void> _releaseAudioInputForSession() async {
+    final producer = _audioProducer;
+    _audioProducer = null;
+    if (producer != null && !producer.closed) producer.close();
+
+    final tracks = _localStream?.getAudioTracks() ?? const <MediaStreamTrack>[];
+    for (final track in tracks) {
+      try {
+        track.enabled = false;
+        await track.stop();
+      } catch (_) {}
     }
   }
 
