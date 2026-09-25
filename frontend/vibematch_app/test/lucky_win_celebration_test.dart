@@ -5,6 +5,8 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:vibematch_app/features/rooms/data/live_room_system_event_bus.dart';
 import 'package:vibematch_app/features/rooms/presentation/widgets/lucky_win_celebration_overlay.dart';
 
+// Lucky-win presentation is tested against an explicit room scope so event
+// filtering never relies on retired global active-room state.
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
 
@@ -18,7 +20,10 @@ void main() {
         home: Scaffold(
           body: Stack(
             children: <Widget>[
-              LuckyWinCelebrationOverlay(systemEvents: events.stream),
+              LuckyWinCelebrationOverlay(
+                roomPublicId: 'LUCKYROOM',
+                systemEvents: events.stream,
+              ),
             ],
           ),
         ),
@@ -57,7 +62,10 @@ void main() {
         home: Scaffold(
           body: Stack(
             children: <Widget>[
-              LuckyWinCelebrationOverlay(systemEvents: events.stream),
+              LuckyWinCelebrationOverlay(
+                roomPublicId: 'LUCKYROOM',
+                systemEvents: events.stream,
+              ),
             ],
           ),
         ),
@@ -81,7 +89,10 @@ void main() {
         home: Scaffold(
           body: Stack(
             children: <Widget>[
-              LuckyWinCelebrationOverlay(systemEvents: events.stream),
+              LuckyWinCelebrationOverlay(
+                roomPublicId: 'LUCKYROOM',
+                systemEvents: events.stream,
+              ),
             ],
           ),
         ),

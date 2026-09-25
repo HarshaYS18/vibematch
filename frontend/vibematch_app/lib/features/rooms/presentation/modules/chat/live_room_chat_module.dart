@@ -71,6 +71,7 @@ class LiveRoomChatModule {
       controller: bundle.messageController,
       focusNode: bundle.messageFocusNode,
       imagesEnabled: bundle.roomImagesEnabled,
+      onDismissSeatActions: bundle.seatController.clearSelectedSeat,
       onSendText: () => sendMessage(bundle),
       onImageTap: () => handleImageMessageTap(bundle),
       onSendFloatingText: () => sendMessage(bundle),

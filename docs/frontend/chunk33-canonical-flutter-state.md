@@ -445,3 +445,18 @@ The frontend architecture guard now rejects references to the retired
 `activeRoomBackgroundTheme` identifiers anywhere under Flutter `lib/`.
 This catches incomplete migrations at the source-of-truth gate instead of
 allowing them to surface later as broad compile failures.
+
+
+### Post-M6 repair R6 — constructor propagation closure
+
+The scoped constructor changes from R1/R2 are now propagated through every
+remaining production/test caller:
+
+- `LiveRoomMessageActionsModule.openComposer` requires the owning room's
+  seat-dismiss callback and `LiveRoomChatModule` supplies
+  `LiveRoomSeatController.clearSelectedSeat`;
+- gift-overlay regression tests pass the explicit `LUCKYROOM` room id;
+- lucky-win celebration tests pass the same explicit room scope.
+
+This closes the last compile failures caused by removing process-global room
+presentation identity/dismissal state.

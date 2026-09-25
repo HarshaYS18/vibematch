@@ -11,6 +11,8 @@ import 'package:vibematch_app/features/rooms/presentation/widgets/premium_gift_b
 
 // Regression coverage for lucky-combo dedupe using the same room-scoped gift
 // presentation queues that production owns in LiveRoomGiftController.
+// Explicit roomPublicId mirrors production's controller-bundle scope and
+// protects against fallback to a process-global active-room identity.
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
 
@@ -80,6 +82,7 @@ void main() {
       MaterialApp(
         home: Scaffold(
           body: LiveRoomGiftOverlay(
+            roomPublicId: 'LUCKYROOM',
             systemEvents: events.stream,
             slides: const <GiftSlide>[localSlide],
             activeComboSlide: localSlide,
@@ -119,6 +122,7 @@ void main() {
       return MaterialApp(
         home: Scaffold(
           body: LiveRoomGiftOverlay(
+            roomPublicId: 'LUCKYROOM',
             systemEvents: events.stream,
             slides: slides,
             activeComboSlide: active,
@@ -169,6 +173,7 @@ void main() {
       MaterialApp(
         home: Scaffold(
           body: LiveRoomGiftOverlay(
+            roomPublicId: 'LUCKYROOM',
             systemEvents: events.stream,
             slides: const <GiftSlide>[],
             activeComboSlide: null,
@@ -224,6 +229,7 @@ void main() {
       MaterialApp(
         home: Scaffold(
           body: LiveRoomGiftOverlay(
+            roomPublicId: 'LUCKYROOM',
             systemEvents: events.stream,
             slides: const <GiftSlide>[],
             activeComboSlide: null,

@@ -186,3 +186,11 @@ The architecture guard rejects `ActiveRoomContext`,
 `dismissRoomSeatActionPill`, and `activeRoomBackgroundTheme`. New code must
 use explicit room scope, `LiveRoomSeatController.clearSelectedSeat`, and
 room-scoped background callbacks/controllers instead.
+
+
+### Constructor scope propagation
+
+Room UI helpers and tests must supply explicit room scope after Chunk 33.
+Composer helpers receive a scoped seat-dismiss callback; gift/lucky overlays
+receive `roomPublicId`. Tests intentionally mirror these production contracts
+instead of relying on hidden defaults.
