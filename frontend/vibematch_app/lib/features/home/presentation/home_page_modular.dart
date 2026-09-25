@@ -104,10 +104,10 @@ class _HomePageState extends ConsumerState<HomePage> {
                     onRetry: controller.loadHomeChrome,
                   ),
                 )
-              else if (home.banners.isNotEmpty)
+              else if (home.eventBanners.isNotEmpty)
                 SliverToBoxAdapter(
                   child: HomeBannerSection(
-                    banners: home.banners,
+                    banners: home.eventBanners,
                     selectedIndex: home.selectedBannerIndex,
                     canManageHomeBanners: _canManageHomeBanners,
                     onBannerChanged: controller.selectBanner,
