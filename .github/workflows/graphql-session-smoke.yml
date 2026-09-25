@@ -1,0 +1,91 @@
+name: GraphQL Session Smoke
+
+on:
+  push:
+    branches:
+      - 'chatgpt/**'
+    paths:
+      - '.github/workflows/graphql-session-smoke.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: graphql-session-smoke-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  session-smoke:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Start disposable local FunKey dependencies
+        shell: bash
+        run: |
+          set -euo pipefail
+          docker compose -f infra/docker-compose.yml --profile app up --build -d             postgres pgbouncer cache-redis realtime-redis media-redis nats             migrate identity api
+
+          for attempt in $(seq 1 60); do
+            if curl -fsS http://127.0.0.1:8000/ready >/dev/null; then
+              exit 0
+            fi
+            sleep 5
+          done
+
+          docker compose -f infra/docker-compose.yml --profile app ps
+          docker compose -f infra/docker-compose.yml --profile app logs --tail=200 api identity
+          echo "::error::Local FunKey API did not become ready."
+          exit 1
+
+      - name: Start disposable GraphQL BFF
+        shell: bash
+        run: |
+          set -euo pipefail
+          docker build -f apps/graphql-bff/Dockerfile -t funkey-graphql-bff:session .
+          docker run -d --name funkey-graphql-bff-session --network host             -e GRAPHQL_CORE_URL=http://127.0.0.1:8000/api/v1             -e GRAPHQL_PROFILE_SOCIAL_URL=http://127.0.0.1:8087/api/v1             -e GRAPHQL_VIBES_URL=http://127.0.0.1:8084/api/v1             funkey-graphql-bff:session
+
+          for attempt in $(seq 1 30); do
+            if curl -fsS http://127.0.0.1:8091/ready >/dev/null; then
+              exit 0
+            fi
+            sleep 2
+          done
+
+          docker logs funkey-graphql-bff-session
+          echo "::error::GraphQL BFF did not become ready."
+          exit 1
+
+      - name: Generate session-only test token
+        id: session
+        shell: bash
+        run: |
+          set -euo pipefail
+          EMAIL="funkey-smoke-${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT}@example.com"
+          DEVICE="ci-session-${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT}"
+
+          AUTH_RESPONSE="$(curl -fsS             -H 'Content-Type: application/json'             -d "{\"email\":\"${EMAIL}\",\"username\":\"ci_smoke_${GITHUB_RUN_ID}\",\"display_name\":\"CI Smoke\",\"device_id\":\"${DEVICE}\"}"             http://127.0.0.1:8000/api/v1/auth/dev-login)"
+
+          TOKEN="$(python -c 'import json,sys; print(json.load(sys.stdin)["access_token"])' <<<"${AUTH_RESPONSE}")"
+          test -n "${TOKEN}"
+          echo "::add-mask::${TOKEN}"
+          echo "FUNKEY_TEST_TOKEN=${TOKEN}" >> "${GITHUB_ENV}"
+
+      - name: Run authenticated persisted GraphQL smoke
+        shell: bash
+        env:
+          FUNKEY_API_URL: http://127.0.0.1:8091
+          VUS: '5'
+          DURATION: '30s'
+        run: |
+          set -euo pipefail
+          docker run --rm --network host             -e FUNKEY_API_URL             -e FUNKEY_TEST_TOKEN             -e VUS             -e DURATION             -v "${PWD}/tests/load:/scripts:ro"             grafana/k6:0.52.0             run /scripts/graphql-read-smoke.js
+
+      - name: Cleanup disposable session environment
+        if: always()
+        shell: bash
+        run: |
+          docker rm -f funkey-graphql-bff-session >/dev/null 2>&1 || true
+          docker compose -f infra/docker-compose.yml --profile app down -v --remove-orphans || true
