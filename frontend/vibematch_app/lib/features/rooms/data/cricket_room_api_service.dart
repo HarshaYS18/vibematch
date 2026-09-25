@@ -1,5 +1,8 @@
 import 'dart:convert';
 
+import 'package:crypto/crypto.dart';
+import 'package:shared_preferences/shared_preferences.dart';
+import 'package:uuid/uuid.dart';
 import 'package:vibematch_app/foundation/networking/feature_http_compat.dart' as http;
 
 import '../../../core/network/vm_api_config.dart';
@@ -92,7 +95,36 @@ class CricketRoomApiService {
     required int matchId,
     required Map<String, dynamic> event,
   }) async {
-    final response = await _post('/rooms/$roomId/cricket/matches/$matchId/balls', event);
+    final payload = Map<String, dynamic>.from(event);
+    final suppliedId = payload['event_id']?.toString().trim();
+    if (suppliedId != null && suppliedId.isNotEmpty) {
+      final response = await _post(
+        '/rooms/$roomId/cricket/matches/$matchId/balls',
+        payload,
+      );
+      return jsonDecode(response.body) as Map<String, dynamic>;
+    }
+
+    final canonicalEvent = jsonEncode(_canonicalize(payload));
+    final fingerprint = sha256.convert(utf8.encode(canonicalEvent)).toString();
+    final pendingKey = 'cricket_ball_pending:$roomId:$matchId:$fingerprint';
+    final preferences = await SharedPreferences.getInstance();
+    final eventId = preferences.getString(pendingKey) ?? const Uuid().v4();
+    await preferences.setString(pendingKey, eventId);
+    payload['event_id'] = eventId;
+
+    final response = await http.post(
+      Uri.parse(
+        VmApiConfig.endpoint('/rooms/$roomId/cricket/matches/$matchId/balls'),
+      ),
+      headers: await _headers(),
+      body: jsonEncode(payload),
+    );
+    if (response.statusCode >= 400 && response.statusCode < 500) {
+      await preferences.remove(pendingKey);
+    }
+    _ensureOk(response);
+    await preferences.remove(pendingKey);
     return jsonDecode(response.body) as Map<String, dynamic>;
   }
 
@@ -124,6 +156,19 @@ class CricketRoomApiService {
     if (pointsTable != null) body['points_table'] = pointsTable;
     final response = await _post('/rooms/$roomId/cricket/matches/$matchId/complete', body);
     return jsonDecode(response.body) as Map<String, dynamic>;
+  }
+
+  Object? _canonicalize(Object? value) {
+    if (value is Map) {
+      final keys = value.keys.map((key) => key.toString()).toList()..sort();
+      return <String, Object?>{
+        for (final key in keys) key: _canonicalize(value[key]),
+      };
+    }
+    if (value is List) {
+      return value.map(_canonicalize).toList(growable: false);
+    }
+    return value;
   }
 
   Future<http.Response> _get(String path) async {
