@@ -31,6 +31,8 @@ Primary financial state:
 - `economy_bulk_grants` / recipients
 - `economy_house_reservations`
 - `lucky_packets` / `lucky_packet_claims`
+- `user_vip_statuses` effective VIP/SVIP projection
+- `user_vip_overrides` audited manual override authority
 
 Accounting evidence:
 
@@ -63,8 +65,12 @@ transactions. Any mismatch becomes an operational incident.
 
 ## Cross-domain projections
 
-VIP/SVIP status may be maintained as an Economy-derived projection from
-recharge/value history. That projection does not grant Economy authority over
+VIP/SVIP effective status is an Economy-owned projection. Its default source is
+recharge/value history; audited Owner/Super Owner adjustments are stored in
+`user_vip_overrides` and applied by Economy when materializing
+`user_vip_statuses`. Core/profile surfaces are read-only consumers and cannot
+write either table. Projection changes emit
+`economy.vip_projection.updated.v1`. This does not grant Economy authority over
 identity/profile fields.
 
 ## Security
