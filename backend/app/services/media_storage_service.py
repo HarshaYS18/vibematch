@@ -253,27 +253,55 @@ def create_direct_upload(
     )
 
 
+def _storage_error_code(exc: Exception) -> str | None:
+    response = getattr(exc, "response", None)
+    error = response.get("Error") if isinstance(response, dict) else None
+    if not isinstance(error, dict):
+        return None
+    code = error.get("Code")
+    return str(code) if code is not None else None
+
+
 def complete_multipart_upload(
     *,
     object_key: str,
     upload_id: str,
     parts: list[dict[str, object]],
 ) -> None:
+    """Complete S3 multipart upload with retry recovery.
+
+    S3 removes the multipart upload ID after a successful completion. If that
+    storage call succeeded but the application DB commit/response failed, a
+    client retry receives NoSuchUpload. In that case the durable object itself
+    is the completion proof; later session verification still checks size/type.
+    """
     client = _s3_client()
-    client.complete_multipart_upload(
-        Bucket=_require_s3_bucket(),
-        Key=object_key,
-        UploadId=upload_id,
-        MultipartUpload={
-            "Parts": [
-                {
-                    "PartNumber": int(part["part_number"]),
-                    "ETag": str(part["etag"]),
-                }
-                for part in parts
-            ]
-        },
-    )
+    try:
+        client.complete_multipart_upload(
+            Bucket=_require_s3_bucket(),
+            Key=object_key,
+            UploadId=upload_id,
+            MultipartUpload={
+                "Parts": [
+                    {
+                        "PartNumber": int(part["part_number"]),
+                        "ETag": str(part["etag"]),
+                    }
+                    for part in parts
+                ]
+            },
+        )
+    except Exception as exc:
+        if _storage_error_code(exc) == "NoSuchUpload":
+            try:
+                client.head_object(
+                    Bucket=_require_s3_bucket(),
+                    Key=object_key,
+                )
+            except Exception:
+                raise
+            return
+        raise
 
 
 def abort_multipart_upload(*, object_key: str, upload_id: str) -> None:
@@ -286,9 +314,7 @@ def abort_multipart_upload(*, object_key: str, upload_id: str) -> None:
             UploadId=upload_id,
         )
     except Exception as exc:
-        response = getattr(exc, "response", None)
-        error = response.get("Error") if isinstance(response, dict) else None
-        if isinstance(error, dict) and error.get("Code") == "NoSuchUpload":
+        if _storage_error_code(exc) == "NoSuchUpload":
             return
         raise
 
