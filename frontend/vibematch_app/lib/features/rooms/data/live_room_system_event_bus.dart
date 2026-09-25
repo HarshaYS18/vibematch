@@ -1,16 +1,3 @@
-import 'package:flutter/foundation.dart';
-
-class LiveRoomSystemEventBus {
-  LiveRoomSystemEventBus._();
-
-  static final ValueNotifier<LiveRoomSystemEvent?> latestEvent =
-      ValueNotifier<LiveRoomSystemEvent?>(null);
-
-  static void publish(LiveRoomSystemEvent event) {
-    latestEvent.value = event;
-  }
-}
-
 class LiveRoomSystemEvent {
   const LiveRoomSystemEvent({
     required this.id,
