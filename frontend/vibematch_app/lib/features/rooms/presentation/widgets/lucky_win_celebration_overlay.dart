@@ -4,6 +4,8 @@ import 'dart:math' as math;
 
 import 'package:flutter/material.dart';
 
+import '../../../../realtime/app_realtime_hub.dart';
+import '../../data/active_room_context.dart';
 import '../../data/live_room_system_event_bus.dart';
 
 class LuckyWinCelebrationOverlay extends StatefulWidget {
@@ -26,7 +28,7 @@ class _LuckyWinCelebrationOverlayState
 
   late final AnimationController _controller;
   _LuckyWinPresentation? _active;
-  VoidCallback? _roomEventListener;
+  StreamSubscription<dynamic>? _roomEventSubscription;
   Timer? _nextTimer;
 
   @override
@@ -38,24 +40,26 @@ class _LuckyWinCelebrationOverlayState
     )..addStatusListener((status) {
         if (status == AnimationStatus.completed) _finishActive();
       });
-    _roomEventListener = _handleRoomEvent;
-    LiveRoomSystemEventBus.latestEvent.addListener(_roomEventListener!);
+    _roomEventSubscription = AppRealtimeHub.shared.events.listen((envelope) {
+      final event = decodeLiveRoomSystemEvent(
+        envelope,
+        roomId: ActiveRoomContext.roomPublicId,
+      );
+      if (event != null) _handleRoomEvent(event);
+    });
+    unawaited(AppRealtimeHub.shared.start());
   }
 
   @override
   void dispose() {
-    final listener = _roomEventListener;
-    if (listener != null) {
-      LiveRoomSystemEventBus.latestEvent.removeListener(listener);
-    }
+    unawaited(_roomEventSubscription?.cancel());
     _nextTimer?.cancel();
     _controller.dispose();
     super.dispose();
   }
 
-  void _handleRoomEvent() {
-    final event = LiveRoomSystemEventBus.latestEvent.value;
-    if (event == null || !event.isRoomGiftSent || !event.isLuckyGift) return;
+  void _handleRoomEvent(LiveRoomSystemEvent event) {
+    if (!event.isRoomGiftSent || !event.isLuckyGift) return;
 
     final tier = _LuckyWinTier.fromMultiplier(event.luckyMultiplier);
     if (tier == null || !_rememberEvent(event.id)) return;
