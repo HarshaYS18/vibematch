@@ -17,7 +17,8 @@ on:
       - 'scripts/check_contracts.py'
       - 'scripts/check_gateway_architecture.py'
       - 'scripts/check_graphql_bff_architecture.py'
-      - 'scripts/check_kafka_data_platform.py'
+      - 'scripts/check_kafka_data_platform.py scripts/check_search_platform.py'
+      - 'scripts/check_search_platform.py'
       - 'scripts/prepare_gitops_promotion.py'
       - 'docs/platform/chunk37-kafka-data-platform.md'
       - 'docs/architecture/kafka-data-platform.md'
@@ -79,6 +80,7 @@ jobs:
       - run: python scripts/check_gateway_architecture.py
       - run: python scripts/check_graphql_bff_architecture.py
       - run: python scripts/check_kafka_data_platform.py
+      - run: python scripts/check_search_platform.py
       - uses: azure/setup-kubectl@v4
         with:
           version: v1.36.4
@@ -111,11 +113,11 @@ jobs:
           python - <<'PY'
           from pathlib import Path
           manifest = Path("/tmp/funkey-production.yaml").read_text()
-          for image in ("funkey-api", "funkey-inbox", "funkey-vibes", "funkey-room-control", "funkey-identity", "funkey-profile-social", "funkey-economy", "funkey-game-platform", "funkey-notification", "funkey-graphql-bff", "funkey-worker", "funkey-kafka-event-bridge", "funkey-realtime", "funkey-media"):
+          for image in ("funkey-api", "funkey-inbox", "funkey-vibes", "funkey-room-control", "funkey-identity", "funkey-profile-social", "funkey-economy", "funkey-game-platform", "funkey-notification", "funkey-graphql-bff", "funkey-worker", "funkey-kafka-event-bridge", "funkey-search", "funkey-realtime", "funkey-media"):
               if f"{image}:dev" in manifest:
                   raise SystemExit(f"production render still contains mutable dev image: {image}")
-          if manifest.count("@sha256:") < 14:
-              raise SystemExit("production render must pin all 14 backend workloads by digest")
+          if manifest.count("@sha256:") < 15:
+              raise SystemExit("production render must pin all 15 backend workloads by digest")
           PY
       - name: Parse load and chaos harnesses
         shell: bash
@@ -131,6 +133,7 @@ jobs:
       - run: docker build -f backend/Dockerfile -t funkey-api:ci .
       - run: docker build -f apps/worker/Dockerfile -t funkey-worker:ci .
       - run: docker build -f apps/kafka-event-bridge/Dockerfile -t funkey-kafka-event-bridge:ci .
+      - run: docker build -f apps/search-service/Dockerfile -t funkey-search:ci .
       - run: docker build -f apps/inbox-service/Dockerfile -t funkey-inbox:ci .
       - run: docker build -f apps/vibes-service/Dockerfile -t funkey-vibes:ci .
       - run: docker build -f apps/room-control-service/Dockerfile -t funkey-room-control:ci .
@@ -280,6 +283,27 @@ jobs:
       - name: Cleanup Kafka integration
         if: always()
         run: docker compose -f infra/docker-compose.yml --profile data down -v --remove-orphans
+
+  search-platform:
+    name: Search platform
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.13'
+      - name: Install Search runtime
+        run: pip install -r apps/search-service/requirements.txt
+      - name: Compile Search service
+        run: python -m compileall -q apps/search-service scripts/check_search_platform.py
+      - name: Run Search tests
+        working-directory: apps/search-service
+        run: python -m unittest discover -s tests -p 'test_*.py' -v
+      - name: Enforce Search architecture
+        run: python scripts/check_search_platform.py
+      - name: Build Search image
+        run: docker build -f apps/search-service/Dockerfile -t funkey-search:ci .
 
   security-source:
     runs-on: ubuntu-latest

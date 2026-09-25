@@ -7,6 +7,7 @@ on:
       - 'scripts/check_frontend_architecture.py'
       - 'scripts/check_frontend_baseline.py'
       - 'scripts/check_graphql_bff_architecture.py'
+      - 'scripts/check_search_platform.py'
       - 'contracts/graphql/**'
       - '.github/workflows/frontend-architecture.yml'
   push:
@@ -18,6 +19,7 @@ on:
       - 'scripts/check_frontend_architecture.py'
       - 'scripts/check_frontend_baseline.py'
       - 'scripts/check_graphql_bff_architecture.py'
+      - 'scripts/check_search_platform.py'
       - 'contracts/graphql/**'
 
 jobs:
@@ -31,3 +33,5 @@ jobs:
         run: python scripts/check_frontend_baseline.py
       - name: Verify persisted GraphQL read boundary
         run: python scripts/check_graphql_bff_architecture.py
+      - name: Verify Search projection boundary
+        run: python scripts/check_search_platform.py

@@ -58,6 +58,9 @@ jobs:
           - name: kafka-event-bridge
             dockerfile: apps/kafka-event-bridge/Dockerfile
             context: .
+          - name: search
+            dockerfile: apps/search-service/Dockerfile
+            context: .
           - name: realtime
             dockerfile: apps/realtime-gateway/Dockerfile
             context: .

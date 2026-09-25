@@ -45,6 +45,9 @@ images:
   - name: funkey-kafka-event-bridge
     newName: ghcr.io/harshays18/vibematch/funkey-kafka-event-bridge
     digest: sha256:0000000000000000000000000000000000000000000000000000000000000000
+  - name: funkey-search
+    newName: ghcr.io/harshays18/vibematch/funkey-search
+    digest: sha256:0000000000000000000000000000000000000000000000000000000000000000
   - name: funkey-realtime
     newName: ghcr.io/harshays18/vibematch/funkey-realtime
     digest: sha256:0000000000000000000000000000000000000000000000000000000000000000

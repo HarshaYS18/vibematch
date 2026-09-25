@@ -53,6 +53,18 @@ docker compose -f infra/docker-compose.yml --profile data up --build -d --wait k
 Local Kafka uses one KRaft node with auto topic creation disabled. Kafka is exposed only on `127.0.0.1:19092`; the bridge health endpoint is `127.0.0.1:8092`. Stop it with `docker compose -f infra/docker-compose.yml --profile data down -v` when finished.
 
 
+## Search profile
+
+Chunk 38 keeps OpenSearch optional:
+
+```powershell
+docker compose -f infra/docker-compose.yml --profile search up --build -d --wait nats opensearch search-service
+```
+
+OpenSearch is exposed only on `127.0.0.1:19200` and the Search service on
+`127.0.0.1:8093`. Search depends on the canonical `FUNKEY_EVENTS` JetStream
+stream and is a disposable projection.
+
 ## Key local ports
 
 - core API: 8000
@@ -66,6 +78,8 @@ Local Kafka uses one KRaft node with auto topic creation disabled. Kafka is expo
 - Economy: 8088
 - Game Platform: 8089
 - Notification: 8090
+- Search: 8093
+- OpenSearch (search profile): 19200
 - backend_media: 4100
 
 ## Validation

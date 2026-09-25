@@ -167,6 +167,10 @@ class Settings(BaseSettings):
     NOTIFICATION_PROVIDER_LEASE_SECONDS: int = 60
     NOTIFICATION_PROVIDER_MAX_ATTEMPTS: int = 8
 
+    # Chunk 38 Search/OpenSearch projection boundary.
+    SEARCH_SERVICE_URL: str = "http://127.0.0.1:8093/api/v1"
+    SEARCH_SERVICE_TIMEOUT_SECONDS: float = 3.0
+
     # Topology budgets. These are planning/validation limits, not capacity claims.
     API_MAX_REPLICAS: int = 20
     DB_API_CONNECTION_BUDGET: int = 100

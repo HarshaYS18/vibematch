@@ -18,6 +18,7 @@ rollback runbook before reducing capacity. Exercise these procedures in staging.
 ## Platform incidents
 - [GraphQL Read BFF](graphql-read-bff.md)
 - [Kafka data platform](kafka-data-platform.md)
+- [Search / OpenSearch](search-opensearch.md)
 - [API Gateway / edge](api-gateway.md)
 - [API degraded](api-degraded.md)
 - [Realtime degraded](realtime-degraded.md)

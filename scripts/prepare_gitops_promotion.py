@@ -20,6 +20,7 @@ _IMAGE_KEYS = (
     "graphql_bff",
     "worker",
     "kafka_event_bridge",
+    "search",
     "realtime",
     "media",
 )
@@ -36,6 +37,7 @@ _IMAGE_NAMES = {
     "graphql_bff": "funkey-graphql-bff",
     "worker": "funkey-worker",
     "kafka_event_bridge": "funkey-kafka-event-bridge",
+    "search": "funkey-search",
     "realtime": "funkey-realtime",
     "media": "funkey-media",
 }

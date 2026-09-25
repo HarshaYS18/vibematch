@@ -1,9 +1,9 @@
 # FunKey module index
 
 Use this index to find the current owner, contracts, runbooks and architecture
-for the repository through Chunk 37. A service name here means the deployable
+for the repository through Chunk 38. A service name here means the deployable
 exists. GraphQL read composition and the Kafka analytics bridge are now deployed
-platform boundaries; Search/Recommendation product services remain later chunks.
+platform boundaries; Search is now a deployed projection boundary; Recommendation remains a later chunk.
 
 ## Deployables
 
@@ -12,6 +12,7 @@ platform boundaries; Search/Recommendation product services remain later chunks.
 - [Worker Platform](modules/worker/README.md)
 - [GraphQL Read BFF](modules/graphql-read-bff/README.md)
 - [Kafka Event Bridge](modules/kafka-event-bridge/README.md)
+- [Search Service](modules/search/README.md)
 - [Inbox Service](architecture/inbox-service.md)
 - [Vibes Service](architecture/vibes-service.md)
 - [Room Control Service](architecture/room-control-service.md)
@@ -46,7 +47,8 @@ platform boundaries; Search/Recommendation product services remain later chunks.
 
 - [database](modules/database/README.md)
 - [cache / Redis](modules/cache/README.md)
-- [events / NATS](modules/events/README.md)\n- [observability](modules/observability/README.md)
+- [events / NATS](modules/events/README.md)
+- [observability](modules/observability/README.md)
 - [security](modules/security/README.md)
 - [infrastructure](modules/infrastructure/README.md)
 - [Kubernetes](modules/kubernetes/README.md)
@@ -64,7 +66,9 @@ platform boundaries; Search/Recommendation product services remain later chunks.
 - [State classification](architecture/state-classification.md)
 - [Service contracts](architecture/service-contracts.md)
 - [PostgreSQL platform](architecture/postgresql-platform.md)
-- [Redis / Valkey platform](architecture/redis-valkey-platform.md)\n- [Kafka data platform](architecture/kafka-data-platform.md)
+- [Redis / Valkey platform](architecture/redis-valkey-platform.md)
+- [Kafka data platform](architecture/kafka-data-platform.md)
+- [Search platform](architecture/search-platform.md)
 - [Room State Engine v2](architecture/room-state-engine-v2.md)
 - [Go realtime v2](architecture/go-realtime-platform-v2.md)
 - [Media v2](architecture/media-v2-upload.md)

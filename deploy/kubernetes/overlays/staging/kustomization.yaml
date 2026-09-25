@@ -6,6 +6,7 @@ resources:
   - ../../jobs
   - ../../gateway
   - ../../../kafka
+  - ../../../opensearch
 patches:
   - path: config.yaml
   - target:

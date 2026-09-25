@@ -84,6 +84,10 @@ data:
   KAFKA_BRIDGE_MAX_IN_FLIGHT: "32"
   KAFKA_BRIDGE_NAK_DELAY_SECONDS: "5"
   KAFKA_TOPIC_REPLICATION_FACTOR: "3"
+  OPENSEARCH_URL: https://opensearch.example.invalid
+  SEARCH_INDEX_PREFIX: funkey-search-v1
+  SEARCH_NATS_DURABLE: funkey-search-projector-v1
+  SEARCH_SERVICE_URL: http://funkey-search:8093/api/v1
   REALTIME_NATS_URL: nats://nats.example.invalid:4222
   REALTIME_NATS_INBOX_SUBJECT: funkey.events.inbox.realtime
   REALTIME_INBOX_COMMAND_URL: http://funkey-inbox:8083/api/v1/realtime/command

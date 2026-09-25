@@ -164,6 +164,38 @@ services:
       kafka: {condition: service_healthy}
     restart: "no"
 
+  opensearch:
+    profiles: ["search"]
+    image: opensearchproject/opensearch:2.19.1
+    environment:
+      discovery.type: single-node
+      DISABLE_SECURITY_PLUGIN: "true"
+      OPENSEARCH_JAVA_OPTS: "-Xms512m -Xmx512m"
+    ports:
+      - "127.0.0.1:19200:9200"
+    volumes: ["opensearch_data:/usr/share/opensearch/data"]
+    healthcheck:
+      test: ["CMD-SHELL", "curl -fsS http://127.0.0.1:9200/_cluster/health >/dev/null"]
+      interval: 10s
+      timeout: 5s
+      retries: 40
+      start_period: 30s
+
+  search-service:
+    profiles: ["search"]
+    build: {context: .., dockerfile: apps/search-service/Dockerfile}
+    environment:
+      OPENSEARCH_URL: http://opensearch:9200
+      SEARCH_INDEX_PREFIX: funkey-search-v1
+      NATS_URL: nats://nats:4222
+      NATS_STREAM: FUNKEY_EVENTS
+      SEARCH_NATS_DURABLE: funkey-search-projector-v1
+      SEARCH_PORT: "8093"
+    ports: ["127.0.0.1:8093:8093"]
+    depends_on:
+      opensearch: {condition: service_healthy}
+      nats: {condition: service_healthy}
+
   kafka-event-bridge:
     profiles: ["data"]
     build: {context: .., dockerfile: apps/kafka-event-bridge/Dockerfile}
@@ -506,3 +538,4 @@ volumes:
   media_redis_data:
   nats_data:
   kafka_data:
+  opensearch_data:
