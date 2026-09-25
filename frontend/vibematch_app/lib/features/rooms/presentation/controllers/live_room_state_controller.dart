@@ -5,7 +5,6 @@ import 'package:flutter/material.dart';
 import '../../../../core/security/screenshot_guard_service.dart';
 import '../../../../room_session/data/room_session_repository.dart';
 import '../../data/live_room_media_signaling_service.dart';
-import '../../data/live_room_restrictions_service.dart';
 import '../../data/room_seat_layout_sync_service.dart';
 import '../../data/room_settings_repository.dart';
 import '../live_room_models.dart';
@@ -414,10 +413,6 @@ class LiveRoomStateController {
   }
 
   void _applyDerivedPolicies() {
-    LiveRoomRestrictionsService.update(
-      roomImagesEnabled: roomImagesEnabled,
-      guestMessagesEnabled: guestMessagesEnabled,
-    );
     ScreenshotGuardService.applyRoomScreenshotPolicy(
       allowScreenshots: allowScreenshots,
     );

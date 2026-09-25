@@ -5,7 +5,6 @@ import '../../../../realtime/app_realtime_hub.dart';
 import '../../data/live_room_media_signaling_service.dart';
 import '../../../../room_session/data/room_session_repository.dart';
 import '../../data/room_session_legacy_adapter.dart';
-import '../../data/live_room_restrictions_service.dart';
 import '../../data/live_room_seat_application_event_bus.dart';
 import '../../data/live_room_system_event_bus.dart';
 import '../live_room_models.dart';
@@ -54,12 +53,44 @@ class LiveRoomMessageController {
   final AppRealtimeHub _realtimeHub;
   StreamSubscription<RealtimeEventEnvelope>? _eventSubscription;
 
-  bool get _currentUserCanBypassGuestMessageBlock =>
-      currentUser.isHost || currentUser.isRoomAdmin;
+  bool get _currentUserCanBypassGuestMessageBlock {
+    if (currentUser.isHost || currentUser.isRoomAdmin) return true;
+    final repository = roomSessionRepository;
+    if (repository == null) return false;
+    final aliases = _identityAliases(currentUser.id);
+    for (final entry in repository.currentState.membershipRoster.values) {
+      final matchesIdentity =
+          aliases.contains(entry.backendUserId.toString()) ||
+          aliases.contains('user_${entry.backendUserId}') ||
+          aliases.contains(entry.publicUserId.toString()) ||
+          aliases.contains('user_${entry.publicUserId}');
+      if (matchesIdentity && (entry.isMember || entry.isAdmin || entry.isHost)) {
+        return true;
+      }
+    }
+    return false;
+  }
+
+  bool get _guestMessagesEnabled {
+    final repository = roomSessionRepository;
+    if (repository == null) return true;
+    return _canonicalBool(
+      repository.currentState.room['guest_messages_enabled'],
+      fallback: true,
+    );
+  }
+
+  bool get _roomImagesEnabled {
+    final repository = roomSessionRepository;
+    if (repository == null) return true;
+    return _canonicalBool(
+      repository.currentState.room['room_images_enabled'],
+      fallback: true,
+    );
+  }
 
   bool get _guestMessageAllowed =>
-      LiveRoomRestrictionsService.guestMessagesEnabled ||
-      _currentUserCanBypassGuestMessageBlock;
+      _guestMessagesEnabled || _currentUserCanBypassGuestMessageBlock;
 
   LiveRoomMessageRestoreState snapshotForRestore() {
     return LiveRoomMessageRestoreState(
@@ -81,7 +112,7 @@ class LiveRoomMessageController {
   }) {
     final safeUrl = imageUrl.trim();
     if (safeUrl.isEmpty) return;
-    if (!LiveRoomRestrictionsService.roomImagesEnabled) return;
+    if (!_roomImagesEnabled) return;
     if (!_guestMessageAllowed) return;
   }
 
@@ -564,6 +595,20 @@ class LiveRoomMessageController {
     final direct = int.tryParse(value);
     if (direct != null) aliases.add('user_$direct');
     return aliases;
+  }
+
+  bool _canonicalBool(Object? value, {required bool fallback}) {
+    if (value == null) return fallback;
+    if (value is bool) return value;
+    if (value is num) return value != 0;
+    final normalized = value.toString().trim().toLowerCase();
+    if (normalized == 'true' || normalized == '1' || normalized == 'yes') {
+      return true;
+    }
+    if (normalized == 'false' || normalized == '0' || normalized == 'no') {
+      return false;
+    }
+    return fallback;
   }
 
   void _scheduleAutoDismiss(ChatEntry entry) {
