@@ -42,7 +42,7 @@ The positive Home workload then requires:
 The scenario performs no blanket retry and therefore exposes real transport,
 protocol, owner-service, and tail-latency instability.
 
-Chunk 37 also removes duplicate Home banner owner reads: event and policy
+The Chunk 36 reliability/latency improvement also removes duplicate Home banner owner reads: event and policy
 placements now share one request-scoped active-banner read. The smoke remains
 end-to-end and therefore still includes gateway/network cost; BFF timing is
 tracked separately so a regression can be localized instead of hidden by a
