@@ -2,32 +2,47 @@
 
 ## Purpose
 
-Chunk 36 introduces GraphQL only for composite reads. Home, Profile, Discovery and creator/admin dashboards can aggregate multiple owning services without Flutter discovering internal service endpoints.
+The GraphQL BFF exists only for composite reads. Home, Profile, Discovery, and creator/admin dashboards can aggregate owning services without Flutter learning internal service topology.
+
+Chunk 37 hardening adds strict SLO measurement and removes avoidable request-path work.
 
 ## Non-authority rule
 
-The BFF owns no PostgreSQL tables, Redis truth, NATS subjects, WebSocket, or business commands. It receives no database secret. All reads flow through owning HTTP APIs with the caller bearer token.
+The BFF owns no PostgreSQL tables, Redis truth, NATS subjects, WebSocket authority, or business commands. It receives no database secret. All reads go through owning HTTP APIs with the caller bearer token.
 
 ## Security envelope
 
-Only four SHA-256 persisted operations are accepted. Ad-hoc `query` payloads are rejected, the allowlist is checked into `contracts/graphql`, introspection is rejected, maximum depth is 4, complexity budget is 30 and JSON request size is capped at 16KiB.
+Only four SHA-256 persisted operations are accepted. Ad-hoc query text is rejected. Introspection is rejected. Maximum depth is 4, complexity is 30, and the JSON request cap is 16KiB.
 
-Envoy adds a 64KiB outer buffer/rate limit; the smaller application cap is authoritative for the BFF payload.
+Persisted documents are immutable for a process lifetime, so security inspection and GraphQL schema validation happen once at startup. Unsafe or invalid checked-in operations fail process startup; accepted requests do not repeat this work.
 
 ## Composition
 
-GraphQL sibling fields are asynchronous, so unrelated owner reads execute concurrently. Request-scoped DataLoaders deduplicate profile/user-Vibes keys. No cross-request DataLoader cache exists.
+Sibling fields execute asynchronously. Request-scoped DataLoaders deduplicate repeated profile/user-Vibes keys.
 
-Upstream reads use a 2.5-second deadline and a request-local concurrency semaphore. Authorization, `X-Request-ID` and `traceparent` propagate to owner services. OpenTelemetry spans identify operation ID/name and upstream service without recording variables or tokens.
+Home event and policy banners intentionally share one request-scoped `/home-banners` owner read. The BFF partitions the active list by placement after the single authoritative read. This removes duplicate upstream HTTP and JSON work while preserving request-level freshness and the no-cross-request-cache rule.
+
+Upstream reads have a bounded deadline and request-local concurrency limit. Authorization, `X-Request-ID`, and `traceparent` propagate to owner services.
+
+## SLO observability
+
+The service emits cumulative Prometheus histograms:
+
+- `funkey_graphql_operation_duration_seconds`, labelled only by persisted operation name and `ok|error`;
+- `funkey_graphql_upstream_duration_seconds`, labelled only by fixed owner-service name and `ok|error`.
+
+No user ID, room ID, request ID, URL path, token, or GraphQL variable is permitted as a metric label.
+
+Successful responses include aggregate `graphql-exec` and total `bff` values in `Server-Timing`. Per-service topology remains in server-side metrics/traces.
 
 ## Partial data
 
-Owner timeouts, HTTP failures and protocol errors map to field-level GraphQL errors. Other fields may still return data. This is a read-composition availability feature, not permission to synthesize missing business state.
+Owner timeout, HTTP, and protocol failures map to field-level GraphQL errors. Valid sibling data may still return. This is a read-composition availability feature, not permission to synthesize missing state.
 
 ## Client
 
-Flutter uses the existing AppNetworkRuntime and sends only operation IDs plus variables. No `graphql_flutter` stack is introduced. Home chrome is the first live cutover: my room plus event/policy banners replace three independent reads with one persisted operation while preserving existing domain models/UI.
+Flutter uses the existing networking runtime and sends only persisted operation IDs plus variables. No second GraphQL transport stack is introduced.
 
 ## Commands
 
-All writes remain existing REST/gRPC-backed command APIs. The Go realtime gateway remains the sole application WebSocket.
+All writes stay on existing REST/gRPC command APIs. The Go realtime gateway remains the sole application WebSocket.

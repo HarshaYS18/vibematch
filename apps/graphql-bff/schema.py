@@ -54,18 +54,27 @@ async def _home_my_room(root, info):
     return await _ctx(info).upstream.get_json("core", "/rooms/my-created-room")
 
 
+def _filter_home_banners(payload: Any, placement: str) -> list[dict[str, Any]]:
+    """Partition the authoritative active-banner list without a second owner read."""
+    if not isinstance(payload, list):
+        return []
+    return [
+        item
+        for item in payload
+        if isinstance(item, dict) and item.get("placement") == placement
+    ]
+
+
 async def _home_event_banners(root, info):
     del root
-    return await _ctx(info).upstream.get_json(
-        "core", "/home-banners", params={"placement": "event"}
-    )
+    banners = await _ctx(info).home_banners_loader.load("active")
+    return _filter_home_banners(banners, "event")
 
 
 async def _home_policy_banners(root, info):
     del root
-    return await _ctx(info).upstream.get_json(
-        "core", "/home-banners", params={"placement": "policy_rules"}
-    )
+    banners = await _ctx(info).home_banners_loader.load("active")
+    return _filter_home_banners(banners, "policy_rules")
 
 
 async def _profile_display(root, info):

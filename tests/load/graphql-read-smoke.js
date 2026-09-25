@@ -13,6 +13,7 @@ const PersistedGraphqlOperations = {
 const unexpectedFailureRate = new Rate('graphql_unexpected_failure_rate');
 const semanticErrorRate = new Rate('graphql_semantic_error_rate');
 const homeCompositeDuration = new Trend('graphql_home_composite_duration', true);
+const bffServerDuration = new Trend('graphql_bff_server_duration', true);
 
 export const options = {
   vus: Number(__ENV.VUS || 5),
@@ -24,6 +25,7 @@ export const options = {
     graphql_unexpected_failure_rate: ['rate==0'],
     graphql_semantic_error_rate: ['rate==0'],
     graphql_home_composite_duration: ['p(95)<250', 'p(99)<500'],
+    graphql_bff_server_duration: ['p(95)<200', 'p(99)<400'],
   },
 };
 
@@ -42,6 +44,15 @@ function decodeGraphqlResponse(response) {
   } catch (_) {
     return null;
   }
+}
+
+function parseBffServerTiming(response) {
+  const value = response.headers['Server-Timing'] || response.headers['server-timing'];
+  if (!value) {
+    return null;
+  }
+  const match = /(?:^|,\s*)bff;dur=([0-9]+(?:\.[0-9]+)?)/.exec(value);
+  return match ? Number(match[1]) : null;
 }
 
 function hasCompleteHomeComposite(body) {
@@ -79,12 +90,19 @@ export default function () {
   });
 
   const body = decodeGraphqlResponse(response);
+  const bffDurationMs = parseBffServerTiming(response);
+  if (bffDurationMs !== null) {
+    bffServerDuration.add(bffDurationMs, { operation: 'HomeComposite' });
+  }
+
   const transportAccepted = response.status === 200;
   const semanticErrors =
     body && Array.isArray(body.errors) ? body.errors.length : body ? 0 : 1;
   const completeHome = hasCompleteHomeComposite(body);
+  const serverTimingPresent = bffDurationMs !== null;
   const semanticFailure = !body || semanticErrors > 0 || !completeHome;
-  const unexpectedFailure = !transportAccepted || semanticFailure;
+  const unexpectedFailure =
+    !transportAccepted || semanticFailure || !serverTimingPresent;
 
   semanticErrorRate.add(semanticFailure, { operation: 'HomeComposite' });
   unexpectedFailureRate.add(unexpectedFailure, { operation: 'HomeComposite' });
@@ -96,6 +114,7 @@ export default function () {
       'GraphQL response is valid JSON': () => body !== null,
       'GraphQL response has zero semantic errors': () => semanticErrors === 0,
       'Home composite returned every required field': () => completeHome,
+      'BFF Server-Timing is present': () => serverTimingPresent,
     },
     { operation: 'HomeComposite' },
   );

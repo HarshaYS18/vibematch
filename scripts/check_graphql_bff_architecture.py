@@ -31,12 +31,56 @@ required_bff_files = (
 for name in required_bff_files:
     require(BFF / name)
 
-main_text = require(BFF / 'main.py', ('PERSISTED_ONLY', 'UNKNOWN_OPERATION', 'max_request_bytes', 'Bearer authentication is required', 'X-Request-ID'))
-schema_text = require(BFF / 'schema.py', ('GraphQLSchema(query=Query)', 'HomeComposite', 'ProfileComposite', 'DiscoveryComposite', 'CreatorAdminDashboard'))
+main_text = require(
+    BFF / 'main.py',
+    (
+        'PERSISTED_ONLY',
+        'UNKNOWN_OPERATION',
+        'max_request_bytes',
+        'Bearer authentication is required',
+        'X-Request-ID',
+        '_OPERATION_BUDGETS',
+        'observe_operation',
+        'Server-Timing',
+    ),
+)
+schema_text = require(
+    BFF / 'schema.py',
+    (
+        'GraphQLSchema(query=Query)',
+        'HomeComposite',
+        'ProfileComposite',
+        'DiscoveryComposite',
+        'CreatorAdminDashboard',
+        '_filter_home_banners',
+        'home_banners_loader.load("active")',
+    ),
+)
 operations_text = require(BFF / 'operations.py', ('HomeComposite', 'ProfileComposite', 'DiscoveryComposite', 'CreatorAdminDashboard', 'hashlib.sha256'))
 require(BFF / 'security.py', ('max_depth', 'max_complexity', 'introspection is not available'))
 require(BFF / 'dataloader.py', ('class DataLoader', '_cache', '_pending'))
-upstream_text = require(BFF / 'upstream.py', ('async def get_json', 'X-Request-ID', 'traceparent', 'UPSTREAM_TIMEOUT'))
+context_text = require(
+    BFF / 'context.py',
+    ('home_banners_loader', 'batch_home_banners', '"/home-banners"'),
+)
+upstream_text = require(
+    BFF / 'upstream.py',
+    (
+        'async def get_json',
+        'X-Request-ID',
+        'traceparent',
+        'UPSTREAM_TIMEOUT',
+        'observe_upstream',
+    ),
+)
+metrics_text = require(
+    BFF / 'metrics.py',
+    (
+        'funkey_graphql_operation_duration_seconds',
+        'funkey_graphql_upstream_duration_seconds',
+        'outcome not in {"ok", "error"}',
+    ),
+)
 
 bff_python = '\n'.join(path.read_text(encoding='utf-8-sig') for path in BFF.glob('*.py'))
 for marker in ('sqlalchemy', 'app.database', 'Session(', 'mutation_type='):
@@ -44,6 +88,16 @@ for marker in ('sqlalchemy', 'app.database', 'Session(', 'mutation_type='):
         violations.append(f'apps/graphql-bff: forbidden authority marker: {marker}')
 if 'async def post_' in upstream_text or 'async def put_' in upstream_text or 'async def delete_' in upstream_text:
     violations.append('apps/graphql-bff/upstream.py: BFF upstream client must remain read-only')
+
+if 'request_id' in metrics_text or 'authorization' in metrics_text or 'variables' in metrics_text:
+    violations.append(
+        'apps/graphql-bff/metrics.py: high-cardinality or sensitive labels are forbidden'
+    )
+
+if 'params={"placement": "event"}' in schema_text or 'params={"placement": "policy_rules"}' in schema_text:
+    violations.append(
+        'apps/graphql-bff/schema.py: Home banner placements must share one request-scoped owner read'
+    )
 
 contract_path = ROOT / 'contracts' / 'graphql' / 'persisted_operations.json'
 if not contract_path.exists():
@@ -104,6 +158,10 @@ require(
         'rate==0',
         'graphql_semantic_error_rate',
         'graphql_unexpected_failure_rate',
+        'graphql_bff_server_duration',
+        'p(95)<200',
+        'p(99)<400',
+        'Server-Timing',
         '/graphql',
     ),
 )

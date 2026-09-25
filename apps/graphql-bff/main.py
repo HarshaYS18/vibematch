@@ -1,10 +1,11 @@
-"""FunKey Chunk 36 read-only GraphQL BFF."""
+"""FunKey read-only GraphQL BFF with persisted-operation SLO instrumentation."""
 
 from __future__ import annotations
 
 import inspect
 import json
 from contextlib import asynccontextmanager
+from time import perf_counter
 from uuid import uuid4
 
 import httpx
@@ -16,7 +17,7 @@ from opentelemetry.instrumentation.fastapi import FastAPIInstrumentor
 
 from config import settings
 from context import GraphQLRequestContext
-from metrics import increment, render
+from metrics import increment, observe_operation, render
 from operations import OPERATIONS
 from schema import schema
 from security import inspect_query
@@ -25,8 +26,33 @@ from upstream import RequestMetadata, UpstreamClient
 tracer = trace.get_tracer("funkey.graphql_bff")
 
 
+def _compile_operation_budgets():
+    """Validate immutable persisted documents once so request hot paths do no schema work."""
+    budgets = {}
+    for operation_id, operation in OPERATIONS.items():
+        try:
+            budget = inspect_query(operation.document)
+        except ValueError as exc:
+            raise RuntimeError(
+                f"Persisted operation {operation.name} violates the security budget"
+            ) from exc
+
+        schema_errors = validate(schema, operation.document)
+        if schema_errors:
+            raise RuntimeError(
+                f"Persisted operation {operation.name} is invalid: "
+                f"{schema_errors[0].message}"
+            )
+        budgets[operation_id] = budget
+    return budgets
+
+
+_OPERATION_BUDGETS = _compile_operation_budgets()
+
+
 @asynccontextmanager
 async def lifespan(app: FastAPI):
+    """Own the shared HTTP connection pool for all BFF upstream reads."""
     app.state.http = httpx.AsyncClient(
         limits=httpx.Limits(max_connections=64, max_keepalive_connections=32),
         follow_redirects=False,
@@ -49,6 +75,7 @@ FastAPIInstrumentor.instrument_app(app)
 
 
 def _reject(status: int, code: str, message: str) -> JSONResponse:
+    """Return a low-cardinality pre-execution GraphQL rejection."""
     increment("rejected")
     return JSONResponse(
         status_code=status,
@@ -58,21 +85,31 @@ def _reject(status: int, code: str, message: str) -> JSONResponse:
 
 @app.get("/live", include_in_schema=False)
 def live() -> dict[str, str]:
+    """Liveness never depends on downstream owner services."""
     return {"status": "live"}
 
 
 @app.get("/ready", include_in_schema=False)
 def ready() -> dict[str, object]:
-    return {"status": "ready", "persisted_operations": len(OPERATIONS)}
+    """Readiness confirms every allowlisted document compiled successfully."""
+    return {
+        "status": "ready",
+        "persisted_operations": len(OPERATIONS),
+        "compiled_operations": len(_OPERATION_BUDGETS),
+    }
 
 
 @app.get("/metrics", include_in_schema=False, response_class=PlainTextResponse)
 def metrics() -> PlainTextResponse:
+    """Expose counters and low-cardinality latency histograms."""
     return PlainTextResponse(render(), media_type="text/plain; version=0.0.4")
 
 
 @app.post("/graphql")
 async def graphql_endpoint(request: Request):
+    """Execute one authenticated persisted read without request-time query validation."""
+    request_started = perf_counter()
+
     raw = await request.body()
     if len(raw) > settings.max_request_bytes:
         return _reject(413, "PAYLOAD_TOO_LARGE", "GraphQL request payload is too large")
@@ -107,42 +144,57 @@ async def graphql_endpoint(request: Request):
     )
     upstream = UpstreamClient(request.app.state.http, metadata)
     context = GraphQLRequestContext.build(upstream, metadata)
-
-    try:
-        budget = inspect_query(operation.document)
-        schema_errors = validate(schema, operation.document)
-        if schema_errors:
-            return _reject(500, "PERSISTED_QUERY_INVALID", schema_errors[0].message)
-    except ValueError as exc:
-        return _reject(500, "PERSISTED_QUERY_UNSAFE", str(exc))
+    budget = _OPERATION_BUDGETS[operation_id]
 
     increment("requests")
-    with tracer.start_as_current_span(
-        "graphql.persisted_operation",
-        attributes={
-            "graphql.operation.name": operation.name,
-            "graphql.operation.id": operation.operation_id,
-            "graphql.query.depth": budget.depth,
-            "graphql.query.complexity": budget.complexity,
-            "funkey.request_id": request_id,
-        },
-    ):
-        result = execute(
-            schema,
-            operation.document,
-            variable_values=variables,
-            operation_name=operation.name,
-            context_value=context,
+    execution_started = perf_counter()
+    try:
+        with tracer.start_as_current_span(
+            "graphql.persisted_operation",
+            attributes={
+                "graphql.operation.name": operation.name,
+                "graphql.operation.id": operation.operation_id,
+                "graphql.query.depth": budget.depth,
+                "graphql.query.complexity": budget.complexity,
+                "funkey.request_id": request_id,
+            },
+        ):
+            result = execute(
+                schema,
+                operation.document,
+                variable_values=variables,
+                operation_name=operation.name,
+                context_value=context,
+            )
+            if inspect.isawaitable(result):
+                result = await result
+    except Exception:
+        observe_operation(
+            operation.name,
+            perf_counter() - request_started,
+            outcome="error",
         )
-        if inspect.isawaitable(result):
-            result = await result
+        raise
 
+    execution_seconds = perf_counter() - execution_started
     body: dict[str, object] = {"data": result.data}
+    outcome = "ok"
     if result.errors:
+        outcome = "error"
         increment("execution_errors")
         body["errors"] = [error.formatted for error in result.errors]
+
+    total_seconds = perf_counter() - request_started
+    observe_operation(operation.name, total_seconds, outcome=outcome)
+
     return JSONResponse(
         status_code=200,
         content=body,
-        headers={"X-Request-ID": request_id},
+        headers={
+            "X-Request-ID": request_id,
+            "Server-Timing": (
+                f"graphql-exec;dur={execution_seconds * 1000:.2f}, "
+                f"bff;dur={total_seconds * 1000:.2f}"
+            ),
+        },
     )
