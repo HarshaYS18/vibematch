@@ -144,6 +144,9 @@ class _FakeMediasoupAudioDelegate implements MediasoupAudioDelegate {
   String? _roomId;
 
   @override
+  void bindMediaResourceRegistry(registry) {}
+
+  @override
   bool get isJoined => _joined;
 
   @override

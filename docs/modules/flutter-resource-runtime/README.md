@@ -133,3 +133,14 @@ foreground resumes only when appropriate, and memory pressure/session teardown
 may drop the decoder and finish the presentation.
 
 Gift settlement and wallet/domain state are unchanged.
+
+
+## M11 microphone input
+
+The concrete `getUserMedia(audio)` stream now registers as
+`MediaResourceKind.audioInput` only while capture exists.
+Registry injection reaches the legacy low-level audio implementation through
+the canonical RoomMediaEngine/delegate boundary.
+
+Background and memory pressure do not silently mute active room voice. Session
+teardown releases the local input device.

@@ -77,6 +77,26 @@ void main() {
     expect(participant, isNot(contains('_engine.dispose()')));
   });
 
+  test('Chunk 34-M11 microphone capture registers at the real device owner', () {
+    final service = File(
+      'lib/features/rooms/data/live_room_audio_service.dart',
+    ).readAsStringSync();
+    final participant = File(
+      'lib/features/rooms/data/runtime/audio_input_resource_participant.dart',
+    ).readAsStringSync();
+    final binding = File(
+      'lib/room_media/runtime/room_media_resource_registry_binding.dart',
+    ).readAsStringSync();
+
+    expect(service, contains('bindMediaResourceRegistry'));
+    expect(service, contains('_attachAudioInputResource'));
+    expect(service, contains('_detachAudioInputResource'));
+    expect(service, contains('AudioInputResourceParticipant'));
+    expect(participant, contains('MediaResourceKind.audioInput'));
+    expect(participant, contains('_releaseInput()'));
+    expect(binding, contains('RoomMediaResourceRegistryBinding'));
+  });
+
   test('room feature code cannot bypass RoomMediaEngine', () {
     final root = Directory('lib/features/rooms');
     final leaks = <String>[];

@@ -3,6 +3,8 @@ import 'dart:async';
 import 'package:flutter/foundation.dart';
 import 'package:flutter_webrtc/flutter_webrtc.dart';
 
+import '../../foundation/runtime/media_resource_lifecycle.dart';
+
 import '../../features/rooms/data/live_room_audio_service.dart';
 import '../domain/room_media_engine.dart';
 import 'mediasoup_audio_delegate.dart';
@@ -17,6 +19,11 @@ class LiveRoomMediasoupAudioDelegate implements MediasoupAudioDelegate {
   }) : _service = service ?? LiveRoomAudioService.instance;
 
   final LiveRoomAudioService _service;
+
+  @override
+  void bindMediaResourceRegistry(MediaResourceRegistry? registry) {
+    _service.bindMediaResourceRegistry(registry);
+  }
 
   @override
   bool get isJoined => _service.isJoined;

@@ -1,13 +1,14 @@
 import 'dart:async';
 
 import '../domain/room_media_engine.dart';
+import '../runtime/room_media_resource_registry_binding.dart';
 import 'mediasoup_audio_delegate.dart';
 
 /// Deterministic lifecycle wrapper shared by native and web mediasoup engines.
 ///
 /// All mutating operations are serialized so reconnects, room switches, and
 /// teardown cannot create overlapping producer/consumer lifecycles.
-abstract class DelegatingMediasoupEngine implements RoomMediaEngine {
+abstract class DelegatingMediasoupEngine implements RoomMediaEngine, RoomMediaResourceRegistryBinding {
   DelegatingMediasoupEngine({
     required MediasoupAudioDelegate delegate,
   }) : _delegate = delegate;
@@ -23,6 +24,11 @@ abstract class DelegatingMediasoupEngine implements RoomMediaEngine {
   Future<void>? _disposeFuture;
 
   MediasoupAudioDelegate get delegate => _delegate;
+
+  @override
+  void bindMediaResourceRegistry(registry) {
+    _delegate.bindMediaResourceRegistry(registry);
+  }
 
   @override
   RoomMediaEnginePhase get phase => _phase;

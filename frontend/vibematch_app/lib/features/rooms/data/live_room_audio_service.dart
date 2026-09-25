@@ -5,6 +5,9 @@ import 'dart:convert';
 import 'package:flutter/foundation.dart';
 import 'package:vibematch_app/foundation/networking/feature_http_compat.dart' as http;
 import 'package:flutter_webrtc/flutter_webrtc.dart';
+
+import '../../../foundation/runtime/media_resource_lifecycle.dart';
+import 'runtime/audio_input_resource_participant.dart';
 import 'package:mediasfu_mediasoup_client/mediasfu_mediasoup_client.dart';
 import 'package:socket_io_client/socket_io_client.dart' as io;
 
@@ -19,11 +22,25 @@ class LiveRoomAudioService {
 
   static final LiveRoomAudioService instance = LiveRoomAudioService._();
 
+  /// Injects the authenticated session resource registry through the
+  /// RoomMediaEngine/delegate boundary. Room UI never reaches this service
+  /// directly.
+  void bindMediaResourceRegistry(MediaResourceRegistry? registry) {
+    if (identical(_mediaResourceRegistry, registry)) return;
+    _detachAudioInputResource();
+    _mediaResourceRegistry = registry;
+    if (registry != null && _localAudioStream != null) {
+      unawaited(_attachAudioInputResource());
+    }
+  }
+
   io.Socket? _socket;
   String? _roomId;
   String? _peerId;
   String? _currentUserId;
   MediaStream? _localAudioStream;
+  MediaResourceRegistry? _mediaResourceRegistry;
+  AudioInputResourceParticipant? _audioInputResourceParticipant;
   Device? _device;
   dynamic _sendTransport;
   dynamic _recvTransport;
@@ -653,6 +670,7 @@ class LiveRoomAudioService {
       }
       _localAudioStream = stream;
       localMicCapturing.value = true;
+      await _attachAudioInputResource();
       _debug(
         'local mic capture started tracks=${stream.getAudioTracks().length}',
       );
@@ -1343,6 +1361,7 @@ class LiveRoomAudioService {
   }
 
   Future<void> _stopLocalMicCapture() async {
+    _detachAudioInputResource();
     final stream = _localAudioStream;
     if (stream == null) return;
     _localAudioStream = null;
@@ -1357,6 +1376,46 @@ class LiveRoomAudioService {
     } catch (_) {}
     localMicCapturing.value = false;
     _debug('local mic capture stopped');
+  }
+
+  Future<void> _attachAudioInputResource() async {
+    if (_audioInputResourceParticipant != null) return;
+    final registry = _mediaResourceRegistry;
+    final stream = _localAudioStream;
+    if (registry == null || stream == null) return;
+
+    final participant = AudioInputResourceParticipant(
+      resourceId:
+          'audio-input:${_roomId ?? 'room'}:${_currentUserId ?? 'user'}',
+      releaseInput: _releaseAudioInputForSession,
+    );
+    try {
+      if (!registry.register(participant)) return;
+      _audioInputResourceParticipant = participant;
+      await participant.onForegroundChanged(registry.isForeground);
+    } catch (_) {
+      registry.unregister(
+        participant.resourceId,
+        expectedParticipant: participant,
+      );
+    }
+  }
+
+  void _detachAudioInputResource() {
+    final registry = _mediaResourceRegistry;
+    final participant = _audioInputResourceParticipant;
+    _audioInputResourceParticipant = null;
+    if (registry == null || participant == null) return;
+    registry.unregister(
+      participant.resourceId,
+      expectedParticipant: participant,
+    );
+  }
+
+  Future<void> _releaseAudioInputForSession() async {
+    _invalidatePublishingIntent();
+    _silenceLocalMicImmediately();
+    await _stopLocalMicCapture();
   }
 
   void _closeSendTransport() {

@@ -203,3 +203,12 @@ decoders register through the foundation media-resource port using explicit room
 scope. The resource runtime may pause/resume presentation or drop an ephemeral
 gift decoder under memory pressure, but it never owns gift settlement, wallet or
 combo authority.
+
+
+### Microphone resource lifecycle
+
+Local microphone capture is registered only while the underlying
+`MediaStream` exists. Resource-registry injection travels through
+`RoomMediaEngine` and its delegate; room UI must not import or call
+`LiveRoomAudioService` directly. Lifecycle coordination never overrides
+backend seat/admin-mute/publish authorization.

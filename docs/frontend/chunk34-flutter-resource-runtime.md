@@ -438,3 +438,37 @@ controller.
 Gift settlement, wallet state, combo state and durable gift history remain
 backend/`LiveRoomGiftController` authority. This migration affects only local
 gift presentation resources.
+
+
+## M11: microphone/audio-input lifecycle
+
+M11 registers the actual `getUserMedia(audio)` capture at its real owner,
+`LiveRoomAudioService`, rather than inventing a second microphone path.
+
+### Binding path
+
+The authenticated foundation registry is passed through a narrow
+`RoomMediaResourceRegistryBinding` implemented by
+`DelegatingMediasoupEngine` and forwarded by the mediasoup audio delegate.
+Room UI therefore continues to depend only on `RoomMediaEngine`; it never
+bypasses the canonical media boundary to reach `LiveRoomAudioService`.
+
+### Capture lifetime
+
+An `AudioInputResourceParticipant` is registered only after a real local
+`MediaStream` has been acquired. It is unregistered when that stream is
+stopped.
+
+Active room voice is treated as high-priority media:
+
+- app background: no forced mute/stop;
+- memory pressure: no forced capture teardown;
+- authenticated-session teardown: release the local microphone stream.
+
+Normal mute/leave/seat transitions remain owned by the existing audio service
+and continue to stop capture through the same canonical path.
+
+### Authority
+
+The resource participant does not decide whether the user may speak. Seat,
+admin-mute and publish authorization remain backend/room authority.

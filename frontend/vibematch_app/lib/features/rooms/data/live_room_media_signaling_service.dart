@@ -14,6 +14,7 @@ import '../presentation/widgets/cricket_room_backgrounds.dart';
 import '../presentation/widgets/room_theme.dart';
 import '../../../room_media/domain/room_media_engine.dart';
 import '../../../room_media/runtime/room_media_resource_participant.dart';
+import '../../../room_media/runtime/room_media_resource_registry_binding.dart';
 import '../../../room_media/room_media_engine_factory.dart';
 import 'live_room_log.dart';
 import 'live_room_foreground_service.dart';
@@ -146,6 +147,7 @@ class LiveRoomMediaSignalingService with WidgetsBindingObserver {
     }
 
     _detachMediaResourceLifecycle();
+    _bindNestedMediaResources(resourceRegistry);
     if (resourceRegistry == null) return;
 
     final participant = RoomMediaResourceParticipant(
@@ -169,6 +171,7 @@ class LiveRoomMediaSignalingService with WidgetsBindingObserver {
   }
 
   void _detachMediaResourceLifecycle() {
+    _bindNestedMediaResources(null);
     final registry = _mediaResourceRegistry;
     final participant = _mediaResourceParticipant;
     _mediaResourceRegistry = null;
@@ -178,6 +181,13 @@ class LiveRoomMediaSignalingService with WidgetsBindingObserver {
       participant.resourceId,
       expectedParticipant: participant,
     );
+  }
+
+  void _bindNestedMediaResources(MediaResourceRegistry? registry) {
+    final engine = _mediaEngine;
+    if (engine is RoomMediaResourceRegistryBinding) {
+      engine.bindMediaResourceRegistry(registry);
+    }
   }
 
   void setActiveLoggedInUser(CurrentUser user) {

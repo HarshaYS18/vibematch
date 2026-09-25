@@ -432,6 +432,52 @@ if _LIVE_GIFT_OVERLAY.exists():
         )
 
 
+# Chunk 34-M11: microphone capture registers at the low-level audio owner
+# through the RoomMediaEngine/delegate boundary.
+_AUDIO_INPUT_RESOURCE = (
+    APP / "features" / "rooms" / "data" / "runtime" / "audio_input_resource_participant.dart"
+)
+if not _AUDIO_INPUT_RESOURCE.exists():
+    violations.append(
+        "features/rooms/data/runtime/audio_input_resource_participant.dart: Chunk 34-M11 participant is required"
+    )
+else:
+    audio_input_text = _AUDIO_INPUT_RESOURCE.read_text(encoding="utf-8-sig")
+    for marker in (
+        "implements MediaResourceParticipant",
+        "MediaResourceKind.audioInput",
+        "_releaseInput()",
+    ):
+        if marker not in audio_input_text:
+            violations.append(
+                "features/rooms/data/runtime/audio_input_resource_participant.dart: "
+                f"missing Chunk 34-M11 lifecycle marker: {marker}"
+            )
+
+_AUDIO_SERVICE = APP / "features" / "rooms" / "data" / "live_room_audio_service.dart"
+if _AUDIO_SERVICE.exists():
+    audio_service_text = _AUDIO_SERVICE.read_text(encoding="utf-8-sig")
+    for marker in (
+        "bindMediaResourceRegistry",
+        "_attachAudioInputResource",
+        "_detachAudioInputResource",
+        "AudioInputResourceParticipant",
+    ):
+        if marker not in audio_service_text:
+            violations.append(
+                "features/rooms/data/live_room_audio_service.dart: "
+                f"missing Chunk 34-M11 microphone lifecycle marker: {marker}"
+            )
+
+_ROOM_MEDIA_REGISTRY_BINDING = (
+    APP / "room_media" / "runtime" / "room_media_resource_registry_binding.dart"
+)
+if not _ROOM_MEDIA_REGISTRY_BINDING.exists():
+    violations.append(
+        "room_media/runtime/room_media_resource_registry_binding.dart: Chunk 34-M11 binding is required"
+    )
+
+
 # Chunk 34-M1: heavyweight media/resource lifecycle coordination must be
 # session-scoped. The coordinator is an app/runtime implementation, not a
 # feature singleton or a new domain-state authority.
