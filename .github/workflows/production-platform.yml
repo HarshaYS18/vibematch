@@ -178,7 +178,7 @@ jobs:
       - name: Install Kafka bridge runtime
         run: pip install -r apps/kafka-event-bridge/requirements.txt
       - name: Compile Kafka platform
-        run: python -m compileall -q apps/kafka-event-bridge scripts/check_kafka_data_platform.py tests/integration/kafka_bridge_smoke.py
+        run: python -m compileall -q apps/kafka-event-bridge scripts/check_kafka_data_platform.py tests/integration/kafka_bridge_smoke.py tests/integration/kafka_bridge_recovery.py
       - name: Run Kafka bridge unit tests
         working-directory: apps/kafka-event-bridge
         run: python -m unittest discover -s tests -p 'test_*.py' -v
@@ -224,6 +224,56 @@ jobs:
         run: docker compose -f infra/docker-compose.yml --profile data up -d --wait kafka-event-bridge
       - name: Run NATS to Kafka integration smoke
         run: python tests/integration/kafka_bridge_smoke.py
+      - name: Prove Kafka outage retention and recovery
+        shell: bash
+        run: |
+          set -euo pipefail
+          state_file=/tmp/funkey-kafka-recovery.json
+
+          docker compose -f infra/docker-compose.yml --profile data stop kafka
+          python tests/integration/kafka_bridge_recovery.py publish --state-file "$state_file"
+
+          unhealthy=0
+          for attempt in $(seq 1 10); do
+            if ! curl -fsS http://127.0.0.1:8092/ready >/dev/null 2>&1; then
+              unhealthy=1
+              break
+            fi
+            sleep 1
+          done
+          if [ "$unhealthy" -ne 1 ]; then
+            echo "::error::Kafka bridge readiness remained green while Kafka was stopped."
+            exit 1
+          fi
+
+          docker compose -f infra/docker-compose.yml --profile data start kafka
+          kafka_ready=0
+          for attempt in $(seq 1 40); do
+            if docker compose -f infra/docker-compose.yml --profile data exec -T kafka               /opt/kafka/bin/kafka-topics.sh --bootstrap-server 127.0.0.1:9092 --list >/dev/null 2>&1; then
+              kafka_ready=1
+              break
+            fi
+            sleep 1
+          done
+          if [ "$kafka_ready" -ne 1 ]; then
+            echo "::error::Kafka did not recover after restart."
+            exit 1
+          fi
+
+          bridge_ready=0
+          for attempt in $(seq 1 30); do
+            if curl -fsS http://127.0.0.1:8092/ready >/dev/null 2>&1; then
+              bridge_ready=1
+              break
+            fi
+            sleep 1
+          done
+          if [ "$bridge_ready" -ne 1 ]; then
+            echo "::error::Kafka bridge readiness did not recover."
+            exit 1
+          fi
+
+          python tests/integration/kafka_bridge_recovery.py verify --state-file "$state_file"
       - name: Capture Kafka bridge logs
         if: failure()
         run: docker compose -f infra/docker-compose.yml --profile data logs --tail=300 kafka kafka-event-bridge
