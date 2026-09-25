@@ -376,6 +376,11 @@ class LiveRoomStateController {
     );
   }
 
+  void applyCanonicalRoomState() {
+    _applyDerivedPolicies();
+    _notify();
+  }
+
   void resetForLeaveFlow() {
     _allowRoomPop = false;
     _leaveSheetOpen = false;
