@@ -99,7 +99,7 @@ See [CI](.github/workflows/room-production-hardening.yml) for the full gate, inc
 
 ## Realtime and media
 
-Room commands and snapshots are registered by `backend/app/api/router.py`; `backend/app/realtime/` holds event and connection abstractions. The Go realtime gateway is a bounded migration target and must defer durable decisions to domain authority. Clients reconnect by fetching an authoritative snapshot and then receiving incremental events. Media discovery is `GET /api/v1/rooms/{room_public_id}/media`; the backend authorizes, chooses a healthy non-draining media node, and maintains sticky room assignment in Redis. The SFU reauthorizes sensitive signaling actions with FastAPI. See the [realtime](docs/modules/realtime-gateway/README.md) and [media](docs/modules/media/README.md) guides.
+Room commands and snapshots are registered by `backend/app/api/router.py`; `backend/app/realtime/` holds event and connection abstractions. The Go realtime gateway is the canonical application realtime transport and must defer durable decisions to domain authority. Clients reconnect by fetching an authoritative snapshot and then receiving incremental events. Media discovery is `GET /api/v1/rooms/{room_public_id}/media`; the backend authorizes, chooses a healthy non-draining media node, and maintains sticky room assignment in Redis. The SFU reauthorizes sensitive signaling actions with FastAPI. See the [realtime](docs/modules/realtime-gateway/README.md) and [media](docs/modules/media/README.md) guides.
 
 ## Operations and deployment
 
