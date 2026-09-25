@@ -175,3 +175,45 @@ The cache contains only reconstructable, integrity-verified remote game bundle
 content. Clearing it changes no durable game state, settlement, wallet state,
 room state or game-session authority; the next launch reloads and verifies the
 bundle through the canonical Game Platform repository.
+
+
+## M5: Flutter decoded image-cache migration
+
+M5 migrates the final heavyweight cleanup path that was still executed directly
+inside AppShell: Flutter's live decoded/network image cache.
+
+### Resource taxonomy
+
+`MediaResourceKind.flutterImageCache` is added separately from
+`imagePrefetch`. The former represents Flutter's shared decoded image-cache
+memory; the latter is reserved for explicit feature-driven prefetch work that
+may be introduced or migrated later.
+
+### Adapter boundary
+
+`FlutterImageCacheResourceParticipant` receives an injected
+`clearLiveImages` callback. AppShell supplies
+`PaintingBinding.instance.imageCache.clearLiveImages`, while tests can inject
+a counter without depending on global Flutter cache internals.
+
+Foreground/background transitions are a no-op. Memory pressure clears live
+decoded images. Authenticated-session release performs the same trim once and
+then makes the adapter terminal.
+
+### Cutover
+
+The direct AppShell image-cache call is removed. After M5, the three original
+AppShell memory-pressure cleanup paths all converge through the coordinator:
+
+- Vibes decoder arbitration → M3 participant;
+- verified game-bundle cache → M4 participant;
+- Flutter live image cache → M5 participant.
+
+AppShell now only emits the memory-pressure signal and no longer knows how each
+heavy resource performs cleanup.
+
+### Authority and safety
+
+Flutter's image cache contains reconstructable presentation memory only.
+Clearing live entries changes no durable application state and does not alter
+room, identity, wallet, Watch Party, game-session or content authority.

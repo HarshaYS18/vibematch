@@ -44,3 +44,11 @@ only applies app-background pause pressure and forwards memory-pressure trims.
 bridge for Game Platform's verified in-memory bundle cache. It forwards memory
 pressure/session release to `GameBundleCache.clear()` and deliberately does
 nothing on foreground transitions because the cache is passive warm memory.
+
+
+## Flutter image-cache adapter
+
+`flutter_image_cache_resource_participant.dart` is the Chunk 34-M5 bridge for
+Flutter's shared decoded image cache. It is callback-injected so runtime tests
+remain deterministic and AppShell no longer contains direct image-cache cleanup
+logic.

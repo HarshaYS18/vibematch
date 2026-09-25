@@ -198,16 +198,8 @@ if _APP_SHELL.exists():
                 f"app/app_shell.dart: Chunk 34-M2 resource mirror marker missing: {marker}"
             )
 
-    # Freeze only cleanup that has not migrated yet. Vibes (M3) and game
-    # bundle cache (M4) now flow through registered participants.
-    direct_cleanup_markers = (
-        "PaintingBinding.instance.imageCache.clearLiveImages();",
-    )
-    for marker in direct_cleanup_markers:
-        if marker not in shell_text:
-            violations.append(
-                f"app/app_shell.dart: Chunk 34-M2 removed direct cleanup before migration: {marker}"
-            )
+    # By M5 all original AppShell heavyweight cleanup routes have migrated to
+    # resource participants. New direct cleanup calls must not be added here.
 
 
 # Chunk 34-M3: Vibes decoder lifecycle is migrated through an App-runtime
@@ -287,6 +279,46 @@ if _APP_SHELL.exists():
     if "ref.read(gameBundleCacheProvider).clear();" in shell_text:
         violations.append(
             "app/app_shell.dart: game bundle cache memory pressure must flow through MediaResourceCoordinator after Chunk 34-M4"
+        )
+
+
+# Chunk 34-M5: Flutter's decoded image cache is reconstructable runtime memory
+# and clears through a resource participant rather than AppShell directly.
+_IMAGE_CACHE_RESOURCE_ADAPTER = (
+    APP / "app" / "runtime" / "flutter_image_cache_resource_participant.dart"
+)
+if not _IMAGE_CACHE_RESOURCE_ADAPTER.exists():
+    violations.append(
+        "app/runtime/flutter_image_cache_resource_participant.dart: Chunk 34-M5 image cache participant is required"
+    )
+else:
+    image_cache_resource_text = _IMAGE_CACHE_RESOURCE_ADAPTER.read_text(
+        encoding="utf-8-sig"
+    )
+    for marker in (
+        "implements MediaResourceParticipant",
+        "MediaResourceKind.flutterImageCache",
+        "_clearLiveImages()",
+    ):
+        if marker not in image_cache_resource_text:
+            violations.append(
+                "app/runtime/flutter_image_cache_resource_participant.dart: "
+                f"missing image cache lifecycle marker: {marker}"
+            )
+
+if _APP_SHELL.exists():
+    shell_text = _APP_SHELL.read_text(encoding="utf-8-sig")
+    for marker in (
+        "FlutterImageCacheResourceParticipant",
+        "resourceCoordinator.register(_flutterImageCacheResourceParticipant)",
+    ):
+        if marker not in shell_text:
+            violations.append(
+                f"app/app_shell.dart: Chunk 34-M5 image cache registration missing: {marker}"
+            )
+    if "PaintingBinding.instance.imageCache.clearLiveImages();" in shell_text:
+        violations.append(
+            "app/app_shell.dart: Flutter image cache memory pressure must flow through MediaResourceCoordinator after Chunk 34-M5"
         )
 
 

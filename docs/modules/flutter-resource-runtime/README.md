@@ -63,3 +63,14 @@ integrity and game-session authority remain in Game Platform.
 
 AppShell no longer clears `gameBundleCacheProvider` directly after M4.
 Flutter image-cache cleanup is still direct until its dedicated migration.
+
+
+## M5 Flutter image cache
+
+`FlutterImageCacheResourceParticipant` migrates the last direct AppShell
+memory-pressure cleanup path. AppShell injects Flutter's existing
+`ImageCache.clearLiveImages` callback and registers the participant beside the
+Vibes and game-cache adapters.
+
+The resource kind is `flutterImageCache`; explicit image-prefetch jobs remain
+a separate `imagePrefetch` category for later work.

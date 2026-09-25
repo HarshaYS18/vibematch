@@ -5,8 +5,8 @@ import 'package:flutter_test/flutter_test.dart';
 /// Chunk 34 AppShell resource-runtime source contract.
 ///
 /// M2 established the lifecycle mirror, M3 migrated Vibes decoder lifecycle,
-/// and M4 migrates verified game-bundle cache cleanup. Image cleanup remains
-/// direct until its own micro-chunk.
+/// M4 migrated verified game-bundle cache cleanup, and M5 migrates Flutter
+/// image-cache cleanup. AppShell now owns no direct heavyweight cleanup path.
 void main() {
   test('AppShell keeps the resource coordinator session-scoped and alive', () {
     final shell = File('lib/app/app_shell.dart').readAsStringSync();
@@ -37,7 +37,7 @@ void main() {
     expect(shell, contains('.setForeground(isForeground)'));
   });
 
-  test('M4 migrates Vibes and game cache while preserving image cleanup', () {
+  test('M5 routes all AppShell heavyweight cleanup through participants', () {
     final shell = File('lib/app/app_shell.dart').readAsStringSync();
 
     expect(
@@ -50,11 +50,17 @@ void main() {
         'resourceCoordinator.register(_gameBundleCacheResourceParticipant)',
       ),
     );
+    expect(
+      shell,
+      contains(
+        'resourceCoordinator.register(_flutterImageCacheResourceParticipant)',
+      ),
+    );
     expect(shell, isNot(contains('_vibePlaybackGate.handleMemoryPressure();')));
     expect(shell, isNot(contains('ref.read(gameBundleCacheProvider).clear();')));
     expect(
       shell,
-      contains('PaintingBinding.instance.imageCache.clearLiveImages();'),
+      isNot(contains('PaintingBinding.instance.imageCache.clearLiveImages();')),
     );
     expect(shell, contains('unawaited(_reconcileCanonicalShellState());'));
   });
