@@ -76,6 +76,7 @@ class LiveRoomMediaSignalingService with WidgetsBindingObserver {
   bool get isConnected => _appRealtimeHub.isConnected;
   bool get isJoined => _joined;
   String? get roomId => _roomId;
+  String? get roomName => _roomName;
   String? get peerId => _peerId;
   SeatUser? get activeLoggedInSeatUser => _activeLoggedInSeatUser;
   RoomMediaEngine get mediaEngine => _mediaEngine;
