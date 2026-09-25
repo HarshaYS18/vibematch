@@ -6,24 +6,28 @@ import '../../foundation/networking/app_network_client.dart';
 import '../../session/data/session_repository.dart';
 import '../domain/room_session_state.dart';
 
-class RoomSessionRepository extends StateNotifier<RoomSessionState> {
-  RoomSessionRepository({
-    required String roomId,
-    required AppNetworkClient networkClient,
-    required String? Function() accessTokenProvider,
-  })  : _roomId = roomId.trim(),
-        _networkClient = networkClient,
-        _accessTokenProvider = accessTokenProvider,
-        super(RoomSessionState.initial(roomId.trim()));
+final roomSessionAccessTokenProvider = Provider<String?>((ref) {
+  return ref.watch(
+    sessionRepositoryProvider.select((session) => session.accessToken),
+  );
+});
 
-  final String _roomId;
-  final AppNetworkClient _networkClient;
-  final String? Function() _accessTokenProvider;
+class RoomSessionRepository
+    extends AutoDisposeFamilyNotifier<RoomSessionState, String> {
+  late String _roomId;
+  late AppNetworkClient _networkClient;
+
+  @override
+  RoomSessionState build(String roomId) {
+    _roomId = roomId.trim();
+    _networkClient = ref.read(appNetworkClientProvider);
+    return RoomSessionState.initial(_roomId);
+  }
 
   /// Read-only snapshot for compatibility adapters during the Chunk 21 cutover.
   ///
   /// RoomSessionRepository remains the single mutable room-session authority;
-  /// callers can inspect the current state but cannot assign StateNotifier.state.
+  /// callers can inspect the current immutable state but cannot assign it.
   RoomSessionState get currentState => state;
 
   Future<RoomSessionState> join({String? lockPassword}) async {
@@ -269,7 +273,7 @@ class RoomSessionRepository extends StateNotifier<RoomSessionState> {
   }
 
   Map<String, String> _headers() {
-    final token = _accessTokenProvider()?.trim();
+    final token = ref.read(roomSessionAccessTokenProvider)?.trim();
     if (token == null || token.isEmpty) {
       throw StateError('Authenticated session required for room access.');
     }
@@ -325,17 +329,12 @@ class RoomSessionRepository extends StateNotifier<RoomSessionState> {
   }
 }
 
-final roomSessionRepositoryProvider = StateNotifierProvider.family<
-    RoomSessionRepository,
-    RoomSessionState,
-    String>((ref, roomId) {
-  return RoomSessionRepository(
-    roomId: roomId,
-    networkClient: ref.read(appNetworkClientProvider),
-    accessTokenProvider: () =>
-        ref.read(sessionRepositoryProvider).accessToken,
-  );
-});
+final roomSessionRepositoryProvider =
+    NotifierProvider.autoDispose.family<
+      RoomSessionRepository,
+      RoomSessionState,
+      String
+    >(RoomSessionRepository.new);
 
 
 Map<String, dynamic> _asMap(dynamic value) {
