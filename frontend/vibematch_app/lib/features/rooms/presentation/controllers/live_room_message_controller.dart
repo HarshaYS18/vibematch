@@ -3,7 +3,8 @@ import 'dart:async';
 import '../../../../foundation/realtime/realtime_event_envelope.dart';
 import '../../../../realtime/app_realtime_hub.dart';
 import '../../data/live_room_media_signaling_service.dart';
-import '../../data/live_room_presence_repository.dart';
+import '../../../../room_session/data/room_session_repository.dart';
+import '../../data/room_session_legacy_adapter.dart';
 import '../../data/live_room_restrictions_service.dart';
 import '../../data/live_room_seat_application_event_bus.dart';
 import '../../data/live_room_system_event_bus.dart';
@@ -13,6 +14,7 @@ import '../live_room_restore_state.dart';
 class LiveRoomMessageController {
   LiveRoomMessageController({
     required String roomId,
+    required this.roomSessionRepository,
     required SeatUser currentUser,
     required this.onChanged,
     LiveRoomMessageRestoreState? restoreState,
@@ -58,6 +60,7 @@ class LiveRoomMessageController {
   }
 
   final SeatUser currentUser;
+  final RoomSessionRepository roomSessionRepository;
   final VoidCallbackLike onChanged;
 
   late List<ChatEntry> messages;
@@ -267,7 +270,10 @@ class LiveRoomMessageController {
     if (existingPending) return;
     final applicant = _sameRoomUserId(applicantUserId, currentUser.id)
         ? currentUser
-        : LiveRoomPresenceRepository.userByRoomUserId(applicantUserId);
+        : RoomSessionLegacyAdapter.findPresenceUser(
+            roomSessionRepository.currentState,
+            applicantUserId,
+          );
     messages.insert(
       0,
       ChatEntry(
