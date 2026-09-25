@@ -25,7 +25,7 @@ database roles for bounded composite reads.
 | Search Projection | direct DB search today | OpenSearch remains a future rebuildable projection. |
 | Recommendation | not deployed | Future ranking platform; output is rebuildable. |
 | Analytics | NATS/outbox operational path today | Kafka/ClickHouse/data lake remain future downstream projections. |
-| GraphQL Read BFF | not deployed | Future composite-read surface only; never a mutation authority. |
+| GraphQL Read BFF | `graphql-bff` | Composite-read surface for Home, Profile, Discovery and creator/admin dashboards. Calls owning APIs only; never a mutation or database authority. |
 
 ## Communication
 
@@ -34,7 +34,7 @@ database roles for bounded composite reads.
 - Application realtime: one Go `funkey.v2` WebSocket plus Redis/Valkey routing/replay.
 - Operational async work: NATS JetStream through the transactional outbox.
 - Long-retained analytics/ML: Kafka only when the analytics chunk is implemented.
-- Composite reads: direct owner APIs/read-only roles today; GraphQL BFF is a later read-only option.
+- Composite reads: GraphQL Read BFF composes owner APIs for approved persisted reads; direct owner APIs remain valid for non-composite reads. GraphQL never owns commands.
 
 ## Database ownership
 

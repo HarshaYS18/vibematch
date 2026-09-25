@@ -8,6 +8,7 @@ reviewed immutable image digests.
 
 ```text
 HTTPS API -> CDN/WAF/DDoS -> Envoy Gateway -> core compatibility / extracted services
+GraphQL reads -> api.funkey.com/graphql -> GraphQL Read BFF -> owning service APIs
 Application WebSocket -> Envoy Gateway -> Go realtime gateway (funkey.v2)
 Media control/discovery -> Envoy Gateway -> core control plane -> assigned backend_media node
 Media RTP/RTC -> assigned public SFU or TURN (never HTTP Gateway)
@@ -57,3 +58,9 @@ Production dynamic traffic uses Kubernetes Gateway API with Envoy Gateway. Publi
 API requests are version-routed before the core compatibility fallback. Realtime `/ws` is upgrade-safe and has no request buffering. Media control is a stable public alias for discovery/control; mediasoup/TURN data-plane addresses remain assignment-derived. The API canary backend starts at zero weight.
 
 The provider WAF/DDoS layer must protect the Envoy origin. Optional Envoy `SecurityPolicy` external authorization is defense in depth and is activated only after a real ext-auth service is deployed.
+
+## Chunk 36 GraphQL Read BFF rollout
+
+Deploy the stateless GraphQL BFF after its owning read services are healthy and before enabling Flutter composite reads. The BFF has no database migration or durable state.
+
+Rollback is routing/client-only: restore the previous Flutter read path or remove the exact `/graphql` route while preserving owner services. Never grant the BFF direct database access as an outage workaround.

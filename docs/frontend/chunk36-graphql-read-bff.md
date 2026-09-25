@@ -1,0 +1,28 @@
+# Chunk 36 — GraphQL Read BFF
+
+**Status: implementation complete; CI is the final closure gate.**
+
+## Delivered
+
+- dedicated stateless `graphql-bff` service on port 8091
+- real graphql-core schema with no mutation root
+- four SHA-256 persisted composite operations
+- query allowlist, introspection rejection, depth 4, complexity 30 and 16KiB payload cap
+- request-scoped DataLoader batching/deduplication
+- 2.5s owner-service deadlines and bounded concurrency
+- forwarded bearer auth, request ID and trace context
+- OpenTelemetry operation/upstream spans and Prometheus counters
+- GraphQL partial-data field errors
+- exact Envoy `/graphql` route with dedicated timeout/rate/payload policy
+- Kubernetes Deployment/Service/PDB/HPA/NetworkPolicy and immutable image publishing
+- Flutter persisted-read client with no GraphQL package
+- Home chrome cut over from three REST reads to one composite without UI changes
+- canonical Python/Dart operation-ID contract and architecture guard
+
+## Authority invariant
+
+GraphQL is read composition only. Writes stay on existing REST/gRPC command APIs and domain services remain authoritative.
+
+## Closure test
+
+Chunk 36 is complete only when BFF unit/boundary tests, frontend guard, infrastructure/Gateway render, container build and repository architecture guard are green.

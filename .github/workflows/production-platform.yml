@@ -15,6 +15,7 @@ on:
       - 'tests/chaos/**'
       - 'scripts/check_contracts.py'
       - 'scripts/check_gateway_architecture.py'
+      - 'scripts/check_graphql_bff_architecture.py'
       - 'scripts/prepare_gitops_promotion.py'
       - '.github/workflows/contracts.yml'
       - '.github/workflows/production-platform.yml'
@@ -63,8 +64,9 @@ jobs:
       - run: terraform -chdir=infra/terraform fmt -check -recursive
       - run: terraform -chdir=infra/terraform init -backend=false
       - run: terraform -chdir=infra/terraform validate
-      - run: python -m py_compile scripts/prepare_gitops_promotion.py scripts/check_contracts.py scripts/check_gateway_architecture.py
+      - run: python -m py_compile scripts/prepare_gitops_promotion.py scripts/check_contracts.py scripts/check_gateway_architecture.py scripts/check_graphql_bff_architecture.py
       - run: python scripts/check_gateway_architecture.py
+      - run: python scripts/check_graphql_bff_architecture.py
       - uses: azure/setup-kubectl@v4
         with:
           version: v1.36.4
@@ -133,6 +135,23 @@ jobs:
           format: table
           exit-code: '0'
           severity: CRITICAL,HIGH
+
+  graphql-bff:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.13'
+      - name: Install GraphQL BFF runtime
+        run: pip install -r backend/requirements.txt -r apps/graphql-bff/requirements.txt
+      - name: Compile GraphQL BFF
+        run: python -m compileall -q apps/graphql-bff
+      - name: Run GraphQL BFF unit and boundary tests
+        working-directory: apps/graphql-bff
+        run: python -m unittest discover -s tests -p 'test_*.py'
+      - name: Enforce GraphQL BFF architecture
+        run: python scripts/check_graphql_bff_architecture.py
 
   security-source:
     runs-on: ubuntu-latest

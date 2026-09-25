@@ -142,3 +142,11 @@ The stable Deployment rename is ordered with Argo CD sync waves:
 
 This avoids a transient zero-endpoint window while still preventing canary pods
 from matching the stable Service.
+
+## Chunk 36 GraphQL read route
+
+`HTTPRoute/funkey-graphql` attaches to the API listener with an Exact `/graphql` match and routes only to `funkey-graphql-bff:8091`. Exact matching prevents the core API fallback from becoming the GraphQL implementation.
+
+`BackendTrafficPolicy/funkey-graphql-traffic` uses a 64KiB request buffer and a local 200 requests/second edge limit. The BFF applies a tighter 16KiB JSON payload cap plus persisted-query, depth and complexity enforcement.
+
+GraphQL remains read-only; REST/gRPC command paths and the realtime WebSocket are unchanged.

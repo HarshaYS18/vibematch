@@ -16,6 +16,7 @@ rollback runbook before reducing capacity. Exercise these procedures in staging.
 - [Media v2 upload/processing](media-v2-upload.md)
 
 ## Platform incidents
+- [GraphQL Read BFF](graphql-read-bff.md)
 - [API Gateway / edge](api-gateway.md)
 - [API degraded](api-degraded.md)
 - [Realtime degraded](realtime-degraded.md)
