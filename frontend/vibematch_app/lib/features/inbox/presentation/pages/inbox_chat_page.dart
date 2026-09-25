@@ -1,6 +1,7 @@
 import 'dart:async';
 
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../../app/app_routes.dart';
 import '../../controllers/inbox_controller.dart';
@@ -9,7 +10,7 @@ import '../widgets/inbox_call_action_sheet.dart';
 import '../widgets/inbox_call_realtime_presenter.dart';
 import '../widgets/swipe_reply_message.dart';
 
-class InboxChatPage extends StatefulWidget {
+class InboxChatPage extends ConsumerStatefulWidget {
   const InboxChatPage({
     super.key,
     required this.conversation,
@@ -24,10 +25,10 @@ class InboxChatPage extends StatefulWidget {
   final VoidCallback? onBackTap;
 
   @override
-  State<InboxChatPage> createState() => _InboxChatPageState();
+  ConsumerState<InboxChatPage> createState() => _InboxChatPageState();
 }
 
-class _InboxChatPageState extends State<InboxChatPage> {
+class _InboxChatPageState extends ConsumerState<InboxChatPage> {
   final TextEditingController _textController = TextEditingController();
   final ScrollController _scrollController = ScrollController();
   bool _loadingOlderMessages = false;
@@ -51,7 +52,6 @@ class _InboxChatPageState extends State<InboxChatPage> {
   void initState() {
     super.initState();
     widget.controller.markConversationRead(widget.conversation.id);
-    widget.controller.addListener(_handleChanged);
     _textController.addListener(_handleInputChanged);
     _scrollController.addListener(_handleMessageScroll);
     WidgetsBinding.instance.addPostFrameCallback((_) {
@@ -68,20 +68,11 @@ class _InboxChatPageState extends State<InboxChatPage> {
       widget.controller.closeSecretDriftSession(conversation: _conversation),
     );
     widget.controller.clearActiveConversation(widget.conversation.id);
-    widget.controller.removeListener(_handleChanged);
     _textController.removeListener(_handleInputChanged);
     _scrollController.removeListener(_handleMessageScroll);
     _textController.dispose();
     _scrollController.dispose();
     super.dispose();
-  }
-
-  void _handleChanged() {
-    if (!mounted) return;
-    setState(() {});
-    if (!_loadingOlderMessages) {
-      WidgetsBinding.instance.addPostFrameCallback((_) => _jumpToBottom());
-    }
   }
 
   void _handleMessageScroll() {
@@ -209,6 +200,8 @@ class _InboxChatPageState extends State<InboxChatPage> {
 
   @override
   Widget build(BuildContext context) {
+    ref.watch(inboxControllerProvider);
+
     final conversation = _conversation;
     final messages = conversation.messages;
     return InboxCallRealtimePresenter(
