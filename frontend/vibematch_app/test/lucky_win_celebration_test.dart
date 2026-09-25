@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:vibematch_app/features/rooms/data/live_room_system_event_bus.dart';
@@ -6,22 +8,24 @@ import 'package:vibematch_app/features/rooms/presentation/widgets/lucky_win_cele
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
 
-  tearDown(() {
-    LiveRoomSystemEventBus.latestEvent.value = null;
-  });
-
   testWidgets('x100 x500 and x1000 lucky wins render escalating celebrations', (
     tester,
   ) async {
+    final events = StreamController<LiveRoomSystemEvent>.broadcast();
+    addTearDown(events.close);
     await tester.pumpWidget(
-      const MaterialApp(
+      MaterialApp(
         home: Scaffold(
-          body: Stack(children: <Widget>[LuckyWinCelebrationOverlay()]),
+          body: Stack(
+            children: <Widget>[
+              LuckyWinCelebrationOverlay(systemEvents: events.stream),
+            ],
+          ),
         ),
       ),
     );
 
-    _publishLuckyWin(id: 'lucky-100', multiplier: 100, rewardCoins: 1200);
+    _publishLuckyWin(events, id: 'lucky-100', multiplier: 100, rewardCoins: 1200);
     await tester.pump(const Duration(milliseconds: 180));
     expect(find.byKey(const ValueKey('lucky-win-celebration')), findsOneWidget);
     expect(find.text('BIG WIN'), findsOneWidget);
@@ -29,13 +33,13 @@ void main() {
     expect(find.text('+1.2K COINS'), findsOneWidget);
 
     // A larger tier preempts a smaller active animation immediately.
-    _publishLuckyWin(id: 'lucky-500', multiplier: 500, rewardCoins: 15000);
+    _publishLuckyWin(events, id: 'lucky-500', multiplier: 500, rewardCoins: 15000);
     await tester.pump(const Duration(milliseconds: 180));
     expect(find.text('BIG WIN'), findsNothing);
     expect(find.text('MEGA WIN'), findsOneWidget);
     expect(find.text('x500'), findsOneWidget);
 
-    _publishLuckyWin(id: 'lucky-1000', multiplier: 1000, rewardCoins: 250000);
+    _publishLuckyWin(events, id: 'lucky-1000', multiplier: 1000, rewardCoins: 250000);
     await tester.pump(const Duration(milliseconds: 180));
     expect(find.text('MEGA WIN'), findsNothing);
     expect(find.text('JACKPOT'), findsOneWidget);
@@ -46,15 +50,21 @@ void main() {
   testWidgets('ordinary lucky multipliers do not trigger the celebration', (
     tester,
   ) async {
+    final events = StreamController<LiveRoomSystemEvent>.broadcast();
+    addTearDown(events.close);
     await tester.pumpWidget(
-      const MaterialApp(
+      MaterialApp(
         home: Scaffold(
-          body: Stack(children: <Widget>[LuckyWinCelebrationOverlay()]),
+          body: Stack(
+            children: <Widget>[
+              LuckyWinCelebrationOverlay(systemEvents: events.stream),
+            ],
+          ),
         ),
       ),
     );
 
-    _publishLuckyWin(id: 'lucky-20', multiplier: 20, rewardCoins: 100);
+    _publishLuckyWin(events, id: 'lucky-20', multiplier: 20, rewardCoins: 100);
     await tester.pump(const Duration(milliseconds: 200));
 
     expect(find.byKey(const ValueKey('lucky-win-celebration')), findsNothing);
@@ -64,20 +74,26 @@ void main() {
   });
 
   testWidgets('duplicate authoritative event id is not replayed', (tester) async {
+    final events = StreamController<LiveRoomSystemEvent>.broadcast();
+    addTearDown(events.close);
     await tester.pumpWidget(
-      const MaterialApp(
+      MaterialApp(
         home: Scaffold(
-          body: Stack(children: <Widget>[LuckyWinCelebrationOverlay()]),
+          body: Stack(
+            children: <Widget>[
+              LuckyWinCelebrationOverlay(systemEvents: events.stream),
+            ],
+          ),
         ),
       ),
     );
 
-    _publishLuckyWin(id: 'same-event', multiplier: 100, rewardCoins: 500);
+    _publishLuckyWin(events, id: 'same-event', multiplier: 100, rewardCoins: 500);
     await tester.pump(const Duration(milliseconds: 200));
     expect(find.text('BIG WIN'), findsOneWidget);
 
     // Same backend event arriving again must not restart/queue the effect.
-    _publishLuckyWin(id: 'same-event', multiplier: 100, rewardCoins: 500);
+    _publishLuckyWin(events, id: 'same-event', multiplier: 100, rewardCoins: 500);
     await tester.pump(const Duration(milliseconds: 2400));
     await tester.pump(const Duration(milliseconds: 200));
 
@@ -85,12 +101,13 @@ void main() {
   });
 }
 
-void _publishLuckyWin({
+void _publishLuckyWin(
+  StreamController<LiveRoomSystemEvent> events, {
   required String id,
   required int multiplier,
   required int rewardCoins,
 }) {
-  LiveRoomSystemEventBus.publish(
+  events.add(
     LiveRoomSystemEvent.fromJson(<String, dynamic>{
       'id': id,
       'event_type': 'room_gift_sent',
