@@ -67,6 +67,11 @@ class LuckyPacketRoomEvent {
   }
 }
 
+/// Room-scoped owner for gift interaction and gift presentation state.
+///
+/// Backend services remain authoritative for wallet/gift outcomes. The
+/// controller owns only one mounted room's transient slides, combo state,
+/// flying-gift queue and premium-broadcast queue; all are disposed on room exit.
 class LiveRoomGiftController {
   LiveRoomGiftController({
     required SeatUser currentUser,
@@ -96,6 +101,14 @@ class LiveRoomGiftController {
   final LuckyGiftsApiService _luckyGiftsApi = const LuckyGiftsApiService();
   final RelationshipExpApiService _relationshipExpApi =
       const RelationshipExpApiService();
+
+  /// Ephemeral flight animations scoped to this room controller.
+  final GiftFlightBus giftFlightBus = GiftFlightBus();
+
+  /// Ephemeral premium broadcasts scoped to this room controller.
+  final PremiumGiftBroadcastBus premiumGiftBroadcastBus =
+      PremiumGiftBroadcastBus();
+
   StreamSubscription<CurrentUser>? _userRealtimeSub;
 
   GiftCategory selectedCategory = GiftCategory.premium;
@@ -371,7 +384,7 @@ class LiveRoomGiftController {
 
     final shouldFly = (gift.coins * combo) < smallGiftFlightThreshold;
     if (shouldFly) {
-      GiftFlightBus.publish(
+      giftFlightBus.publish(
         GiftFlightEvent(
           id: 'flight-${slide.id}',
           gift: gift,
@@ -864,7 +877,7 @@ class LiveRoomGiftController {
     required int rewardCoinAmount,
     required Alignment endAlignment,
   }) {
-    GiftFlightBus.publish(
+    giftFlightBus.publish(
       GiftFlightEvent(
         id: 'flight-${slide.id}',
         gift: gift,
@@ -885,7 +898,7 @@ class LiveRoomGiftController {
     required bool shouldPublish,
   }) {
     if (!shouldPublish) return;
-    PremiumGiftBroadcastBus.publish(
+    premiumGiftBroadcastBus.publish(
       PremiumGiftBroadcastEvent(
         id: 'premium-${gift.id}-${DateTime.now().microsecondsSinceEpoch}',
         senderName: currentUser.name,
@@ -948,6 +961,8 @@ class LiveRoomGiftController {
     _lastComboTapBySlideId.clear();
     _luckyPacketTimer?.cancel();
     _luckyPacketTimer = null;
+    giftFlightBus.dispose();
+    premiumGiftBroadcastBus.dispose();
   }
 }
 

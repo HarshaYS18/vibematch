@@ -14,6 +14,11 @@ import 'live_room_seat_invite_notification.dart';
 import 'lucky_win_celebration_overlay.dart';
 import 'vibesync_room_module.dart';
 
+/// Hosts overlays for a single mounted room controller bundle.
+///
+/// Gift presentation queues are obtained from the scoped
+/// [LiveRoomGiftController]; this host never creates or reads process-global
+/// room presentation state.
 class LiveRoomOverlayHost extends StatelessWidget {
   const LiveRoomOverlayHost({
     super.key,
@@ -61,23 +66,26 @@ class LiveRoomOverlayHost extends StatelessWidget {
           valueListenable: giftRevision,
           builder: (context, value, child) {
             final controller = giftController;
+            if (controller == null) return const SizedBox.shrink();
             return LiveRoomGiftOverlay(
-              slides: controller?.giftSlides ?? const <GiftSlide>[],
-              activeComboSlide: controller?.activeComboSlide,
-              activeLuckyPacket: controller?.activeLuckyPacket,
+              slides: controller.giftSlides,
+              activeComboSlide: controller.activeComboSlide,
+              activeLuckyPacket: controller.activeLuckyPacket,
               bottomPadding: MediaQuery.paddingOf(context).bottom,
-              onComboTap: (slide) => controller?.tapGiftCombo(slide),
+              onComboTap: (slide) => controller.tapGiftCombo(slide),
               onVideoGiftFinished: (slide) =>
-                  controller?.finishVideoGift(slide),
+                  controller.finishVideoGift(slide),
               onComboButtonTap: () {
-                final slide = controller?.activeComboSlide;
-                if (slide != null) controller?.tapGiftCombo(slide);
+                final slide = controller.activeComboSlide;
+                if (slide != null) controller.tapGiftCombo(slide);
               },
               onLuckyPacketGetTap: () =>
                   unawaited(luckyPacketRealtimeService.claim()),
               onLuckyPacketResultsDismiss:
                   luckyPacketRealtimeService.dismiss,
-              currentUserId: controller?.currentUser.id,
+              currentUserId: controller.currentUser.id,
+              giftFlightBus: controller.giftFlightBus,
+              premiumGiftBroadcastBus: controller.premiumGiftBroadcastBus,
             );
           },
         ),

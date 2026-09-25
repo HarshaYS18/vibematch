@@ -17,6 +17,11 @@ import 'gift_modules/lucky_packet_room_overlay.dart';
 import 'premium_gift_broadcast_overlay.dart';
 import 'room_gifts.dart';
 
+/// Composes local and backend gift presentation for one mounted room.
+///
+/// Flight and premium queues are injected from the room's
+/// [LiveRoomGiftController], preventing gift UI events from leaking between
+/// rooms while preserving backend/local deduplication behavior.
 class LiveRoomGiftOverlay extends StatefulWidget {
   const LiveRoomGiftOverlay({
     super.key,
@@ -27,6 +32,8 @@ class LiveRoomGiftOverlay extends StatefulWidget {
     required this.onComboTap,
     required this.onComboButtonTap,
     required this.onVideoGiftFinished,
+    required this.giftFlightBus,
+    required this.premiumGiftBroadcastBus,
     this.onLuckyPacketGetTap,
     this.onLuckyPacketResultsDismiss,
     this.currentUserId,
@@ -40,6 +47,8 @@ class LiveRoomGiftOverlay extends StatefulWidget {
   final ValueChanged<GiftSlide> onComboTap;
   final VoidCallback onComboButtonTap;
   final ValueChanged<GiftSlide> onVideoGiftFinished;
+  final GiftFlightBus giftFlightBus;
+  final PremiumGiftBroadcastBus premiumGiftBroadcastBus;
   final VoidCallback? onLuckyPacketGetTap;
   final VoidCallback? onLuckyPacketResultsDismiss;
   final String? currentUserId;
@@ -436,7 +445,7 @@ class _LiveRoomGiftOverlayState extends State<LiveRoomGiftOverlay> {
         event.ribbonTier == 'premium' ||
         event.broadcastScope == 'global';
     if (!shouldBroadcast) return;
-    PremiumGiftBroadcastBus.publish(
+    widget.premiumGiftBroadcastBus.publish(
       PremiumGiftBroadcastEvent(
         id: 'premium-${event.id}',
         senderName: slide.senderName,
@@ -460,7 +469,7 @@ class _LiveRoomGiftOverlayState extends State<LiveRoomGiftOverlay> {
         ? event.giftTotalCoinValue
         : gift.coins * slide.combo;
     if (totalCoins >= LiveRoomGiftController.smallGiftFlightThreshold) return;
-    GiftFlightBus.publish(
+    widget.giftFlightBus.publish(
       GiftFlightEvent(
         id: 'flight-${event.id}',
         gift: gift,
@@ -515,7 +524,7 @@ class _LiveRoomGiftOverlayState extends State<LiveRoomGiftOverlay> {
         fit: StackFit.expand,
         clipBehavior: Clip.none,
         children: [
-          const PremiumGiftBroadcastOverlay(),
+          PremiumGiftBroadcastOverlay(bus: widget.premiumGiftBroadcastBus),
           GiftSlideOverlay(
             slides: normalSlides,
             onComboTap: (slide) {
@@ -531,11 +540,11 @@ class _LiveRoomGiftOverlayState extends State<LiveRoomGiftOverlay> {
             onVideoFinished: _finishVideoGift,
           ),
           ValueListenableBuilder<GiftFlightEvent?>(
-            valueListenable: GiftFlightBus.latest,
+            valueListenable: widget.giftFlightBus.latest,
             builder: (context, event, _) {
               return GiftFlightOverlay(
                 event: event,
-                onCompleted: GiftFlightBus.clear,
+                onCompleted: widget.giftFlightBus.clear,
               );
             },
           ),

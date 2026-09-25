@@ -91,3 +91,12 @@ Before changing this module: identify the owning table and contract, add an addi
 ## Known migration status
 
 Chunk 20 Room State Engine v2 is implemented and Chunk 21 completed the one-Go-socket application realtime cutover. Chunk 26 physically extracts durable Room Control authority from core into `room-control-service`, preserves the public `/api/v1/rooms/**` contract through a compatibility proxy, isolates room PostgreSQL credentials, and keeps Go realtime/Redis/media transport outside Room Control authority.
+
+
+## Flutter room presentation ownership
+
+Client gift animation queues are not room-domain authority. Flying-gift and
+premium-broadcast presentation state is scoped to the mounted
+`LiveRoomGiftController` and disposed when that room exits. Durable gift,
+wallet and room-event outcomes remain backend/canonical realtime authority.
+Do not introduce static Flutter event buses for room presentation.

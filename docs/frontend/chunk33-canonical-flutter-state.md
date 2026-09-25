@@ -195,3 +195,12 @@ Love Bond request/inventory client state is now owned by
 remain authoritative. Public-profile presentation watches the provider and
 pure card-mapping helpers receive explicit request snapshots; no static
 `ValueNotifier` relationship cache remains.
+
+
+### Gift presentation ownership
+
+Flying-gift and premium-broadcast queues are owned by the room-scoped
+`LiveRoomGiftController`. `LiveRoomGiftOverlay` receives those queue objects
+explicitly. The queues contain animation-only state, preserve authoritative
+backend/local dedupe, and are disposed on room exit; no process-global gift
+presentation `ValueNotifier` remains.
