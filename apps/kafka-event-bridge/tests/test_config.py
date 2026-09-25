@@ -15,6 +15,15 @@ class ConfigTests(unittest.TestCase):
             settings.validate()
             self.assertEqual(settings.kafka_security_protocol, "PLAINTEXT")
 
+    def test_production_rejects_plaintext(self):
+        with patch.dict(os.environ, {
+            "APP_ENV": "production",
+            "KAFKA_BOOTSTRAP_SERVERS": "kafka.example:9092",
+            "KAFKA_SECURITY_PROTOCOL": "PLAINTEXT",
+        }, clear=True):
+            with self.assertRaises(RuntimeError):
+                Settings.from_env().validate()
+
     def test_sasl_requires_credentials(self):
         with patch.dict(os.environ, {
             "KAFKA_BOOTSTRAP_SERVERS": "kafka.example:9093",
