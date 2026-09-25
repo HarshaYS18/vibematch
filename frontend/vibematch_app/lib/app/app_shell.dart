@@ -25,6 +25,7 @@ import 'runtime/app_identity_runtime.dart';
 import 'runtime/app_inbox_runtime.dart';
 import '../realtime/app_realtime_hub.dart';
 import 'runtime/app_shell_navigation_controller.dart';
+import 'runtime/media_resource_coordinator.dart';
 import 'runtime/app_wallet_runtime.dart';
 import 'app_routes.dart';
 import 'app_source_registry_repository.dart';
@@ -96,6 +97,10 @@ class _AppShellState extends ConsumerState<AppShell>
 
   @override
   void didHaveMemoryPressure() {
+    // Chunk 34 mirror phase: notify the session-scoped coordinator while
+    // preserving every existing direct cleanup path until each resource owner
+    // is migrated and independently guarded.
+    unawaited(_notifyResourceMemoryPressure());
     _vibePlaybackGate.handleMemoryPressure();
     PaintingBinding.instance.imageCache.clearLiveImages();
     ref.read(gameBundleCacheProvider).clear();
@@ -103,8 +108,31 @@ class _AppShellState extends ConsumerState<AppShell>
 
   @override
   void didChangeAppLifecycleState(AppLifecycleState state) {
+    // The coordinator receives lifecycle pressure only. It does not become
+    // authority for session, navigation, playback, room, or game state.
+    unawaited(
+      _notifyResourceForegroundState(state == AppLifecycleState.resumed),
+    );
     if (state == AppLifecycleState.resumed) {
       unawaited(_reconcileCanonicalShellState());
+    }
+  }
+
+  Future<void> _notifyResourceMemoryPressure() async {
+    try {
+      await ref.read(mediaResourceCoordinatorProvider).handleMemoryPressure();
+    } catch (error) {
+      debugPrint('[FK:W:ResourceRuntime:Memory] $error');
+    }
+  }
+
+  Future<void> _notifyResourceForegroundState(bool isForeground) async {
+    try {
+      await ref
+          .read(mediaResourceCoordinatorProvider)
+          .setForeground(isForeground);
+    } catch (error) {
+      debugPrint('[FK:W:ResourceRuntime:Lifecycle] $error');
     }
   }
 
@@ -207,6 +235,9 @@ class _AppShellState extends ConsumerState<AppShell>
     ref.watch(appIdentityRuntimeProvider);
     ref.watch(appRealtimeHubProvider);
     ref.watch(appWalletRuntimeProvider);
+    // Chunk 34: registry lifetime exactly matches the authenticated AppShell.
+    // M2 only mirrors lifecycle signals; no feature resource is migrated yet.
+    ref.watch(mediaResourceCoordinatorProvider);
 
     final navigation = ref.watch(appShellNavigationProvider);
     final identity = ref.watch(identityRepositoryProvider);

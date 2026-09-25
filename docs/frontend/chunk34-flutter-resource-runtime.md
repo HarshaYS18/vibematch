@@ -57,3 +57,41 @@ M1 includes focused coordinator tests and architecture rules requiring:
 Because M1 is inert, rollback is limited to removing the coordinator contract,
 its tests/docs, and its architecture rule. No feature behavior or persisted
 state changes are introduced.
+
+
+## M2: AppShell lifecycle mirror wiring
+
+M2 wires the authenticated AppShell lifecycle into the coordinator without
+moving ownership of any heavy resource.
+
+### AppShell integration
+
+AppShell now keeps `mediaResourceCoordinatorProvider` alive for exactly the
+authenticated-shell lifetime and mirrors:
+
+- memory pressure → `MediaResourceCoordinator.handleMemoryPressure()`;
+- resumed lifecycle → `setForeground(true)`;
+- inactive/paused/hidden/detached lifecycle → `setForeground(false)`.
+
+Coordinator notifications are failure-isolated in AppShell helpers. A
+participant failure is logged and cannot block the existing canonical session
+reconciliation path.
+
+### Mirror-mode freeze
+
+M2 intentionally retains the existing proven cleanup behavior:
+
+- `VibeMediaPlaybackGate.handleMemoryPressure()`;
+- Flutter live image-cache clearing;
+- `GameBundleCache.clear()`.
+
+The architecture guard freezes those direct paths in place until each resource
+owner is migrated in its own later micro-chunk. This prevents a premature
+cutover from creating memory regressions.
+
+### Behavioral impact
+
+There is no user-visible/UI change in M2. Because no resource participant is
+registered yet, the coordinator lifecycle broadcast is currently inert. M2 is
+the mirror step that establishes the production lifecycle entry point before
+resource-by-resource migration.

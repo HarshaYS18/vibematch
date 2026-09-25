@@ -179,6 +179,39 @@ else:
             )
 
 
+# Chunk 34-M2: AppShell mirrors lifecycle and memory pressure into the
+# coordinator, but legacy/direct cleanup must remain until each resource is
+# migrated in its own later micro-chunk.
+_APP_SHELL = APP / "app" / "app_shell.dart"
+if _APP_SHELL.exists():
+    shell_text = _APP_SHELL.read_text(encoding="utf-8-sig")
+    required_resource_runtime_markers = (
+        "ref.watch(mediaResourceCoordinatorProvider);",
+        "_notifyResourceMemoryPressure()",
+        "_notifyResourceForegroundState(state == AppLifecycleState.resumed)",
+        "handleMemoryPressure()",
+        "setForeground(isForeground)",
+    )
+    for marker in required_resource_runtime_markers:
+        if marker not in shell_text:
+            violations.append(
+                f"app/app_shell.dart: Chunk 34-M2 resource mirror marker missing: {marker}"
+            )
+
+    # Freeze mirror mode: these proven Chunk 13 cleanup paths are intentionally
+    # retained until their owning resources migrate one by one.
+    direct_cleanup_markers = (
+        "_vibePlaybackGate.handleMemoryPressure();",
+        "PaintingBinding.instance.imageCache.clearLiveImages();",
+        "ref.read(gameBundleCacheProvider).clear();",
+    )
+    for marker in direct_cleanup_markers:
+        if marker not in shell_text:
+            violations.append(
+                f"app/app_shell.dart: Chunk 34-M2 removed direct cleanup before migration: {marker}"
+            )
+
+
 # Chunk 21: one physical application WebSocket.
 #
 # Application features subscribe through AppRealtimeHub. Raw websocket creation

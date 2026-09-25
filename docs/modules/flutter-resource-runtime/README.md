@@ -29,3 +29,15 @@ a process-global singleton is forbidden.
 
 Chunk 34-M1 introduces only the contract, provider, tests, and guard. No
 production resource has been migrated yet.
+
+
+## M2 AppShell mirror
+
+AppShell watches `mediaResourceCoordinatorProvider` for the authenticated
+session lifetime and forwards foreground/background plus memory-pressure
+signals. Existing Vibes, image-cache, and game-cache cleanup remains active
+during this mirror phase.
+
+Lifecycle forwarding is best-effort and failure-isolated; it must never replace
+canonical session reconciliation or introduce domain state into the resource
+runtime.

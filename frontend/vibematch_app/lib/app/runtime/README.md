@@ -14,3 +14,15 @@ Feature integrations must register adapters explicitly and preserve their
 existing canonical repositories/controllers. Memory-pressure operations may
 discard reconstructable/warm resources only; durable state is never stored
 here.
+
+
+## AppShell lifecycle bridge
+
+Chunk 34-M2 makes AppShell the lifecycle bridge for
+`MediaResourceCoordinator`. The shell keeps the auto-disposed provider alive
+while authenticated and mirrors app foreground/background and memory-pressure
+signals into it.
+
+This is a mirror-only migration step. Existing direct Vibes decoder ownership,
+Flutter image-cache cleanup, and game-bundle cache cleanup remain in AppShell
+until their dedicated resource migrations are completed and guarded.
