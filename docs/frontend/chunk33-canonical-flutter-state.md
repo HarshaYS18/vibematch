@@ -234,3 +234,11 @@ relationship panels now access `loveBondRealtimeProvider` through their
 Riverpod scope. No compatibility callsite restores the retired static
 `LoveBondRealtimeService`; consumers either read immutable provider state or
 invoke the provider notifier for backend synchronization/actions.
+
+
+### Gift regression-test ownership
+
+Gift broadcast/combo regression tests now create and dispose their own
+`GiftFlightBus`/`PremiumGiftBroadcastBus` instances. Tests therefore verify
+the same room-scoped lifecycle as production and cannot rely on or accidentally
+reintroduce process-global reset hooks.

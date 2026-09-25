@@ -5,10 +5,22 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:vibematch_app/features/rooms/data/live_room_system_event_bus.dart';
 import 'package:vibematch_app/features/rooms/modules/gift_slide/presentation/gift_slide_overlay.dart';
 import 'package:vibematch_app/features/rooms/presentation/live_room_models.dart';
+import 'package:vibematch_app/features/rooms/presentation/widgets/gift_flight_bus.dart';
 import 'package:vibematch_app/features/rooms/presentation/widgets/live_room_gift_overlay.dart';
+import 'package:vibematch_app/features/rooms/presentation/widgets/premium_gift_broadcast_overlay.dart';
 
+// Regression coverage for lucky-combo dedupe using the same room-scoped gift
+// presentation queues that production owns in LiveRoomGiftController.
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
+
+  ({GiftFlightBus flight, PremiumGiftBroadcastBus premium}) scopedQueues() {
+    final flight = GiftFlightBus();
+    final premium = PremiumGiftBroadcastBus();
+    addTearDown(flight.dispose);
+    addTearDown(premium.dispose);
+    return (flight: flight, premium: premium);
+  }
 
   StreamController<LiveRoomSystemEvent> eventController() {
     final controller = StreamController<LiveRoomSystemEvent>.broadcast();
@@ -50,6 +62,7 @@ void main() {
   testWidgets('sender lucky combo backend echo does not create a second slide', (
     tester,
   ) async {
+    final queues = scopedQueues();
     final events = eventController();
     const localSlide = GiftSlide(
       id: 'local-lucky-slide',
@@ -75,6 +88,8 @@ void main() {
             onComboTap: (_) {},
             onComboButtonTap: () {},
             onVideoGiftFinished: (_) {},
+            giftFlightBus: queues.flight,
+            premiumGiftBroadcastBus: queues.premium,
           ),
         ),
       ),
@@ -98,6 +113,7 @@ void main() {
   testWidgets('sender backend echo arriving before local slide never flashes duplicate', (
     tester,
   ) async {
+    final queues = scopedQueues();
     final events = eventController();
     Widget overlay(List<GiftSlide> slides, GiftSlide? active) {
       return MaterialApp(
@@ -111,6 +127,8 @@ void main() {
             onComboTap: (_) {},
             onComboButtonTap: () {},
             onVideoGiftFinished: (_) {},
+            giftFlightBus: queues.flight,
+            premiumGiftBroadcastBus: queues.premium,
           ),
         ),
       );
@@ -145,6 +163,7 @@ void main() {
   testWidgets('receiver lucky combo stays one slide and accumulates quantity', (
     tester,
   ) async {
+    final queues = scopedQueues();
     final events = eventController();
     await tester.pumpWidget(
       MaterialApp(
@@ -158,6 +177,8 @@ void main() {
             onComboTap: (_) {},
             onComboButtonTap: () {},
             onVideoGiftFinished: (_) {},
+            giftFlightBus: queues.flight,
+            premiumGiftBroadcastBus: queues.premium,
           ),
         ),
       ),
@@ -197,6 +218,7 @@ void main() {
   testWidgets('zero multiplier is shown as try again without resetting combo', (
     tester,
   ) async {
+    final queues = scopedQueues();
     final events = eventController();
     await tester.pumpWidget(
       MaterialApp(
@@ -210,6 +232,8 @@ void main() {
             onComboTap: (_) {},
             onComboButtonTap: () {},
             onVideoGiftFinished: (_) {},
+            giftFlightBus: queues.flight,
+            premiumGiftBroadcastBus: queues.premium,
           ),
         ),
       ),
