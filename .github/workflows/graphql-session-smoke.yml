@@ -96,6 +96,26 @@ jobs:
           echo "::add-mask::${TOKEN}"
           echo "FUNKEY_TEST_TOKEN=${TOKEN}" >> "${GITHUB_ENV}"
 
+      - name: Probe Home composite errors
+        shell: bash
+        run: |
+          set -euo pipefail
+          PROBE_FILE="$(mktemp)"
+          curl -sS \
+            -H "Authorization: Bearer ${FUNKEY_TEST_TOKEN}" \
+            -H 'Content-Type: application/json' \
+            -d '{"id":"49caa7816c5a823071f7b812cfcc35b6ee996fe337da55dce98f121c776c16f6","variables":{}}' \
+            http://127.0.0.1:8091/graphql >"${PROBE_FILE}"
+          python - "${PROBE_FILE}" <<'PY'
+          import json
+          import sys
+
+          with open(sys.argv[1], encoding="utf-8") as handle:
+              body = json.load(handle)
+          print(json.dumps({"errors": body.get("errors", [])}, indent=2))
+          PY
+          rm -f "${PROBE_FILE}"
+
       - name: Run authenticated persisted GraphQL smoke
         shell: bash
         env:
