@@ -20,6 +20,7 @@ class LiveRoomGiftActionsModule {
   static Future<void> openGiftPanel({
     required BuildContext context,
     required LiveRoomGiftController giftController,
+    required LuckyPacketRealtimeService luckyPacketService,
     required List<SeatUser> roomUsers,
   }) async {
     FocusManager.instance.primaryFocus?.unfocus();
@@ -79,6 +80,7 @@ class LiveRoomGiftActionsModule {
               _openLuckyPacketSetup(
                 context: context,
                 giftController: giftController,
+                luckyPacketService: luckyPacketService,
                 roomUsers: roomUsers,
               );
             });
@@ -121,9 +123,9 @@ class LiveRoomGiftActionsModule {
   static Future<void> _openLuckyPacketSetup({
     required BuildContext context,
     required LiveRoomGiftController giftController,
+    required LuckyPacketRealtimeService luckyPacketService,
     required List<SeatUser> roomUsers,
   }) {
-    LuckyPacketRealtimeService.instance.attach();
     return LiveRoomSheetController.showTransparentSheet<void>(
       context: context,
       isScrollControlled: true,
@@ -132,7 +134,7 @@ class LiveRoomGiftActionsModule {
         onSend: (coinAmount, peopleCount, message) {
           unawaited(() async {
             try {
-              final result = await LuckyPacketRealtimeService.instance.create(
+              final result = await luckyPacketService.create(
                 coinAmount: coinAmount,
                 winnerCount: peopleCount,
                 message: message,
