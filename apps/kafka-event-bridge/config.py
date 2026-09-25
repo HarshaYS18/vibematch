@@ -13,6 +13,7 @@ _ALLOWED_SASL = {"PLAIN", "SCRAM-SHA-256", "SCRAM-SHA-512"}
 
 @dataclass(frozen=True)
 class Settings:
+    app_env: str
     nats_url: str
     nats_stream: str
     nats_dlq_stream: str
@@ -33,6 +34,7 @@ class Settings:
     @classmethod
     def from_env(cls) -> "Settings":
         return cls(
+            app_env=os.getenv("APP_ENV", "development").strip().lower(),
             nats_url=os.getenv("NATS_URL", "nats://127.0.0.1:4222").strip(),
             nats_stream=os.getenv("NATS_STREAM", "FUNKEY_EVENTS").strip(),
             nats_dlq_stream=os.getenv("NATS_DLQ_STREAM", "FUNKEY_DLQ").strip(),
@@ -58,6 +60,8 @@ class Settings:
             raise RuntimeError("KAFKA_BOOTSTRAP_SERVERS is required")
         if self.kafka_security_protocol not in _ALLOWED_PROTOCOLS:
             raise RuntimeError("unsupported KAFKA_SECURITY_PROTOCOL")
+        if self.app_env == "production" and self.kafka_security_protocol != "SASL_SSL":
+            raise RuntimeError("production Kafka requires KAFKA_SECURITY_PROTOCOL=SASL_SSL")
         if self.kafka_sasl_mechanism not in _ALLOWED_SASL:
             raise RuntimeError("unsupported KAFKA_SASL_MECHANISM")
         if self.kafka_security_protocol.startswith("SASL_"):
