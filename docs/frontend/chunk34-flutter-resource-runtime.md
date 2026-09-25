@@ -139,3 +139,39 @@ micro-chunks.
 Vibes playback arbitration remains owned by `VibeMediaPlaybackGate`, and
 individual `VideoPlayerController` instances remain widget-owned. The
 coordinator does not select feed items, choose autoplay, or own video state.
+
+
+## M4: verified game-bundle cache migration
+
+M4 migrates the second reconstructable resource family: the in-memory verified
+remote game bundle cache.
+
+### Adapter boundary
+
+`GameBundleCacheResourceParticipant` wraps the existing `GameBundleCache`.
+Game manifest verification, integrity checks, catalog/version policy and cache
+population remain owned by Game Platform. The resource adapter only clears the
+warm cache when memory pressure or authenticated-session teardown requires it.
+
+Foreground/background transitions are intentionally a no-op because verified
+HTML bundle bytes are passive memory, not an active decoder/WebView.
+
+### Cutover
+
+AppShell creates the adapter around the existing
+`gameBundleCacheProvider` instance and registers it idempotently with the same
+session coordinator used for Vibes.
+
+The old direct AppShell call
+`ref.read(gameBundleCacheProvider).clear()` is removed, leaving one route:
+
+`AppShell → MediaResourceCoordinator → GameBundleCacheResourceParticipant → GameBundleCache.clear()`.
+
+Flutter image-cache cleanup remains direct and guarded for a later micro-chunk.
+
+### Authority and safety
+
+The cache contains only reconstructable, integrity-verified remote game bundle
+content. Clearing it changes no durable game state, settlement, wallet state,
+room state or game-session authority; the next launch reloads and verifies the
+bundle through the canonical Game Platform repository.

@@ -198,11 +198,10 @@ if _APP_SHELL.exists():
                 f"app/app_shell.dart: Chunk 34-M2 resource mirror marker missing: {marker}"
             )
 
-    # Freeze mirror mode: these proven Chunk 13 cleanup paths are intentionally
-    # retained until their owning resources migrate one by one.
+    # Freeze only cleanup that has not migrated yet. Vibes (M3) and game
+    # bundle cache (M4) now flow through registered participants.
     direct_cleanup_markers = (
         "PaintingBinding.instance.imageCache.clearLiveImages();",
-        "ref.read(gameBundleCacheProvider).clear();",
     )
     for marker in direct_cleanup_markers:
         if marker not in shell_text:
@@ -248,6 +247,46 @@ if _APP_SHELL.exists():
     if "_vibePlaybackGate.handleMemoryPressure();" in shell_text:
         violations.append(
             "app/app_shell.dart: Vibes memory pressure must flow through MediaResourceCoordinator after Chunk 34-M3"
+        )
+
+
+# Chunk 34-M4: verified remote game bundles are reconstructable warm cache and
+# clear through a resource participant on memory pressure/session teardown.
+_GAME_CACHE_RESOURCE_ADAPTER = (
+    APP / "app" / "runtime" / "game_bundle_cache_resource_participant.dart"
+)
+if not _GAME_CACHE_RESOURCE_ADAPTER.exists():
+    violations.append(
+        "app/runtime/game_bundle_cache_resource_participant.dart: Chunk 34-M4 game cache participant is required"
+    )
+else:
+    game_cache_resource_text = _GAME_CACHE_RESOURCE_ADAPTER.read_text(
+        encoding="utf-8-sig"
+    )
+    for marker in (
+        "implements MediaResourceParticipant",
+        "MediaResourceKind.gameBundleCache",
+        "_cache.clear()",
+    ):
+        if marker not in game_cache_resource_text:
+            violations.append(
+                "app/runtime/game_bundle_cache_resource_participant.dart: "
+                f"missing game cache lifecycle marker: {marker}"
+            )
+
+if _APP_SHELL.exists():
+    shell_text = _APP_SHELL.read_text(encoding="utf-8-sig")
+    for marker in (
+        "GameBundleCacheResourceParticipant",
+        "resourceCoordinator.register(_gameBundleCacheResourceParticipant)",
+    ):
+        if marker not in shell_text:
+            violations.append(
+                f"app/app_shell.dart: Chunk 34-M4 game cache registration missing: {marker}"
+            )
+    if "ref.read(gameBundleCacheProvider).clear();" in shell_text:
+        violations.append(
+            "app/app_shell.dart: game bundle cache memory pressure must flow through MediaResourceCoordinator after Chunk 34-M4"
         )
 
 

@@ -52,3 +52,14 @@ does not depend on the coordinator.
 Background lifecycle uses a dedicated pause lock so it composes with the
 existing tab-pause state. Memory pressure flows through the coordinator exactly
 once. Image and game cache cleanup remain on their existing direct paths.
+
+
+## M4 verified game-bundle cache
+
+`GameBundleCacheResourceParticipant` migrates the Game Platform's verified
+in-memory bundle cache onto the coordinator. Memory pressure and session
+teardown clear only reconstructable cached HTML bundles; catalog, manifest,
+integrity and game-session authority remain in Game Platform.
+
+AppShell no longer clears `gameBundleCacheProvider` directly after M4.
+Flutter image-cache cleanup is still direct until its dedicated migration.

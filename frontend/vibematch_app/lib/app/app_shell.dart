@@ -25,6 +25,7 @@ import 'runtime/app_identity_runtime.dart';
 import 'runtime/app_inbox_runtime.dart';
 import '../realtime/app_realtime_hub.dart';
 import 'runtime/app_shell_navigation_controller.dart';
+import 'runtime/game_bundle_cache_resource_participant.dart';
 import 'runtime/media_resource_coordinator.dart';
 import 'runtime/vibes_media_resource_participant.dart';
 import 'runtime/app_wallet_runtime.dart';
@@ -56,6 +57,8 @@ class _AppShellState extends ConsumerState<AppShell>
   bool _canonicalRefreshInFlight = false;
   late final VibeMediaPlaybackGate _vibePlaybackGate;
   late final VibesMediaResourceParticipant _vibesMediaResourceParticipant;
+  late final GameBundleCacheResourceParticipant
+      _gameBundleCacheResourceParticipant;
 
   @override
   void initState() {
@@ -64,6 +67,9 @@ class _AppShellState extends ConsumerState<AppShell>
     _vibePlaybackGate = VibeMediaPlaybackGate(initiallyPaused: true);
     _vibesMediaResourceParticipant = VibesMediaResourceParticipant(
       playbackGate: _vibePlaybackGate,
+    );
+    _gameBundleCacheResourceParticipant = GameBundleCacheResourceParticipant(
+      cache: ref.read(gameBundleCacheProvider),
     );
 
     ref.read(identityRepositoryProvider.notifier).accept(widget.currentUser);
@@ -102,12 +108,11 @@ class _AppShellState extends ConsumerState<AppShell>
 
   @override
   void didHaveMemoryPressure() {
-    // Chunk 34 mirror phase: notify the session-scoped coordinator while
-    // preserving every existing direct cleanup path until each resource owner
-    // is migrated and independently guarded.
+    // Chunk 34-M4: Vibes and game-bundle cleanup now flow through registered
+    // participants. Flutter image-cache cleanup remains direct until its own
+    // migration micro-chunk.
     unawaited(_notifyResourceMemoryPressure());
     PaintingBinding.instance.imageCache.clearLiveImages();
-    ref.read(gameBundleCacheProvider).clear();
   }
 
   @override
@@ -251,14 +256,22 @@ class _AppShellState extends ConsumerState<AppShell>
     ref.watch(appRealtimeHubProvider);
     ref.watch(appWalletRuntimeProvider);
     // Chunk 34: registry lifetime exactly matches the authenticated AppShell.
-    // Vibes decoder lifecycle is the first migrated resource; registration is
-    // idempotent across AppShell rebuilds.
+    // Vibes decoder and verified game-bundle cache lifecycle are migrated;
+    // registration remains idempotent across AppShell rebuilds.
     final resourceCoordinator = ref.watch(mediaResourceCoordinatorProvider);
     if (resourceCoordinator.register(_vibesMediaResourceParticipant)) {
       unawaited(
         _syncNewResourceParticipant(
           resourceCoordinator,
           _vibesMediaResourceParticipant,
+        ),
+      );
+    }
+    if (resourceCoordinator.register(_gameBundleCacheResourceParticipant)) {
+      unawaited(
+        _syncNewResourceParticipant(
+          resourceCoordinator,
+          _gameBundleCacheResourceParticipant,
         ),
       );
     }

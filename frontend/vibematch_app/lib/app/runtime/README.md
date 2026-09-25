@@ -36,3 +36,11 @@ owns the gate and registers the adapter with the session coordinator.
 
 The adapter does not own feed selection or decoder/controller instances. It
 only applies app-background pause pressure and forwards memory-pressure trims.
+
+
+## Game bundle cache adapter
+
+`game_bundle_cache_resource_participant.dart` is the Chunk 34-M4 lifecycle
+bridge for Game Platform's verified in-memory bundle cache. It forwards memory
+pressure/session release to `GameBundleCache.clear()` and deliberately does
+nothing on foreground transitions because the cache is passive warm memory.
