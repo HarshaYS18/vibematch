@@ -7,11 +7,13 @@ import 'package:flutter_webrtc/flutter_webrtc.dart';
 import 'package:mediasfu_mediasoup_client/mediasfu_mediasoup_client.dart' as ms;
 
 import '../../../core/network/vm_api_config.dart';
+import '../../../foundation/runtime/media_resource_lifecycle.dart';
 import '../../auth/data/auth_api_service.dart';
 import '../../audio_mediasoup/data/mediasoup_socket_service.dart';
 import '../../audio_mediasoup/models/mediasoup_producer_state.dart';
 import '../../audio_mediasoup/models/mediasoup_room_state.dart';
 import '../models/inbox_call_models.dart';
+import 'runtime/camera_input_resource_participant.dart';
 
 class InboxRemoteVideoStream {
   const InboxRemoteVideoStream({
@@ -26,9 +28,15 @@ class InboxRemoteVideoStream {
 }
 
 class InboxCallMediaBridge {
-  InboxCallMediaBridge({MediasoupSocketService? socketService}) : _socketService = socketService ?? MediasoupSocketService();
+  InboxCallMediaBridge({
+    MediasoupSocketService? socketService,
+    MediaResourceRegistry? resourceRegistry,
+  }) : _socketService = socketService ?? MediasoupSocketService(),
+       _resourceRegistry = resourceRegistry;
 
   final MediasoupSocketService _socketService;
+  final MediaResourceRegistry? _resourceRegistry;
+  CameraInputResourceParticipant? _cameraResourceParticipant;
   final StreamController<String> _logController = StreamController<String>.broadcast();
   final ValueNotifier<MediaStream?> localVideoStream = ValueNotifier<MediaStream?>(null);
   final ValueNotifier<List<InboxRemoteVideoStream>> remoteVideoStreams = ValueNotifier<List<InboxRemoteVideoStream>>(const <InboxRemoteVideoStream>[]);
@@ -126,6 +134,7 @@ class InboxCallMediaBridge {
   }
 
   Future<void> leave() async {
+    _detachCameraResource();
     _joinedSession = null;
     await _newProducerSub?.cancel();
     await _producerClosedSub?.cancel();
@@ -199,6 +208,73 @@ class InboxCallMediaBridge {
     });
     _localStream = stream;
     localVideoStream.value = session.isVideo ? stream : null;
+    if (session.isVideo && stream.getVideoTracks().isNotEmpty) {
+      await _attachCameraResource(session);
+    }
+  }
+
+  Future<void> _attachCameraResource(InboxCallSession session) async {
+    if (_cameraResourceParticipant != null) return;
+    final registry = _resourceRegistry;
+    if (registry == null) return;
+
+    final participant = CameraInputResourceParticipant(
+      resourceId: 'camera-input:${session.id}',
+      pauseCamera: _pauseCameraForLifecycle,
+      resumeCamera: _resumeCameraForLifecycle,
+      releaseCamera: _releaseCameraForSession,
+    );
+    try {
+      if (!registry.register(participant)) return;
+      _cameraResourceParticipant = participant;
+      await participant.onForegroundChanged(registry.isForeground);
+    } catch (_) {
+      registry.unregister(
+        participant.resourceId,
+        expectedParticipant: participant,
+      );
+    }
+  }
+
+  void _detachCameraResource() {
+    final registry = _resourceRegistry;
+    final participant = _cameraResourceParticipant;
+    _cameraResourceParticipant = null;
+    if (registry == null || participant == null) return;
+    registry.unregister(
+      participant.resourceId,
+      expectedParticipant: participant,
+    );
+  }
+
+  Future<bool> _pauseCameraForLifecycle() async {
+    final tracks = _localStream?.getVideoTracks() ?? const <MediaStreamTrack>[];
+    final wasEnabled = tracks.any((track) => track.enabled);
+    if (wasEnabled) await setCameraEnabled(false);
+    return wasEnabled;
+  }
+
+  Future<void> _resumeCameraForLifecycle() async {
+    final session = _joinedSession;
+    if (session == null || !session.isVideo) return;
+    final tracks = _localStream?.getVideoTracks() ?? const <MediaStreamTrack>[];
+    if (tracks.isEmpty) return;
+    await setCameraEnabled(true);
+  }
+
+  Future<void> _releaseCameraForSession() async {
+    final producer = _videoProducer;
+    _videoProducer = null;
+    if (producer != null && !producer.closed) producer.close();
+
+    final tracks = _localStream?.getVideoTracks() ?? const <MediaStreamTrack>[];
+    for (final track in tracks) {
+      try {
+        track.enabled = false;
+        await track.stop();
+      } catch (_) {}
+    }
+    localVideoStream.value = null;
   }
 
   Future<void> _publishLocalTracks(InboxCallSession session) async {

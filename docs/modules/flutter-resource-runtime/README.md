@@ -144,3 +144,12 @@ the canonical RoomMediaEngine/delegate boundary.
 
 Background and memory pressure do not silently mute active room voice. Session
 teardown releases the local input device.
+
+
+## M12 camera input
+
+Inbox video calls now expose the local camera as
+`MediaResourceKind.cameraInput`. Background lifecycle pauses only the camera,
+preserving call audio, and foreground resumes only if lifecycle performed that
+pause. Memory pressure is non-destructive; session teardown releases the
+camera track.

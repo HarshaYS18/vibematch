@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_webrtc/flutter_webrtc.dart';
 
+import '../../../../foundation/runtime/media_resource_lifecycle.dart';
 import '../../controllers/inbox_call_controller.dart';
 import '../../data/inbox_call_media_bridge.dart';
 import '../../models/inbox_call_models.dart';
@@ -21,7 +22,7 @@ class InboxActiveCallPage extends ConsumerStatefulWidget {
 }
 
 class _InboxActiveCallPageState extends ConsumerState<InboxActiveCallPage> {
-  final InboxCallMediaBridge _mediaBridge = InboxCallMediaBridge();
+  late final InboxCallMediaBridge _mediaBridge;
   bool _closingFromRemote = false;
   bool _mediaJoining = false;
   bool _mediaReady = false;
@@ -30,6 +31,9 @@ class _InboxActiveCallPageState extends ConsumerState<InboxActiveCallPage> {
   @override
   void initState() {
     super.initState();
+    _mediaBridge = InboxCallMediaBridge(
+      resourceRegistry: ref.read(mediaResourceRegistryProvider),
+    );
     WidgetsBinding.instance.addPostFrameCallback((_) => _maybeJoinMedia());
   }
 

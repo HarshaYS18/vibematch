@@ -472,3 +472,32 @@ and continue to stop capture through the same canonical path.
 
 The resource participant does not decide whether the user may speak. Seat,
 admin-mute and publish authorization remain backend/room authority.
+
+
+## M12: camera-input lifecycle
+
+M12 migrates the actual local camera track used by Inbox video calls.
+
+### Ownership
+
+`InboxCallMediaBridge` remains the owner of the combined local call
+`MediaStream`, mediasoup producers/transports and call media lifecycle.
+`CameraInputResourceParticipant` wraps only the video-input portion.
+
+The active call page injects the foundation registry when creating its media
+bridge; it does not import the concrete App coordinator.
+
+### Lifecycle
+
+- background: disable/pause the local camera only when it was enabled;
+- foreground: resume only when lifecycle had paused an active camera;
+- memory pressure: non-destructive, preserving an active video call;
+- authenticated-session teardown: close the local video producer and stop the
+  camera track while leaving call audio cleanup to the bridge's normal teardown.
+
+A user-disabled camera is never auto-enabled by a later foreground transition.
+
+### Authority
+
+Inbox call session state remains Inbox/backend authority. The resource runtime
+does not answer/end calls or alter call participants.

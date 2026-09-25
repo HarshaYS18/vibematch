@@ -478,6 +478,57 @@ if not _ROOM_MEDIA_REGISTRY_BINDING.exists():
     )
 
 
+# Chunk 34-M12: Inbox video-call camera capture registers through the
+# foundation resource lifecycle port.
+_CAMERA_INPUT_RESOURCE = (
+    APP / "features" / "inbox" / "data" / "runtime" / "camera_input_resource_participant.dart"
+)
+if not _CAMERA_INPUT_RESOURCE.exists():
+    violations.append(
+        "features/inbox/data/runtime/camera_input_resource_participant.dart: Chunk 34-M12 participant is required"
+    )
+else:
+    camera_text = _CAMERA_INPUT_RESOURCE.read_text(encoding="utf-8-sig")
+    for marker in (
+        "implements MediaResourceParticipant",
+        "MediaResourceKind.cameraInput",
+        "_pauseCamera()",
+        "_resumeCamera()",
+        "_releaseCamera()",
+    ):
+        if marker not in camera_text:
+            violations.append(
+                "features/inbox/data/runtime/camera_input_resource_participant.dart: "
+                f"missing Chunk 34-M12 lifecycle marker: {marker}"
+            )
+
+_CALL_MEDIA_BRIDGE = APP / "features" / "inbox" / "data" / "inbox_call_media_bridge.dart"
+if _CALL_MEDIA_BRIDGE.exists():
+    call_media_text = _CALL_MEDIA_BRIDGE.read_text(encoding="utf-8-sig")
+    for marker in (
+        "MediaResourceRegistry? resourceRegistry",
+        "CameraInputResourceParticipant",
+        "_attachCameraResource",
+        "_detachCameraResource",
+        "_releaseCameraForSession",
+    ):
+        if marker not in call_media_text:
+            violations.append(
+                "features/inbox/data/inbox_call_media_bridge.dart: "
+                f"missing Chunk 34-M12 camera lifecycle marker: {marker}"
+            )
+
+_ACTIVE_CALL_PAGE = (
+    APP / "features" / "inbox" / "presentation" / "pages" / "inbox_active_call_page.dart"
+)
+if _ACTIVE_CALL_PAGE.exists():
+    active_call_text = _ACTIVE_CALL_PAGE.read_text(encoding="utf-8-sig")
+    if "resourceRegistry: ref.read(mediaResourceRegistryProvider)" not in active_call_text:
+        violations.append(
+            "features/inbox/presentation/pages/inbox_active_call_page.dart: camera lifecycle registry injection missing"
+        )
+
+
 # Chunk 34-M1: heavyweight media/resource lifecycle coordination must be
 # session-scoped. The coordinator is an app/runtime implementation, not a
 # feature singleton or a new domain-state authority.

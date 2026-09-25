@@ -95,3 +95,15 @@ If realtime delivery is missed, clients recover via REST cursors. If the Inbox s
 ## Change checklist
 
 Preserve one durable writer, bounded reads, explicit mutation endpoints, backward-compatible public response fields, NATS -> Go delivery, and service-local DB credentials. Any new cross-domain Inbox write requires a service contract rather than a shared ORM import.
+
+
+## Flutter call-camera resource lifecycle
+
+Chunk 34-M12 registers the concrete local video-call camera through the
+foundation `MediaResourceRegistry`.
+
+`InboxCallMediaBridge` remains the owner of the call `MediaStream`, mediasoup
+producers and transport. Backgrounding pauses the camera without ending call
+audio; foreground resumes only if lifecycle paused it. Session teardown stops
+the video producer/track. Durable Inbox call sessions and participants remain
+Inbox-service/PostgreSQL authority.
