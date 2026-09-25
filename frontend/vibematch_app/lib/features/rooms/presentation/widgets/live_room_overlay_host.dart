@@ -1,6 +1,9 @@
+import 'dart:async';
+
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 
+import '../../data/lucky_packet_realtime_service.dart';
 import '../../data/room_music_controller.dart';
 import '../controllers/live_room_gift_controller.dart';
 import '../live_room_models.dart';
@@ -19,6 +22,7 @@ class LiveRoomOverlayHost extends StatelessWidget {
     required this.giftRevision,
     required this.giftController,
     required this.roomMusicController,
+    required this.luckyPacketRealtimeService,
     required this.roomUsers,
     required this.pendingSeatInviteInviterName,
     required this.pendingSeatInviteUser,
@@ -32,6 +36,7 @@ class LiveRoomOverlayHost extends StatelessWidget {
   final ValueListenable<int> giftRevision;
   final LiveRoomGiftController? giftController;
   final RoomMusicController roomMusicController;
+  final LuckyPacketRealtimeService luckyPacketRealtimeService;
   final List<SeatUser> roomUsers;
   final String? pendingSeatInviteInviterName;
   final SeatUser? pendingSeatInviteUser;
@@ -69,9 +74,9 @@ class LiveRoomOverlayHost extends StatelessWidget {
                 if (slide != null) controller?.tapGiftCombo(slide);
               },
               onLuckyPacketGetTap: () =>
-                  controller?.claimLuckyPacket(roomUsers),
+                  unawaited(luckyPacketRealtimeService.claim()),
               onLuckyPacketResultsDismiss:
-                  controller?.dismissLuckyPacketResults,
+                  luckyPacketRealtimeService.dismiss,
               currentUserId: controller?.currentUser.id,
             );
           },
