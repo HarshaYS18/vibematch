@@ -1,36 +1,25 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../controllers/inventory_controller.dart';
 import '../models/store_models.dart';
 import 'widgets/inventory_section.dart';
 import 'widgets/store_category_tabs.dart';
 
-class InventoryPage extends StatefulWidget {
+class InventoryPage extends ConsumerStatefulWidget {
   const InventoryPage({super.key});
 
   @override
-  State<InventoryPage> createState() => _InventoryPageState();
+  ConsumerState<InventoryPage> createState() => _InventoryPageState();
 }
 
-class _InventoryPageState extends State<InventoryPage> {
-  late final InventoryController _controller;
-
+class _InventoryPageState extends ConsumerState<InventoryPage> {
   @override
   void initState() {
     super.initState();
-    _controller = InventoryController()..addListener(_onControllerChanged);
-    _controller.load();
-  }
-
-  @override
-  void dispose() {
-    _controller.removeListener(_onControllerChanged);
-    _controller.dispose();
-    super.dispose();
-  }
-
-  void _onControllerChanged() {
-    if (mounted) setState(() {});
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted) ref.read(inventoryControllerProvider.notifier).load();
+    });
   }
 
   void _showToast(String message) {
@@ -46,7 +35,7 @@ class _InventoryPageState extends State<InventoryPage> {
 
   Future<void> _equip(InventoryItem item) async {
     try {
-      final message = await _controller.equip(item);
+      final message = await ref.read(inventoryControllerProvider.notifier).equip(item);
       if (!mounted) return;
       _showToast(message);
     } catch (error) {
@@ -57,6 +46,8 @@ class _InventoryPageState extends State<InventoryPage> {
 
   @override
   Widget build(BuildContext context) {
+    final inventory = ref.watch(inventoryControllerProvider);
+    final controller = ref.read(inventoryControllerProvider.notifier);
     return Scaffold(
       backgroundColor: const Color(0xFFFAF7F1),
       appBar: AppBar(
@@ -67,36 +58,36 @@ class _InventoryPageState extends State<InventoryPage> {
         actions: [
           IconButton(
             tooltip: 'Refresh',
-            onPressed: _controller.load,
+            onPressed: controller.load,
             icon: const Icon(Icons.refresh_rounded),
           ),
         ],
       ),
       body: RefreshIndicator(
-        onRefresh: _controller.load,
+        onRefresh: controller.load,
         child: CustomScrollView(
           physics: const AlwaysScrollableScrollPhysics(parent: BouncingScrollPhysics()),
           slivers: [
-            SliverToBoxAdapter(child: _InventoryHero(isLoading: _controller.isLoading || _controller.isUpdating)),
+            SliverToBoxAdapter(child: _InventoryHero(isLoading: inventory.isLoading || inventory.isUpdating)),
             SliverToBoxAdapter(
               child: StoreCategoryTabs(
-                categories: _controller.categories,
-                selectedCategory: _controller.selectedCategory,
-                onSelected: _controller.selectCategory,
+                categories: inventory.categories,
+                selectedCategory: inventory.selectedCategory,
+                onSelected: controller.selectCategory,
               ),
             ),
-            if (_controller.isLoading)
+            if (inventory.isLoading)
               const SliverFillRemaining(
                 hasScrollBody: false,
                 child: Center(child: CircularProgressIndicator()),
               )
-            else if (_controller.errorMessage != null)
+            else if (inventory.errorMessage != null)
               SliverFillRemaining(
                 hasScrollBody: false,
-                child: _InventoryError(message: _controller.errorMessage!, onRetry: _controller.load),
+                child: _InventoryError(message: inventory.errorMessage!, onRetry: controller.load),
               )
             else
-              InventorySection(items: _controller.currentItems, onEquip: _equip),
+              InventorySection(items: inventory.currentItems, onEquip: _equip),
           ],
         ),
       ),
