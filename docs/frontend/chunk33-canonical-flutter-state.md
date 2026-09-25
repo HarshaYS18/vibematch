@@ -399,3 +399,19 @@ identity cache:
 Ownership remains unchanged: PostgreSQL/backend commands are durable authority,
 `RoomSessionRepository` is canonical room client state, and media transport owns
 only transient attachment/media lifecycle.
+
+
+### Post-M6 repair R2 — scoped seat-action dismissal
+
+M5 intentionally removed the process-global seat-action dismissal signal when
+`RoomSeatLayout` became widget-local. R2 removes the stale callers of the
+deleted `dismissRoomSeatActionPill()` helper:
+
+- layout/lifecycle/overlay actions clear the mounted room's
+  `LiveRoomSeatController.selectedSeatIndex`;
+- the input dock threads that scoped callback into the message composer;
+- the message composer no longer imports the seat widget just to invoke global
+  presentation state.
+
+Seat-menu lifetime is now controlled entirely by room-scoped seat selection and
+the mounted `RoomSeatLayout` overlay entry.

@@ -8,7 +8,6 @@ import '../../../../../watch_party/data/watch_party_repository.dart';
 import '../../widgets/live_room_body.dart';
 import '../../widgets/live_room_minimized_bubble.dart';
 import '../../widgets/live_room_shell.dart';
-import '../../widgets/room_seats.dart';
 import '../chat/live_room_chat_module.dart';
 import '../cricket/live_room_cricket_module.dart';
 import '../games/live_room_games_entry_module.dart';
@@ -91,11 +90,11 @@ class LiveRoomLayoutModule extends ConsumerWidget {
             LiveRoomMinimizedBubble(
               offset: bundle.bubbleOffset,
               onRestore: () {
-                dismissRoomSeatActionPill();
+                bundle.seatController.clearSelectedSeat();
                 bundle.roomStateController.setMinimized(false);
               },
               onDrag: (details) {
-                dismissRoomSeatActionPill();
+                bundle.seatController.clearSelectedSeat();
                 bundle.roomStateController.moveBubble(
                   delta: details.delta,
                   screenSize: MediaQuery.sizeOf(context),

@@ -155,3 +155,11 @@ reintroduced. Gift commands, privacy settings, rankings, and room event overlays
 now receive an explicit room id. Media `roomId` may be used only as a transient
 navigation/runtime fallback where no durable mutation or canonical projection is
 owned.
+
+
+### Scoped seat-action dismissal
+
+Seat action menus are widget-local. Features that need to dismiss them clear
+the owning room's selected seat via `LiveRoomSeatController.clearSelectedSeat`
+(or an injected callback to it). No process-global seat-menu dismissal function
+or notifier may be reintroduced.

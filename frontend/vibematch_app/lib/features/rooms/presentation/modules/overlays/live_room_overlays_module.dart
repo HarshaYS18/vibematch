@@ -1,7 +1,6 @@
 import 'package:flutter/widgets.dart';
 
 import '../../widgets/live_room_overlay_host.dart';
-import '../../widgets/room_seats.dart';
 import '../lifecycle/live_room_lifecycle_module.dart';
 import '../live_room_controller_bundle.dart';
 import '../seats/live_room_seats_module.dart';
@@ -14,7 +13,7 @@ class LiveRoomOverlaysModule {
   const LiveRoomOverlaysModule._();
 
   static void dismissRoomOverlays(LiveRoomControllerBundle bundle) {
-    dismissRoomSeatActionPill();
+    bundle.seatController.clearSelectedSeat();
     LiveRoomLifecycleModule.clearFocus(bundle);
   }
 

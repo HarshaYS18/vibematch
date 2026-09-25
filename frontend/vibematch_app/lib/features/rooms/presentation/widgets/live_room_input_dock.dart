@@ -97,6 +97,7 @@ class RoomInputDock extends StatelessWidget {
           controller: controller,
           focusNode: focusNode,
           imagesEnabled: imagesEnabled,
+          onDismissSeatActions: onDismissSeatActions,
           onSendText: onSendTap,
           onImageTap: () => _pickAndSendImage(context),
           onSendFloatingText: onSendTap,
