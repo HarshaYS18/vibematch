@@ -3,6 +3,8 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 
 import '../../../../room_session/data/room_session_repository.dart';
+import '../../../../room_session/domain/room_session_state.dart';
+import '../../data/room_session_legacy_adapter.dart';
 import '../../data/chat_moderation_api_service.dart';
 import '../../data/live_room_media_signaling_service.dart';
 import '../../data/live_room_presence_repository.dart';
@@ -234,6 +236,9 @@ class LiveRoomControllerBundle {
   List<SeatUser> get allRoomUsers {
     return usersController.buildAllRoomUsers(
       seatedUsers: roomUsers,
+      canonicalUsers: RoomSessionLegacyAdapter.presenceUsers(
+        roomSessionRepository.currentState,
+      ),
       fallbackRoomUsers: mockRoomUsers,
       inviteUsers: mockInviteUsers,
       isUserRemoved: moderationController.isLocallyKickedOut,
@@ -303,6 +308,7 @@ class LiveRoomControllerBundle {
 
     roomMessageController = LiveRoomMessageController(
       roomId: roomId,
+      roomSessionRepository: roomSessionRepository,
       currentUser: currentUser,
       restoreState: restoreState?.messageState,
       onChanged: () => notifyRoomChanged(),
@@ -310,6 +316,7 @@ class LiveRoomControllerBundle {
 
     seatController = LiveRoomSeatController(
       currentUser: currentUser,
+      roomSessionRepository: roomSessionRepository,
       onChanged: () => notifyRoomChanged(),
       onToast: (message) {
         if (!mounted) return;
@@ -389,6 +396,16 @@ class LiveRoomControllerBundle {
       }
     }
     return false;
+  }
+
+  RoomSessionState? _lastAppliedCanonicalState;
+
+  void applyCanonicalRoomState(RoomSessionState state) {
+    if (disposed || identical(_lastAppliedCanonicalState, state)) return;
+    _lastAppliedCanonicalState = state;
+    seatController.applyCanonicalRoomState();
+    roomStateController.applyCanonicalRoomState();
+    notifyRoomChanged(syncLuckyPacket: false);
   }
 
   void setRoomState(VoidCallback callback) {
