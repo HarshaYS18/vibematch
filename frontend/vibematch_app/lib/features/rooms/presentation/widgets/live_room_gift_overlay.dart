@@ -3,7 +3,6 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 
 import '../../../../realtime/app_realtime_hub.dart';
-import '../../data/active_room_context.dart';
 import '../../data/live_room_system_event_bus.dart';
 import '../../modules/gift_slide/presentation/gift_slide_overlay.dart';
 import '../../modules/ribbon_chat/models/ribbon_message.dart';
@@ -25,6 +24,7 @@ import 'room_gifts.dart';
 class LiveRoomGiftOverlay extends StatefulWidget {
   const LiveRoomGiftOverlay({
     super.key,
+    required this.roomPublicId,
     required this.slides,
     required this.activeComboSlide,
     this.activeLuckyPacket,
@@ -40,6 +40,8 @@ class LiveRoomGiftOverlay extends StatefulWidget {
     this.systemEvents,
   });
 
+  /// Canonical room scope supplied by LiveRoomControllerBundle.
+  final String roomPublicId;
   final List<GiftSlide> slides;
   final GiftSlide? activeComboSlide;
   final LuckyPacketRoomEvent? activeLuckyPacket;
@@ -83,7 +85,7 @@ class _LiveRoomGiftOverlayState extends State<LiveRoomGiftOverlay> {
       _backendGiftSubscription = AppRealtimeHub.shared.events.listen((envelope) {
         final event = decodeLiveRoomSystemEvent(
           envelope,
-          roomId: ActiveRoomContext.roomPublicId,
+          roomId: widget.roomPublicId,
         );
         if (event != null) _handleBackendRoomEvent(event);
       });

@@ -5,15 +5,17 @@ import 'dart:math' as math;
 import 'package:flutter/material.dart';
 
 import '../../../../realtime/app_realtime_hub.dart';
-import '../../data/active_room_context.dart';
 import '../../data/live_room_system_event_bus.dart';
 
 class LuckyWinCelebrationOverlay extends StatefulWidget {
   const LuckyWinCelebrationOverlay({
     super.key,
+    required this.roomPublicId,
     this.systemEvents,
   });
 
+  /// Canonical room scope supplied by the mounted room overlay host.
+  final String roomPublicId;
   final Stream<LiveRoomSystemEvent>? systemEvents;
 
   @override
@@ -52,7 +54,7 @@ class _LuckyWinCelebrationOverlayState
       _roomEventSubscription = AppRealtimeHub.shared.events.listen((envelope) {
         final event = decodeLiveRoomSystemEvent(
           envelope,
-          roomId: ActiveRoomContext.roomPublicId,
+          roomId: widget.roomPublicId,
         );
         if (event != null) _handleRoomEvent(event);
       });

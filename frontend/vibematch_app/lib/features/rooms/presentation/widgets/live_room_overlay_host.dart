@@ -22,6 +22,7 @@ import 'vibesync_room_module.dart';
 class LiveRoomOverlayHost extends StatelessWidget {
   const LiveRoomOverlayHost({
     super.key,
+    required this.roomPublicId,
     required this.vibeSyncState,
     required this.onDismissVibeSync,
     required this.giftRevision,
@@ -36,6 +37,7 @@ class LiveRoomOverlayHost extends StatelessWidget {
     required this.onAcceptSeatInvite,
   });
 
+  final String roomPublicId;
   final VibeSyncRoomState vibeSyncState;
   final VoidCallback onDismissVibeSync;
   final ValueListenable<int> giftRevision;
@@ -68,6 +70,7 @@ class LiveRoomOverlayHost extends StatelessWidget {
             final controller = giftController;
             if (controller == null) return const SizedBox.shrink();
             return LiveRoomGiftOverlay(
+              roomPublicId: roomPublicId,
               slides: controller.giftSlides,
               activeComboSlide: controller.activeComboSlide,
               activeLuckyPacket: controller.activeLuckyPacket,
@@ -92,7 +95,7 @@ class LiveRoomOverlayHost extends StatelessWidget {
         // Authoritative lucky gift results are celebrated independently from
         // the combo slide state. This keeps x100/x500/x1000 effects room-wide
         // without feeding visual state back into combo accounting.
-        const LuckyWinCelebrationOverlay(),
+        LuckyWinCelebrationOverlay(roomPublicId: roomPublicId),
         if (_hasPendingSeatInvite)
           LiveRoomSeatInviteNotification(
             inviterName: pendingSeatInviteInviterName!,

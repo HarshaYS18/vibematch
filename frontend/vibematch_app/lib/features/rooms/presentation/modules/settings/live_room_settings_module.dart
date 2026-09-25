@@ -469,6 +469,7 @@ class LiveRoomSettingsModule {
       isScrollControlled: true,
       builder: (context) => LiveRoomPrivacySheet(
         currentMode: bundle.privacyMode,
+        roomId: bundle.roomId,
         onModeChanged: (mode) {
           LiveRoomChatModule.insertSystemMessage(
             bundle,

@@ -4,12 +4,15 @@ import 'package:flutter/material.dart';
 
 import '../../../../core/security/screenshot_guard_service.dart';
 import '../../../../core/ui/vm_motion.dart';
-import '../../data/active_room_context.dart';
 import '../../data/room_api_service.dart';
 import '../../data/room_settings_repository.dart';
 import '../live_room_models.dart';
 import 'room_theme.dart';
 
+/// Mutates durable privacy/access settings for one explicitly scoped room.
+///
+/// The caller supplies [roomId] from its RoomSessionRepository-backed bundle;
+/// this sheet never discovers room identity from a process-global singleton.
 class LiveRoomPrivacySheet extends StatefulWidget {
   const LiveRoomPrivacySheet({
     super.key,
@@ -69,8 +72,7 @@ class _LiveRoomPrivacySheetState extends State<LiveRoomPrivacySheet> {
     super.dispose();
   }
 
-  String get _roomId =>
-      (widget.roomId ?? ActiveRoomContext.roomPublicId ?? '').trim();
+  String get _roomId => (widget.roomId ?? '').trim();
 
   Future<void> _loadSettings() async {
     final roomId = _roomId;

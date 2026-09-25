@@ -6,6 +6,10 @@ import '../lifecycle/live_room_lifecycle_module.dart';
 import '../live_room_controller_bundle.dart';
 import '../seats/live_room_seats_module.dart';
 
+/// Room-scoped overlay composition.
+///
+/// The canonical bundle room id is threaded into overlay event decoders so
+/// cross-room realtime presentation cannot depend on a global active-room cache.
 class LiveRoomOverlaysModule {
   const LiveRoomOverlaysModule._();
 
@@ -22,6 +26,7 @@ class LiveRoomOverlaysModule {
 
   static Widget buildOverlayHost(LiveRoomControllerBundle bundle) {
     return LiveRoomOverlayHost(
+      roomPublicId: bundle.roomId,
       vibeSyncState: bundle.vibeSyncState,
       onDismissVibeSync: () => clearVibeSyncOverlay(bundle),
       giftRevision: bundle.giftRevision,

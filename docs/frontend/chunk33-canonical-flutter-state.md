@@ -378,3 +378,24 @@ All planned Chunk 33 state-ownership repairs are implemented. Completion is
 considered verified only when the final branch-head architecture guard,
 backend/service contracts, Flutter tests/analyze and production-platform
 checks pass. No UI visual redesign was introduced by Chunk 33.
+
+
+### Post-M6 repair R1 — stale active-room context removal
+
+The M6 deletion of `ActiveRoomContext` exposed callers that had not yet been
+migrated. R1 completes that migration without restoring a process-global room
+identity cache:
+
+- privacy and contribution-ranking sheets now require/use the explicit room id
+  supplied by the room controller bundle;
+- gift controllers receive the room id from `LiveRoomControllerBundle` and use
+  it only as command context for backend gift/relationship requests;
+- gift and lucky-win realtime overlays receive the mounted room id from
+  `LiveRoomOverlayHost` and filter events against that scope;
+- session cleanup no longer clears a deleted global room cache;
+- Room Level accepts an explicit room id and uses the attached media room only
+  as a transient navigation fallback, never as durable state authority.
+
+Ownership remains unchanged: PostgreSQL/backend commands are durable authority,
+`RoomSessionRepository` is canonical room client state, and media transport owns
+only transient attachment/media lifecycle.

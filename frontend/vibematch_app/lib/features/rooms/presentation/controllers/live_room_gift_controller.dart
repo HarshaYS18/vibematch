@@ -9,7 +9,6 @@ import '../../../auth/models/current_user.dart';
 import '../../../gifts/data/lucky_gifts_api_service.dart';
 import '../../../relationships/data/relationship_exp_api_service.dart';
 import '../../../wallet/data/wallet_api_service.dart';
-import '../../data/active_room_context.dart';
 import '../../data/gift_api_service.dart';
 import '../../data/live_room_media_signaling_service.dart';
 import '../../data/mini_profile_economy_service.dart';
@@ -73,8 +72,12 @@ class LuckyPacketRoomEvent {
 /// controller owns only one mounted room's transient slides, combo state,
 /// flying-gift queue and premium-broadcast queue; all are disposed on room exit.
 class LiveRoomGiftController {
+  /// Optional only for isolated controller tests. Production room bundles pass
+  /// their canonical room id explicitly; no process-global room cache is read.
+
   LiveRoomGiftController({
     required SeatUser currentUser,
+    this.roomPublicId,
     required this.onChanged,
     required this.onFinalGiftMessage,
     required this.onToast,
@@ -88,6 +91,8 @@ class LiveRoomGiftController {
       unawaited(refreshCoinBalance());
     }
   }
+
+  final String? roomPublicId;
 
   static const int smallGiftFlightThreshold = 200000;
   static const int comboTriggerSeconds = 15;
@@ -313,7 +318,7 @@ class LiveRoomGiftController {
           giftId: gift.id,
           coinValue: gift.coins,
           quantity: effectiveCombo,
-          roomPublicId: ActiveRoomContext.roomPublicId,
+          roomPublicId: roomPublicId,
         );
         coinBalance = result.senderCoinBalance;
         unawaited(
@@ -423,7 +428,7 @@ class LiveRoomGiftController {
           giftId: gift.id,
           coinValue: gift.coins,
           quantity: effectiveCombo,
-          roomPublicId: ActiveRoomContext.roomPublicId,
+          roomPublicId: roomPublicId,
         );
 
         final multiplier =
@@ -603,7 +608,7 @@ class LiveRoomGiftController {
         giftId: context.gift.id,
         coinValue: context.gift.coins,
         quantity: context.baseCombo,
-        roomPublicId: ActiveRoomContext.roomPublicId,
+        roomPublicId: roomPublicId,
       );
       final multiplier =
           result.luckyMultiplier ?? result.luckyResult?.multiplier ?? 1;
@@ -767,7 +772,7 @@ class LiveRoomGiftController {
         eventType: eventType,
         otherPublicUserId: receiverPublicUserId,
         coinValue: gift.coins * quantity,
-        roomPublicId: ActiveRoomContext.roomPublicId,
+        roomPublicId: roomPublicId,
       );
     } catch (_) {
       // Relationship EXP sync should never block the gift send flow.

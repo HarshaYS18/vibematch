@@ -145,3 +145,13 @@ files were removed during Chunk 33 closure.
 Text and image chat now use the same canonical
 `/rooms/{room}/realtime/chat/send` command. Chat clear uses
 `/rooms/{room}/realtime/chat/clear`.
+
+
+### Chunk 33 post-closure repair: room identity threading
+
+Room-facing UI modules must receive room identity from their scoped
+`LiveRoomControllerBundle`/route. The deleted `ActiveRoomContext` must not be
+reintroduced. Gift commands, privacy settings, rankings, and room event overlays
+now receive an explicit room id. Media `roomId` may be used only as a transient
+navigation/runtime fallback where no durable mutation or canonical projection is
+owned.

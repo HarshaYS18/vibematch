@@ -1,17 +1,24 @@
 import 'package:flutter/material.dart';
 
 import '../../experience/presentation/experience_detail_page.dart';
-import '../../rooms/data/active_room_context.dart';
 import '../../rooms/data/live_room_media_signaling_service.dart';
 
+/// Room EXP details for an explicitly scoped room.
+///
+/// [roomPublicId] should be supplied by room-scoped navigation. The attached
+/// media room is only a transient routing fallback and is never durable room
+/// state authority.
 class RoomLevelPage extends StatelessWidget {
-  const RoomLevelPage({super.key});
+  const RoomLevelPage({super.key, this.roomPublicId});
+
+  final String? roomPublicId;
 
   @override
   Widget build(BuildContext context) {
-    final activeRoomId = ActiveRoomContext.roomPublicId ?? LiveRoomMediaSignalingService.instance.roomId;
+    final activeRoomId =
+        (roomPublicId ?? LiveRoomMediaSignalingService.instance.roomId)?.trim();
 
-    if (activeRoomId == null || activeRoomId.trim().isEmpty) {
+    if (activeRoomId == null || activeRoomId.isEmpty) {
       return Scaffold(
         backgroundColor: const Color(0xFFFAF7F1),
         appBar: AppBar(
