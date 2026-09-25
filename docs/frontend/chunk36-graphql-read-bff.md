@@ -51,3 +51,11 @@ Chunk 36 updates the earlier Chunk 35 buffer-count invariant from two to three
 intentional non-streaming policies. The guard now explicitly verifies that the
 realtime WebSocket policy remains unbuffered rather than relying only on a
 global count.
+
+
+## Composite-read load budget
+
+Chunk 36 includes `tests/load/graphql-read-smoke.js` for the persisted Home
+composite. The staging smoke threshold requires less than 2% failed requests
+and p95 below 1500ms, providing an explicit composition-latency signal in
+addition to unit, architecture, and container gates.

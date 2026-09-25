@@ -14,3 +14,16 @@ The smoke thresholds in scripts are local correctness checks. They are not produ
 `reconnect-storm.js` repeatedly upgrades, optionally subscribes to a disposable room, disconnects, and reconnects. Use it while normal room traffic is being generated through the authoritative API to measure reconnect success and gateway fanout recovery. Set `VUS`, `DURATION`, and `HOLD_MS` explicitly for each stage.
 
 A soak run reuses the same scenarios with a longer `DURATION` (for example several hours) and fixed representative concurrency. Do not promote a measured capacity number until HTTP, realtime, worker backlog, Redis, PostgreSQL, JetStream, media CPU/bandwidth, TURN relay use, and client reconnect success were captured from the same environment.
+
+
+## GraphQL persisted-read smoke
+
+`graphql-read-smoke.js` exercises the real persisted Home composite at
+`/graphql`. It requires `FUNKEY_TEST_TOKEN`; without a token the scenario
+only sleeps and does not generate authenticated load.
+
+The smoke budget is intentionally stricter than the Gateway's 10-second hard
+deadline: less than 2% request failures and p95 below 1500ms. These are
+promotion/smoke thresholds, not a universal production SLO. Run this scenario
+against staging with representative owner-service latency before raising BFF
+HPA or concurrency limits.

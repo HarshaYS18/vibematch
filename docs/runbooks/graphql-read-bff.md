@@ -29,3 +29,12 @@ Rollback the BFF image/Gateway route and client read cutover while preserving ex
 ## Recovery evidence
 
 Verify one Home composite, Profile composite, Discovery composite and authorized Creator/Admin composite; verify partial-error behavior, request-ID propagation, p95 latency and zero mutation/database access.
+
+
+## Load verification
+
+Before promotion after a BFF/upstream routing change, run the persisted GraphQL
+smoke against staging with a disposable authenticated test account. Treat a
+p95 above 1500ms or request-failure rate at/above 2% as a signal to inspect
+owner-service latency, BFF concurrency, and trace spans before increasing
+capacity limits.

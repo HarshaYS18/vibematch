@@ -95,6 +95,16 @@ require(
     ('funkey-graphql-bff', 'manifest.count("@sha256:") < 13', 'graphql-bff:'),
 )
 
+require(
+    ROOT / 'tests' / 'load' / 'graphql-read-smoke.js',
+    (
+        'PersistedGraphqlOperations',
+        'p(95)<1500',
+        'rate<0.02',
+        '/graphql',
+    ),
+)
+
 for doc in (
     BFF / 'README.md',
     BFF / 'tests' / 'README.md',
