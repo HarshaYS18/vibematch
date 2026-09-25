@@ -58,6 +58,15 @@ class VibesState {
 class VibesController extends AutoDisposeNotifier<VibesState> {
   final VibesApiService _apiService = const VibesApiService();
 
+  VibesFeedTab get selectedTab => state.selectedTab;
+  VibePrivacyAudience get whoCanMention => state.whoCanMention;
+  VibePrivacyAudience get whoCanComment => state.whoCanComment;
+  bool get canUseMentionAllToday => state.canUseMentionAllToday;
+  bool get showingSavedVibes => state.showingSavedVibes;
+  bool get isLoading => state.isLoading;
+  String? get loadErrorMessage => state.loadErrorMessage;
+  List<VibeItem> get visibleVibes => state.visibleVibes;
+
   @override
   VibesState build() => const VibesState();
 
