@@ -151,6 +151,34 @@ if _MEDIA_FACADE.exists():
             )
 
 
+# Chunk 34-M1: heavyweight media/resource lifecycle coordination must be
+# session-scoped. The coordinator is an app/runtime contract, not a feature
+# singleton or a new domain-state authority.
+_RESOURCE_COORDINATOR = (
+    APP / "app" / "runtime" / "media_resource_coordinator.dart"
+)
+if not _RESOURCE_COORDINATOR.exists():
+    violations.append(
+        "app/runtime/media_resource_coordinator.dart: Chunk 34 resource coordinator is required"
+    )
+else:
+    resource_text = _RESOURCE_COORDINATOR.read_text(encoding="utf-8-sig")
+    if "Provider.autoDispose<MediaResourceCoordinator>" not in resource_text:
+        violations.append(
+            "app/runtime/media_resource_coordinator.dart: coordinator must be session-scoped with Provider.autoDispose"
+        )
+    for forbidden in (
+        "MediaResourceCoordinator.instance",
+        "static final MediaResourceCoordinator",
+        "static MediaResourceCoordinator",
+    ):
+        if forbidden in resource_text:
+            violations.append(
+                "app/runtime/media_resource_coordinator.dart: "
+                f"process-global resource coordinator is forbidden ({forbidden})"
+            )
+
+
 # Chunk 21: one physical application WebSocket.
 #
 # Application features subscribe through AppRealtimeHub. Raw websocket creation
