@@ -404,3 +404,37 @@ without double reconnecting production room media.
 Room membership, seats and permissions remain
 `RoomSessionRepository`/backend authority. The media engine continues to own
 only mediasoup/WebRTC transport and local media intent.
+
+
+## M10: gift-video decoder lifecycle
+
+M10 migrates the production gift-video decoder path used by
+`CleanVideoGiftOverlay`. The older `video_gift_overlay.dart` implementation
+is not mounted by the live-room gift composition and is intentionally not given
+a second lifecycle owner.
+
+### Ownership
+
+Each active gift video remains widget-owned through its
+`VideoPlayerController`. The new `GiftVideoResourceParticipant` only
+coordinates that ephemeral decoder with the authenticated resource runtime.
+
+The participant is identified by explicit room scope plus gift-slide id, so
+simultaneous rooms cannot collide.
+
+### Lifecycle
+
+- background: pause and remember whether the gift was playing;
+- foreground: resume only if lifecycle had paused an active gift;
+- memory pressure: release the ephemeral decoder and finish the gift rather
+  than retaining a large transient video allocation;
+- authenticated-session teardown: same terminal release path.
+
+Normal widget disposal unregisters first, then idempotently disposes the
+controller.
+
+### Authority
+
+Gift settlement, wallet state, combo state and durable gift history remain
+backend/`LiveRoomGiftController` authority. This migration affects only local
+gift presentation resources.

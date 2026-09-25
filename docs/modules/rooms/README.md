@@ -194,3 +194,12 @@ Room UI helpers and tests must supply explicit room scope after Chunk 33.
 Composer helpers receive a scoped seat-dismiss callback; gift/lucky overlays
 receive `roomPublicId`. Tests intentionally mirror these production contracts
 instead of relying on hidden defaults.
+
+
+### Gift-video resource lifecycle
+
+The production gift-video path is `CleanVideoGiftOverlay`. Active video
+decoders register through the foundation media-resource port using explicit room
+scope. The resource runtime may pause/resume presentation or drop an ephemeral
+gift decoder under memory pressure, but it never owns gift settlement, wallet or
+combo authority.

@@ -122,3 +122,14 @@ minimized.
 Foreground lifecycle reconnects the active WebRTC engine. Background and memory
 pressure are non-destructive. Session teardown calls `leave()` rather than
 terminally disposing the reusable singleton-owned engine.
+
+
+## M10 gift-video decoder
+
+The mounted `CleanVideoGiftOverlay` now registers each active
+`VideoPlayerController` through a feature-owned
+`GiftVideoResourceParticipant`. Backgrounding pauses the ephemeral gift,
+foreground resumes only when appropriate, and memory pressure/session teardown
+may drop the decoder and finish the presentation.
+
+Gift settlement and wallet/domain state are unchanged.

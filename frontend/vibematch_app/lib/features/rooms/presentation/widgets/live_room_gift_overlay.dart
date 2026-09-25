@@ -538,6 +538,7 @@ class _LiveRoomGiftOverlayState extends State<LiveRoomGiftOverlay> {
             },
           ),
           CleanVideoGiftOverlay(
+            roomPublicId: widget.roomPublicId,
             slides: videoSlides,
             onVideoFinished: _finishVideoGift,
           ),

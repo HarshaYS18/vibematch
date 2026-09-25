@@ -368,6 +368,70 @@ if _ROOM_PRESENCE_SHELL.exists():
             )
 
 
+# Chunk 34-M10: the production gift-video decoder is feature-owned and
+# registers through the foundation resource lifecycle port.
+_GIFT_VIDEO_PARTICIPANT = (
+    APP
+    / "features"
+    / "rooms"
+    / "modules"
+    / "video_gift"
+    / "runtime"
+    / "gift_video_resource_participant.dart"
+)
+if not _GIFT_VIDEO_PARTICIPANT.exists():
+    violations.append(
+        "features/rooms/modules/video_gift/runtime/gift_video_resource_participant.dart: Chunk 34-M10 participant is required"
+    )
+else:
+    gift_video_text = _GIFT_VIDEO_PARTICIPANT.read_text(encoding="utf-8-sig")
+    for marker in (
+        "implements MediaResourceParticipant",
+        "MediaResourceKind.giftVideo",
+        "_pause()",
+        "_resume()",
+        "_releaseResource()",
+    ):
+        if marker not in gift_video_text:
+            violations.append(
+                "features/rooms/modules/video_gift/runtime/gift_video_resource_participant.dart: "
+                f"missing Chunk 34-M10 lifecycle marker: {marker}"
+            )
+
+_CLEAN_GIFT_VIDEO = (
+    APP
+    / "features"
+    / "rooms"
+    / "modules"
+    / "video_gift"
+    / "presentation"
+    / "clean_video_gift_overlay.dart"
+)
+if _CLEAN_GIFT_VIDEO.exists():
+    clean_gift_text = _CLEAN_GIFT_VIDEO.read_text(encoding="utf-8-sig")
+    for marker in (
+        "mediaResourceRegistryProvider",
+        "GiftVideoResourceParticipant",
+        "registry.register(participant)",
+        "registry.unregister(",
+    ):
+        if marker not in clean_gift_text:
+            violations.append(
+                "features/rooms/modules/video_gift/presentation/clean_video_gift_overlay.dart: "
+                f"missing Chunk 34-M10 resource marker: {marker}"
+            )
+
+_LIVE_GIFT_OVERLAY = (
+    APP / "features" / "rooms" / "presentation" / "widgets" / "live_room_gift_overlay.dart"
+)
+if _LIVE_GIFT_OVERLAY.exists():
+    live_gift_text = _LIVE_GIFT_OVERLAY.read_text(encoding="utf-8-sig")
+    if "roomPublicId: widget.roomPublicId" not in live_gift_text:
+        violations.append(
+            "features/rooms/presentation/widgets/live_room_gift_overlay.dart: gift-video resource must receive explicit room scope"
+        )
+
+
 # Chunk 34-M1: heavyweight media/resource lifecycle coordination must be
 # session-scoped. The coordinator is an app/runtime implementation, not a
 # feature singleton or a new domain-state authority.
