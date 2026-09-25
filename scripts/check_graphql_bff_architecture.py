@@ -31,6 +31,17 @@ required_bff_files = (
 for name in required_bff_files:
     require(BFF / name)
 
+require(
+    BFF / 'tests' / 'test_upstream.py',
+    (
+        'authorization',
+        'x-request-id',
+        'traceparent',
+        'UPSTREAM_TIMEOUT',
+        'UPSTREAM_PROTOCOL',
+    ),
+)
+
 main_text = require(
     BFF / 'main.py',
     (
