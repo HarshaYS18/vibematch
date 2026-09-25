@@ -67,6 +67,11 @@ class InboxState {
   final bool loadingMoreConversations;
   final List<InboxReportTask> reportTasks;
 
+  int get unreadCount => conversations.fold<int>(
+    0,
+    (sum, conversation) => sum + conversation.unreadCount,
+  );
+
   InboxState copyWith({
     String? selectedFilter,
     bool? lockedVaultUnlocked,
