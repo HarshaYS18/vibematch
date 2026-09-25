@@ -12,7 +12,7 @@ database roles for bounded composite reads.
 |---|---|---|
 | Identity | `identity-service` | Owns account/security/session/device truth. Core is a compatibility facade/read composer only. |
 | Profile/Social | `profile-social-service` | Owns profile mutation, social graph, relationships and family membership. |
-| Room Control | `room-control-service` | Owns room definition/membership/permissions/seats/Watch Party/activity truth. |
+| Room Control | `room-control-service` | Owns room definition/membership/permissions/seats/Watch Party/activity and Room Cricket tournament/match/ball truth. |
 | Inbox | `inbox-service` | Owns conversations/messages/read state/Inbox preferences and family community chat. |
 | Vibes | `vibes-service` | Owns Vibes content/reactions/feed source state; ranking copies remain projections. |
 | Economy | `economy-service` | Exclusive writer for wallet/ledger, supply/game pools, durable house liability, gift/Lucky Packet settlement, mission rewards and game financial settlement. |
