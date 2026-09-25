@@ -3,6 +3,8 @@
 import asyncio
 import unittest
 
+from graphql import GraphQLError
+
 from context import GraphQLRequestContext
 from dataloader import DataLoader
 from metrics import observe_operation, observe_upstream, render
@@ -104,7 +106,10 @@ class HomeCompositionTests(unittest.IsolatedAsyncioTestCase):
             [item["title"] for item in _filter_home_banners(payload, "policy_rules")],
             ["Rules"],
         )
-        self.assertEqual(_filter_home_banners({"not": "a-list"}, "event"), [])
+        with self.assertRaises(GraphQLError):
+            _filter_home_banners({"not": "a-list"}, "event")
+        with self.assertRaises(GraphQLError):
+            _filter_home_banners(["invalid-item"], "event")
 
 
 class MetricsTests(unittest.TestCase):
