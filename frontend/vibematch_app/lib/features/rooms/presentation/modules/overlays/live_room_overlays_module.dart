@@ -26,6 +26,7 @@ class LiveRoomOverlaysModule {
       onDismissVibeSync: () => clearVibeSyncOverlay(bundle),
       giftRevision: bundle.giftRevision,
       giftController: bundle.giftControllerInstance,
+      roomMusicController: bundle.roomMusicController,
       roomUsers: bundle.allRoomUsers,
       pendingSeatInviteInviterName: bundle.pendingSeatInvite?.inviterName,
       pendingSeatInviteUser: bundle.pendingSeatInvite?.invitedUser,
