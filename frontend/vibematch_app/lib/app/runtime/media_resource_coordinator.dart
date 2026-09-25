@@ -2,43 +2,9 @@ import 'dart:async';
 
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
-/// Heavyweight runtime resource classes coordinated at authenticated AppShell
-/// scope.
-///
-/// These values describe resource *lifecycle cost*, not domain ownership.
-/// Room state, Watch Party state, game state, gifts, and media signaling remain
-/// owned by their existing canonical repositories/controllers.
-enum MediaResourceKind {
-  vibesVideoDecoder,
-  watchPartyWebView,
-  gameWebView,
-  roomWebRtc,
-  giftVideo,
-  audioInput,
-  cameraInput,
+import '../../foundation/runtime/media_resource_lifecycle.dart';
 
-  /// Flutter's decoded/network image cache owned by PaintingBinding.
-  flutterImageCache,
-
-  /// Explicit feature-driven image prefetch work, migrated separately.
-  imagePrefetch,
-  gameBundleCache,
-}
-
-/// Lifecycle adapter registered with [MediaResourceCoordinator].
-///
-/// Feature owners remain responsible for creating and mutating their resource.
-/// The coordinator only broadcasts app/session lifecycle pressure so expensive
-/// resources can pause, trim warm state, or release during authenticated-shell
-/// teardown. Implementations should make [release] idempotent.
-abstract interface class MediaResourceParticipant {
-  String get resourceId;
-  MediaResourceKind get kind;
-
-  Future<void> onForegroundChanged(bool isForeground);
-  Future<void> onMemoryPressure();
-  Future<void> release();
-}
+export '../../foundation/runtime/media_resource_lifecycle.dart';
 
 /// Session-scoped coordinator for heavyweight Flutter runtime resources.
 ///
@@ -49,7 +15,7 @@ abstract interface class MediaResourceParticipant {
 /// The coordinator is created by [mediaResourceCoordinatorProvider], which is
 /// auto-disposed with the authenticated AppShell/session. No process-global
 /// singleton is allowed.
-class MediaResourceCoordinator {
+class MediaResourceCoordinator implements MediaResourceRegistry {
   final Map<String, MediaResourceParticipant> _participants =
       <String, MediaResourceParticipant>{};
 

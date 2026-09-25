@@ -217,3 +217,50 @@ heavy resource performs cleanup.
 Flutter's image cache contains reconstructable presentation memory only.
 Clearing live entries changes no durable application state and does not alter
 room, identity, wallet, Watch Party, game-session or content authority.
+
+
+## M6: foundation resource registry boundary
+
+M6 prepares Chunk 34 for feature-owned resources such as game WebViews, Watch
+Party WebViews and room WebRTC without allowing those features to import
+`app/runtime`.
+
+### Foundation contract
+
+`foundation/runtime/media_resource_lifecycle.dart` now owns:
+
+- `MediaResourceKind`;
+- `MediaResourceParticipant`;
+- `MediaResourceRegistry`;
+- nullable `mediaResourceRegistryProvider`.
+
+The nullable default intentionally allows feature widgets to remain reusable
+outside the authenticated AppShell (tests, previews or future isolated flows).
+
+### App implementation
+
+`MediaResourceCoordinator` remains under `app/runtime` and now implements the
+foundation `MediaResourceRegistry`. Its auto-disposed provider, lifecycle
+fan-out and terminal session cleanup remain unchanged.
+
+Existing App-runtime adapters now import the foundation lifecycle contract
+directly rather than relying on transitive types from the coordinator file.
+
+### Authenticated subtree injection
+
+AppShell wraps its existing UI subtree in a nested Riverpod `ProviderScope`
+that overrides `mediaResourceRegistryProvider` with the current
+session-scoped coordinator. There is no layout or visual change.
+
+This creates the dependency direction required for later migrations:
+
+`AppShell/app runtime → foundation registry port ← feature-owned resource`.
+
+Feature code can now read the registry port and register its own resource
+participant without importing or knowing about `MediaResourceCoordinator`.
+
+### Guard
+
+The architecture guard requires the foundation contract and rejects imports of
+`media_resource_coordinator.dart` from features, Game Platform, Watch Party or
+room media.

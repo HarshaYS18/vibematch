@@ -1,5 +1,5 @@
 import '../../game_platform/data/game_bundle_cache.dart';
-import 'media_resource_coordinator.dart';
+import '../../foundation/runtime/media_resource_lifecycle.dart';
 
 /// Chunk 34-M4 lifecycle adapter for Game Platform's verified bundle cache.
 ///

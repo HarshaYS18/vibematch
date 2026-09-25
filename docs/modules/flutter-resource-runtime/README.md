@@ -74,3 +74,15 @@ Vibes and game-cache adapters.
 
 The resource kind is `flutterImageCache`; explicit image-prefetch jobs remain
 a separate `imagePrefetch` category for later work.
+
+
+## M6 feature registration boundary
+
+Feature-owned heavy resources must depend on
+`foundation/runtime/media_resource_lifecycle.dart`, never on the concrete
+AppShell coordinator.
+
+The authenticated AppShell injects its session coordinator through
+`mediaResourceRegistryProvider` using a nested `ProviderScope`. This allows
+Game Platform, Watch Party and room media to register lifecycle participants
+while preserving foundation → feature → app dependency direction.

@@ -151,9 +151,50 @@ if _MEDIA_FACADE.exists():
             )
 
 
+# Chunk 34-M6 foundation boundary: feature-owned heavy resources depend on a
+# foundation lifecycle/registry contract, never the concrete App runtime.
+_RESOURCE_LIFECYCLE_CONTRACT = (
+    APP / "foundation" / "runtime" / "media_resource_lifecycle.dart"
+)
+if not _RESOURCE_LIFECYCLE_CONTRACT.exists():
+    violations.append(
+        "foundation/runtime/media_resource_lifecycle.dart: Chunk 34-M6 lifecycle contract is required"
+    )
+else:
+    resource_contract_text = _RESOURCE_LIFECYCLE_CONTRACT.read_text(
+        encoding="utf-8-sig"
+    )
+    for marker in (
+        "enum MediaResourceKind",
+        "abstract interface class MediaResourceParticipant",
+        "abstract interface class MediaResourceRegistry",
+        "mediaResourceRegistryProvider",
+    ):
+        if marker not in resource_contract_text:
+            violations.append(
+                "foundation/runtime/media_resource_lifecycle.dart: "
+                f"missing Chunk 34-M6 contract marker: {marker}"
+            )
+
+for resource_root in (
+    APP / "features",
+    APP / "game_platform",
+    APP / "watch_party",
+    APP / "room_media",
+):
+    if not resource_root.exists():
+        continue
+    for path in resource_root.rglob("*.dart"):
+        text = path.read_text(encoding="utf-8-sig")
+        if "media_resource_coordinator.dart" in text:
+            rel = path.relative_to(ROOT).as_posix()
+            violations.append(
+                f"{rel}: feature-owned resources must depend on foundation media_resource_lifecycle.dart, not app/runtime coordinator"
+            )
+
 # Chunk 34-M1: heavyweight media/resource lifecycle coordination must be
-# session-scoped. The coordinator is an app/runtime contract, not a feature
-# singleton or a new domain-state authority.
+# session-scoped. The coordinator is an app/runtime implementation, not a
+# feature singleton or a new domain-state authority.
 _RESOURCE_COORDINATOR = (
     APP / "app" / "runtime" / "media_resource_coordinator.dart"
 )
@@ -163,6 +204,10 @@ if not _RESOURCE_COORDINATOR.exists():
     )
 else:
     resource_text = _RESOURCE_COORDINATOR.read_text(encoding="utf-8-sig")
+    if "implements MediaResourceRegistry" not in resource_text:
+        violations.append(
+            "app/runtime/media_resource_coordinator.dart: coordinator must implement the foundation MediaResourceRegistry"
+        )
     if "Provider.autoDispose<MediaResourceCoordinator>" not in resource_text:
         violations.append(
             "app/runtime/media_resource_coordinator.dart: coordinator must be session-scoped with Provider.autoDispose"
@@ -187,6 +232,7 @@ if _APP_SHELL.exists():
     shell_text = _APP_SHELL.read_text(encoding="utf-8-sig")
     required_resource_runtime_markers = (
         "ref.watch(mediaResourceCoordinatorProvider);",
+        "mediaResourceRegistryProvider.overrideWithValue(resourceCoordinator)",
         "_notifyResourceMemoryPressure()",
         "_notifyResourceForegroundState(state == AppLifecycleState.resumed)",
         "handleMemoryPressure()",

@@ -19,6 +19,7 @@ import '../features/rooms/presentation/widgets/live_room_minimized_bubble.dart';
 import '../features/rooms/presentation/widgets/live_room_minimized_overlay_service.dart';
 import '../features/vibes/presentation/vibes_page_modular.dart';
 import '../features/vibes/presentation/widgets/vibe_media_playback_gate.dart';
+import '../foundation/runtime/media_resource_lifecycle.dart';
 import '../identity/data/identity_repository.dart';
 import '../session/data/session_repository.dart';
 import 'runtime/app_identity_runtime.dart';
@@ -331,7 +332,11 @@ class _AppShellState extends ConsumerState<AppShell>
       ),
     ];
 
-    return PopScope<void>(
+    return ProviderScope(
+      overrides: [
+        mediaResourceRegistryProvider.overrideWithValue(resourceCoordinator),
+      ],
+      child: PopScope<void>(
       canPop: false,
       onPopInvokedWithResult: _handleAppBack,
       child: Scaffold(
@@ -365,6 +370,7 @@ class _AppShellState extends ConsumerState<AppShell>
           inboxUnreadCount: inboxState.unreadCount,
           onTabSelected: _selectTab,
         ),
+      ),
       ),
     );
   }

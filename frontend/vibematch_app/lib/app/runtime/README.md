@@ -52,3 +52,14 @@ nothing on foreground transitions because the cache is passive warm memory.
 Flutter's shared decoded image cache. It is callback-injected so runtime tests
 remain deterministic and AppShell no longer contains direct image-cache cleanup
 logic.
+
+
+## Foundation registry port
+
+From Chunk 34-M6 onward, the participant/registry interfaces and resource-kind
+taxonomy live in `foundation/runtime/media_resource_lifecycle.dart`.
+`MediaResourceCoordinator` is only the authenticated AppShell implementation.
+
+AppShell exposes that implementation to descendants through a scoped
+`mediaResourceRegistryProvider` override. Feature code must never import the
+concrete coordinator.

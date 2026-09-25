@@ -1,4 +1,4 @@
-import 'media_resource_coordinator.dart';
+import '../../foundation/runtime/media_resource_lifecycle.dart';
 
 /// Callback used to trim Flutter's live decoded image entries.
 typedef ClearLiveImages = void Function();

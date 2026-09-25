@@ -1,5 +1,5 @@
 import '../../features/vibes/presentation/widgets/vibe_media_playback_gate.dart';
-import 'media_resource_coordinator.dart';
+import '../../foundation/runtime/media_resource_lifecycle.dart';
 
 /// App-runtime lifecycle adapter for the existing Vibes playback gate.
 ///

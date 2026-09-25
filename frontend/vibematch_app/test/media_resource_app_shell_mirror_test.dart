@@ -65,6 +65,16 @@ void main() {
     expect(shell, contains('unawaited(_reconcileCanonicalShellState());'));
   });
 
+  test('M6 exposes the coordinator through the foundation registry port', () {
+    final shell = File('lib/app/app_shell.dart').readAsStringSync();
+
+    expect(
+      shell,
+      contains('mediaResourceRegistryProvider.overrideWithValue(resourceCoordinator)'),
+    );
+    expect(shell, contains('ProviderScope('));
+  });
+
   test('resource lifecycle forwarding is failure-isolated', () {
     final shell = File('lib/app/app_shell.dart').readAsStringSync();
 
