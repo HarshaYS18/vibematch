@@ -96,3 +96,10 @@ Preferred rollback:
 4. preserve `economy_transactions`, wallet ledger and journal history.
 
 Never downgrade or delete financial audit rows during normal rollback.
+
+
+## VIP/SVIP projection and overrides
+
+`user_vip_statuses` is the effective Economy-owned projection. `user_vip_overrides` stores audited manual Owner/Super Owner overrides. Core and Profile/Social are read-only consumers.
+
+If an admin adjustment times out, retry with the original request ID so Economy transaction idempotency returns the same result. Do not edit `user_vip_statuses` or `user_vip_overrides` directly from core credentials. Recharge/value changes re-run projection synchronization but must continue to honor an active manual override.
