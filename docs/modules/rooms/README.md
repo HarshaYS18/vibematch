@@ -128,3 +128,20 @@ returns a new authoritative snapshot whose `recent_messages` is empty.
 Flutter must call this through the room-scoped `RoomSessionRepository` and
 reconcile the returned snapshot. Media signaling, widget-local lists, and
 process-global notifier/event-bus state must not clear durable chat.
+
+
+## Canonical settings command ownership
+
+Room images, guest messaging, apply-only seat mode, background and announcement
+are durable room settings. Their writes use authenticated backend REST settings
+routes, which persist PostgreSQL state and publish the canonical room update.
+Flutter reconciles the returned DTO/snapshot into `RoomSessionRepository`.
+
+`LiveRoomMediaSignalingService` is transport/compatibility only and must not
+originate those durable settings or room chat mutations. The retired
+`ActiveRoomContext` and no-op `RoomSeatLayoutSyncService` compatibility
+files were removed during Chunk 33 closure.
+
+Text and image chat now use the same canonical
+`/rooms/{room}/realtime/chat/send` command. Chat clear uses
+`/rooms/{room}/realtime/chat/clear`.

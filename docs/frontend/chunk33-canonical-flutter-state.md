@@ -342,3 +342,39 @@ violations it exposed instead of adding an allowlist.
 
 The guard has no exception for these files. UI appearance and interaction
 layout remain unchanged.
+
+
+### Micro-chunk 33-M6 — final anomaly and ownership closure
+
+The final audit removed the last durable mutations that still bypassed
+canonical room ownership:
+
+- text chat now awaits `RoomSessionRepository.sendChatMessage(text: ...)`,
+  matching the already-canonical image-chat path;
+- the message composer is cleared only after that canonical command succeeds;
+- room-images, guest-messages and apply-only settings are persisted through
+  `RoomSettingsRepository.updateAccessSettings`, reconciled into
+  `RoomSessionRepository`, and broadcast once by the backend;
+- duplicate media-singleton settings commands for image/guest/apply,
+  background and announcement were removed;
+- the media facade no longer exposes `sendRoomChat`;
+- the obsolete `ActiveRoomContext` facade and no-op
+  `RoomSeatLayoutSyncService` were deleted;
+- architecture/source guards now prevent those retired authorities from
+  returning.
+
+`LiveRoomMediaSignalingService` remains only as a compatibility/media runtime
+for audio, transient room effects, invitations and derived media projection.
+It does not own durable chat or settings mutations. Canonical durable room
+state continues to live in `RoomSessionRepository`.
+
+Regression coverage now protects canonical text chat, image chat, chat clear,
+settings ownership, scoped room UI coordination, canonical chat projection and
+the absence of retired compatibility files.
+
+#### Final Chunk 33 implementation status
+
+All planned Chunk 33 state-ownership repairs are implemented. Completion is
+considered verified only when the final branch-head architecture guard,
+backend/service contracts, Flutter tests/analyze and production-platform
+checks pass. No UI visual redesign was introduced by Chunk 33.

@@ -41,7 +41,17 @@ class RoomAnnouncementUpdateRequest(BaseModel):
 
 
 class RoomAccessSettingsUpdateRequest(BaseModel):
+    """Authoritative mutable room-access and participation settings.
+
+    These fields are persisted by the room settings REST command and broadcast
+    as one canonical room_settings/updated event. Clients must not duplicate
+    these writes through a realtime/media compatibility facade.
+    """
+
     language: str | None = Field(default=None, min_length=1, max_length=40)
     mode: str | None = Field(default=None, min_length=1, max_length=40)
     lock_password: str | None = Field(default=None, max_length=80)
     allow_screenshots: bool | None = None
+    room_images_enabled: bool | None = None
+    guest_messages_enabled: bool | None = None
+    apply_only_mode_enabled: bool | None = None

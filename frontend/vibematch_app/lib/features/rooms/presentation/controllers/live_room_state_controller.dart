@@ -5,7 +5,6 @@ import 'package:flutter/material.dart';
 import '../../../../core/security/screenshot_guard_service.dart';
 import '../../../../room_session/data/room_session_repository.dart';
 import '../../data/live_room_media_signaling_service.dart';
-import '../../data/room_seat_layout_sync_service.dart';
 import '../../data/room_settings_repository.dart';
 import '../live_room_models.dart';
 import '../modules/cricket_mode_module.dart';
@@ -231,16 +230,43 @@ class LiveRoomStateController {
     _reconcileSettings(settings);
   }
 
+  /// Persists image-chat permission through the authoritative settings API.
   void setRoomImagesEnabled(bool value) {
-    LiveRoomMediaSignalingService.instance.setRoomImagesEnabled(value);
+    unawaited(_setRoomImagesEnabled(value));
   }
 
+  Future<void> _setRoomImagesEnabled(bool value) async {
+    final settings = await _settingsRepository.updateAccessSettings(
+      roomPublicId: roomId,
+      roomImagesEnabled: value,
+    );
+    _reconcileSettings(settings);
+  }
+
+  /// Persists guest-chat permission through the authoritative settings API.
   void setGuestMessagesEnabled(bool value) {
-    LiveRoomMediaSignalingService.instance.setGuestMessagesEnabled(value);
+    unawaited(_setGuestMessagesEnabled(value));
   }
 
+  Future<void> _setGuestMessagesEnabled(bool value) async {
+    final settings = await _settingsRepository.updateAccessSettings(
+      roomPublicId: roomId,
+      guestMessagesEnabled: value,
+    );
+    _reconcileSettings(settings);
+  }
+
+  /// Persists seat apply-only mode through the authoritative settings API.
   void setApplyOnlyModeEnabled(bool value) {
-    LiveRoomMediaSignalingService.instance.setRoomApplyOnlyMode(value);
+    unawaited(_setApplyOnlyModeEnabled(value));
+  }
+
+  Future<void> _setApplyOnlyModeEnabled(bool value) async {
+    final settings = await _settingsRepository.updateAccessSettings(
+      roomPublicId: roomId,
+      applyOnlyModeEnabled: value,
+    );
+    _reconcileSettings(settings);
   }
 
   void setMinimized(bool value) {
@@ -313,10 +339,6 @@ class LiveRoomStateController {
       seatLayoutId: value,
     );
     _reconcileSettings(settings);
-    RoomSeatLayoutSyncService.broadcastSeatLayout(
-      roomId: roomId,
-      seatLayoutId: settings.seatLayoutId,
-    );
   }
 
   void setVibeSyncState(VibeSyncRoomState value) {
@@ -357,9 +379,6 @@ class LiveRoomStateController {
       backgroundThemeId: value.id,
     );
     _reconcileSettings(settings);
-    LiveRoomMediaSignalingService.instance.setRoomBackgroundTheme(
-      settings.backgroundThemeId,
-    );
   }
 
   Future<void> setRoomAnnouncement(String value) async {
@@ -370,9 +389,6 @@ class LiveRoomStateController {
       announcementText: nextValue,
     );
     _reconcileSettings(settings);
-    LiveRoomMediaSignalingService.instance.setRoomAnnouncement(
-      settings.announcementText ?? '',
-    );
   }
 
   void applyCanonicalRoomState() {

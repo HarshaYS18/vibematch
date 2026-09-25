@@ -1,6 +1,12 @@
 import '../../../foundation/networking/app_network_client.dart';
 import '../../auth/data/auth_local_storage.dart';
 
+/// Stateless command repository for durable room settings.
+///
+/// PostgreSQL/backend room settings are authoritative. This class performs
+/// authenticated REST mutations and returns immutable DTO snapshots; callers
+/// must reconcile those responses into RoomSessionRepository rather than cache
+/// a second settings authority here.
 class RoomSettingsRepository {
   RoomSettingsRepository({AppNetworkClient? apiClient, AuthLocalStorage? authStorage})
     : _apiClient = apiClient ?? AppNetworkRuntime.shared,
@@ -20,6 +26,9 @@ class RoomSettingsRepository {
     String? mode,
     String? lockPassword,
     bool? allowScreenshots,
+    bool? roomImagesEnabled,
+    bool? guestMessagesEnabled,
+    bool? applyOnlyModeEnabled,
   }) async {
     final response = await _apiClient.patchMap(
       '/rooms/$roomPublicId/settings',
@@ -30,6 +39,9 @@ class RoomSettingsRepository {
         if (lockPassword != null && lockPassword.trim().isNotEmpty)
           'lock_password': lockPassword.trim(),
         'allow_screenshots': ?allowScreenshots,
+        'room_images_enabled': ?roomImagesEnabled,
+        'guest_messages_enabled': ?guestMessagesEnabled,
+        'apply_only_mode_enabled': ?applyOnlyModeEnabled,
       },
     );
     return RoomSettingsDto.fromJson(response);

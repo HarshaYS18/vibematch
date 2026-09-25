@@ -1,8 +1,8 @@
 // Source-level guard for canonical room ownership boundaries.
 //
-// This complements behavioral repository tests by ensuring UI image sending
-// remains awaited end-to-end: controller -> RoomSessionRepository -> input-dock
-// success feedback. It deliberately forbids a return to singleton chat sends.
+// This complements behavioral repository tests by ensuring text/image chat,
+// settings and room UI coordination stay on canonical/scoped owners. It
+ // deliberately forbids a return to media-singleton durable mutations.
 import 'dart:io';
 
 import 'package:flutter_test/flutter_test.dart';
@@ -101,6 +101,64 @@ void main() {
     expect(
       layout,
       contains('onDismissSeatActions: bundle.seatController.clearSelectedSeat'),
+    );
+  });
+
+
+  test('Chunk 33 text chat also uses the canonical repository', () {
+    final controller = File(
+      'lib/features/rooms/presentation/controllers/live_room_message_controller.dart',
+    ).readAsStringSync();
+    final chatModule = File(
+      'lib/features/rooms/presentation/modules/chat/live_room_chat_module.dart',
+    ).readAsStringSync();
+    final media = File(
+      'lib/features/rooms/data/live_room_media_signaling_service.dart',
+    ).readAsStringSync();
+
+    expect(controller, contains('Future<void> sendMessage(String text)'));
+    expect(controller, contains('await repository.sendChatMessage(text: trimmed);'));
+    expect(chatModule, contains('await bundle.roomMessageController.sendMessage(text);'));
+    expect(media, isNot(contains('void sendRoomChat(')));
+  });
+
+  test('Chunk 33 media facade cannot originate durable room settings', () {
+    final stateController = File(
+      'lib/features/rooms/presentation/controllers/live_room_state_controller.dart',
+    ).readAsStringSync();
+    final settingsRepository = File(
+      'lib/features/rooms/data/room_settings_repository.dart',
+    ).readAsStringSync();
+    final media = File(
+      'lib/features/rooms/data/live_room_media_signaling_service.dart',
+    ).readAsStringSync();
+
+    expect(settingsRepository, contains("'room_images_enabled': ?roomImagesEnabled"));
+    expect(settingsRepository, contains("'guest_messages_enabled': ?guestMessagesEnabled"));
+    expect(settingsRepository, contains("'apply_only_mode_enabled': ?applyOnlyModeEnabled"));
+    expect(stateController, contains('roomImagesEnabled: value'));
+    expect(stateController, contains('guestMessagesEnabled: value'));
+    expect(stateController, contains('applyOnlyModeEnabled: value'));
+
+    for (final retired in <String>[
+      'setRoomImagesEnabled(bool enabled)',
+      'setGuestMessagesEnabled(bool enabled)',
+      'setRoomApplyOnlyMode(bool enabled)',
+      'setRoomBackgroundTheme(String backgroundThemeId)',
+      'setRoomAnnouncement(String announcementText)',
+    ]) {
+      expect(media, isNot(contains(retired)));
+    }
+  });
+
+  test('Chunk 33 retired room compatibility files are removed', () {
+    expect(
+      File('lib/features/rooms/data/active_room_context.dart').existsSync(),
+      isFalse,
+    );
+    expect(
+      File('lib/features/rooms/data/room_seat_layout_sync_service.dart').existsSync(),
+      isFalse,
     );
   });
 

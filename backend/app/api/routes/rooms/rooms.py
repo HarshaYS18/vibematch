@@ -533,11 +533,18 @@ async def update_room_settings(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ) -> RoomSettingsResponse:
+    """Persist room access/participation settings and publish one room delta."""
     room = _get_room_for_update(db, room_public_id, current_user)
     if payload.language is not None:
         room.language = payload.language.strip()
     if payload.allow_screenshots is not None:
         room.allow_screenshots = payload.allow_screenshots
+    if payload.room_images_enabled is not None:
+        room.room_images_enabled = payload.room_images_enabled
+    if payload.guest_messages_enabled is not None:
+        room.guest_messages_enabled = payload.guest_messages_enabled
+    if payload.apply_only_mode_enabled is not None:
+        room.apply_only_mode_enabled = payload.apply_only_mode_enabled
     if payload.mode is not None:
         apply_room_mode(
             room,

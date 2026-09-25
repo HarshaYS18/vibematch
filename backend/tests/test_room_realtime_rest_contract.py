@@ -9,6 +9,7 @@ from app.schemas.room_realtime import (
     RoomJoinCommand,
     RoomWatchPartyCommand,
 )
+from app.schemas.room_settings import RoomAccessSettingsUpdateRequest
 from app.services.rooms.room_action_service import _safe_room_join_event_payload
 
 
@@ -74,6 +75,16 @@ class RoomRealtimeRestContractTests(unittest.TestCase):
                     "content_type": "image/png",
                 }
             )
+
+    def test_room_access_settings_accept_canonical_chat_and_seat_toggles(self):
+        command = RoomAccessSettingsUpdateRequest(
+            room_images_enabled=False,
+            guest_messages_enabled=False,
+            apply_only_mode_enabled=True,
+        )
+        self.assertFalse(command.room_images_enabled)
+        self.assertFalse(command.guest_messages_enabled)
+        self.assertTrue(command.apply_only_mode_enabled)
 
     def test_watch_party_command_accepts_revisioned_sync_payload(self):
         command = RoomWatchPartyCommand(

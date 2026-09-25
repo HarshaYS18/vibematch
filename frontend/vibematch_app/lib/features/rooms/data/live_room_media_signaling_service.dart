@@ -17,6 +17,13 @@ import 'live_room_log.dart';
 import 'live_room_foreground_service.dart';
 import 'seat_authority_gate.dart';
 
+/// Compatibility facade for room media and transient realtime effects.
+///
+/// Durable room/chat/settings state is owned by RoomSessionRepository and
+/// backend REST commands. This singleton may coordinate the media engine,
+/// application-realtime subscription, seat/audio enforcement, invitations and
+/// transient system effects, but it must not originate durable chat/settings
+/// mutations or act as a second canonical room-state authority.
 class LiveRoomMediaSignalingService with WidgetsBindingObserver {
   LiveRoomMediaSignalingService._({
     RoomMediaEngine? mediaEngine,
@@ -438,41 +445,6 @@ class LiveRoomMediaSignalingService with WidgetsBindingObserver {
     });
   }
 
-  void setRoomApplyOnlyMode(bool enabled) {
-    _send('room_settings/apply_mode', <String, Object?>{
-      'apply_only_mode_enabled': enabled,
-    });
-  }
-
-  void setRoomImagesEnabled(bool enabled) {
-    _send('room_settings/images', <String, Object?>{
-      'enabled': enabled,
-      'room_images_enabled': enabled,
-    });
-  }
-
-  void setGuestMessagesEnabled(bool enabled) {
-    _send('room_settings/guest_messages', <String, Object?>{
-      'enabled': enabled,
-      'guest_messages_enabled': enabled,
-    });
-  }
-
-  void setRoomBackgroundTheme(String backgroundThemeId) {
-    final safeThemeId = backgroundThemeId.trim();
-    if (safeThemeId.isEmpty) return;
-
-    _send('room_settings/background_theme', <String, Object?>{
-      'background_theme_id': safeThemeId,
-    });
-  }
-
-  void setRoomAnnouncement(String announcementText) {
-    _send('room_settings/announcement', <String, Object?>{
-      'announcement_text': announcementText.trim(),
-    });
-  }
-
   void startCricketMode(CricketQuickMatchSetup setup) {
     _send('room_cricket/start', <String, Object?>{
       'room_id': setup.roomId,
@@ -511,13 +483,6 @@ class LiveRoomMediaSignalingService with WidgetsBindingObserver {
     if (safeMessage.isEmpty) return;
 
     _send('room/system_message', <String, Object?>{'message': safeMessage});
-  }
-
-  void sendRoomChat(String text) {
-    final safeText = text.trim();
-    if (safeText.isEmpty) return;
-
-    _send('room/chat', <String, Object?>{'text': safeText});
   }
 
   Future<void> leaveRoom() async {

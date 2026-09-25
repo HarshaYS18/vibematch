@@ -352,6 +352,41 @@ void main() {
     expect(clientB.state.seats[1]!.occupantBackendUserId, 2);
   });
 
+  test('text chat posts canonical payload and reconciles snapshot', () async {
+    final network = _FakeNetworkClient(_room(43, <int>[1, 2]));
+    final harness = _RoomHarness(network);
+    addTearDown(harness.dispose);
+    final repository = harness.repository;
+
+    await repository.join();
+    network.calls.clear();
+    network.postedBodies.clear();
+    network.snapshot = _room(44, <int>[1, 2])
+      ..['recent_messages'] = <Map<String, dynamic>>[
+        <String, dynamic>{
+          'id': 76,
+          'message_type': 'text',
+          'text': 'canonical text',
+        },
+      ];
+
+    final state = await repository.sendChatMessage(text: 'canonical text');
+
+    expect(
+      network.calls,
+      <String>['POST /rooms/VM123/realtime/chat/send'],
+    );
+    expect(
+      network.postedBodies.single,
+      <String, dynamic>{
+        'message_type': 'text',
+        'text': 'canonical text',
+      },
+    );
+    expect(state.stateVersion, 44);
+    expect(state.chat.single['text'], 'canonical text');
+  });
+
   test('image chat posts canonical media payload and reconciles snapshot', () async {
     final network = _FakeNetworkClient(_room(44, <int>[1, 2]));
     final harness = _RoomHarness(network);

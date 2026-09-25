@@ -98,6 +98,46 @@ for path in APP.rglob("*.dart"):
         )
 
 
+# Chunk 33 final closure: the media compatibility facade may not originate
+# durable room/chat/settings mutations, and retired global compatibility files
+# must stay deleted. These markers are intentionally specific to paths that
+# were removed after canonical RoomSessionRepository/settings migration.
+_RETIRED_ROOM_COMPAT_FILES = (
+    APP / "features" / "rooms" / "data" / "active_room_context.dart",
+    APP / "features" / "rooms" / "data" / "room_seat_layout_sync_service.dart",
+)
+for retired_path in _RETIRED_ROOM_COMPAT_FILES:
+    if retired_path.exists():
+        rel = retired_path.relative_to(ROOT).as_posix()
+        violations.append(
+            f"{rel}: retired Chunk 33 room compatibility file must remain deleted"
+        )
+
+_MEDIA_FACADE = (
+    APP
+    / "features"
+    / "rooms"
+    / "data"
+    / "live_room_media_signaling_service.dart"
+)
+if _MEDIA_FACADE.exists():
+    media_text = _MEDIA_FACADE.read_text(encoding="utf-8-sig")
+    durable_markers = (
+        "void sendRoomChat(",
+        "void setRoomImagesEnabled(",
+        "void setGuestMessagesEnabled(",
+        "void setRoomApplyOnlyMode(",
+        "void setRoomBackgroundTheme(",
+        "void setRoomAnnouncement(",
+    )
+    for durable_marker in durable_markers:
+        if durable_marker in media_text:
+            violations.append(
+                "features/rooms/data/live_room_media_signaling_service.dart: "
+                f"media facade must not own durable mutation {durable_marker}"
+            )
+
+
 # Chunk 21: one physical application WebSocket.
 #
 # Application features subscribe through AppRealtimeHub. Raw websocket creation

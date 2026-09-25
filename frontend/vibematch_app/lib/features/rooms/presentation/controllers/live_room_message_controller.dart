@@ -105,11 +105,21 @@ class LiveRoomMessageController {
     );
   }
 
-  void sendMessage(String text) {
+  /// Persists a text message through the canonical room repository.
+  ///
+  /// The future completes only after the authoritative backend snapshot is
+  /// reconciled. No local durable chat row is inserted optimistically.
+  Future<void> sendMessage(String text) async {
     final trimmed = text.trim();
     if (trimmed.isEmpty) return;
-    if (!_guestMessageAllowed) return;
-    LiveRoomMediaSignalingService.instance.sendRoomChat(trimmed);
+    if (!_guestMessageAllowed) {
+      throw StateError('Guest messages are disabled in this room');
+    }
+    final repository = roomSessionRepository;
+    if (repository == null) {
+      throw StateError('Room session is unavailable');
+    }
+    await repository.sendChatMessage(text: trimmed);
   }
 
   /// Persists an image message through RoomSessionRepository.
