@@ -8,3 +8,6 @@ data:
   KAFKA_SECURITY_PROTOCOL: PLAINTEXT
   KAFKA_TOPIC_REPLICATION_FACTOR: "3"
   OPENSEARCH_URL: http://funkey-opensearch:9200
+  FUNKEY_REGION: staging-primary
+  FUNKEY_HOME_REGION: staging-primary
+  ECONOMY_WRITER_REGION: staging-primary

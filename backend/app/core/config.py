@@ -9,6 +9,12 @@ class Settings(BaseSettings):
     ENFORCE_SCHEMA_CURRENT: bool = True
     CORS_ALLOWED_ORIGINS: str = "*"
 
+    # Chunk 40 regional runtime identity. Production overlays must replace the
+    # local defaults and keep Economy single-writer.
+    FUNKEY_REGION: str = "local"
+    FUNKEY_HOME_REGION: str = "local"
+    ECONOMY_WRITER_REGION: str = "local"
+
     # OpenTelemetry tracing is opt-in locally and enabled by deployment config.
     # Export failure is never a readiness or business-transaction dependency.
     OTEL_TRACES_ENABLED: bool = False
@@ -310,6 +316,12 @@ class Settings(BaseSettings):
         if not self.is_production:
             return
         unsafe = []
+        if not self.FUNKEY_REGION.strip() or self.FUNKEY_REGION == "local":
+            unsafe.append("FUNKEY_REGION")
+        if not self.FUNKEY_HOME_REGION.strip() or self.FUNKEY_HOME_REGION == "local":
+            unsafe.append("FUNKEY_HOME_REGION")
+        if not self.ECONOMY_WRITER_REGION.strip() or self.ECONOMY_WRITER_REGION == "local":
+            unsafe.append("ECONOMY_WRITER_REGION")
         for name in (
             "JWT_SECRET_KEY",
             "MEDIA_INTERNAL_TOKEN",
@@ -642,6 +654,8 @@ class Settings(BaseSettings):
         if not self.is_production:
             return
         unsafe: list[str] = []
+        if not self.FUNKEY_REGION.strip() or not self.ECONOMY_WRITER_REGION.strip():
+            unsafe.append("FUNKEY_REGION/ECONOMY_WRITER_REGION")
         if len(self.ECONOMY_INTERNAL_TOKEN.strip()) < 32 or "change-this" in self.ECONOMY_INTERNAL_TOKEN.lower():
             unsafe.append("ECONOMY_INTERNAL_TOKEN")
         url = self.ECONOMY_DATABASE_URL.strip()

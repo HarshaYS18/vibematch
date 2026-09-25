@@ -17,9 +17,11 @@ on:
       - 'scripts/check_contracts.py'
       - 'scripts/check_gateway_architecture.py'
       - 'scripts/check_graphql_bff_architecture.py'
-      - 'scripts/check_kafka_data_platform.py scripts/check_search_platform.py scripts/check_recommendation_platform.py'
+      - 'scripts/check_kafka_data_platform.py scripts/check_search_platform.py scripts/check_recommendation_platform.py scripts/check_multiregion_architecture.py scripts/check_disaster_recovery.py'
       - 'scripts/check_search_platform.py'
       - 'scripts/check_recommendation_platform.py'
+      - 'scripts/check_multiregion_architecture.py'
+      - 'scripts/check_disaster_recovery.py'
       - 'scripts/prepare_gitops_promotion.py'
       - 'docs/platform/chunk37-kafka-data-platform.md'
       - 'docs/architecture/kafka-data-platform.md'
@@ -83,6 +85,8 @@ jobs:
       - run: python scripts/check_kafka_data_platform.py
       - run: python scripts/check_search_platform.py
       - run: python scripts/check_recommendation_platform.py
+      - run: python scripts/check_multiregion_architecture.py
+      - run: python scripts/check_disaster_recovery.py
       - uses: azure/setup-kubectl@v4
         with:
           version: v1.36.4

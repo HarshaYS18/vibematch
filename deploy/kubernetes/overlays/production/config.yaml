@@ -4,3 +4,6 @@ metadata: {name: funkey-config}
 data:
   APP_ENV: production
   MEDIA_CDN_BASE_URL: https://cdn.funkey.com/media
+  FUNKEY_REGION: production-primary
+  FUNKEY_HOME_REGION: production-primary
+  ECONOMY_WRITER_REGION: production-primary

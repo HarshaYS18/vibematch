@@ -1,5 +1,5 @@
-from fastapi import APIRouter, FastAPI
-from fastapi.responses import PlainTextResponse
+from fastapi import APIRouter, FastAPI, Request
+from fastapi.responses import JSONResponse, PlainTextResponse
 from sqlalchemy import text
 
 from app.api.routes import (
@@ -27,6 +27,28 @@ app = FastAPI(
     redoc_url=None,
 )
 app.middleware("http")(operational_middleware)
+
+
+@app.middleware("http")
+async def enforce_economy_writer_region(request: Request, call_next):
+    """Reject Tier-0 mutations outside the explicitly configured writer region."""
+    if (
+        request.method.upper() not in {"GET", "HEAD", "OPTIONS"}
+        and settings.FUNKEY_REGION != settings.ECONOMY_WRITER_REGION
+    ):
+        return JSONResponse(
+            status_code=503,
+            content={
+                "detail": "Economy writes are disabled in this region",
+                "code": "REGION_NOT_WRITER",
+                "writer_region": settings.ECONOMY_WRITER_REGION,
+            },
+            headers={"X-FunKey-Writer-Region": settings.ECONOMY_WRITER_REGION},
+        )
+    response = await call_next(request)
+    response.headers["X-FunKey-Region"] = settings.FUNKEY_REGION
+    response.headers["X-FunKey-Writer-Region"] = settings.ECONOMY_WRITER_REGION
+    return response
 app.dependency_overrides[get_db] = get_economy_db
 
 api = APIRouter(prefix="/api/v1")

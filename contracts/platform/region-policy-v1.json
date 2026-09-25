@@ -1,0 +1,25 @@
+{
+  "schema_version": 1,
+  "routing": {
+    "strategy": "nearest_healthy_region",
+    "health_requirement": "application_and_dependencies_ready",
+    "session_affinity": "best_effort_only"
+  },
+  "state_policy": {
+    "api": "regional",
+    "realtime": "regional",
+    "cache_redis": "regional_ephemeral",
+    "realtime_redis": "regional_ephemeral",
+    "media_nodes": "regional",
+    "workers": "regional",
+    "search": "regional_projection",
+    "recommendation": "regional_projection",
+    "economy": "single_writer_region",
+    "postgresql": "single_writable_primary_unless_separately_proven"
+  },
+  "required_env": [
+    "FUNKEY_REGION",
+    "FUNKEY_HOME_REGION",
+    "ECONOMY_WRITER_REGION"
+  ]
+}

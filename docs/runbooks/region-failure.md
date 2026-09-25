@@ -1,31 +1,44 @@
 # Region failure
 
-Use this procedure with the production incident commander and environment-specific access controls. Record every change and its UTC timestamp. Replace example paths with the active environment; never paste credentials into incident notes.
+Use this procedure with the production incident commander. Record every action
+and UTC timestamp. Never paste credentials into incident notes.
 
 ## Symptoms
 
-A regional edge, cluster, PostgreSQL, Redis, or media path becomes unavailable.
+A regional edge, cluster, PostgreSQL, Redis, media, Search or Recommendation
+path becomes unavailable.
 
-## Dashboards and metrics to inspect
+## Immediate checks
 
-Global traffic, DNS/edge health, regional pods, DB replica lag, backup currency, object storage reachability.
+Inspect global routing health, regional pod readiness, authoritative PostgreSQL
+state/replica lag, object storage reachability, regional Redis roles, Kafka/NATS
+lag and media/TURN reachability. Record current RPO and estimated RTO against
+`contracts/platform/recovery-objectives-v1.json`.
 
-## Immediate actions
+## Economy writer rule
 
-Declare regional incident; stop writes that cannot be reconciled; identify the authoritative DB failover state.
+Economy is single-writer. Before moving `ECONOMY_WRITER_REGION`, prove the
+previous writer cannot accept mutations and confirm the database writer/failover
+state. A region receiving Economy traffic while it is not configured as writer
+must return `REGION_NOT_WRITER`.
+
+Never run two Economy writer regions or two writable PostgreSQL primaries.
 
 ## Safe mitigation
 
-Fail over traffic only to a region with confirmed data and service readiness; use client reconnect/snapshot recovery.
-
-## Dangerous actions to avoid
-
-Do not create two writable PostgreSQL primaries or split media registry authority.
+Route stateless/read/reconstructable traffic to the nearest healthy region only
+after its dependencies are ready. Realtime clients reconnect and resync from
+authoritative snapshots. Search and Recommendation may rebuild/degrade.
 
 ## Recovery validation
 
-Critical flows pass in surviving region and ledgers reconcile; monitor return traffic and latency. Keep elevated monitoring until the incident window and delayed work are reconciled.
+Critical identity, room and Economy flows pass in the surviving region; ledgers
+reconcile; no dual writer exists; delayed NATS/Kafka work drains; realtime/media
+reconnect succeeds; achieved RPO/RTO is recorded.
 
-## Escalation and data to collect
+## Failback
 
-Collect timeline, region/provider status, last committed LSN, failover decision, RPO/RTO, and impacted sessions. Escalate to the owning application, database, network, or security team when mitigation exceeds the runbook or data integrity is uncertain.
+Return traffic gradually after the recovered region has synchronized projections
+and dependencies. Move Economy writer ownership only through another explicit
+single-writer transition. Keep elevated monitoring until backlogs and ledgers
+are reconciled.

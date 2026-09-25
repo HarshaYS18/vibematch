@@ -38,6 +38,7 @@ rollback runbook before reducing capacity. Exercise these procedures in staging.
 - [High latency](high-latency.md)
 - [Capacity emergency](capacity-emergency.md)
 - [Region failure](region-failure.md)
+- [Disaster recovery](disaster-recovery.md)
 - [Security incident](security-incident.md)
 - [Authority registry conformance](authority-registry.md)
 - [Observability degraded](observability-degraded.md)
