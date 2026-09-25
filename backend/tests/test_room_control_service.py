@@ -99,12 +99,19 @@ class RoomControlServiceContractTests(TestCase):
             "room_themes",
             "user_room_theme_inventory",
             "room_theme_reviews",
+            "cricket_tournaments",
+            "cricket_matches",
+            "cricket_ball_events",
         ):
             self.assertIn(
                 f"ALTER TABLE {table} OWNER TO funkey_room_control_owner",
                 sql,
             )
         self.assertIn(
+            "REVOKE ALL ON TABLE user_room_presence FROM funkey_room_control_runtime",
+            sql,
+        )
+        self.assertNotIn(
             "GRANT SELECT, INSERT, UPDATE ON TABLE user_room_presence",
             sql,
         )
