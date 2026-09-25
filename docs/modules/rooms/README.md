@@ -6,11 +6,11 @@ Owns room metadata, membership decisions, seats, chat state, current room reques
 
 ## Responsibilities
 
-The module owns `rooms`, `room_participants`, `room_seat_states`, `room_member_requests`, `room_seat_applications`, `room_realtime_events`, `room_chat_messages`, and `room_kickouts`. Routes validate input and delegate business decisions to services. Normal socket liveness is an expiring realtime Redis lease, not a PostgreSQL heartbeat.
+The module owns `rooms`, `room_participants`, `room_seat_states`, `room_member_requests`, `room_seat_applications`, `room_realtime_events`, `room_chat_messages`, `room_kickouts`, and Room Cricket state (`cricket_tournaments`, `cricket_matches`, `cricket_ball_events`). Routes validate input and delegate business decisions to services. Normal socket liveness is an expiring realtime Redis lease, not a PostgreSQL heartbeat.
 
 ## What this module owns
 
-`rooms`, `room_participants`, `room_seat_states`, `room_member_requests`, `room_seat_applications`, `room_realtime_events`, `room_chat_messages`, and `room_kickouts`.
+`rooms`, `room_participants`, `room_seat_states`, `room_member_requests`, `room_seat_applications`, `room_realtime_events`, `room_chat_messages`, `room_kickouts`, `cricket_tournaments`, `cricket_matches`, and `cricket_ball_events`.
 
 ## What this module does NOT own
 
@@ -38,11 +38,11 @@ No durable broker consumer is implied by this ownership guide. Add a consumer on
 
 ## Database tables/state owned
 
-Database tables and state: `rooms, room_participants, room_seat_states, room_realtime_events, room_chat_messages`.
+Database tables and state: `rooms, room_participants, room_seat_states, room_realtime_events, room_chat_messages, cricket_tournaments, cricket_matches, cricket_ball_events`.
 
 ## Redis keys/state owned
 
-`funkey:realtime:room:*` leases, stream epoch/sequence, replay, command-dedupe, and fanout keys are transient. Media assignment is a separate Redis role.
+`funkey:realtime:room:*`, `funkey:realtime:gateway:user-rooms:*`, and `funkey:realtime:gateway:room-users:*` leases plus stream epoch/sequence, replay, command-dedupe, and fanout keys are transient. Media assignment is a separate Redis role.
 
 ## Dependencies
 
