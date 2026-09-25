@@ -1,12 +1,13 @@
 import 'dart:async';
 
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../controllers/vibe_detail_controller.dart';
 import '../../models/vibe_models.dart';
 import '../widgets/vibe_detail_widgets.dart';
 
-class VibeDetailBackendPage extends StatefulWidget {
+class VibeDetailBackendPage extends ConsumerStatefulWidget {
   const VibeDetailBackendPage({
     super.key,
     required this.vibe,
@@ -19,61 +20,112 @@ class VibeDetailBackendPage extends StatefulWidget {
   final Future<void> Function()? onDeleteVibe;
 
   @override
-  State<VibeDetailBackendPage> createState() => _VibeDetailBackendPageState();
+  ConsumerState<VibeDetailBackendPage> createState() =>
+      _VibeDetailBackendPageState();
 }
 
-class _VibeDetailBackendPageState extends State<VibeDetailBackendPage> {
-  late final VibeDetailController _controller;
+class _VibeDetailBackendPageState
+    extends ConsumerState<VibeDetailBackendPage> {
+  late final VibeDetailArgs _providerArgs;
+  final TextEditingController _commentController = TextEditingController();
+  final FocusNode _commentFocusNode = FocusNode();
+
+  VibeDetailController get _controller =>
+      ref.read(vibeDetailControllerProvider(_providerArgs).notifier);
 
   @override
   void initState() {
     super.initState();
-    _controller = VibeDetailController(
+    _providerArgs = VibeDetailArgs(
       vibe: widget.vibe,
       onCommentChanged: widget.onCommentAdded,
       onDeleteVibe: widget.onDeleteVibe,
-    )..addListener(_onControllerChanged);
+    );
     unawaited(_controller.initialize());
   }
 
   @override
   void dispose() {
-    _controller.removeListener(_onControllerChanged);
-    _controller.dispose();
+    _commentFocusNode.dispose();
+    _commentController.dispose();
     super.dispose();
   }
 
-  void _onControllerChanged() {
-    if (mounted) setState(() {});
-  }
-
-  Future<void> _runAction(Future<String?> Function() action, {bool popOnSuccess = false}) async {
+  Future<void> _runAction(
+    Future<String?> Function() action, {
+    bool popOnSuccess = false,
+  }) async {
     try {
       final message = await action();
       if (!mounted) return;
-      if (message != null && message.trim().isNotEmpty) _toast(message);
+      if (message != null && message.trim().isNotEmpty) {
+        _toast(message);
+      }
       if (popOnSuccess) Navigator.pop(context);
     } catch (error) {
-      if (mounted) _toast(error.toString().replaceFirst('Exception: ', ''));
+      if (mounted) {
+        _toast(error.toString().replaceFirst('Exception: ', ''));
+      }
     }
   }
 
+  Future<String?> _sendComment() async {
+    final before = ref.read(vibeDetailControllerProvider(_providerArgs));
+    final text = _commentController.text;
+    final message = await _controller.sendComment(text);
+    if (message == null &&
+        before.canComment &&
+        before.hasBackendId &&
+        !before.sendingComment &&
+        text.trim().isNotEmpty) {
+      _commentController.clear();
+    }
+    return message;
+  }
+
+  void _startReply(VibeComment comment) {
+    _controller.startReply(comment);
+    _commentController.text = '@${comment.name} ';
+    _commentController.selection = TextSelection.fromPosition(
+      TextPosition(offset: _commentController.text.length),
+    );
+    _commentFocusNode.requestFocus();
+  }
+
+  void _cancelReply() {
+    _controller.cancelReply();
+    _commentController.clear();
+  }
+
   Future<void> _confirmAndDeleteVibe() async {
-    if (!_controller.isSelfVibe || _controller.deleting) return;
-    final shouldDelete = await showModalBottomSheet<bool>(context: context, backgroundColor: Colors.transparent, builder: (_) => const VibeConfirmDeleteSheet());
+    final detail = ref.read(vibeDetailControllerProvider(_providerArgs));
+    if (!detail.isSelfVibe || detail.deleting) return;
+    final shouldDelete = await showModalBottomSheet<bool>(
+      context: context,
+      backgroundColor: Colors.transparent,
+      builder: (_) => const VibeConfirmDeleteSheet(),
+    );
     if (shouldDelete != true || !mounted) return;
     await _runAction(_controller.deleteVibe, popOnSuccess: true);
   }
 
   Future<void> _confirmAndDeleteComment(VibeComment comment) async {
-    final shouldDelete = await showModalBottomSheet<bool>(context: context, backgroundColor: Colors.transparent, builder: (_) => const VibeConfirmDeleteCommentSheet());
+    final shouldDelete = await showModalBottomSheet<bool>(
+      context: context,
+      backgroundColor: Colors.transparent,
+      builder: (_) => const VibeConfirmDeleteCommentSheet(),
+    );
     if (shouldDelete != true || !mounted) return;
     await _runAction(() => _controller.deleteComment(comment));
   }
 
   Future<void> _openCommentActions(VibeComment comment) async {
     if (!comment.canPin && !comment.canDelete) return;
-    final action = await showModalBottomSheet<VibeDetailCommentAction>(context: context, backgroundColor: Colors.transparent, builder: (_) => VibeCommentActionsSheet(comment: comment));
+    final action = await showModalBottomSheet<VibeDetailCommentAction>(
+      context: context,
+      backgroundColor: Colors.transparent,
+      builder: (_) => VibeCommentActionsSheet(comment: comment),
+    );
     if (!mounted || action == null) return;
     switch (action) {
       case VibeDetailCommentAction.pin:
@@ -90,41 +142,34 @@ class _VibeDetailBackendPageState extends State<VibeDetailBackendPage> {
       useSafeArea: true,
       backgroundColor: Colors.transparent,
       barrierColor: Colors.black.withValues(alpha: 0.35),
-      builder: (_) => StatefulBuilder(
-        builder: (context, setSheetState) {
-          Future<void> runAndRefresh(Future<void> Function() action) async {
-            await action();
-            if (context.mounted) setSheetState(() {});
-          }
-
-          Future<void> runMessageAndRefresh(Future<String?> Function() action) async {
-            await _runAction(action);
-            if (context.mounted) setSheetState(() {});
-          }
-
+      builder: (_) => Consumer(
+        builder: (context, ref, child) {
+          final detail = ref.watch(
+            vibeDetailControllerProvider(_providerArgs),
+          );
+          final controller = ref.read(
+            vibeDetailControllerProvider(_providerArgs).notifier,
+          );
           return VibeDetailCommentsOverlaySheet(
-            comments: _controller.orderedComments,
-            commentsCount: _controller.commentsCount,
-            loading: _controller.loadingComments,
-            error: _controller.error,
-            canComment: _controller.canComment,
-            sending: _controller.sendingComment,
-            controller: _controller.commentController,
-            focusNode: _controller.commentFocusNode,
-            replyingTo: _controller.replyingTo,
-            onRefresh: () => runAndRefresh(_controller.loadComments),
-            onRetry: () => runAndRefresh(_controller.loadComments),
-            onSend: () => runMessageAndRefresh(_controller.sendComment),
-            onCancelReply: () {
-              _controller.cancelReply();
-              setSheetState(() {});
-            },
-            onReplyTap: (comment) {
-              _controller.startReply(comment);
-              setSheetState(() {});
-            },
-            onLikeTap: (comment) => runAndRefresh(() => _controller.toggleCommentLike(comment)),
-            onActionsTap: (comment) => runAndRefresh(() => _openCommentActions(comment)),
+            comments: detail.orderedComments,
+            commentsCount: detail.commentsCount,
+            loading: detail.loadingComments,
+            error: detail.error,
+            canComment: detail.canComment,
+            sending: detail.sendingComment,
+            controller: _commentController,
+            focusNode: _commentFocusNode,
+            replyingTo: detail.replyingTo,
+            onRefresh: controller.loadComments,
+            onRetry: controller.loadComments,
+            onSend: () => unawaited(_runAction(_sendComment)),
+            onCancelReply: _cancelReply,
+            onReplyTap: _startReply,
+            onLikeTap: (comment) => unawaited(
+              controller.toggleCommentLike(comment),
+            ),
+            onActionsTap: (comment) =>
+                unawaited(_openCommentActions(comment)),
           );
         },
       ),
@@ -134,62 +179,79 @@ class _VibeDetailBackendPageState extends State<VibeDetailBackendPage> {
   void _toast(String message) {
     ScaffoldMessenger.of(context)
       ..clearSnackBars()
-      ..showSnackBar(SnackBar(content: Text(message, style: const TextStyle(fontWeight: FontWeight.w800)), behavior: SnackBarBehavior.floating, backgroundColor: const Color(0xFF111015)));
+      ..showSnackBar(
+        SnackBar(
+          content: Text(
+            message,
+            style: const TextStyle(fontWeight: FontWeight.w800),
+          ),
+          behavior: SnackBarBehavior.floating,
+          backgroundColor: const Color(0xFF111015),
+        ),
+      );
   }
 
   @override
   Widget build(BuildContext context) {
-    if (_controller.isMediaVibe) {
+    final detail = ref.watch(vibeDetailControllerProvider(_providerArgs));
+    final controller = ref.read(
+      vibeDetailControllerProvider(_providerArgs).notifier,
+    );
+
+    if (detail.isMediaVibe) {
       return VibeLegacyReelDetail(
         vibe: widget.vibe,
-        caption: _controller.caption,
-        likedByMe: _controller.likedByMe,
-        savedByMe: _controller.savedByMe,
-        likes: _controller.likesCount,
-        comments: _controller.commentsCount,
-        shares: _controller.sharesCount,
-        saves: _controller.savesCount,
-        isSelfVibe: _controller.isSelfVibe,
-        deleting: _controller.deleting,
+        caption: detail.caption,
+        likedByMe: detail.likedByMe,
+        savedByMe: detail.savedByMe,
+        likes: detail.likesCount,
+        comments: detail.commentsCount,
+        shares: detail.sharesCount,
+        saves: detail.savesCount,
+        isSelfVibe: detail.isSelfVibe,
+        deleting: detail.deleting,
         onBack: () => Navigator.pop(context),
         onDelete: () => unawaited(_confirmAndDeleteVibe()),
-        onLike: () => unawaited(_runAction(_controller.toggleVibeLike)),
+        onLike: () => unawaited(_runAction(controller.toggleVibeLike)),
         onComments: () => unawaited(_openCommentsOverlay()),
-        onShare: () => unawaited(_runAction(_controller.shareVibe)),
-        onSave: () => unawaited(_runAction(_controller.toggleVibeSave)),
+        onShare: () => unawaited(_runAction(controller.shareVibe)),
+        onSave: () => unawaited(_runAction(controller.toggleVibeSave)),
       );
     }
 
     return VibeTextDetailView(
-      caption: _controller.caption,
+      caption: detail.caption,
       timeAgo: widget.vibe.timeAgo,
-      likes: _controller.likesCount,
-      commentsCount: _controller.commentsCount,
-      shares: _controller.sharesCount,
-      saves: _controller.savesCount,
+      likes: detail.likesCount,
+      commentsCount: detail.commentsCount,
+      shares: detail.sharesCount,
+      saves: detail.savesCount,
       commentsEnabled: widget.vibe.commentsEnabled,
-      comments: _controller.orderedComments,
-      loadingComments: _controller.loadingComments,
-      error: _controller.error,
-      isSelfVibe: _controller.isSelfVibe,
-      deleting: _controller.deleting,
-      canComment: _controller.canComment,
-      sendingComment: _controller.sendingComment,
-      commentController: _controller.commentController,
-      commentFocusNode: _controller.commentFocusNode,
-      replyingTo: _controller.replyingTo,
+      comments: detail.orderedComments,
+      loadingComments: detail.loadingComments,
+      error: detail.error,
+      isSelfVibe: detail.isSelfVibe,
+      deleting: detail.deleting,
+      canComment: detail.canComment,
+      sendingComment: detail.sendingComment,
+      commentController: _commentController,
+      commentFocusNode: _commentFocusNode,
+      replyingTo: detail.replyingTo,
       onBack: () => Navigator.pop(context),
       onDeleteVibe: () => unawaited(_confirmAndDeleteVibe()),
       onOpenCommentsOverlay: () => unawaited(_openCommentsOverlay()),
-      onRefreshComments: _controller.loadComments,
-      onCommentLike: (comment) => unawaited(_runAction(() async {
-        await _controller.toggleCommentLike(comment);
-        return null;
-      })),
-      onCommentReply: _controller.startReply,
-      onCommentActions: (comment) => unawaited(_openCommentActions(comment)),
-      onCancelReply: _controller.cancelReply,
-      onSendComment: _controller.sendComment,
+      onRefreshComments: controller.loadComments,
+      onCommentLike: (comment) => unawaited(
+        _runAction(() async {
+          await controller.toggleCommentLike(comment);
+          return null;
+        }),
+      ),
+      onCommentReply: _startReply,
+      onCommentActions: (comment) =>
+          unawaited(_openCommentActions(comment)),
+      onCancelReply: _cancelReply,
+      onSendComment: _sendComment,
     );
   }
 }
