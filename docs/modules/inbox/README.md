@@ -107,3 +107,11 @@ producers and transport. Backgrounding pauses the camera without ending call
 audio; foreground resumes only if lifecycle paused it. Session teardown stops
 the video producer/track. Durable Inbox call sessions and participants remain
 Inbox-service/PostgreSQL authority.
+
+
+### Flutter call microphone lifecycle
+
+Chunk 34-M14 completes call capture coverage by registering the Inbox call
+microphone separately from the camera. Failed call-media startup now performs
+best-effort teardown before propagating the original failure. Durable call state
+remains Inbox-service/PostgreSQL authority.

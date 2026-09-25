@@ -16,3 +16,10 @@ resource lifecycle coordination:
 
 No durable domain state belongs in these contracts. Features must not import
 `app/runtime/media_resource_coordinator.dart`.
+
+
+## Resource budget policy
+
+`media_resource_budget.dart` assigns every `MediaResourceKind` a recommended
+active-count budget and pressure tier. This policy is lifecycle infrastructure
+only; it never becomes application/domain authority.

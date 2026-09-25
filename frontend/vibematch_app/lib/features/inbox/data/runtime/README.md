@@ -12,3 +12,11 @@ resumes only a lifecycle-paused camera. Memory pressure does not destroy an
 active call. Session teardown releases the camera producer/track.
 
 Inbox/backend remains durable call-session authority.
+
+
+## M14 call microphone
+
+`CallAudioInputResourceParticipant` registers the audio-input portion of an
+Inbox call. Active call audio is preserved across background and ordinary memory
+pressure; authenticated-session teardown releases the local audio producer and
+track.

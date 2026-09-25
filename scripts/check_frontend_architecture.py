@@ -589,6 +589,97 @@ for hot_image_path in (
         )
 
 
+# Chunk 34-M14: final resource-runtime closure. Every resource kind must
+# have a budget, cleanup must be failure-isolated, and all concrete capture
+# owners must participate in the foundation lifecycle registry.
+_RESOURCE_BUDGET = APP / "foundation" / "runtime" / "media_resource_budget.dart"
+if not _RESOURCE_BUDGET.exists():
+    violations.append(
+        "foundation/runtime/media_resource_budget.dart: Chunk 34-M14 budget policy is required"
+    )
+else:
+    budget_text = _RESOURCE_BUDGET.read_text(encoding="utf-8-sig")
+    for marker in (
+        "enum MediaResourcePressureTier",
+        "class MediaResourceBudget",
+        "abstract final class MediaResourceBudgetPolicy",
+        "MediaResourceKind.vibesVideoDecoder",
+        "MediaResourceKind.watchPartyWebView",
+        "MediaResourceKind.gameWebView",
+        "MediaResourceKind.roomWebRtc",
+        "MediaResourceKind.giftVideo",
+        "MediaResourceKind.audioInput",
+        "MediaResourceKind.cameraInput",
+        "MediaResourceKind.flutterImageCache",
+        "MediaResourceKind.imagePrefetch",
+        "MediaResourceKind.gameBundleCache",
+    ):
+        if marker not in budget_text:
+            violations.append(
+                f"foundation/runtime/media_resource_budget.dart: missing M14 marker: {marker}"
+            )
+
+_RESOURCE_COORDINATOR = APP / "app" / "runtime" / "media_resource_coordinator.dart"
+if _RESOURCE_COORDINATOR.exists():
+    coordinator_text = _RESOURCE_COORDINATOR.read_text(encoding="utf-8-sig")
+    for marker in (
+        "MediaResourceBudgetPolicy",
+        "overRecommendedBudgetKinds",
+        "MediaResourcePressureTier.values",
+        "_runSafely",
+        "session-release",
+    ):
+        if marker not in coordinator_text:
+            violations.append(
+                f"app/runtime/media_resource_coordinator.dart: missing M14 closure marker: {marker}"
+            )
+
+_CALL_AUDIO_INPUT = (
+    APP
+    / "features"
+    / "inbox"
+    / "data"
+    / "runtime"
+    / "call_audio_input_resource_participant.dart"
+)
+if not _CALL_AUDIO_INPUT.exists():
+    violations.append(
+        "features/inbox/data/runtime/call_audio_input_resource_participant.dart: Inbox call microphone lifecycle is required"
+    )
+else:
+    call_audio_text = _CALL_AUDIO_INPUT.read_text(encoding="utf-8-sig")
+    for marker in (
+        "implements MediaResourceParticipant",
+        "MediaResourceKind.audioInput",
+        "_releaseInput()",
+    ):
+        if marker not in call_audio_text:
+            violations.append(
+                f"features/inbox/data/runtime/call_audio_input_resource_participant.dart: missing M14 marker: {marker}"
+            )
+
+_CALL_MEDIA_BRIDGE = APP / "features" / "inbox" / "data" / "inbox_call_media_bridge.dart"
+if _CALL_MEDIA_BRIDGE.exists():
+    call_bridge_text = _CALL_MEDIA_BRIDGE.read_text(encoding="utf-8-sig")
+    for marker in (
+        "CallAudioInputResourceParticipant",
+        "_attachAudioInputResource",
+        "_detachAudioInputResource",
+        "_releaseAudioInputForSession",
+    ):
+        if marker not in call_bridge_text:
+            violations.append(
+                f"features/inbox/data/inbox_call_media_bridge.dart: missing M14 call-audio marker: {marker}"
+            )
+
+_IMAGE_PREFETCH_PROVIDER = APP / "foundation" / "images" / "app_image_prefetch.dart"
+if _IMAGE_PREFETCH_PROVIDER.exists():
+    prefetch_text = _IMAGE_PREFETCH_PROVIDER.read_text(encoding="utf-8-sig")
+    if "dependencies: [mediaResourceRegistryProvider]" not in prefetch_text:
+        violations.append(
+            "foundation/images/app_image_prefetch.dart: prefetch provider must declare the scoped registry dependency"
+        )
+
 # Chunk 34-M1: heavyweight media/resource lifecycle coordination must be
 # session-scoped. The coordinator is an app/runtime implementation, not a
 # feature singleton or a new domain-state authority.

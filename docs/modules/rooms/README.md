@@ -212,3 +212,10 @@ Local microphone capture is registered only while the underlying
 `RoomMediaEngine` and its delegate; room UI must not import or call
 `LiveRoomAudioService` directly. Lifecycle coordination never overrides
 backend seat/admin-mute/publish authorization.
+
+
+### Gift-video async initialization safety
+
+Chunk 34-M14 closes the lifecycle edge where a gift-video widget can unmount
+while its decoder is still initializing. Stale or failed controllers are
+disposed before the presentation path returns.

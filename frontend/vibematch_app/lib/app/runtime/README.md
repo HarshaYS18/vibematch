@@ -63,3 +63,11 @@ taxonomy live in `foundation/runtime/media_resource_lifecycle.dart`.
 AppShell exposes that implementation to descendants through a scoped
 `mediaResourceRegistryProvider` override. Feature code must never import the
 concrete coordinator.
+
+
+## Chunk 34-M14 closure
+
+The coordinator now uses `media_resource_budget.dart` for deterministic
+pressure ordering and advisory over-budget diagnostics. Foreground, pressure and
+session-release operations are isolated per participant, so one failing adapter
+cannot prevent other resources from being cleaned up.

@@ -1,5 +1,7 @@
 # Chunk 34 — Flutter Resource Runtime
 
+**Status: COMPLETE through M14.**
+
 ## M1: session-scoped resource coordinator contract
 
 Chunk 34 addresses Flutter resource pressure caused by persistent tabs and
@@ -555,3 +557,47 @@ the shared cache.
 No user-visible layout is changed. Uploaded/profile image URLs remain owned by
 their existing profile/content domains; the image runtime is presentation/cache
 infrastructure only.
+
+
+## M14: final closure
+
+M14 closes Chunk 34 after auditing all heavyweight Flutter resource owners,
+their registration lifetime, memory-pressure policy, authenticated-session
+teardown, tests, guards and documentation.
+
+### Final pressure policy
+
+`media_resource_budget.dart` gives every `MediaResourceKind` an advisory
+active-count budget and one of four pressure tiers: reclaim-first,
+reconstructable, interactive, or realtime-critical. These values are
+diagnostics, not destructive admission control.
+
+The coordinator now processes pressure tier-by-tier, reclaiming speculative and
+reconstructable work before realtime-critical room/call media. Lifecycle
+callback failures are isolated per participant so one broken resource cannot
+block cleanup of healthy resources.
+
+### Capture completeness
+
+Known concrete Flutter capture owners are now covered:
+
+- live-room microphone;
+- Inbox call microphone;
+- Inbox call camera;
+- room WebRTC transport.
+
+The Inbox call microphone was found during the final audit and is now registered
+as `MediaResourceKind.audioInput`.
+
+### Closure repairs
+
+The previous M11 room-media binding is explicitly cast through its optional
+registry interface for compatibility with the current Dart toolchain. The M8
+Watch Party lifecycle test imports the domain contract that defines
+`WatchLiveTimeline`.
+
+Gift-video async initialization disposes stale/failed controllers, failed Inbox
+call startup performs best-effort teardown, and the image-prefetch provider
+explicitly declares its scoped registry dependency.
+
+No further Chunk 34 micro-chunk remains after M14.

@@ -27,8 +27,10 @@ a process-global singleton is forbidden.
 
 ## Current rollout
 
-Chunk 34-M1 introduces only the contract, provider, tests, and guard. No
-production resource has been migrated yet.
+Chunk 34 is complete through M14. Vibes decoders, Game and Watch Party WebViews,
+room WebRTC, gift video, live-room and Inbox-call microphone capture, Inbox call
+camera input, Flutter image cache, image prefetch and verified game-bundle cache
+are represented by the authenticated-session resource runtime.
 
 
 ## M2 AppShell mirror
@@ -165,3 +167,11 @@ device-pixel-ratio-aware bounded decoding. A bounded
 Background, memory pressure and session teardown invalidate speculative queued
 work. In-flight work that finishes after invalidation is evicted. The shared
 Flutter image cache remains independently managed by the M5 participant.
+
+
+## M14 closure
+
+Every resource kind now has an advisory budget and pressure tier. The
+coordinator performs tiered memory-pressure cleanup and isolates failures per
+participant. The final audit also adds the Inbox-call microphone and verifies
+that speculative image prefetch stays scoped to the AppShell registry.

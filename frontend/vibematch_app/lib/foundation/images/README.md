@@ -21,3 +21,10 @@ invalidation is evicted.
 
 Visible image loading never waits on prefetch. Flutter's shared decoded
 ImageCache remains managed separately by the Chunk 34-M5 resource participant.
+
+
+## Scoped provider dependency
+
+`appImagePrefetchQueueProvider` explicitly depends on
+`mediaResourceRegistryProvider`, ensuring the queue resolves inside the
+authenticated AppShell resource-registry override.
