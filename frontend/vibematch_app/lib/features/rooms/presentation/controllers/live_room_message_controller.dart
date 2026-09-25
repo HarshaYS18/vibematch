@@ -27,7 +27,6 @@ class LiveRoomMessageController {
     joinRequestUsers.addAll(restoreState?.joinRequestUsers ?? const []);
     _eventSubscription = _realtimeHub.events.listen(_handleRealtimeEvent);
     unawaited(_realtimeHub.start());
-    _activeController = this;
   }
 
   static const Duration _roomSettingsSystemMessageDuration = Duration(
@@ -42,22 +41,6 @@ class LiveRoomMessageController {
     'Apply mode enabled',
     'Free mode enabled',
   };
-
-  static LiveRoomMessageController? _activeController;
-
-  static void clearActiveRoomChatForEveryone() {
-    _activeController?.clearChatForEveryone();
-  }
-
-  static void sendActiveRoomImageMessage({
-    required String imageUrl,
-    required String contentType,
-  }) {
-    _activeController?.sendImageMessage(
-      imageUrl: imageUrl,
-      contentType: contentType,
-    );
-  }
 
   final SeatUser currentUser;
   final RoomSessionRepository? roomSessionRepository;
