@@ -656,10 +656,29 @@ def join_room(db: Session, room_public_id: str, current_user: User, lock_passwor
     db.refresh(participant)
     participants = roster_participants(db, room)
     db.commit()
-    response = RoomJoinResponse(room=room_to_detail_response(room), participants=[participant_to_response(db, item, room) for item in participants], joined_user=participant_to_response(db, participant, room), should_show_entered_message=not was_active, closed_room_ids=sorted(closed_room_ids))
-    # participant_to_response may create wallet, experience and VIP rows. Commit
-    # those writes before the async route broadcasts, or a concurrent room join
-    # can wait on this transaction while blocking the FastAPI event loop.
+    online_user_ids = presence_projection_service.room_online_user_ids(
+        room.room_public_id
+    )
+    response = RoomJoinResponse(
+        room=room_to_detail_response(room),
+        participants=[
+            participant_to_response(
+                db,
+                item,
+                room,
+                online_user_ids=online_user_ids,
+            )
+            for item in participants
+        ],
+        joined_user=participant_to_response(
+            db,
+            participant,
+            room,
+            online_user_ids=online_user_ids,
+        ),
+        should_show_entered_message=not was_active,
+        closed_room_ids=sorted(closed_room_ids),
+    )
     db.commit()
     return response
 
@@ -694,7 +713,22 @@ def list_room_participants(db: Session, room_public_id: str, current_user: User)
         return None
     participants = roster_participants(db, room)
     db.commit()
-    response = RoomParticipantsResponse(room_id=room.room_public_id, online_count=room.online_count, participants=[participant_to_response(db, participant, room) for participant in participants])
+    online_user_ids = presence_projection_service.room_online_user_ids(
+        room.room_public_id
+    )
+    response = RoomParticipantsResponse(
+        room_id=room.room_public_id,
+        online_count=room.online_count,
+        participants=[
+            participant_to_response(
+                db,
+                participant,
+                room,
+                online_user_ids=online_user_ids,
+            )
+            for participant in participants
+        ],
+    )
     db.commit()
     return response
 
