@@ -389,6 +389,36 @@ def append_ball_event(
         for_update=True,
     )
 
+    source_event_id = (payload.event_id or "").strip() or None
+    if source_event_id is not None:
+        existing_by_source = (
+            db.query(CricketBallEvent)
+            .filter(
+                CricketBallEvent.match_id == match.id,
+                CricketBallEvent.source_event_id == source_event_id,
+            )
+            .first()
+        )
+        if existing_by_source is not None:
+            expected = payload.model_dump(exclude_none=True)
+            actual = dict(existing_by_source.event_json or {})
+            comparable = {
+                key: actual.get(key)
+                for key in expected
+                if key not in {"sequence", "created_at"}
+            }
+            expected_comparable = {
+                key: value
+                for key, value in expected.items()
+                if key not in {"sequence", "created_at"}
+            }
+            if comparable != expected_comparable:
+                raise HTTPException(
+                    status_code=status.HTTP_409_CONFLICT,
+                    detail="Cricket ball event ID already exists with different data",
+                )
+            return _match_payload(db, match)
+
     current_sequence = int(
         db.query(func.max(CricketBallEvent.sequence))
         .filter(CricketBallEvent.match_id == match.id)
@@ -437,6 +467,7 @@ def append_ball_event(
         CricketBallEvent(
             match_id=match.id,
             sequence=sequence,
+            source_event_id=source_event_id,
             event_json=event,
         )
     )
