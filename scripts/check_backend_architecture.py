@@ -1526,9 +1526,11 @@ def _validate_post_chunk32_repair_wave(errors: list[str]) -> None:
             "funkey:realtime:gateway:user-active",
             "funkey:realtime:gateway:user-rooms",
             "funkey:realtime:gateway:room-users",
+            "RoomParticipant.is_active.is_(True)",
+            "active_memberships",
         ):
             if required_token not in text:
-                errors.append("presence projection missing Redis lease index: " + required_token)
+                errors.append("presence projection invariant missing: " + required_token)
     if realtime_gateway.exists():
         text = realtime_gateway.read_text(encoding="utf-8")
         for required_token in ("userRoomPresenceLeaseKey", "roomUserPresenceLeaseKey"):
