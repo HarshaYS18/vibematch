@@ -41,3 +41,14 @@ during this mirror phase.
 Lifecycle forwarding is best-effort and failure-isolated; it must never replace
 canonical session reconciliation or introduce domain state into the resource
 runtime.
+
+
+## M3 Vibes migration
+
+Vibes is the first migrated resource. App runtime wraps
+`VibeMediaPlaybackGate` in `VibesMediaResourceParticipant`; the feature layer
+does not depend on the coordinator.
+
+Background lifecycle uses a dedicated pause lock so it composes with the
+existing tab-pause state. Memory pressure flows through the coordinator exactly
+once. Image and game cache cleanup remain on their existing direct paths.

@@ -95,3 +95,47 @@ There is no user-visible/UI change in M2. Because no resource participant is
 registered yet, the coordinator lifecycle broadcast is currently inert. M2 is
 the mirror step that establishes the production lifecycle entry point before
 resource-by-resource migration.
+
+
+## M3: Vibes decoder lifecycle migration
+
+M3 migrates the first real heavyweight resource family: Vibes feed video
+decoder lifecycle.
+
+### Adapter boundary
+
+`VibesMediaResourceParticipant` lives in `app/runtime` and wraps the existing
+`VibeMediaPlaybackGate`. This keeps dependency direction clean: feature code
+does not import App runtime.
+
+The adapter:
+
+- acquires a dedicated app-background pause lock when the authenticated app is
+  not foregrounded;
+- releases only that lock on foreground, so the existing tab-pause lock still
+  wins when Vibes is not the active tab;
+- forwards memory pressure to the existing gate, which clears active decoder
+  ownership and nudges distant players to dispose;
+- on session release, pauses Vibes and triggers one final memory-pressure trim.
+
+### Cutover
+
+AppShell registers the adapter idempotently with the session coordinator. On
+first registration it synchronizes the participant to the coordinator's current
+foreground state, covering registration that occurs after an earlier lifecycle
+transition.
+
+The previous direct
+`_vibePlaybackGate.handleMemoryPressure()` AppShell call is removed. Vibes
+memory pressure now has one lifecycle route:
+
+`AppShell → MediaResourceCoordinator → VibesMediaResourceParticipant → VibeMediaPlaybackGate`.
+
+Image-cache and game-bundle cleanup remain direct and frozen for later
+micro-chunks.
+
+### No UI/state authority change
+
+Vibes playback arbitration remains owned by `VibeMediaPlaybackGate`, and
+individual `VideoPlayerController` instances remain widget-owned. The
+coordinator does not select feed items, choose autoplay, or own video state.

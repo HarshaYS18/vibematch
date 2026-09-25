@@ -26,6 +26,7 @@ import 'runtime/app_inbox_runtime.dart';
 import '../realtime/app_realtime_hub.dart';
 import 'runtime/app_shell_navigation_controller.dart';
 import 'runtime/media_resource_coordinator.dart';
+import 'runtime/vibes_media_resource_participant.dart';
 import 'runtime/app_wallet_runtime.dart';
 import 'app_routes.dart';
 import 'app_source_registry_repository.dart';
@@ -54,12 +55,16 @@ class _AppShellState extends ConsumerState<AppShell>
   bool _sessionLogoutInFlight = false;
   bool _canonicalRefreshInFlight = false;
   late final VibeMediaPlaybackGate _vibePlaybackGate;
+  late final VibesMediaResourceParticipant _vibesMediaResourceParticipant;
 
   @override
   void initState() {
     super.initState();
     WidgetsBinding.instance.addObserver(this);
     _vibePlaybackGate = VibeMediaPlaybackGate(initiallyPaused: true);
+    _vibesMediaResourceParticipant = VibesMediaResourceParticipant(
+      playbackGate: _vibePlaybackGate,
+    );
 
     ref.read(identityRepositoryProvider.notifier).accept(widget.currentUser);
     LiveRoomMediaSignalingService.instance.setActiveLoggedInUser(
@@ -101,7 +106,6 @@ class _AppShellState extends ConsumerState<AppShell>
     // preserving every existing direct cleanup path until each resource owner
     // is migrated and independently guarded.
     unawaited(_notifyResourceMemoryPressure());
-    _vibePlaybackGate.handleMemoryPressure();
     PaintingBinding.instance.imageCache.clearLiveImages();
     ref.read(gameBundleCacheProvider).clear();
   }
@@ -133,6 +137,17 @@ class _AppShellState extends ConsumerState<AppShell>
           .setForeground(isForeground);
     } catch (error) {
       debugPrint('[FK:W:ResourceRuntime:Lifecycle] $error');
+    }
+  }
+
+  Future<void> _syncNewResourceParticipant(
+    MediaResourceCoordinator coordinator,
+    MediaResourceParticipant participant,
+  ) async {
+    try {
+      await participant.onForegroundChanged(coordinator.isForeground);
+    } catch (error) {
+      debugPrint('[FK:W:ResourceRuntime:Register] $error');
     }
   }
 
@@ -236,8 +251,17 @@ class _AppShellState extends ConsumerState<AppShell>
     ref.watch(appRealtimeHubProvider);
     ref.watch(appWalletRuntimeProvider);
     // Chunk 34: registry lifetime exactly matches the authenticated AppShell.
-    // M2 only mirrors lifecycle signals; no feature resource is migrated yet.
-    ref.watch(mediaResourceCoordinatorProvider);
+    // Vibes decoder lifecycle is the first migrated resource; registration is
+    // idempotent across AppShell rebuilds.
+    final resourceCoordinator = ref.watch(mediaResourceCoordinatorProvider);
+    if (resourceCoordinator.register(_vibesMediaResourceParticipant)) {
+      unawaited(
+        _syncNewResourceParticipant(
+          resourceCoordinator,
+          _vibesMediaResourceParticipant,
+        ),
+      );
+    }
 
     final navigation = ref.watch(appShellNavigationProvider);
     final identity = ref.watch(identityRepositoryProvider);

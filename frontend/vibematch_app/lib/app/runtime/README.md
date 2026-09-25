@@ -26,3 +26,13 @@ signals into it.
 This is a mirror-only migration step. Existing direct Vibes decoder ownership,
 Flutter image-cache cleanup, and game-bundle cache cleanup remain in AppShell
 until their dedicated resource migrations are completed and guarded.
+
+
+## Vibes resource participant
+
+`vibes_media_resource_participant.dart` adapts the existing
+`VibeMediaPlaybackGate` to the generic resource lifecycle contract. AppShell
+owns the gate and registers the adapter with the session coordinator.
+
+The adapter does not own feed selection or decoder/controller instances. It
+only applies app-background pause pressure and forwards memory-pressure trims.

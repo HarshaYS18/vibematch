@@ -2,10 +2,10 @@ import 'dart:io';
 
 import 'package:flutter_test/flutter_test.dart';
 
-/// Chunk 34-M2 source contract.
+/// Chunk 34-M2/M3 source contract.
 ///
-/// AppShell mirrors lifecycle pressure into the session-scoped coordinator
-/// while the proven Chunk 13 direct cleanup paths remain frozen in place.
+/// AppShell mirrors lifecycle pressure into the session-scoped coordinator.
+/// M3 migrates Vibes decoder lifecycle while image/game cleanup remains direct.
 void main() {
   test('AppShell keeps the resource coordinator session-scoped and alive', () {
     final shell = File('lib/app/app_shell.dart').readAsStringSync();
@@ -36,10 +36,14 @@ void main() {
     expect(shell, contains('.setForeground(isForeground)'));
   });
 
-  test('M2 preserves direct cleanup until resources migrate individually', () {
+  test('M3 migrates Vibes cleanup but preserves image and game direct paths', () {
     final shell = File('lib/app/app_shell.dart').readAsStringSync();
 
-    expect(shell, contains('_vibePlaybackGate.handleMemoryPressure();'));
+    expect(
+      shell,
+      contains('resourceCoordinator.register(_vibesMediaResourceParticipant)'),
+    );
+    expect(shell, isNot(contains('_vibePlaybackGate.handleMemoryPressure();')));
     expect(
       shell,
       contains('PaintingBinding.instance.imageCache.clearLiveImages();'),
@@ -53,5 +57,6 @@ void main() {
 
     expect(shell, contains("debugPrint('[FK:W:ResourceRuntime:Memory]"));
     expect(shell, contains("debugPrint('[FK:W:ResourceRuntime:Lifecycle]"));
+    expect(shell, contains("debugPrint('[FK:W:ResourceRuntime:Register]"));
   });
 }

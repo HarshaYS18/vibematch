@@ -61,10 +61,11 @@ class MediaResourceCoordinator {
 
   /// Registers one feature-owned resource adapter.
   ///
-  /// Re-registering the same object is idempotent. Reusing an id for a
-  /// different participant is rejected so two heavy resources cannot silently
-  /// share one lifecycle identity.
-  void register(MediaResourceParticipant participant) {
+  /// Re-registering the same object is idempotent and returns false. A new
+  /// registration returns true. Reusing an id for a different participant is
+  /// rejected so two heavy resources cannot silently share one lifecycle
+  /// identity.
+  bool register(MediaResourceParticipant participant) {
     _ensureOpen();
     final id = participant.resourceId.trim();
     if (id.isEmpty) {
@@ -79,7 +80,9 @@ class MediaResourceCoordinator {
     if (existing != null && !identical(existing, participant)) {
       throw StateError('Media resource id already registered: $id');
     }
+    if (identical(existing, participant)) return false;
     _participants[id] = participant;
+    return true;
   }
 
   /// Removes a registration without disposing the feature-owned resource.

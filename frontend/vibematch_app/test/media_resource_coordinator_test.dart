@@ -19,8 +19,8 @@ void main() {
       kind: MediaResourceKind.vibesVideoDecoder,
     );
 
-    coordinator.register(first);
-    coordinator.register(first);
+    expect(coordinator.register(first), isTrue);
+    expect(coordinator.register(first), isFalse);
 
     expect(coordinator.registeredResourceCount, 1);
     expect(

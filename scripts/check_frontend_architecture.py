@@ -201,7 +201,6 @@ if _APP_SHELL.exists():
     # Freeze mirror mode: these proven Chunk 13 cleanup paths are intentionally
     # retained until their owning resources migrate one by one.
     direct_cleanup_markers = (
-        "_vibePlaybackGate.handleMemoryPressure();",
         "PaintingBinding.instance.imageCache.clearLiveImages();",
         "ref.read(gameBundleCacheProvider).clear();",
     )
@@ -210,6 +209,46 @@ if _APP_SHELL.exists():
             violations.append(
                 f"app/app_shell.dart: Chunk 34-M2 removed direct cleanup before migration: {marker}"
             )
+
+
+# Chunk 34-M3: Vibes decoder lifecycle is migrated through an App-runtime
+# participant. The old direct AppShell memory-pressure call must stay removed.
+_VIBES_RESOURCE_ADAPTER = (
+    APP / "app" / "runtime" / "vibes_media_resource_participant.dart"
+)
+if not _VIBES_RESOURCE_ADAPTER.exists():
+    violations.append(
+        "app/runtime/vibes_media_resource_participant.dart: Chunk 34-M3 Vibes resource adapter is required"
+    )
+else:
+    vibes_resource_text = _VIBES_RESOURCE_ADAPTER.read_text(encoding="utf-8-sig")
+    for marker in (
+        "implements MediaResourceParticipant",
+        "MediaResourceKind.vibesVideoDecoder",
+        "playbackGate.acquirePauseLock",
+        "playbackGate.releasePauseLock",
+        "playbackGate.handleMemoryPressure()",
+    ):
+        if marker not in vibes_resource_text:
+            violations.append(
+                f"app/runtime/vibes_media_resource_participant.dart: missing Vibes lifecycle marker: {marker}"
+            )
+
+if _APP_SHELL.exists():
+    shell_text = _APP_SHELL.read_text(encoding="utf-8-sig")
+    for marker in (
+        "VibesMediaResourceParticipant",
+        "resourceCoordinator.register(_vibesMediaResourceParticipant)",
+        "_syncNewResourceParticipant(",
+    ):
+        if marker not in shell_text:
+            violations.append(
+                f"app/app_shell.dart: Chunk 34-M3 Vibes resource registration missing: {marker}"
+            )
+    if "_vibePlaybackGate.handleMemoryPressure();" in shell_text:
+        violations.append(
+            "app/app_shell.dart: Vibes memory pressure must flow through MediaResourceCoordinator after Chunk 34-M3"
+        )
 
 
 # Chunk 21: one physical application WebSocket.
