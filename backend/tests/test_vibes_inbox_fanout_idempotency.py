@@ -28,7 +28,8 @@ class VibesInboxFanoutRepairTests(unittest.TestCase):
 
         self.assertIn("source_dedupe_key", model)
         self.assertIn("unique=True", model)
-        self.assertIn("uq_inbox_messages_source_dedupe_key", migration)
+        self.assertIn("ix_inbox_messages_source_dedupe_key", migration)
+        self.assertIn("unique=True", migration)
         self.assertIn("IntegrityError", service)
         self.assertIn("source_dedupe_key=payload.source_dedupe_key", internal)
 
