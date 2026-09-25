@@ -101,6 +101,7 @@ def check_bridge() -> None:
             "funkey.events.>",
             "durable=settings.nats_durable",
             "monitor_source_lag",
+            "monitor_kafka",
         ),
     )
     require(
@@ -225,6 +226,17 @@ def check_docs_and_ci() -> None:
             "Kafka data platform",
             "apps/kafka-event-bridge/requirements.txt",
             "kafka_bridge_smoke.py",
+            "kafka_bridge_recovery.py",
+            "Prove Kafka outage retention and recovery",
+            "cancel-in-progress: true",
+        ),
+    )
+    require(
+        ROOT / "tests/integration/kafka_bridge_recovery.py",
+        (
+            "published_during_outage",
+            "silent_loss",
+            "auto_offset_reset=\"earliest\"",
         ),
     )
     publish = require(
