@@ -3,13 +3,15 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 
 import '../../data/live_room_media_signaling_service.dart';
-import '../../data/live_room_presence_repository.dart';
+import '../../../../room_session/data/room_session_repository.dart';
+import '../../data/room_session_legacy_adapter.dart';
 import '../live_room_models.dart';
 import '../live_room_restore_state.dart';
 
 class LiveRoomSeatController {
   LiveRoomSeatController({
     required SeatUser currentUser,
+    required this.roomSessionRepository,
     required this.onChanged,
     required this.onToast,
   }) : currentUser = LiveRoomMediaSignalingService.instance
@@ -17,15 +19,13 @@ class LiveRoomSeatController {
     LiveRoomMediaSignalingService.instance.roomSnapshot.addListener(
       _applyLatestMediaSnapshot,
     );
-    LiveRoomPresenceRepository.activeParticipants.addListener(
-      _applyLatestPresenceSnapshot,
-    );
   }
 
   static const Duration seatApplicationExpiry = Duration(seconds: 20);
   static const Duration seatApplicationCooldown = Duration(seconds: 30);
 
   SeatUser currentUser;
+  final RoomSessionRepository roomSessionRepository;
   final VoidCallbackLike onChanged;
   final ValueChangedLike<String> onToast;
 
@@ -37,8 +37,6 @@ class LiveRoomSeatController {
   bool _preserveRestoredSeatsUntilLiveSnapshot = false;
 
   final Map<String, DateTime> _seatApplyCooldownUntil = <String, DateTime>{};
-  final LiveRoomPresenceRepository _presenceRepository =
-      LiveRoomPresenceRepository();
 
   List<SeatUser> get roomUsers => seats
       .where((seat) => seat.user != null)
@@ -60,9 +58,6 @@ class LiveRoomSeatController {
   void dispose() {
     LiveRoomMediaSignalingService.instance.roomSnapshot.removeListener(
       _applyLatestMediaSnapshot,
-    );
-    LiveRoomPresenceRepository.activeParticipants.removeListener(
-      _applyLatestPresenceSnapshot,
     );
   }
 
@@ -102,18 +97,17 @@ class LiveRoomSeatController {
     );
   }
 
-  void _applyLatestPresenceSnapshot() {
+  void applyCanonicalRoomState() {
     final changed = _refreshCurrentUserFromPresence();
-    if (changed) {
-      _applyLatestMediaSnapshot();
-      onChanged();
-    }
+    _applyLatestMediaSnapshot();
+    if (changed) onChanged();
   }
 
   bool _refreshCurrentUserFromPresence() {
-    final liveUser = LiveRoomPresenceRepository.currentParticipantsForRoom(
-      LiveRoomMediaSignalingService.instance.roomId,
-    ).firstWhereOrNull((user) => _sameRoomUserId(user.id, currentUser.id));
+    final liveUser = RoomSessionLegacyAdapter.findPresenceUser(
+      roomSessionRepository.currentState,
+      currentUser.id,
+    );
     if (liveUser == null) return false;
     final nextUser = _mergePresenceIntoCurrentUser(liveUser);
     final changed =
@@ -175,8 +169,8 @@ class LiveRoomSeatController {
       rememberUser(user);
     }
     rememberUser(currentUser);
-    for (final user in LiveRoomPresenceRepository.currentParticipantsForRoom(
-      LiveRoomMediaSignalingService.instance.roomId,
+    for (final user in RoomSessionLegacyAdapter.presenceUsers(
+      roomSessionRepository.currentState,
     )) {
       rememberUser(user);
     }
@@ -353,9 +347,10 @@ class LiveRoomSeatController {
     );
     if (seated != null) return seated;
 
-    final presence = LiveRoomPresenceRepository.currentParticipantsForRoom(
-      LiveRoomMediaSignalingService.instance.roomId,
-    ).firstWhereOrNull((user) => _sameRoomUserId(user.id, userId));
+    final presence = RoomSessionLegacyAdapter.findPresenceUser(
+      roomSessionRepository.currentState,
+      userId,
+    );
     if (presence != null) return presence;
 
     final snapshot = LiveRoomMediaSignalingService.instance.roomSnapshot.value;
@@ -375,7 +370,6 @@ class LiveRoomSeatController {
       _publicUserIdFromAny(userId);
 
   void _publishParticipantRole(SeatUser user) {
-    LiveRoomPresenceRepository.publishParticipant(user);
     if (_sameRoomUserId(user.id, currentUser.id)) {
       currentUser = _mergePresenceIntoCurrentUser(user);
       LiveRoomMediaSignalingService.instance.seedActiveRoomSeatUser(
@@ -767,25 +761,6 @@ class LiveRoomSeatController {
       isRoomAdmin: true,
     );
     onChanged();
-    final publicUserId = _publicUserIdFromRoomUserId(userId);
-    final roomId = LiveRoomMediaSignalingService.instance.roomId;
-    if (publicUserId == null || roomId == null || roomId.trim().isEmpty) {
-      onToast('${target.name} is now Admin');
-      return;
-    }
-    unawaited(
-      _presenceRepository
-          .addRoomAdmin(roomId: roomId, publicUserId: publicUserId)
-          .then((serverUser) {
-            _publishParticipantRole(
-              serverUser.copyWith(isRoomAdmin: true, roleLabel: 'Admin'),
-            );
-            onChanged();
-          })
-          .catchError((Object error) {
-            onToast(error.toString().replaceFirst('Exception: ', ''));
-          }),
-    );
     onToast('${target.name} is now Admin');
   }
 
@@ -804,25 +779,6 @@ class LiveRoomSeatController {
       isRoomAdmin: false,
     );
     onChanged();
-    final publicUserId = _publicUserIdFromRoomUserId(userId);
-    final roomId = LiveRoomMediaSignalingService.instance.roomId;
-    if (publicUserId == null || roomId == null || roomId.trim().isEmpty) {
-      onToast('${target.name} is no longer Admin');
-      return;
-    }
-    unawaited(
-      _presenceRepository
-          .removeRoomAdmin(roomId: roomId, publicUserId: publicUserId)
-          .then((serverUser) {
-            _publishParticipantRole(
-              serverUser.copyWith(isRoomAdmin: false, roleLabel: 'Member'),
-            );
-            onChanged();
-          })
-          .catchError((Object error) {
-            onToast(error.toString().replaceFirst('Exception: ', ''));
-          }),
-    );
     onToast('${target.name} is no longer Admin');
   }
 
