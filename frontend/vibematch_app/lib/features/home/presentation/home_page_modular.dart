@@ -4,8 +4,8 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../core/navigation/vm_navigator.dart';
-import '../controllers/homehome.dart';
-import '../controllers/home_navigationhome.dart';
+import '../controllers/home_controller.dart';
+import '../controllers/home_navigation_controller.dart';
 import 'sections/home_banner_section.dart';
 import 'sections/home_filters_section.dart';
 import 'sections/home_header_section.dart';
@@ -77,13 +77,13 @@ class _HomePageState extends ConsumerState<HomePage> {
                   myCreatedRoom: home.myCreatedRoom,
                   onMyRoomTap: () => HomeNavigationController.openMyRoomOrCreate(
                     context: context,
-                    controller: _controller,
+                    controller: controller,
                     currentUser: activeCurrentUser,
                   ),
                   onQuickMatchTap: () => unawaited(
                     HomeNavigationController.quickMatch(
                       context: context,
-                      controller: _controller,
+                      controller: controller,
                       currentUser: activeCurrentUser,
                     ),
                   ),
@@ -121,7 +121,7 @@ class _HomePageState extends ConsumerState<HomePage> {
                   selectedCategory: home.selectedCategory,
                   selectedLanguage: home.selectedLanguage,
                   onCategorySelected: controller.selectCategory,
-                  onLanguageTap: () => HomeNavigationController.openLanguageSheet(context: context, controller: _controller),
+                  onLanguageTap: () => HomeNavigationController.openLanguageSheet(context: context, controller: controller),
                 ),
               ),
               if (home.isLoadingRooms)
