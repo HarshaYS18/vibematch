@@ -7,6 +7,7 @@ from typing import Any
 from graphql import (
     GraphQLArgument,
     GraphQLField,
+    GraphQLError,
     GraphQLInt,
     GraphQLNonNull,
     GraphQLObjectType,
@@ -55,14 +56,15 @@ async def _home_my_room(root, info):
 
 
 def _filter_home_banners(payload: Any, placement: str) -> list[dict[str, Any]]:
-    """Partition the authoritative active-banner list without a second owner read."""
-    if not isinstance(payload, list):
-        return []
-    return [
-        item
-        for item in payload
-        if isinstance(item, dict) and item.get("placement") == placement
-    ]
+    """Partition one authoritative banner list and reject malformed owner payloads."""
+    if not isinstance(payload, list) or any(
+        not isinstance(item, dict) for item in payload
+    ):
+        raise GraphQLError(
+            "core returned invalid home banner payload",
+            extensions={"code": "UPSTREAM_PROTOCOL", "service": "core"},
+        )
+    return [item for item in payload if item.get("placement") == placement]
 
 
 async def _home_event_banners(root, info):
