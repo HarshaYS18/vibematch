@@ -1,6 +1,7 @@
 import 'dart:async';
 
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../models/family_ui_models.dart';
 import 'controllers/family_controller.dart';
@@ -17,7 +18,7 @@ import 'widgets/family_clan_hero.dart';
 import 'widgets/family_ranked_member_strip.dart';
 import 'widgets/family_redesign_shared.dart';
 
-class FamilyModularPage extends StatefulWidget {
+class FamilyModularPage extends ConsumerStatefulWidget {
   const FamilyModularPage({
     super.key,
     this.openCurrentFamily = false,
@@ -32,28 +33,31 @@ class FamilyModularPage extends StatefulWidget {
   final bool initialIsAdmin;
 
   @override
-  State<FamilyModularPage> createState() => _FamilyModularPageState();
+  ConsumerState<FamilyModularPage> createState() => _FamilyModularPageState();
 }
 
-class _FamilyModularPageState extends State<FamilyModularPage> {
-  late final FamilyController _controller = FamilyController(
-    initialHasFamily: widget.openCurrentFamily,
-    initialProfile: widget.initialFamilyProfile,
-    initialIsOwner: widget.initialIsOwner,
-    initialIsAdmin: widget.initialIsAdmin,
-  )..addListener(_sync);
+class _FamilyModularPageState extends ConsumerState<FamilyModularPage> {
+  late final FamilyControllerArgs _providerArgs;
   final TextEditingController _chatController = TextEditingController();
+
+  FamilyController get _controller =>
+      ref.read(familyControllerProvider(_providerArgs).notifier);
+
+  @override
+  void initState() {
+    super.initState();
+    _providerArgs = FamilyControllerArgs(
+      initialHasFamily: widget.openCurrentFamily,
+      initialProfile: widget.initialFamilyProfile,
+      initialIsOwner: widget.initialIsOwner,
+      initialIsAdmin: widget.initialIsAdmin,
+    );
+  }
 
   @override
   void dispose() {
-    _controller.removeListener(_sync);
-    _controller.dispose();
     _chatController.dispose();
     super.dispose();
-  }
-
-  void _sync() {
-    if (mounted) setState(() {});
   }
 
   void _toast(String message) {
@@ -225,6 +229,7 @@ class _FamilyModularPageState extends State<FamilyModularPage> {
 
   @override
   Widget build(BuildContext context) {
+    ref.watch(familyControllerProvider(_providerArgs));
     if (!_controller.hasFamily) {
       return FamilyRankingModule(
         rankings: _controller.rankings,
