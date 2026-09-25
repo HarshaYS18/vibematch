@@ -187,7 +187,6 @@ for doc in (
     BFF / 'tests' / 'README.md',
     ROOT / 'contracts' / 'graphql' / 'README.md',
     ROOT / 'docs' / 'frontend' / 'chunk36-graphql-read-bff.md',
-    ROOT / 'docs' / 'frontend' / 'chunk37-graphql-slo-hardening.md',
     ROOT / 'docs' / 'architecture' / 'graphql-read-bff.md',
     ROOT / 'docs' / 'modules' / 'graphql-read-bff' / 'README.md',
     ROOT / 'docs' / 'runbooks' / 'graphql-read-bff.md',
