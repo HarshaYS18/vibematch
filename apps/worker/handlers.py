@@ -54,13 +54,24 @@ def handle_vibes_post_published(event:EventEnvelope)->str:
         notification_service_client.create_intent(source_event_id=str(event.event_id),recipient_user_id=user_id,actor_user_id=author_user_id,notification_type="vibe_mention",title=f"{author_name} mentioned you"[:160],body=f'Mentioned you in a Vibe: "{caption_preview}"',target_type="vibe",target_id=str(payload.post_id),metadata=dict(common),dedupe_key=f"vibe:{event.event_id}:{user_id}:mention",collapse_key=f"vibe:{payload.post_id}")
     for user_id in sorted(mention_all_ids):
         notification_service_client.create_intent(source_event_id=str(event.event_id),recipient_user_id=user_id,actor_user_id=author_user_id,notification_type="vibe_mention_all",title=f"{author_name} posted to followers"[:160],body=f'Mentioned all followers in a new Vibe: "{caption_preview}"',target_type="vibe",target_id=str(payload.post_id),metadata=dict(common),dedupe_key=f"vibe:{event.event_id}:{user_id}:mention-all",collapse_key=f"vibe:{payload.post_id}")
-    result=_mark_processed(event,handler_name)
     inbox_text=f"Mentioned you in a Vibe\n\n{caption_preview}\n\nVibe ID: {payload.post_id}"
     for user_id in sorted(direct_ids):
-        try:
-            inbox_service_client.send_direct_message(sender_user_id=author_user_id,target_user_id=user_id,text=inbox_text,message_type="image" if snapshot.get("media_type")=="photo" and snapshot.get("media_url") else "text",attachment_url=snapshot.get("media_url"),metadata={"vibe_post_id":payload.post_id,"source":"vibe_mention","event_id":str(event.event_id)})
-        except (inbox_service_client.InboxServiceUnavailable,ValueError): continue
-    return result
+        inbox_service_client.send_direct_message(
+            sender_user_id=author_user_id,
+            target_user_id=user_id,
+            text=inbox_text,
+            message_type="image"
+            if snapshot.get("media_type")=="photo" and snapshot.get("media_url")
+            else "text",
+            attachment_url=snapshot.get("media_url"),
+            metadata={
+                "vibe_post_id":payload.post_id,
+                "source":"vibe_mention",
+                "event_id":str(event.event_id),
+            },
+            source_dedupe_key=f"vibe:{event.event_id}:inbox:{user_id}:mention",
+        )
+    return _mark_processed(event,handler_name)
 
 def handle_vibes_media_requested(event:EventEnvelope)->str:
     payload=VibesMediaRequested.model_validate(event.payload); handler_name="vibes.media.requested"
