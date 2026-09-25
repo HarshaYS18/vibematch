@@ -11,6 +11,7 @@ from threading import Thread
 
 import nats
 from aiokafka import AIOKafkaProducer
+from aiokafka.admin import AIOKafkaAdminClient
 from nats.js import api as js_api
 
 from bridge import consume_loop
@@ -90,6 +91,41 @@ async def monitor_source_lag(js, settings: Settings, stop: asyncio.Event) -> Non
             pass
 
 
+async def monitor_kafka(settings: Settings, stop: asyncio.Event) -> None:
+    """Keep readiness tied to live broker metadata, not merely producer startup."""
+    while not stop.is_set():
+        admin = AIOKafkaAdminClient(**settings.kafka_client_kwargs())
+        try:
+            await admin.start()
+            while not stop.is_set():
+                try:
+                    await admin.list_topics()
+                    state.kafka_ready = True
+                except asyncio.CancelledError:
+                    raise
+                except Exception:
+                    state.kafka_ready = False
+                    break
+                try:
+                    await asyncio.wait_for(stop.wait(), timeout=5)
+                except asyncio.TimeoutError:
+                    pass
+        except asyncio.CancelledError:
+            raise
+        except Exception:
+            state.kafka_ready = False
+        finally:
+            try:
+                await admin.close()
+            except Exception:
+                pass
+        if not stop.is_set():
+            try:
+                await asyncio.wait_for(stop.wait(), timeout=2)
+            except asyncio.TimeoutError:
+                pass
+
+
 async def run() -> None:
     settings = Settings.from_env()
     settings.validate()
@@ -117,6 +153,7 @@ async def run() -> None:
     nc = None
     task = None
     lag_task = None
+    kafka_monitor_task = None
     try:
         await producer.start()
         state.kafka_ready = True
@@ -152,6 +189,7 @@ async def run() -> None:
         }))
 
         lag_task = asyncio.create_task(monitor_source_lag(js, settings, stop))
+        kafka_monitor_task = asyncio.create_task(monitor_kafka(settings, stop))
         task = asyncio.create_task(
             consume_loop(
                 js,
@@ -176,6 +214,9 @@ async def run() -> None:
         if lag_task is not None:
             lag_task.cancel()
             await asyncio.gather(lag_task, return_exceptions=True)
+        if kafka_monitor_task is not None:
+            kafka_monitor_task.cancel()
+            await asyncio.gather(kafka_monitor_task, return_exceptions=True)
         if nc is not None:
             await nc.drain()
         state.nats_connection = None
