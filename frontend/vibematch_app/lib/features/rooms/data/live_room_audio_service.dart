@@ -436,7 +436,9 @@ class LiveRoomAudioService {
 
     final endpoint =
         Uri.parse(
-          VmApiConfig.endpoint('/rooms/${Uri.encodeComponent(roomId)}/media'),
+          VmApiConfig.mediaControlEndpoint(
+            '/rooms/${Uri.encodeComponent(roomId)}/assignment',
+          ),
         ).replace(
           queryParameters: <String, String>{
             if (deviceId != null && deviceId.trim().isNotEmpty)

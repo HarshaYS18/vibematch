@@ -56,3 +56,15 @@ The post-Chunk-35 anomaly audit closed two defects:
 
 The workload rename is deliberately migration-safe and avoids an in-place
 immutable Deployment-selector mutation.
+
+
+## Repair audit: dedicated media-control routing
+
+The anomaly audit found that the initial media HTTPRoute exposed broad
+`/api/v1` and `/` catch-alls. This would have made `media.funkey.com` a
+second hostname for unrelated APIs.
+
+The repaired route exposes only `/api/v1/media-control`. FastAPI now provides
+an explicit room-assignment alias under that namespace, and Flutter room-media
+discovery uses `VmApiConfig.mediaControlEndpoint`. The old API-host assignment
+path remains for compatibility.

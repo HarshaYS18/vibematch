@@ -50,8 +50,23 @@ require(
 )
 routes_text = require(
     GATEWAY / 'routes.yaml',
-    ('name: funkey-api', 'name: funkey-realtime', 'name: funkey-media-control', '/api/v1', '/ws', 'weight: 100', 'weight: 0', 'funkey-api-canary', 'request: 0s'),
+    (
+        'name: funkey-api',
+        'name: funkey-realtime',
+        'name: funkey-media-control',
+        '/api/v1/media-control',
+        '/ws',
+        'weight: 100',
+        'weight: 0',
+        'funkey-api-canary',
+        'request: 0s',
+    ),
 )
+media_route = routes_text.split('name: funkey-media-control', 1)[1]
+if 'value: /api/v1\n' in media_route or 'value: /\n' in media_route:
+    violations.append(
+        'deploy/kubernetes/gateway/routes.yaml: media.funkey.com must not expose broad API/root catch-alls'
+    )
 policies_text = require(
     GATEWAY / 'policies.yaml',
     ('kind: ClientTrafficPolicy', 'requestID: Generate', 'kind: BackendTrafficPolicy', 'rateLimit:', 'requestBuffer:', 'limit: 10Mi', 'idleTimeout: 3600s'),
@@ -95,9 +110,23 @@ require(
 )
 require(TERRAFORM / 'variables.tf', ('media_dns', 'cdn_dns', 'waf_policy_ref'))
 
-require(
+vm_config = require(
     FLUTTER / 'core' / 'network' / 'vm_api_config.dart',
-    ('https://api.funkey.com', 'wss://realtime.funkey.com/ws', 'https://media.funkey.com', 'https://cdn.funkey.com'),
+    (
+        'https://api.funkey.com',
+        'wss://realtime.funkey.com/ws',
+        'https://media.funkey.com',
+        'https://cdn.funkey.com',
+        'mediaControlEndpoint',
+        '/media-control',
+    ),
+)
+require(
+    FLUTTER / 'features' / 'rooms' / 'data' / 'live_room_audio_service.dart',
+    (
+        'VmApiConfig.mediaControlEndpoint',
+        "'/rooms/${Uri.encodeComponent(roomId)}/assignment'",
+    ),
 )
 for path in FLUTTER.rglob('*.dart'):
     text = path.read_text(encoding='utf-8-sig')

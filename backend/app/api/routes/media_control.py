@@ -46,6 +46,10 @@ def _node_response(node: media_node_registry_service.MediaNode) -> MediaNodeResp
 
 
 @router.get(
+    "/media-control/rooms/{room_public_id}/assignment",
+    response_model=RoomMediaAssignmentResponse,
+)
+@router.get(
     "/rooms/{room_public_id}/media",
     response_model=RoomMediaAssignmentResponse,
 )

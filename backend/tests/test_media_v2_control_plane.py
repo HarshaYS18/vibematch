@@ -13,6 +13,11 @@ class MediaV2ControlPlaneTests(unittest.TestCase):
         self.assertIn('/complete"', routes)
         self.assertIn('/status"', routes)
 
+    def test_public_media_control_assignment_alias_is_registered(self):
+        routes = (ROOT / "backend/app/api/routes/media_control.py").read_text(encoding="utf-8")
+        self.assertIn('"/media-control/rooms/{room_public_id}/assignment"', routes)
+        self.assertIn('"/rooms/{room_public_id}/media"', routes)
+
     def test_completion_verifies_object_before_media_uploaded_event(self):
         service = (ROOT / "backend/app/services/media_upload_session_service.py").read_text(encoding="utf-8")
         head_index = service.index("head_media_object")

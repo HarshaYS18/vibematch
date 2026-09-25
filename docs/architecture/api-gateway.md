@@ -46,3 +46,20 @@ If Envoy is unavailable, public dynamic traffic fails closed; internal services 
 ## Evolution
 
 Chunk 36 may attach the GraphQL Read BFF behind this gateway. New services must add route ownership explicitly; Flutter must continue using public endpoints rather than service discovery.
+
+
+## Dedicated media-control hostname
+
+The media listener is intentionally narrow. `media.funkey.com` accepts only
+the public media-control namespace rooted at
+`/api/v1/media-control`. It is not a second alias for the general REST API.
+
+Room-media assignment is available at
+`/api/v1/media-control/rooms/{room_public_id}/assignment`. The historical
+`api.funkey.com/api/v1/rooms/{room_public_id}/media` path remains registered
+inside FastAPI for rollback/older clients, but new Flutter media discovery uses
+the dedicated media-control origin.
+
+Uploads, admin media routes, and internal media-node heartbeat/drain endpoints
+do not become reachable through the public media hostname merely because they
+share the core service process.

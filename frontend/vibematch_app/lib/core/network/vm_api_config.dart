@@ -112,6 +112,16 @@ abstract final class VmApiConfig {
     return originBaseUrl;
   }
 
+  /// Public media-control endpoint. Production is routed through
+  /// media.funkey.com; local/beta environments use the configured API origin.
+  static String mediaControlEndpoint(String path) {
+    if (path.startsWith('http://') || path.startsWith('https://')) {
+      return path;
+    }
+    final normalizedPath = path.startsWith('/') ? path : '/$path';
+    return '$mediaControlOrigin$apiPrefix/media-control$normalizedPath';
+  }
+
   static String endpoint(String path) {
     if (path.startsWith('http://') || path.startsWith('https://')) {
       return path;
