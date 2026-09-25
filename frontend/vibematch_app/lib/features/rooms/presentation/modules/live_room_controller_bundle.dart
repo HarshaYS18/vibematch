@@ -2,6 +2,7 @@ import 'dart:async';
 
 import 'package:flutter/material.dart';
 
+import '../../../../room_session/data/room_session_repository.dart';
 import '../../data/chat_moderation_api_service.dart';
 import '../../data/live_room_media_signaling_service.dart';
 import '../../data/live_room_member_request_service.dart';
@@ -78,6 +79,7 @@ const SeatUser roomIdentityFallback = SeatUser(
 class LiveRoomControllerBundle {
   LiveRoomControllerBundle({
     required this.config,
+    required this.roomSessionRepository,
     required LiveRoomContextGetter contextGetter,
     required LiveRoomMountedGetter mountedGetter,
   }) : _contextGetter = contextGetter,
@@ -85,6 +87,7 @@ class LiveRoomControllerBundle {
        _backendOnlineCount = config.onlineCount;
 
   final LiveRoomControllerConfig config;
+  final RoomSessionRepository roomSessionRepository;
   final LiveRoomContextGetter _contextGetter;
   final LiveRoomMountedGetter _mountedGetter;
   int _backendOnlineCount;
@@ -226,6 +229,8 @@ class LiveRoomControllerBundle {
 
     roomStateChangedListener = onRoomStateChanged;
     roomStateController = LiveRoomStateController(
+      roomSessionRepository: roomSessionRepository,
+      onChanged: onRoomStateChanged,
       initialRoomName: config.roomName,
       initialRoomId: config.roomId,
       initialModeTitle: config.modeTitle,
@@ -234,7 +239,7 @@ class LiveRoomControllerBundle {
       preserveInitialBackgroundOnFirstLoad:
           config.initialBackgroundTheme != null,
       initialInboxUnreadCount: 0,
-    )..addListener(roomStateChangedListener!);
+    );
 
     moderationController = LiveRoomModerationController(
       currentUser: currentUser,
@@ -302,10 +307,6 @@ class LiveRoomControllerBundle {
         memberRequestListener,
       );
     }
-
-    final stateListener = roomStateChangedListener;
-    if (stateListener != null)
-      roomStateController.removeListener(stateListener);
 
     giftControllerInstance?.dispose();
     messageController.dispose();
