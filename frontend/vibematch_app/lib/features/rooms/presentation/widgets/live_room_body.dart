@@ -132,7 +132,8 @@ class LiveRoomBody extends StatelessWidget {
   final VoidCallback onInboxTap;
   final VoidCallback onEmojiTap;
   final VoidCallback onSendTap;
-  final void Function({
+  /// Canonical image-chat send callback owned by the scoped room controller.
+  final Future<void> Function({
     required String imageUrl,
     required String contentType,
   }) onImageMessage;

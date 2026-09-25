@@ -52,9 +52,17 @@ for root in CANONICAL_ROOTS:
 # Chunk 33: mutable feature state must be scoped instead of process-global.
 #
 # This intentionally scans the whole Flutter app, including legacy feature
-# directories. Constants and immutable service singletons are allowed; static
-# ValueNotifier/ChangeNotifier instances are not because they create hidden
-# process-wide state authorities that outlive a room/page/provider scope.
+# directories. Constants and immutable service singletons are allowed. Static
+# or top-level ValueNotifier/ChangeNotifier instances are forbidden because
+# both forms create hidden process-wide state authorities that outlive a
+# room/page/provider scope.
+_TOP_LEVEL_VALUE_NOTIFIER = re.compile(
+    r"(?m)^(?:late\s+)?final\s+(?:ValueNotifier(?:<[^\n;=]+>)?\s+\w+|\w+\s*=\s*ValueNotifier(?:<[^\n;=]+>)?)"
+)
+_TOP_LEVEL_CHANGE_NOTIFIER = re.compile(
+    r"(?m)^(?:late\s+)?final\s+(?:ChangeNotifier\s+\w+|\w+\s*=\s*ChangeNotifier\s*\()"
+)
+
 for path in APP.rglob("*.dart"):
     text = path.read_text(encoding="utf-8-sig")
     rel = path.relative_to(ROOT).as_posix()
@@ -67,6 +75,16 @@ for path in APP.rglob("*.dart"):
     if re.search(r"\bstatic\s+(?:final\s+)?ChangeNotifier\b", text):
         violations.append(
             f"{rel}: Chunk 33 forbids process-global static ChangeNotifier state"
+        )
+
+    if _TOP_LEVEL_VALUE_NOTIFIER.search(text):
+        violations.append(
+            f"{rel}: Chunk 33 forbids process-global top-level ValueNotifier state"
+        )
+
+    if _TOP_LEVEL_CHANGE_NOTIFIER.search(text):
+        violations.append(
+            f"{rel}: Chunk 33 forbids process-global top-level ChangeNotifier state"
         )
 
     if "class LiveRoomRestrictionsService" in text:

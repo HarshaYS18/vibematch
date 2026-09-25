@@ -242,3 +242,32 @@ Gift broadcast/combo regression tests now create and dispose their own
 `GiftFlightBus`/`PremiumGiftBroadcastBus` instances. Tests therefore verify
 the same room-scoped lifecycle as production and cannot rely on or accidentally
 reintroduce process-global reset hooks.
+
+
+## Canonical room chat repair
+
+The final Chunk 33 anomaly audit found that image upload UI and durable chat
+state had diverged. The repaired ownership model is now:
+
+```text
+RoomInputDock upload
+  -> LiveRoomMessageController.sendImageMessage (awaited)
+  -> RoomSessionRepository.sendChatMessage
+  -> POST /rooms/{room}/realtime/chat/send
+  -> PostgreSQL room_chat_messages
+  -> canonical recent_messages snapshot/delta
+  -> RoomSessionLegacyAdapter.toChatEntries
+  -> scoped LiveRoomMessageController presentation list
+```
+
+Image chat stores `message_type=image`, `media_url`, and optional
+`content_type`; no placeholder text is required. The success toast is emitted
+only after the canonical command completes.
+
+The old top-level `roomChatClearSignal` was removed. Chat clear is represented
+by canonical `recent_messages` becoming empty, so one room can no longer clear
+another room's presentation through process-global Flutter state.
+
+The architecture guard now rejects top-level
+`ValueNotifier`/`ChangeNotifier` state as well as static notifier state.
+Regression coverage verifies text/image projection order and image metadata.

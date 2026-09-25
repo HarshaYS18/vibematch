@@ -112,14 +112,57 @@ class LiveRoomMessageController {
     LiveRoomMediaSignalingService.instance.sendRoomChat(trimmed);
   }
 
-  void sendImageMessage({
+  /// Persists an image message through RoomSessionRepository.
+  ///
+  /// The returned Future completes only after the canonical backend command
+  /// succeeds, allowing the input dock to avoid a false success toast.
+  Future<void> sendImageMessage({
     required String imageUrl,
     required String contentType,
-  }) {
+  }) async {
     final safeUrl = imageUrl.trim();
-    if (safeUrl.isEmpty) return;
-    if (!_roomImagesEnabled) return;
-    if (!_guestMessageAllowed) return;
+    if (safeUrl.isEmpty) {
+      throw ArgumentError.value(imageUrl, 'imageUrl', 'Image URL is required');
+    }
+    if (!_roomImagesEnabled) {
+      throw StateError('Image messages are disabled in this room');
+    }
+    if (!_guestMessageAllowed) {
+      throw StateError('Guest messages are disabled in this room');
+    }
+
+    final repository = roomSessionRepository;
+    if (repository == null) {
+      throw StateError('Room session is unavailable');
+    }
+    await repository.sendChatMessage(
+      messageType: 'image',
+      mediaUrl: safeUrl,
+      contentType: contentType.trim(),
+    );
+  }
+
+  /// Replaces durable chat with the canonical snapshot while retaining only
+  /// local transient/system presentation entries.
+  void applyCanonicalMessages(List<ChatEntry> canonicalMessages) {
+    String key(ChatEntry entry) =>
+        '${entry.senderId ?? ''}|${entry.message}|${entry.imageUrl ?? ''}|${entry.isGift}';
+
+    final canonicalKeys = canonicalMessages.map(key).toSet();
+    final localPresentationOnly = messages.where((entry) {
+      if (!(entry.isSystemMessage ||
+          entry.isSeatApplication ||
+          entry.isGift ||
+          entry.shouldAutoDismiss)) {
+        return false;
+      }
+      return !canonicalKeys.contains(key(entry));
+    }).toList(growable: false);
+
+    messages = <ChatEntry>[
+      ...localPresentationOnly,
+      ...canonicalMessages,
+    ];
   }
 
   void insertSystemMessage(String message) =>

@@ -507,6 +507,9 @@ class LiveRoomControllerBundle {
     _lastAppliedCanonicalState = state;
     seatController.applyCanonicalRoomState();
     roomStateController.applyCanonicalRoomState();
+    roomMessageController.applyCanonicalMessages(
+      RoomSessionLegacyAdapter.toChatEntries(state),
+    );
     notifyRoomChanged();
   }
 

@@ -68,6 +68,51 @@ class RoomSessionLegacyAdapter {
   }
 
 
+  /// Projects canonical durable chat into the legacy ChatEntry presentation.
+  ///
+  /// RoomSessionState.chat is oldest-first from the backend snapshot; the
+  /// existing room feed expects newest-first and reverses it for display.
+  /// This adapter is pure and never owns or mutates chat state.
+  static List<ChatEntry> toChatEntries(RoomSessionState state) {
+    return state.chat.reversed.map((item) {
+      final sender = _asMap(item['sender']);
+      final metadata = _asMap(item['metadata']);
+      final publicUserId = item['sender_public_user_id']?.toString().trim();
+      final roomUserKey = item['sender_room_user_key']?.toString().trim();
+      final senderName =
+          sender['display_name']?.toString().trim().isNotEmpty == true
+          ? sender['display_name'].toString().trim()
+          : sender['username']?.toString().trim().isNotEmpty == true
+          ? sender['username'].toString().trim()
+          : publicUserId?.isNotEmpty == true
+          ? publicUserId!
+          : 'Vibe User';
+      final messageType =
+          item['message_type']?.toString().trim().toLowerCase() ?? 'text';
+      final mediaUrl = item['media_url']?.toString().trim();
+      final contentType = metadata['content_type']?.toString().trim();
+
+      return ChatEntry(
+        senderName: senderName,
+        senderId: roomUserKey?.isNotEmpty == true
+            ? roomUserKey
+            : publicUserId?.isNotEmpty == true
+            ? 'user_$publicUserId'
+            : null,
+        senderAvatarUrl: sender['avatar_url']?.toString(),
+        message: item['text']?.toString() ?? '',
+        isGift: messageType == 'gift',
+        imageUrl: messageType == 'image' && mediaUrl?.isNotEmpty == true
+            ? mediaUrl
+            : null,
+        imageContentType:
+            messageType == 'image' && contentType?.isNotEmpty == true
+            ? contentType
+            : null,
+      );
+    }).toList(growable: false);
+  }
+
   static List<SeatUser> presenceUsers(RoomSessionState state) {
     return state.presence.values
         .map(toSeatUser)

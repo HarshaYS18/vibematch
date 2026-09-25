@@ -193,6 +193,43 @@ class RoomSessionRepository
     );
   }
 
+  /// Persists one durable room chat message through the canonical REST command.
+  ///
+  /// Text messages require [text]. Image messages require [mediaUrl] and may
+  /// omit text; the returned room snapshot is reconciled immediately so UI
+  /// state never depends on a parallel local chat authority.
+  Future<RoomSessionState> sendChatMessage({
+    String? text,
+    String messageType = 'text',
+    String? mediaUrl,
+    String? contentType,
+  }) {
+    final safeType = messageType.trim().toLowerCase().isEmpty
+        ? 'text'
+        : messageType.trim().toLowerCase();
+    final safeText = text?.trim();
+    final safeMediaUrl = mediaUrl?.trim();
+
+    if (safeType == 'image') {
+      if (safeMediaUrl == null || safeMediaUrl.isEmpty) {
+        throw ArgumentError.value(mediaUrl, 'mediaUrl', 'Image URL is required');
+      }
+    } else if (safeText == null || safeText.isEmpty) {
+      throw ArgumentError.value(text, 'text', 'Message text is required');
+    }
+
+    return _postCanonical(
+      '/rooms/$_roomId/realtime/chat/send',
+      <String, dynamic>{
+        'message_type': safeType,
+        if (safeText?.isNotEmpty == true) 'text': safeText,
+        if (safeMediaUrl?.isNotEmpty == true) 'media_url': safeMediaUrl,
+        if (contentType?.trim().isNotEmpty == true)
+          'content_type': contentType!.trim(),
+      },
+    );
+  }
+
   Future<RoomSessionState> activityCommand({
     required String action,
     int? expectedRevision,

@@ -8,10 +8,10 @@ import 'chat_vip_badge.dart';
 import 'room_text_bubbles.dart';
 import 'room_theme.dart';
 
-final ValueNotifier<int> roomChatClearSignal = ValueNotifier<int>(0);
-
-void clearRoomChatHistory() => roomChatClearSignal.value++;
-
+/// Renders one room's canonical newest-first ChatEntry projection.
+  ///
+  /// Chat clearing is represented by RoomSessionRepository publishing an empty
+  /// canonical chat list; this widget owns no process-global clear signal.
 class RoomChatFeed extends StatefulWidget {
   const RoomChatFeed({
     super.key,
@@ -36,7 +36,6 @@ class RoomChatFeed extends StatefulWidget {
 
 class _RoomChatFeedState extends State<RoomChatFeed> {
   late final ScrollController _scrollController;
-  int _clearedMessageCount = 0;
   int _lastMessageCount = 0;
 
   @override
@@ -44,7 +43,6 @@ class _RoomChatFeedState extends State<RoomChatFeed> {
     super.initState();
     _scrollController = ScrollController();
     _lastMessageCount = widget.messages.length;
-    roomChatClearSignal.addListener(_handleClearChat);
     WidgetsBinding.instance.addPostFrameCallback(
       (_) => _scrollToBottom(jump: true),
     );
@@ -53,9 +51,6 @@ class _RoomChatFeedState extends State<RoomChatFeed> {
   @override
   void didUpdateWidget(covariant RoomChatFeed oldWidget) {
     super.didUpdateWidget(oldWidget);
-    if (widget.messages.length < _clearedMessageCount) {
-      _clearedMessageCount = widget.messages.length;
-    }
     if (widget.messages.length != _lastMessageCount) {
       _lastMessageCount = widget.messages.length;
       WidgetsBinding.instance.addPostFrameCallback((_) => _scrollToBottom());
@@ -64,13 +59,8 @@ class _RoomChatFeedState extends State<RoomChatFeed> {
 
   @override
   void dispose() {
-    roomChatClearSignal.removeListener(_handleClearChat);
     _scrollController.dispose();
     super.dispose();
-  }
-
-  void _handleClearChat() {
-    if (mounted) setState(() => _clearedMessageCount = widget.messages.length);
   }
 
   void _scrollToBottom({bool jump = false}) {
@@ -89,12 +79,9 @@ class _RoomChatFeedState extends State<RoomChatFeed> {
 
   @override
   Widget build(BuildContext context) {
-    final newMessageCount = (widget.messages.length - _clearedMessageCount)
-        .clamp(0, widget.messages.length);
-    if (newMessageCount == 0) return const SizedBox.expand();
+    if (widget.messages.isEmpty) return const SizedBox.expand();
 
     final visibleMessages = widget.messages
-        .take(newMessageCount)
         .where((message) => !message.autoDismissed)
         .toList(growable: false)
         .reversed

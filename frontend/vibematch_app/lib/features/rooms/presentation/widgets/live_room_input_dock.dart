@@ -39,7 +39,8 @@ class RoomInputDock extends StatelessWidget {
   final VoidCallback onInboxTap;
   final VoidCallback onEmojiTap;
   final VoidCallback onSendTap;
-  final void Function({
+  /// Completes only after the canonical room image-chat command succeeds.
+  final Future<void> Function({
     required String imageUrl,
     required String contentType,
   }) onImageMessage;
@@ -63,7 +64,7 @@ class RoomInputDock extends StatelessWidget {
     try {
       RoomToast.show(context, 'Uploading image...');
       final upload = await const MediaUploadService().pickAndUploadChatImage();
-      onImageMessage(
+      await onImageMessage(
         imageUrl: upload.url,
         contentType: upload.contentType,
       );
