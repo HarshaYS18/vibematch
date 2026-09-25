@@ -16,5 +16,4 @@ resources:
   - realtime.yaml
   - worker.yaml
   - autoscaling.yaml
-  - ingress.yaml
   - network-policy.yaml

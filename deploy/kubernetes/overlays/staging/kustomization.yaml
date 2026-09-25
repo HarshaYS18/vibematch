@@ -4,5 +4,48 @@ resources:
   - ../../base
   - ../../media
   - ../../jobs
+  - ../../gateway
 patches:
   - path: config.yaml
+  - target:
+      group: gateway.networking.k8s.io
+      version: v1
+      kind: Gateway
+      name: funkey-public
+    patch: |-
+      - op: replace
+        path: /spec/listeners/0/hostname
+        value: api.staging.funkey.com
+      - op: replace
+        path: /spec/listeners/1/hostname
+        value: realtime.staging.funkey.com
+      - op: replace
+        path: /spec/listeners/2/hostname
+        value: media.staging.funkey.com
+  - target:
+      group: gateway.networking.k8s.io
+      version: v1
+      kind: HTTPRoute
+      name: funkey-api
+    patch: |-
+      - op: replace
+        path: /spec/hostnames/0
+        value: api.staging.funkey.com
+  - target:
+      group: gateway.networking.k8s.io
+      version: v1
+      kind: HTTPRoute
+      name: funkey-realtime
+    patch: |-
+      - op: replace
+        path: /spec/hostnames/0
+        value: realtime.staging.funkey.com
+  - target:
+      group: gateway.networking.k8s.io
+      version: v1
+      kind: HTTPRoute
+      name: funkey-media-control
+    patch: |-
+      - op: replace
+        path: /spec/hostnames/0
+        value: media.staging.funkey.com

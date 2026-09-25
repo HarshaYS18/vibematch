@@ -1,0 +1,102 @@
+apiVersion: gateway.networking.k8s.io/v1
+kind: HTTPRoute
+metadata:
+  name: funkey-api
+  labels:
+    funkey.io/public-surface: api
+spec:
+  parentRefs:
+    - name: funkey-public
+      sectionName: api
+  hostnames: [api.funkey.com]
+  rules:
+    - matches:
+        - path: {type: PathPrefix, value: /api/v1/admin/moderation/vibes}
+      timeouts: {request: 30s, backendRequest: 25s}
+      backendRefs:
+        - name: funkey-vibes
+          port: 8084
+    - matches:
+        - path: {type: PathPrefix, value: /api/v1/vibes}
+      timeouts: {request: 30s, backendRequest: 25s}
+      backendRefs:
+        - name: funkey-vibes
+          port: 8084
+    - matches:
+        - path: {type: PathPrefix, value: /api/v1/inbox/stories}
+      timeouts: {request: 30s, backendRequest: 25s}
+      backendRefs:
+        - name: funkey-api
+          port: 8000
+    - matches:
+        - path: {type: PathPrefix, value: /api/v1/inbox}
+        - path: {type: PathPrefix, value: /api/v1/inbox-ai}
+        - path: {type: PathPrefix, value: /api/v1/calls}
+      timeouts: {request: 30s, backendRequest: 25s}
+      backendRefs:
+        - name: funkey-inbox
+          port: 8083
+    - matches:
+        - path: {type: PathPrefix, value: /api/v1}
+      timeouts: {request: 30s, backendRequest: 25s}
+      backendRefs:
+        - name: funkey-api
+          port: 8000
+          weight: 100
+        - name: funkey-api-canary
+          port: 8000
+          weight: 0
+    - matches:
+        - path: {type: PathPrefix, value: /}
+      timeouts: {request: 30s, backendRequest: 25s}
+      backendRefs:
+        - name: funkey-api
+          port: 8000
+          weight: 100
+        - name: funkey-api-canary
+          port: 8000
+          weight: 0
+---
+apiVersion: gateway.networking.k8s.io/v1
+kind: HTTPRoute
+metadata:
+  name: funkey-realtime
+  labels:
+    funkey.io/public-surface: realtime
+spec:
+  parentRefs:
+    - name: funkey-public
+      sectionName: realtime
+  hostnames: [realtime.funkey.com]
+  rules:
+    - matches:
+        - path: {type: PathPrefix, value: /ws}
+      timeouts: {request: 0s, backendRequest: 0s}
+      backendRefs:
+        - name: funkey-realtime
+          port: 8081
+---
+apiVersion: gateway.networking.k8s.io/v1
+kind: HTTPRoute
+metadata:
+  name: funkey-media-control
+  labels:
+    funkey.io/public-surface: media
+spec:
+  parentRefs:
+    - name: funkey-public
+      sectionName: media
+  hostnames: [media.funkey.com]
+  rules:
+    - matches:
+        - path: {type: PathPrefix, value: /api/v1}
+      timeouts: {request: 30s, backendRequest: 25s}
+      backendRefs:
+        - name: funkey-api
+          port: 8000
+    - matches:
+        - path: {type: PathPrefix, value: /}
+      timeouts: {request: 30s, backendRequest: 25s}
+      backendRefs:
+        - name: funkey-api
+          port: 8000

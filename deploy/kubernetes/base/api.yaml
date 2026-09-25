@@ -8,7 +8,7 @@ apiVersion: apps/v1
 kind: Deployment
 metadata:
   name: funkey-api
-  labels: {app: funkey-api}
+  labels: {app: funkey-api, funkey.io/release-track: stable}
 spec:
   replicas: 3
   revisionHistoryLimit: 5
@@ -19,7 +19,7 @@ spec:
     matchLabels: {app: funkey-api}
   template:
     metadata:
-      labels: {app: funkey-api}
+      labels: {app: funkey-api, funkey.io/release-track: stable}
       annotations:
         prometheus.io/scrape: "true"
         prometheus.io/path: /metrics
@@ -79,7 +79,7 @@ kind: Service
 metadata:
   name: funkey-api
 spec:
-  selector: {app: funkey-api}
+  selector: {app: funkey-api, funkey.io/release-track: stable}
   ports: [{name: http, port: 8000, targetPort: http}]
 ---
 apiVersion: policy/v1

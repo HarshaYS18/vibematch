@@ -4,6 +4,7 @@ resources:
   - ../../base
   - ../../media
   - ../../jobs
+  - ../../gateway
 patches:
   - path: config.yaml
 images:
