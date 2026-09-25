@@ -1,3 +1,4 @@
+import '../../../foundation/graphql/composite_read_repository.dart';
 import '../../../foundation/networking/app_network_client.dart';
 import '../../../core/network/api_endpoints.dart';
 import '../../auth/data/auth_api_service.dart';
@@ -7,12 +8,22 @@ import 'models/home_banner_dto.dart';
 import 'models/home_room_dto.dart';
 
 class HomeRepository {
-  HomeRepository({AppNetworkClient? apiClient, AuthApiService? authApiService})
-      : _apiClient = apiClient ?? AppNetworkRuntime.shared,
-        _authApiService = authApiService ?? const AuthApiService();
+  HomeRepository({
+    AppNetworkClient? apiClient,
+    AuthApiService? authApiService,
+    CompositeReadRepository? compositeReadRepository,
+  }) : _apiClient = apiClient ?? AppNetworkRuntime.shared,
+       _authApiService = authApiService ?? const AuthApiService(),
+       _compositeReads =
+           compositeReadRepository ??
+           CompositeReadRepository(
+             apiClient: apiClient ?? AppNetworkRuntime.shared,
+             authApiService: authApiService ?? const AuthApiService(),
+           );
 
   final AppNetworkClient _apiClient;
   final AuthApiService _authApiService;
+  final CompositeReadRepository _compositeReads;
 
   Map<String, String> _authHeaders() {
     final token = _authApiService.cachedAccessToken;
@@ -20,6 +31,38 @@ class HomeRepository {
       throw Exception('Please login again.');
     }
     return {'Authorization': 'Bearer $token'};
+  }
+
+  Future<HomeChromeComposite> fetchHomeChromeComposite() async {
+    final result = await _compositeReads.loadHome();
+    final home = _map(result.data['home']);
+
+    final roomJson = _map(home['myRoom']);
+    final eventJson = _listOfMaps(home['eventBanners']);
+    final policyJson = _listOfMaps(home['policyBanners']);
+
+    return HomeChromeComposite(
+      myCreatedRoom: roomJson.isEmpty
+          ? null
+          : HomeRoomDto.fromJson(roomJson).toDomain(),
+      eventBanners: eventJson
+          .map(HomeBannerDto.fromJson)
+          .map((dto) => dto.toDomain())
+          .where(
+            (banner) =>
+                banner.imageUrl != null && banner.imageUrl!.trim().isNotEmpty,
+          )
+          .toList(growable: false),
+      policyBanners: policyJson
+          .map(HomeBannerDto.fromJson)
+          .map((dto) => dto.toDomain())
+          .where(
+            (banner) =>
+                banner.imageUrl != null && banner.imageUrl!.trim().isNotEmpty,
+          )
+          .toList(growable: false),
+      hasPartialErrors: result.errors.isNotEmpty,
+    );
   }
 
   Future<HomeRoom?> fetchMyCreatedRoom() async {
@@ -106,4 +149,33 @@ class HomeRepository {
   void close() {
     _apiClient.close();
   }
+}
+
+
+class HomeChromeComposite {
+  const HomeChromeComposite({
+    required this.myCreatedRoom,
+    required this.eventBanners,
+    required this.policyBanners,
+    required this.hasPartialErrors,
+  });
+
+  final HomeRoom? myCreatedRoom;
+  final List<HomeBanner> eventBanners;
+  final List<HomeBanner> policyBanners;
+  final bool hasPartialErrors;
+}
+
+Map<String, dynamic> _map(Object? value) {
+  if (value is Map<String, dynamic>) return value;
+  if (value is Map) return value.cast<String, dynamic>();
+  return const <String, dynamic>{};
+}
+
+List<Map<String, dynamic>> _listOfMaps(Object? value) {
+  if (value is! List) return const <Map<String, dynamic>>[];
+  return value
+      .whereType<Map>()
+      .map((item) => item.cast<String, dynamic>())
+      .toList(growable: false);
 }

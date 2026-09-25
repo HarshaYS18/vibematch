@@ -49,24 +49,22 @@ def _ctx(info) -> GraphQLRequestContext:
     return info.context
 
 
-async def _home_banners(root, info):
+async def _home_my_room(root, info):
+    del root
+    return await _ctx(info).upstream.get_json("core", "/rooms/my-created-room")
+
+
+async def _home_event_banners(root, info):
     del root
     return await _ctx(info).upstream.get_json(
-        "core", "/home-banners", params={"placement": "home"}
+        "core", "/home-banners", params={"placement": "event"}
     )
 
 
-async def _home_vibes(root, info):
+async def _home_policy_banners(root, info):
+    del root
     return await _ctx(info).upstream.get_json(
-        "vibes", "/vibes/feed", params={"limit": root["limit"]}
-    )
-
-
-async def _home_rankings(root, info):
-    return await _ctx(info).upstream.get_json(
-        "core",
-        "/rankings/received",
-        params={"period": "daily", "limit": min(root["limit"], 20)},
+        "core", "/home-banners", params={"placement": "policy_rules"}
     )
 
 
@@ -129,9 +127,9 @@ async def _admin_vibe_reports(root, info):
 HomeComposite = GraphQLObjectType(
     "HomeComposite",
     lambda: {
-        "banners": GraphQLField(JSON, resolve=_home_banners),
-        "vibes": GraphQLField(JSON, resolve=_home_vibes),
-        "rankings": GraphQLField(JSON, resolve=_home_rankings),
+        "myRoom": GraphQLField(JSON, resolve=_home_my_room),
+        "eventBanners": GraphQLField(JSON, resolve=_home_event_banners),
+        "policyBanners": GraphQLField(JSON, resolve=_home_policy_banners),
     },
 )
 
@@ -167,10 +165,7 @@ Query = GraphQLObjectType(
     lambda: {
         "home": GraphQLField(
             GraphQLNonNull(HomeComposite),
-            args={"limit": GraphQLArgument(GraphQLInt, default_value=12)},
-            resolve=lambda _root, _info, limit=12: {
-                "limit": max(1, min(int(limit), 30))
-            },
+            resolve=lambda _root, _info: {},
         ),
         "profile": GraphQLField(
             GraphQLNonNull(ProfileComposite),

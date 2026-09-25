@@ -122,6 +122,9 @@ abstract final class VmApiConfig {
     return '$mediaControlOrigin$apiPrefix/media-control$normalizedPath';
   }
 
+  /// Chunk 36 persisted GraphQL read endpoint on the public API origin.
+  static String get graphqlEndpoint => '$originBaseUrl/graphql';
+
   static String endpoint(String path) {
     if (path.startsWith('http://') || path.startsWith('https://')) {
       return path;

@@ -23,12 +23,12 @@ class PersistedOperation:
 _RAW_OPERATIONS: tuple[tuple[str, str, str], ...] = (
     (
         "HomeComposite",
-        "ec52f93fded6530e5456ca224b8dad8454f0f23899298d0b0615ce7ac4c3706f",
-        """query HomeComposite($limit: Int = 12) {
-  home(limit: $limit) {
-    banners
-    vibes
-    rankings
+        "49caa7816c5a823071f7b812cfcc35b6ee996fe337da55dce98f121c776c16f6",
+        """query HomeComposite {
+  home {
+    myRoom
+    eventBanners
+    policyBanners
   }
 }""",
     ),

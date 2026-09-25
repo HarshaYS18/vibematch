@@ -158,24 +158,20 @@ class HomeController extends AutoDisposeNotifier<HomeState> {
     );
 
     try {
-      final results = await Future.wait<Object?>([
-        _repository.fetchMyCreatedRoom(),
-        _repository.fetchHomeBanners(placement: 'event'),
-        _repository.fetchHomeBanners(placement: 'policy_rules'),
-      ]);
-      final eventBanners =
-          (results[1] as List<HomeBanner>?) ?? const <HomeBanner>[];
-      final policyBanners =
-          (results[2] as List<HomeBanner>?) ?? const <HomeBanner>[];
+      final composite = await _repository.fetchHomeChromeComposite();
+      final eventBanners = composite.eventBanners;
+      final policyBanners = composite.policyBanners;
       state = state.copyWith(
-        myCreatedRoom: results[0] as HomeRoom?,
+        myCreatedRoom: composite.myCreatedRoom,
         eventBanners: eventBanners,
         policyBanners: policyBanners,
         selectedBannerIndex:
             _clampIndex(state.selectedBannerIndex, eventBanners.length),
         selectedPolicyBannerIndex:
             _clampIndex(state.selectedPolicyBannerIndex, policyBanners.length),
-        bannerErrorMessage: null,
+        bannerErrorMessage: composite.hasPartialErrors
+            ? 'Some home content could not be refreshed.'
+            : null,
       );
     } catch (_) {
       state = state.copyWith(
