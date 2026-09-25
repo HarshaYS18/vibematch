@@ -18,11 +18,6 @@ def upgrade() -> None:
         "inbox_messages",
         sa.Column("source_dedupe_key", sa.String(length=180), nullable=True),
     )
-    op.create_unique_constraint(
-        "uq_inbox_messages_source_dedupe_key",
-        "inbox_messages",
-        ["source_dedupe_key"],
-    )
     op.create_index(
         "ix_inbox_messages_source_dedupe_key",
         "inbox_messages",
@@ -35,10 +30,5 @@ def downgrade() -> None:
     op.drop_index(
         "ix_inbox_messages_source_dedupe_key",
         table_name="inbox_messages",
-    )
-    op.drop_constraint(
-        "uq_inbox_messages_source_dedupe_key",
-        "inbox_messages",
-        type_="unique",
     )
     op.drop_column("inbox_messages", "source_dedupe_key")
