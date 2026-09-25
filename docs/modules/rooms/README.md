@@ -178,3 +178,11 @@ Do not send a second background mutation through
 
 `CricketRoomBackgroundPickerSheet` is presentation-only. It returns the chosen
 theme through its injected callback and must not mutate global background state.
+
+
+### Retired Chunk 33 identifiers
+
+The architecture guard rejects `ActiveRoomContext`,
+`dismissRoomSeatActionPill`, and `activeRoomBackgroundTheme`. New code must
+use explicit room scope, `LiveRoomSeatController.clearSelectedSeat`, and
+room-scoped background callbacks/controllers instead.

@@ -436,3 +436,12 @@ The Cricket background picker still wrote to the retired
 `activeRoomBackgroundTheme` global before invoking its room-scoped callback.
 R4 removes that write. The picker now emits the selected theme only through
 `onThemeSelected`, and the owning room state controller persists/reconciles it.
+
+
+### Post-M6 repair R5 — stale-identifier architecture guard
+
+The frontend architecture guard now rejects references to the retired
+`ActiveRoomContext`, `dismissRoomSeatActionPill`, and
+`activeRoomBackgroundTheme` identifiers anywhere under Flutter `lib/`.
+This catches incomplete migrations at the source-of-truth gate instead of
+allowing them to surface later as broad compile failures.

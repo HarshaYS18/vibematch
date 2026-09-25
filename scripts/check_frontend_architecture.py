@@ -97,6 +97,19 @@ for path in APP.rglob("*.dart"):
             f"{rel}: Cricket Mode runtime must be room-scoped, not a static signal"
         )
 
+    # Post-M6 closure: references to retired room-global presentation/state
+    # helpers must fail at architecture-guard time instead of surfacing later
+    # as broad Flutter compilation failures.
+    for retired_identifier in (
+        "ActiveRoomContext",
+        "dismissRoomSeatActionPill",
+        "activeRoomBackgroundTheme",
+    ):
+        if retired_identifier in text:
+            violations.append(
+                f"{rel}: retired Chunk 33 identifier {retired_identifier} is forbidden"
+            )
+
 
 # Chunk 33 final closure: the media compatibility facade may not originate
 # durable room/chat/settings mutations, and retired global compatibility files
