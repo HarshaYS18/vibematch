@@ -67,6 +67,7 @@ def send_direct_message(
     message_type: str = "text",
     attachment_url: str | None = None,
     metadata: dict[str, Any] | None = None,
+    source_dedupe_key: str | None = None,
 ) -> dict[str, Any]:
     return _request(
         "POST",
@@ -78,6 +79,7 @@ def send_direct_message(
             "message_type": message_type,
             "attachment_url": attachment_url,
             "metadata": dict(metadata or {}),
+            "source_dedupe_key": source_dedupe_key,
         },
     )
 
