@@ -411,7 +411,7 @@ class LiveRoomMediaSignalingService with WidgetsBindingObserver {
   }
 
   void requestRoomMembership() {
-    _send('room_member/request');
+    _send('room_member/request', const <String, Object?>{});
   }
 
   void approveRoomMembership(String targetUserId) {
