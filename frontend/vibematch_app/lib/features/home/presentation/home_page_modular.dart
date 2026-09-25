@@ -1,10 +1,11 @@
 import 'dart:async';
 
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../core/navigation/vm_navigator.dart';
-import '../controllers/home_controller.dart';
-import '../controllers/home_navigation_controller.dart';
+import '../controllers/homehome.dart';
+import '../controllers/home_navigationhome.dart';
 import 'sections/home_banner_section.dart';
 import 'sections/home_filters_section.dart';
 import 'sections/home_header_section.dart';
@@ -14,7 +15,7 @@ import 'widgets/home_loading_strip.dart';
 import 'widgets/home_network_error_card.dart';
 import 'widgets/home_official_banner_manage_card.dart';
 
-class HomePage extends StatefulWidget {
+class HomePage extends ConsumerStatefulWidget {
   const HomePage({
     super.key,
     this.user,
@@ -25,38 +26,30 @@ class HomePage extends StatefulWidget {
   final Object? currentUser;
 
   @override
-  State<HomePage> createState() => _HomePageState();
+  ConsumerState<HomePage> createState() => _HomePageState();
 }
 
-class _HomePageState extends State<HomePage> {
-  final HomeController _controller = HomeController();
+class _HomePageState extends ConsumerState<HomePage> {
   final ScrollController _scrollController = ScrollController();
 
   @override
   void initState() {
     super.initState();
     _scrollController.addListener(_handleScroll);
-    _controller.addListener(_handleControllerChanged);
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      if (mounted) _controller.refreshAll();
+      if (mounted) ref.read(homeControllerProvider.notifier).refreshAll();
     });
   }
 
   @override
   void dispose() {
     _scrollController.removeListener(_handleScroll);
-    _controller.removeListener(_handleControllerChanged);
     _scrollController.dispose();
-    _controller.dispose();
     super.dispose();
   }
 
   void _handleScroll() {
-    _controller.onScrollNearBottom(_scrollController);
-  }
-
-  void _handleControllerChanged() {
-    if (mounted) setState(() {});
+    ref.read(homeControllerProvider.notifier).onScrollNearBottom(_scrollController);
   }
 
   bool get _canManageHomeBanners {
@@ -65,21 +58,23 @@ class _HomePageState extends State<HomePage> {
 
   @override
   Widget build(BuildContext context) {
-    final visibleRooms = _controller.visibleRooms;
+    final home = ref.watch(homeControllerProvider);
+    final controller = ref.read(homeControllerProvider.notifier);
+    final visibleRooms = home.visibleRooms;
     final activeCurrentUser = HomeNavigationController.activeCurrentUser(widget.user, widget.currentUser);
 
     return Scaffold(
       backgroundColor: const Color(0xFFFAF7F1),
       body: SafeArea(
         child: RefreshIndicator(
-          onRefresh: _controller.refreshAll,
+          onRefresh: controller.refreshAll,
           child: CustomScrollView(
             controller: _scrollController,
             physics: const AlwaysScrollableScrollPhysics(parent: BouncingScrollPhysics()),
             slivers: [
               SliverToBoxAdapter(
                 child: HomeHeaderSection(
-                  myCreatedRoom: _controller.myCreatedRoom,
+                  myCreatedRoom: home.myCreatedRoom,
                   onMyRoomTap: () => HomeNavigationController.openMyRoomOrCreate(
                     context: context,
                     controller: _controller,
@@ -102,61 +97,61 @@ class _HomePageState extends State<HomePage> {
                     onTap: () => VmNavigator.openBannerManager(context),
                   ),
                 ),
-              if (_controller.bannerErrorMessage != null)
+              if (home.bannerErrorMessage != null)
                 SliverToBoxAdapter(
                   child: HomeNetworkErrorCard(
-                    message: _controller.bannerErrorMessage!,
-                    onRetry: _controller.loadHomeChrome,
+                    message: home.bannerErrorMessage!,
+                    onRetry: controller.loadHomeChrome,
                   ),
                 )
-              else if (_controller.banners.isNotEmpty)
+              else if (home.banners.isNotEmpty)
                 SliverToBoxAdapter(
                   child: HomeBannerSection(
-                    banners: _controller.banners,
-                    selectedIndex: _controller.selectedBannerIndex,
+                    banners: home.banners,
+                    selectedIndex: home.selectedBannerIndex,
                     canManageHomeBanners: _canManageHomeBanners,
-                    onBannerChanged: _controller.selectBanner,
+                    onBannerChanged: controller.selectBanner,
                     onBannerTap: (banner) => HomeNavigationController.handleBannerTap(context, banner),
                     onManageTap: () => VmNavigator.openBannerManager(context),
                   ),
                 ),
               SliverToBoxAdapter(
                 child: HomeFiltersSection(
-                  categories: _controller.categories,
-                  selectedCategory: _controller.selectedCategory,
-                  selectedLanguage: _controller.selectedLanguage,
-                  onCategorySelected: _controller.selectCategory,
+                  categories: HomeController.categories,
+                  selectedCategory: home.selectedCategory,
+                  selectedLanguage: home.selectedLanguage,
+                  onCategorySelected: controller.selectCategory,
                   onLanguageTap: () => HomeNavigationController.openLanguageSheet(context: context, controller: _controller),
                 ),
               ),
-              if (_controller.isLoadingRooms)
+              if (home.isLoadingRooms)
                 const SliverToBoxAdapter(child: HomeLoadingStrip())
-              else if (_controller.loadErrorMessage != null)
+              else if (home.loadErrorMessage != null)
                 SliverToBoxAdapter(
                   child: HomeNetworkErrorCard(
-                    message: _controller.loadErrorMessage!,
-                    onRetry: _controller.retryLoadingRooms,
+                    message: home.loadErrorMessage!,
+                    onRetry: controller.retryLoadingRooms,
                   ),
                 ),
               SliverToBoxAdapter(
                 child: HomeRoomSectionHeader(
-                  selectedCategory: _controller.selectedCategory,
-                  totalRooms: _controller.filteredRooms.length,
+                  selectedCategory: home.selectedCategory,
+                  totalRooms: home.filteredRooms.length,
                 ),
               ),
               HomeRoomListSection(
                 visibleRooms: visibleRooms,
-                selectedCategory: _controller.selectedCategory,
-                hasLoadError: _controller.loadErrorMessage != null,
-                policyBanners: _controller.policyBanners,
-                selectedPolicyBannerIndex: _controller.selectedPolicyBannerIndex,
+                selectedCategory: home.selectedCategory,
+                hasLoadError: home.loadErrorMessage != null,
+                policyBanners: home.policyBanners,
+                selectedPolicyBannerIndex: home.selectedPolicyBannerIndex,
                 canManageBanners: _canManageHomeBanners,
                 onRoomTap: (room) => HomeNavigationController.openRoom(
                   context: context,
                   room: room,
                   currentUser: activeCurrentUser,
                 ),
-                onPolicyBannerChanged: _controller.selectPolicyBanner,
+                onPolicyBannerChanged: controller.selectPolicyBanner,
                 onPolicyBannerTap: (banner) => HomeNavigationController.handlePolicyBannerTap(context, banner),
                 onManageBannersTap: () => VmNavigator.openBannerManager(context),
               ),
