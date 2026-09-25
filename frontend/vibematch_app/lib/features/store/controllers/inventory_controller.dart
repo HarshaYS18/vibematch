@@ -1,18 +1,27 @@
-import 'package:flutter/foundation.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../data/store_api_service.dart';
 import '../models/store_models.dart';
 
-class InventoryController extends ChangeNotifier {
-  InventoryController({StoreApiService? api}) : _api = api ?? const StoreApiService();
+const Object _inventoryUnset = Object();
 
-  final StoreApiService _api;
+class InventoryState {
+  const InventoryState({
+    required this.inventory,
+    this.selectedCategory,
+    this.isLoading = false,
+    this.isUpdating = false,
+    this.errorMessage,
+  });
 
-  UserInventory inventory = UserInventory.empty;
-  String? selectedCategory;
-  bool isLoading = false;
-  bool isUpdating = false;
-  String? errorMessage;
+  factory InventoryState.initial() =>
+      InventoryState(inventory: UserInventory.empty);
+
+  final UserInventory inventory;
+  final String? selectedCategory;
+  final bool isLoading;
+  final bool isUpdating;
+  final String? errorMessage;
 
   List<String> get categories => inventory.categories;
 
@@ -22,41 +31,81 @@ class InventoryController extends ChangeNotifier {
     return inventory.sections[category] ?? const <InventoryItem>[];
   }
 
+  InventoryState copyWith({
+    UserInventory? inventory,
+    Object? selectedCategory = _inventoryUnset,
+    bool? isLoading,
+    bool? isUpdating,
+    Object? errorMessage = _inventoryUnset,
+  }) {
+    return InventoryState(
+      inventory: inventory ?? this.inventory,
+      selectedCategory: identical(selectedCategory, _inventoryUnset)
+          ? this.selectedCategory
+          : selectedCategory as String?,
+      isLoading: isLoading ?? this.isLoading,
+      isUpdating: isUpdating ?? this.isUpdating,
+      errorMessage: identical(errorMessage, _inventoryUnset)
+          ? this.errorMessage
+          : errorMessage as String?,
+    );
+  }
+}
+
+class InventoryController extends AutoDisposeNotifier<InventoryState> {
+  final StoreApiService _api = const StoreApiService();
+
+  @override
+  InventoryState build() => InventoryState.initial();
+
   Future<void> load() async {
-    if (isLoading) return;
-    isLoading = true;
-    errorMessage = null;
-    notifyListeners();
+    if (state.isLoading) return;
+    state = state.copyWith(isLoading: true, errorMessage: null);
     try {
-      inventory = await _api.fetchInventory();
-      selectedCategory = inventory.categories.contains(selectedCategory) ? selectedCategory : (inventory.categories.isEmpty ? null : inventory.categories.first);
+      final inventory = await _api.fetchInventory();
+      final selected = inventory.categories.contains(state.selectedCategory)
+          ? state.selectedCategory
+          : (inventory.categories.isEmpty ? null : inventory.categories.first);
+      state = state.copyWith(
+        inventory: inventory,
+        selectedCategory: selected,
+        errorMessage: null,
+      );
     } catch (error) {
-      inventory = UserInventory.empty;
-      selectedCategory = null;
-      errorMessage = error.toString().replaceFirst('Exception: ', '');
+      state = state.copyWith(
+        inventory: UserInventory.empty,
+        selectedCategory: null,
+        errorMessage: error.toString().replaceFirst('Exception: ', ''),
+      );
     } finally {
-      isLoading = false;
-      notifyListeners();
+      state = state.copyWith(isLoading: false);
     }
   }
 
   void selectCategory(String category) {
-    if (selectedCategory == category) return;
-    selectedCategory = category;
-    notifyListeners();
+    if (state.selectedCategory == category) return;
+    state = state.copyWith(selectedCategory: category);
   }
 
   Future<String> equip(InventoryItem item) async {
-    if (isUpdating) return 'Update already in progress';
-    isUpdating = true;
-    notifyListeners();
+    if (state.isUpdating) return 'Update already in progress';
+    state = state.copyWith(isUpdating: true);
     try {
-      final updated = await _api.equip(itemId: item.itemId, equipped: !item.isEquipped);
+      final updated = await _api.equip(
+        itemId: item.itemId,
+        equipped: !item.isEquipped,
+      );
       await load();
-      return updated.isEquipped ? '${updated.name} equipped' : '${updated.name} unequipped';
+      return updated.isEquipped
+          ? '${updated.name} equipped'
+          : '${updated.name} unequipped';
     } finally {
-      isUpdating = false;
-      notifyListeners();
+      state = state.copyWith(isUpdating: false);
     }
   }
 }
+
+final inventoryControllerProvider =
+    NotifierProvider.autoDispose<InventoryController, InventoryState>(
+      InventoryController.new,
+    );
