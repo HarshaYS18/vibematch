@@ -228,7 +228,6 @@ class _LiveRoomPresenceShellPageState
       final snapshot = RoomSessionLegacyAdapter.toPresenceSnapshot(
         roomState,
         currentPublicUserId: widget.currentUser?.publicUserId,
-        publishLegacyCaches: true,
       );
       if (!mounted) return;
 
@@ -333,7 +332,6 @@ class _LiveRoomPresenceShellPageState
       final snapshot = RoomSessionLegacyAdapter.toPresenceSnapshot(
         roomState,
         currentPublicUserId: widget.currentUser?.publicUserId,
-        publishLegacyCaches: true,
       );
       if (!mounted) return;
       _seedIdentityFromPresence(snapshot);
