@@ -5,8 +5,7 @@ import 'package:flutter/material.dart';
 import '../../../../room_session/data/room_session_repository.dart';
 import '../../data/chat_moderation_api_service.dart';
 import '../../data/live_room_media_signaling_service.dart';
-import '../../data/live_room_member_request_service.dart';
-import '../../data/live_room_membership_service.dart';
+import '../../data/live_room_presence_repository.dart';
 import '../controllers/live_room_gift_controller.dart';
 import '../controllers/live_room_message_controller.dart';
 import '../controllers/live_room_mention_text_controller.dart';
@@ -123,8 +122,6 @@ class LiveRoomControllerBundle {
   Timer? hostSeatOneTimer;
   Timer? hostSeatOneRetryTimer;
   VoidCallback? seatInviteListener;
-  VoidCallback? roomMembershipListener;
-  VoidCallback? roomMemberRequestListener;
   VoidCallback? roomStateChangedListener;
   VoidCallback? syncLuckyPacketBeforeRoomRevision;
 
@@ -155,22 +152,83 @@ class LiveRoomControllerBundle {
   List<SeatUser> get roomUsers => seatController.roomUsers;
 
   List<SeatUser> get pendingRoomMemberRequests {
-    return LiveRoomMemberRequestService.instance.pendingRequests.value;
+    final raw = roomSessionRepository
+        .currentState.activities['pending_room_member_requests'];
+    if (raw is! List) return const <SeatUser>[];
+    return raw
+        .whereType<Map>()
+        .map((item) => item.cast<String, dynamic>())
+        .map(LiveRoomPresenceSnapshot.participantToSeatUser)
+        .toList(growable: false);
   }
 
   bool get currentUserIsMember {
     if (viewerCanManageRoom) return true;
-    return LiveRoomMembershipService.isRoomMember(
-      roomId: roomId,
-      userId: currentUser.id,
-    );
+    final aliases = _identityAliases(currentUser.id);
+    final state = roomSessionRepository.currentState;
+    for (final entry in state.membershipRoster.values) {
+      if (_matchesIdentity(
+            aliases,
+            backendUserId: entry.backendUserId,
+            publicUserId: entry.publicUserId,
+          ) &&
+          (entry.isMember || entry.isAdmin || entry.isHost)) {
+        return true;
+      }
+    }
+    for (final participant in state.presence.values) {
+      if (_matchesIdentity(
+            aliases,
+            backendUserId: participant.backendUserId,
+            publicUserId: participant.publicUserId,
+          ) &&
+          (participant.isMember ||
+              participant.isAdmin ||
+              participant.isHost)) {
+        return true;
+      }
+    }
+    return false;
   }
 
   bool get joinRequestPending {
-    return LiveRoomMembershipService.isPending(
-      roomId: roomId,
-      userId: currentUser.id,
-    );
+    final raw = roomSessionRepository
+        .currentState.activities['pending_room_member_requests'];
+    if (raw is! List) return false;
+    final aliases = _identityAliases(currentUser.id);
+    for (final item in raw.whereType<Map>()) {
+      final map = item.cast<String, dynamic>();
+      final backendId = int.tryParse(
+        (map['backend_user_id'] ?? map['user_id'])?.toString() ?? '',
+      );
+      final publicId =
+          int.tryParse(map['public_user_id']?.toString() ?? '');
+      if (_matchesIdentity(
+        aliases,
+        backendUserId: backendId,
+        publicUserId: publicId,
+      )) {
+        return true;
+      }
+    }
+    return false;
+  }
+
+  void requestRoomMembership() {
+    LiveRoomMediaSignalingService.instance.requestRoomMembership();
+  }
+
+  void resolveRoomMembership(
+    SeatUser user, {
+    required bool approved,
+  }) {
+    if (approved) {
+      LiveRoomMediaSignalingService.instance
+          .approveRoomMembership(user.id);
+    } else {
+      LiveRoomMediaSignalingService.instance
+          .rejectRoomMembership(user.id);
+    }
   }
 
   List<SeatUser> get allRoomUsers {
@@ -210,8 +268,6 @@ class LiveRoomControllerBundle {
   void initialize({
     required VoidCallback onRoomStateChanged,
     required VoidCallback onSeatInviteUpdate,
-    required VoidCallback onMembershipChanged,
-    required VoidCallback onMemberRequestChanged,
   }) {
     final restoreState = config.restoreState;
     final initialStateSnapshot = restoreState?.roomState;
@@ -268,19 +324,6 @@ class LiveRoomControllerBundle {
       seatInviteListener!,
     );
 
-    roomMembershipListener = onMembershipChanged;
-    LiveRoomMembershipService.snapshots.addListener(roomMembershipListener!);
-
-    roomMemberRequestListener = onMemberRequestChanged;
-    LiveRoomMemberRequestService.instance.pendingRequests.addListener(
-      roomMemberRequestListener!,
-    );
-
-    LiveRoomMemberRequestService.instance.startRoom(
-      roomId: roomId,
-      currentUser: currentUser,
-    );
-
     unawaited(roomStateController.loadPersistedRoomSettings());
   }
 
@@ -297,18 +340,6 @@ class LiveRoomControllerBundle {
       );
     }
 
-    final membershipListener = roomMembershipListener;
-    if (membershipListener != null) {
-      LiveRoomMembershipService.snapshots.removeListener(membershipListener);
-    }
-
-    final memberRequestListener = roomMemberRequestListener;
-    if (memberRequestListener != null) {
-      LiveRoomMemberRequestService.instance.pendingRequests.removeListener(
-        memberRequestListener,
-      );
-    }
-
     giftControllerInstance?.dispose();
     messageController.dispose();
     announcementController.dispose();
@@ -321,6 +352,43 @@ class LiveRoomControllerBundle {
     roomStateController.dispose();
     roomRevision.dispose();
     giftRevision.dispose();
+  }
+
+  Set<String> _identityAliases(String rawId) {
+    final value = rawId.trim().toLowerCase();
+    if (value.isEmpty) return const <String>{};
+    final aliases = <String>{value};
+    final match = RegExp(r'(?:^|_)user_(\d+)$').firstMatch(value);
+    if (match != null) {
+      aliases.add(match.group(1)!);
+      aliases.add('user_${match.group(1)!}');
+    }
+    final direct = int.tryParse(value);
+    if (direct != null) {
+      aliases.add(direct.toString());
+      aliases.add('user_$direct');
+    }
+    return aliases;
+  }
+
+  bool _matchesIdentity(
+    Set<String> aliases, {
+    int? backendUserId,
+    int? publicUserId,
+  }) {
+    if (backendUserId != null && backendUserId > 0) {
+      if (aliases.contains(backendUserId.toString()) ||
+          aliases.contains('user_$backendUserId')) {
+        return true;
+      }
+    }
+    if (publicUserId != null && publicUserId > 0) {
+      if (aliases.contains(publicUserId.toString()) ||
+          aliases.contains('user_$publicUserId')) {
+        return true;
+      }
+    }
+    return false;
   }
 
   void setRoomState(VoidCallback callback) {
