@@ -40,6 +40,8 @@ rollback runbook before reducing capacity. Exercise these procedures in staging.
 - [Region failure](region-failure.md)
 - [Disaster recovery](disaster-recovery.md)
 - [Security incident](security-incident.md)
+- [Privacy request](privacy-request.md)
+- [Fraud / Economy integrity](fraud-economy-integrity.md)
 - [Authority registry conformance](authority-registry.md)
 - [Observability degraded](observability-degraded.md)
 

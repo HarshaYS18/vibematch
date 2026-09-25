@@ -11,6 +11,7 @@ from app.models.user import User
 from app.services import identity_session_service
 from database import engine, get_identity_db
 from internal import router as internal_router
+import privacy
 
 settings.validate_identity_service()
 app=FastAPI(title="FunKey Identity Service",version="1.0.0",docs_url=None,redoc_url=None)
@@ -57,6 +58,7 @@ api=APIRouter(prefix="/api/v1")
 api.include_router(auth.router)
 api.include_router(admin.router)
 api.include_router(moderation.router)
+api.include_router(privacy.router)
 app.include_router(api)
 app.include_router(internal_router)
 

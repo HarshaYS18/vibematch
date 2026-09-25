@@ -138,3 +138,5 @@ from app.models.user_violation_score import UserViolationScore
 from app.models.user_app_setting import UserAppSetting
 
 from app.models.lucky_packet import LuckyPacket, LuckyPacketClaim
+
+from app.models.privacy_request import PrivacyRequest
