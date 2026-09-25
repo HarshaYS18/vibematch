@@ -7,6 +7,7 @@ import '../../../../room_session/domain/room_session_state.dart';
 import '../../data/room_session_legacy_adapter.dart';
 import '../../data/chat_moderation_api_service.dart';
 import '../../data/live_room_media_signaling_service.dart';
+import '../../data/lucky_packet_realtime_service.dart';
 import '../../data/room_music_controller.dart';
 import '../../data/live_room_presence_repository.dart';
 import '../controllers/live_room_gift_controller.dart';
@@ -103,6 +104,7 @@ class LiveRoomControllerBundle {
   late final LiveRoomModerationController moderationController;
   late final LiveRoomPresenceController presenceController;
   late final RoomMusicController roomMusicController;
+  late final LuckyPacketRealtimeService luckyPacketRealtimeService;
 
   final LiveRoomUsersController usersController =
       const LiveRoomUsersController();
@@ -127,7 +129,6 @@ class LiveRoomControllerBundle {
   Timer? hostSeatOneRetryTimer;
   VoidCallback? seatInviteListener;
   VoidCallback? roomStateChangedListener;
-  VoidCallback? syncLuckyPacketBeforeRoomRevision;
 
   bool disposed = false;
 
@@ -323,6 +324,24 @@ class LiveRoomControllerBundle {
       onChanged: () => notifyRoomChanged(),
     );
 
+    giftControllerInstance = LiveRoomGiftController(
+      currentUser: currentUser,
+      refreshCoinBalanceOnCreate: false,
+      onChanged: notifyGiftChanged,
+      onFinalGiftMessage: (entry) {
+        if (!mounted) return;
+        roomMessageController.insertEntry(entry);
+      },
+      onToast: (message) {
+        if (!mounted) return;
+        RoomToast.show(context, message);
+      },
+    );
+    luckyPacketRealtimeService = LuckyPacketRealtimeService(
+      roomId: roomId,
+      giftController: giftControllerInstance!,
+    )..attach();
+
     seatController = LiveRoomSeatController(
       currentUser: currentUser,
       roomSessionRepository: roomSessionRepository,
@@ -356,6 +375,7 @@ class LiveRoomControllerBundle {
       );
     }
 
+    luckyPacketRealtimeService.dispose();
     giftControllerInstance?.dispose();
     messageController.dispose();
     announcementController.dispose();
@@ -415,7 +435,7 @@ class LiveRoomControllerBundle {
     _lastAppliedCanonicalState = state;
     seatController.applyCanonicalRoomState();
     roomStateController.applyCanonicalRoomState();
-    notifyRoomChanged(syncLuckyPacket: false);
+    notifyRoomChanged();
   }
 
   void setRoomState(VoidCallback callback) {
@@ -424,9 +444,8 @@ class LiveRoomControllerBundle {
     notifyRoomChanged();
   }
 
-  void notifyRoomChanged({bool syncLuckyPacket = true}) {
+  void notifyRoomChanged() {
     if (!mounted || disposed) return;
-    if (syncLuckyPacket) syncLuckyPacketBeforeRoomRevision?.call();
     roomRevision.value++;
   }
 
