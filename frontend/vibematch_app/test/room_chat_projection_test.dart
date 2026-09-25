@@ -60,4 +60,69 @@ void main() {
 
     expect(RoomSessionLegacyAdapter.toChatEntries(state), isEmpty);
   });
+
+  test('initial room state cannot overwrite restored chat before join', () {
+    final initial = RoomSessionState.initial('VMCHAT03');
+
+    expect(
+      RoomSessionLegacyAdapter.canProjectCanonicalChat(initial),
+      isFalse,
+    );
+    expect(RoomSessionLegacyAdapter.toChatEntries(initial), isEmpty);
+  });
+
+  test('connected canonical snapshot is eligible to replace restored chat', () {
+    final connected = RoomSessionState.fromSnapshot(
+      const <String, dynamic>{
+        'room_id': 'VMCHAT04',
+        'recent_messages': <Map<String, dynamic>>[
+          <String, dynamic>{
+            'id': 11,
+            'message_type': '',
+            'text': 'canonical',
+            'sender_public_user_id': 7000000011,
+            'sender': <String, dynamic>{'display_name': 'Canonical User'},
+          },
+        ],
+      },
+      connection: RoomSessionConnection.connected,
+    );
+
+    expect(
+      RoomSessionLegacyAdapter.canProjectCanonicalChat(connected),
+      isTrue,
+    );
+    final entries = RoomSessionLegacyAdapter.toChatEntries(connected);
+    expect(entries, hasLength(1));
+    expect(entries.single.message, 'canonical');
+    expect(entries.single.isImageMessage, isFalse);
+  });
+
+  test('projection preserves repeated identical canonical messages', () {
+    final state = RoomSessionState.fromSnapshot(
+      const <String, dynamic>{
+        'room_id': 'VMCHAT05',
+        'recent_messages': <Map<String, dynamic>>[
+          <String, dynamic>{
+            'id': 21,
+            'message_type': 'text',
+            'text': 'same',
+            'sender_public_user_id': 7000000021,
+          },
+          <String, dynamic>{
+            'id': 22,
+            'message_type': 'text',
+            'text': 'same',
+            'sender_public_user_id': 7000000021,
+          },
+        ],
+      },
+      connection: RoomSessionConnection.connected,
+    );
+
+    final entries = RoomSessionLegacyAdapter.toChatEntries(state);
+    expect(entries, hasLength(2));
+    expect(entries.map((entry) => entry.message), everyElement('same'));
+  });
+
 }

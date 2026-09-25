@@ -68,11 +68,32 @@ class RoomSessionLegacyAdapter {
   }
 
 
-  /// Projects canonical durable chat into the legacy ChatEntry presentation.
+  /// Whether [state.chat] is backed by an authoritative room snapshot.
   ///
-  /// RoomSessionState.chat is oldest-first from the backend snapshot; the
+  /// Idle/joining/failed states may contain the repository's initial empty
+  /// list before the first server snapshot arrives. Projecting that list would
+  /// incorrectly erase route-restored chat during room startup. Connected and
+  /// reconnecting states are authoritative; leaving/left also carry the last
+  /// canonical snapshot returned by the backend.
+  static bool canProjectCanonicalChat(RoomSessionState state) {
+    return switch (state.connection) {
+      RoomSessionConnection.connected ||
+      RoomSessionConnection.reconnecting ||
+      RoomSessionConnection.leaving ||
+      RoomSessionConnection.left => true,
+      RoomSessionConnection.idle ||
+      RoomSessionConnection.joining ||
+      RoomSessionConnection.failed => false,
+    };
+  }
+
+  /// Projects canonical durable chat into the legacy [ChatEntry] presentation.
+  ///
+  /// [RoomSessionState.chat] is oldest-first from the backend snapshot; the
   /// existing room feed expects newest-first and reverses it for display.
-  /// This adapter is pure and never owns or mutates chat state.
+  /// This adapter is pure and never owns or mutates chat state. Callers should
+  /// first check [canProjectCanonicalChat] so an initial repository state does
+  /// not overwrite restored route presentation before join completes.
   static List<ChatEntry> toChatEntries(RoomSessionState state) {
     return state.chat.reversed.map((item) {
       final sender = _asMap(item['sender']);
@@ -87,8 +108,9 @@ class RoomSessionLegacyAdapter {
           : publicUserId?.isNotEmpty == true
           ? publicUserId!
           : 'Vibe User';
-      final messageType =
-          item['message_type']?.toString().trim().toLowerCase() ?? 'text';
+      final rawMessageType =
+          item['message_type']?.toString().trim().toLowerCase() ?? '';
+      final messageType = rawMessageType.isEmpty ? 'text' : rawMessageType;
       final mediaUrl = item['media_url']?.toString().trim();
       final contentType = metadata['content_type']?.toString().trim();
 

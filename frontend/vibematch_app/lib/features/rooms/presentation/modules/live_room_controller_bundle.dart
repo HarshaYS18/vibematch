@@ -502,14 +502,22 @@ class LiveRoomControllerBundle {
 
   RoomSessionState? _lastAppliedCanonicalState;
 
+  /// Applies one immutable canonical room snapshot to scoped presentation.
+  ///
+  /// Seat/settings projection can consume every repository state, but chat is
+  /// replaced only after the repository has an authoritative server snapshot.
+  /// This preserves route-restored messages across the initial idle/joining
+  /// lifecycle and then lets canonical recent_messages take full ownership.
   void applyCanonicalRoomState(RoomSessionState state) {
     if (disposed || identical(_lastAppliedCanonicalState, state)) return;
     _lastAppliedCanonicalState = state;
     seatController.applyCanonicalRoomState();
     roomStateController.applyCanonicalRoomState();
-    roomMessageController.applyCanonicalMessages(
-      RoomSessionLegacyAdapter.toChatEntries(state),
-    );
+    if (RoomSessionLegacyAdapter.canProjectCanonicalChat(state)) {
+      roomMessageController.applyCanonicalMessages(
+        RoomSessionLegacyAdapter.toChatEntries(state),
+      );
+    }
     notifyRoomChanged();
   }
 

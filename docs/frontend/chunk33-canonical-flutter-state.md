@@ -286,3 +286,19 @@ message. `room_session_source_of_truth_test.dart` guards the awaited
 controller/dock chain and prevents a regression to singleton/local-only chat
 sending. No UI styling or interaction layout changes are part of this
 micro-chunk.
+
+
+### Micro-chunk 33-M3 — authoritative canonical chat projection
+
+Canonical room chat projection now has an explicit snapshot-readiness boundary.
+The repository's initial `idle`/`joining` state is not treated as an
+authoritative chat snapshot, so it cannot erase route-restored messages while a
+room is joining. Once the repository reaches an authoritative
+`connected`/`reconnecting` (or terminal snapshot-carrying
+`leaving`/`left`) state, `recent_messages` fully replaces durable chat
+presentation through `RoomSessionLegacyAdapter.toChatEntries`.
+
+The adapter also normalizes an empty backend `message_type` to text and the
+regression suite verifies startup preservation, connected replacement,
+text/image ordering, metadata projection, and repeated identical canonical
+messages. No UI appearance changes are introduced.
