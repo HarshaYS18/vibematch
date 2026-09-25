@@ -5,7 +5,6 @@ import 'package:flutter/material.dart';
 
 import '../../../../core/ui/vm_motion.dart';
 import '../../data/cricket_stumps_flow_repository.dart';
-import '../../data/live_room_media_signaling_service.dart';
 import '../widgets/cricket_room_backgrounds.dart';
 import '../widgets/room_theme.dart';
 import 'cricket_room_mode_signal.dart';
@@ -20,6 +19,7 @@ class CricketStumpsFlowSafeModule {
     required bool canManage,
     required RoomBackgroundTheme previousBackground,
     required ValueChanged<RoomBackgroundTheme> onBackgroundChanged,
+    required ValueChanged<CricketQuickMatchSetup> onMatchStarted,
     ValueChanged<String>? onSystemMessage,
   }) {
     return showModalBottomSheet<void>(
@@ -32,6 +32,7 @@ class CricketStumpsFlowSafeModule {
         roomName: roomName,
         canManage: canManage,
         onBackgroundChanged: onBackgroundChanged,
+        onMatchStarted: onMatchStarted,
         onSystemMessage: onSystemMessage,
       ),
     );
@@ -60,6 +61,7 @@ class _CricketSetupSheet extends StatefulWidget {
     required this.roomName,
     required this.canManage,
     required this.onBackgroundChanged,
+    required this.onMatchStarted,
     this.onSystemMessage,
   });
 
@@ -67,6 +69,7 @@ class _CricketSetupSheet extends StatefulWidget {
   final String roomName;
   final bool canManage;
   final ValueChanged<RoomBackgroundTheme> onBackgroundChanged;
+  final ValueChanged<CricketQuickMatchSetup> onMatchStarted;
   final ValueChanged<String>? onSystemMessage;
 
   @override
@@ -435,8 +438,7 @@ class _CricketSetupSheetState extends State<_CricketSetupSheet> {
         nonStrikerId: _nonStriker!.id,
         bowlerId: _bowler!.id,
       );
-      CricketRoomModeSignal.activateWithSetup(roomId: widget.roomId, setup: setup);
-      LiveRoomMediaSignalingService.instance.startCricketMode(setup);
+      widget.onMatchStarted(setup);
       widget.onSystemMessage?.call('${_tossWinner!.name} won the toss and chose to ${_decision == _TossDecision.bat ? 'bat' : 'ball'}. Seat 3 is now the Umpire/scorer seat.');
       Navigator.pop(context);
     } catch (error) {

@@ -6,7 +6,6 @@ import '../../../data/live_room_media_signaling_service.dart';
 import '../../widgets/cricket_room_backgrounds.dart';
 import '../../widgets/room_theme.dart';
 import '../chat/live_room_chat_module.dart';
-import '../cricket_room_mode_registry.dart';
 import '../cricket_room_mode_signal.dart';
 import '../cricket_stumps_flow_module.dart';
 import '../lifecycle/live_room_lifecycle_module.dart';
@@ -16,7 +15,7 @@ class LiveRoomCricketModule {
   const LiveRoomCricketModule._();
 
   static void capturePreCricketRoomState(LiveRoomControllerBundle bundle) {
-    if (CricketRoomModeSignal.isActive(bundle.roomId)) return;
+    if (bundle.cricketModeController.active) return;
     bundle.preCricketLayoutId ??= bundle.seatController.layoutId;
     if (bundle.preCricketBackgroundTheme == null &&
         !isCricketRoomBackground(bundle.selectedBackgroundTheme)) {
@@ -35,7 +34,7 @@ class LiveRoomCricketModule {
   }
 
   static void startNewMatch(LiveRoomControllerBundle bundle) {
-    if (!CricketRoomModeSignal.isActive(bundle.roomId)) return;
+    if (!bundle.cricketModeController.active) return;
     LiveRoomLifecycleModule.clearFocus(bundle);
     CricketStumpsFlowModule.open(
       context: bundle.context,
@@ -45,6 +44,7 @@ class LiveRoomCricketModule {
       previousBackground: normalBackgroundAfterCricket(bundle),
       onBackgroundChanged:
           bundle.roomStateController.setSelectedBackgroundTheme,
+      onMatchStarted: (setup) => _activateRoomMode(bundle, setup),
       onSystemMessage: (message) =>
           LiveRoomChatModule.insertSystemMessage(bundle, message),
     );
@@ -56,7 +56,7 @@ class LiveRoomCricketModule {
     final restoreBackground = normalBackgroundAfterCricket(bundle);
 
     LiveRoomMediaSignalingService.instance.endCricketMode(bundle.roomId);
-    CricketRoomModeRegistry.disposeRoom(bundle.roomId);
+    bundle.cricketModeController.endRoomMode();
 
     bundle.seatController.changeLayout(restoreLayout);
     bundle.roomStateController.setSeatLayoutId(restoreLayout);
@@ -75,6 +75,20 @@ class LiveRoomCricketModule {
     );
   }
 
+  static void _activateRoomMode(
+    LiveRoomControllerBundle bundle,
+    CricketQuickMatchSetup setup,
+  ) {
+    bundle.cricketModeController.startRoomMode(
+      currentLayoutId:
+          bundle.preCricketLayoutId ?? bundle.seatController.layoutId,
+      currentBackground:
+          bundle.preCricketBackgroundTheme ?? bundle.selectedBackgroundTheme,
+      setup: setup,
+    );
+    LiveRoomMediaSignalingService.instance.startCricketMode(setup);
+  }
+
   static void openFromSettings({
     required LiveRoomControllerBundle bundle,
     required BuildContext sheetContext,
@@ -91,6 +105,7 @@ class LiveRoomCricketModule {
         previousBackground: bundle.selectedBackgroundTheme,
         onBackgroundChanged:
             bundle.roomStateController.setSelectedBackgroundTheme,
+        onMatchStarted: (setup) => _activateRoomMode(bundle, setup),
         onSystemMessage: (message) =>
             LiveRoomChatModule.insertSystemMessage(bundle, message),
       );

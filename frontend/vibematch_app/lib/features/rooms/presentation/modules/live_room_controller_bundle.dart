@@ -25,6 +25,7 @@ import '../live_room_models.dart';
 import '../live_room_restore_state.dart';
 import '../widgets/room_theme.dart';
 import '../widgets/vibesync_room_module.dart';
+import 'cricket_room_mode_module.dart';
 
 typedef LiveRoomContextGetter = BuildContext Function();
 typedef LiveRoomMountedGetter = bool Function();
@@ -104,6 +105,7 @@ class LiveRoomControllerBundle {
   late final LiveRoomModerationController moderationController;
   late final LiveRoomPresenceController presenceController;
   late final RoomMusicController roomMusicController;
+  late final CricketRoomModeController cricketModeController;
   late final LuckyPacketRealtimeService luckyPacketRealtimeService;
 
   final LiveRoomUsersController usersController =
@@ -290,6 +292,10 @@ class LiveRoomControllerBundle {
 
     roomMusicController = RoomMusicController();
     unawaited(roomMusicController.attachRoom(config.roomId));
+    cricketModeController = CricketRoomModeController(
+      roomId: config.roomId,
+      roomName: config.roomName,
+    );
 
     messageController = LiveRoomMentionTextController();
     if (restoreState != null && restoreState.messageDraft.trim().isNotEmpty) {
@@ -386,6 +392,7 @@ class LiveRoomControllerBundle {
     presenceController.leave();
     presenceController.dispose();
     unawaited(roomMusicController.dispose());
+    cricketModeController.dispose();
     roomStateController.dispose();
     roomRevision.dispose();
     giftRevision.dispose();

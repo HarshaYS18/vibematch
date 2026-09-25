@@ -142,6 +142,7 @@ class LiveRoomLayoutModule extends ConsumerWidget {
           showMicButton: bundle.currentUserIsSeated,
           inboxUnreadCount: bundle.inboxUnreadCount,
           imagesEnabled: bundle.roomImagesEnabled,
+          cricketModeController: bundle.cricketModeController,
           watchPartyModule: watchPartyModule,
           onBack: () => LiveRoomLifecycleModule.openLeaveSheet(bundle),
           onJoinTap: () => LiveRoomSeatsModule.handleJoinRoom(bundle),

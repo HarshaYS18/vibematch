@@ -4,8 +4,6 @@ import '../../data/live_room_media_signaling_service.dart';
 import '../live_room_models.dart';
 import '../modules/cricket_room_controls_module.dart';
 import '../modules/cricket_room_mode_module.dart';
-import '../modules/cricket_room_mode_registry.dart';
-import '../modules/cricket_room_mode_signal.dart';
 import 'live_room_input_dock.dart';
 import 'room_chat.dart';
 import 'room_seats.dart';
@@ -41,6 +39,7 @@ class LiveRoomBody extends StatelessWidget {
     this.showMicButton,
     required this.inboxUnreadCount,
     required this.imagesEnabled,
+    required this.cricketModeController,
     this.watchPartyModule,
     required this.onBack,
     required this.onJoinTap,
@@ -101,6 +100,7 @@ class LiveRoomBody extends StatelessWidget {
   final bool? showMicButton;
   final int inboxUnreadCount;
   final bool imagesEnabled;
+  final CricketRoomModeController cricketModeController;
   final Widget? watchPartyModule;
   final VoidCallback onBack;
   final VoidCallback onJoinTap;
@@ -158,16 +158,12 @@ class LiveRoomBody extends StatelessWidget {
   Widget build(BuildContext context) {
     final shouldShowMicButton = showMicButton ?? _derivedShowMicButton;
 
-    return ValueListenableBuilder<Set<String>>(
-      valueListenable: CricketRoomModeSignal.activeRoomIds,
-      builder: (context, _, child) {
+    return AnimatedBuilder(
+      animation: cricketModeController,
+      builder: (context, child) {
         final cricketController =
-            CricketRoomModeRegistry.syncRoomModeFromSignal(
-              roomId: roomId,
-              roomName: roomName,
-              currentLayoutId: layoutId,
-            );
-        final cricketModeActive = cricketController?.active == true;
+            cricketModeController.active ? cricketModeController : null;
+        final cricketModeActive = cricketController != null;
         final effectiveSeats = cricketModeActive ? _cricketSeats() : seats;
         final activeUser =
             LiveRoomMediaSignalingService.instance.activeLoggedInSeatUser;

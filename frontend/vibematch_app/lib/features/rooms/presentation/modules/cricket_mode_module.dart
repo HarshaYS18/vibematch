@@ -4,7 +4,6 @@ import 'package:flutter/material.dart';
 
 import '../../../../core/ui/vm_motion.dart';
 import '../widgets/room_theme.dart';
-import 'cricket_room_mode_signal.dart';
 
 const RoomBackgroundTheme cricketFloodlightArenaBackgroundTheme =
     RoomBackgroundTheme(
@@ -705,6 +704,8 @@ class CricketModeModule {
     required bool canManage,
     required RoomBackgroundTheme previousBackground,
     required ValueChanged<RoomBackgroundTheme> onBackgroundChanged,
+    VoidCallback? onModeStarted,
+    VoidCallback? onModeEnded,
     ValueChanged<String>? onSystemMessage,
   }) {
     return showModalBottomSheet<void>(
@@ -718,6 +719,8 @@ class CricketModeModule {
         canManage: canManage,
         previousBackground: previousBackground,
         onBackgroundChanged: onBackgroundChanged,
+        onModeStarted: onModeStarted,
+        onModeEnded: onModeEnded,
         onSystemMessage: onSystemMessage,
       ),
     );
@@ -732,6 +735,8 @@ class CricketModeSheet extends StatefulWidget {
     required this.canManage,
     required this.previousBackground,
     required this.onBackgroundChanged,
+    this.onModeStarted,
+    this.onModeEnded,
     this.onSystemMessage,
   });
 
@@ -740,6 +745,8 @@ class CricketModeSheet extends StatefulWidget {
   final bool canManage;
   final RoomBackgroundTheme previousBackground;
   final ValueChanged<RoomBackgroundTheme> onBackgroundChanged;
+  final VoidCallback? onModeStarted;
+  final VoidCallback? onModeEnded;
   final ValueChanged<String>? onSystemMessage;
 
   @override
@@ -775,7 +782,7 @@ class _CricketModeSheetState extends State<CricketModeSheet> {
       return;
     }
     widget.onBackgroundChanged(_selectedCricketBackground);
-    CricketRoomModeSignal.activate(widget.roomId);
+    widget.onModeStarted?.call();
     _controller.startMatch();
     widget.onSystemMessage?.call(
       'Cricket Mode started. Room background switched to ${_selectedCricketBackground.name}.',
@@ -784,7 +791,7 @@ class _CricketModeSheetState extends State<CricketModeSheet> {
 
   void _endMode() {
     _controller.complete();
-    CricketRoomModeSignal.deactivate(widget.roomId);
+    widget.onModeEnded?.call();
     widget.onBackgroundChanged(widget.previousBackground);
     widget.onSystemMessage?.call(
       'Cricket Mode ended. Room background restored.',

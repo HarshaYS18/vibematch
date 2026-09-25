@@ -1,5 +1,7 @@
-import 'package:flutter/foundation.dart';
-
+/// Immutable Cricket Mode setup DTOs used by the room-scoped runtime.
+///
+/// Chunk 33 removed the former process-global ValueNotifier signal from this
+/// file. Runtime ownership now lives in LiveRoomControllerBundle.
 class CricketQuickMatchPlayerSetup {
   const CricketQuickMatchPlayerSetup({required this.id, required this.name});
 
@@ -124,62 +126,5 @@ class CricketQuickMatchSetup {
       nonStrikerId: json['non_striker_id']?.toString() ?? '',
       bowlerId: json['bowler_id']?.toString() ?? '',
     );
-  }
-}
-
-class CricketRoomModeSignal {
-  CricketRoomModeSignal._();
-
-  static final ValueNotifier<Set<String>> activeRoomIds =
-      ValueNotifier<Set<String>>(<String>{});
-
-  static final ValueNotifier<Map<String, CricketQuickMatchSetup>> matchSetups =
-      ValueNotifier<Map<String, CricketQuickMatchSetup>>(
-        <String, CricketQuickMatchSetup>{},
-      );
-
-  static bool isActive(String roomId) {
-    return activeRoomIds.value.contains(roomId.trim());
-  }
-
-  static CricketQuickMatchSetup? setupFor(String roomId) {
-    return matchSetups.value[roomId.trim()];
-  }
-
-  static void activate(String roomId) {
-    final safeRoomId = roomId.trim();
-    if (safeRoomId.isEmpty) return;
-
-    activeRoomIds.value = <String>{...activeRoomIds.value, safeRoomId};
-  }
-
-  static void activateWithSetup({
-    required String roomId,
-    required CricketQuickMatchSetup setup,
-  }) {
-    final safeRoomId = roomId.trim();
-    if (safeRoomId.isEmpty) return;
-
-    matchSetups.value = <String, CricketQuickMatchSetup>{
-      ...matchSetups.value,
-      safeRoomId: setup,
-    };
-    activeRoomIds.value = <String>{...activeRoomIds.value, safeRoomId};
-  }
-
-  static void deactivate(String roomId) {
-    final safeRoomId = roomId.trim();
-    if (safeRoomId.isEmpty) return;
-    if (!activeRoomIds.value.contains(safeRoomId) &&
-        !matchSetups.value.containsKey(safeRoomId)) {
-      return;
-    }
-
-    final nextActive = <String>{...activeRoomIds.value}..remove(safeRoomId);
-    final nextSetups = <String, CricketQuickMatchSetup>{...matchSetups.value}
-      ..remove(safeRoomId);
-
-    activeRoomIds.value = nextActive;
-    matchSetups.value = nextSetups;
   }
 }

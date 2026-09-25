@@ -19,7 +19,6 @@ import '../../widgets/room_theme.dart';
 import '../../widgets/vibesync_room_module.dart';
 import '../chat/live_room_chat_module.dart';
 import '../cricket/live_room_cricket_module.dart';
-import '../cricket_room_mode_signal.dart';
 import '../games/live_room_games_entry_module.dart';
 import '../lifecycle/live_room_lifecycle_module.dart';
 import '../live_room_controller_bundle.dart';
@@ -42,7 +41,7 @@ class LiveRoomSettingsModule {
         guestMessagesEnabled: bundle.guestMessagesEnabled,
         applyOnlyModeEnabled: bundle.applyOnlyModeEnabled,
         joinRequestCount: bundle.pendingRoomMemberRequests.length,
-        cricketModeActive: CricketRoomModeSignal.isActive(bundle.roomId),
+        cricketModeActive: bundle.cricketModeController.active,
         onBackgroundTap: () =>
             openBackgroundPickerFromSettings(bundle, sheetContext),
         onCoverPhotoTap: () =>
@@ -195,7 +194,7 @@ class LiveRoomSettingsModule {
     }
     Navigator.pop(sheetContext);
 
-    if (CricketRoomModeSignal.isActive(bundle.roomId)) {
+    if (bundle.cricketModeController.active) {
       final currentCricketTheme =
           isCricketRoomBackground(bundle.selectedBackgroundTheme)
           ? bundle.selectedBackgroundTheme
@@ -471,7 +470,7 @@ class LiveRoomSettingsModule {
   }
 
   static void openSeatLayoutSheet(LiveRoomControllerBundle bundle) {
-    if (CricketRoomModeSignal.isActive(bundle.roomId)) {
+    if (bundle.cricketModeController.active) {
       RoomToast.show(
         bundle.context,
         'Seat layout is fixed during Cricket Mode',
