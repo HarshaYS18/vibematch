@@ -135,6 +135,28 @@ for path in FLUTTER.rglob('*.dart'):
         if marker in text:
             violations.append(f'{rel}: Flutter internal-service discovery is forbidden: {marker}')
 
+require(
+    GATEWAY / 'VERSIONS.env',
+    (
+        'ENVOY_GATEWAY_VERSION=v1.9.1',
+        'GATEWAY_API_VERSION=v1.6.1',
+        'KIND_VERSION=v0.33.0',
+        'KUBERNETES_SCHEMA_VERSION=v1.36.4',
+    ),
+)
+require(
+    GATEWAY / 'install-envoy-gateway.sh',
+    ('gateway-crds-helm', 'crds.gatewayAPI.channel=standard', 'crds.enabled=false'),
+)
+require(
+    ROOT / 'scripts' / 'validate_gateway_schema.sh',
+    ('--dry-run=server', 'GATEWAY_API_VERSION', 'gateway-crds-helm'),
+)
+workflow_text = require(
+    ROOT / '.github' / 'workflows' / 'production-platform.yml',
+    ('validate_gateway_schema.sh', 'kind create cluster', 'v1.36.4'),
+)
+
 for doc in (
     ROOT / 'docs' / 'frontend' / 'chunk35-api-gateway.md',
     ROOT / 'docs' / 'architecture' / 'api-gateway.md',

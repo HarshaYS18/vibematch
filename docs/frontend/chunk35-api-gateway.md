@@ -68,3 +68,15 @@ The repaired route exposes only `/api/v1/media-control`. FastAPI now provides
 an explicit room-assignment alias under that namespace, and Flutter room-media
 discovery uses `VmApiConfig.mediaControlEndpoint`. The old API-host assignment
 path remains for compatibility.
+
+
+## Repair audit: pinned Envoy/Gateway API schema
+
+The anomaly audit found that Chunk 35 originally depended on an unspecified
+Envoy Gateway/CRD installation. The repair pins Envoy Gateway v1.9.1 and Gateway
+API v1.6.1 and adds server-side CRD validation in CI using a pinned Kubernetes
+v1.36.4 kind cluster.
+
+Production install instructions now consume the same version file, so the
+controller, CRDs, CI schema and operator procedure cannot silently drift to an
+unreviewed `latest` release.

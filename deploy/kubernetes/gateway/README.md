@@ -74,3 +74,25 @@ For an existing cluster with the legacy `Deployment/funkey-api`, apply the
 new stable Deployment first, wait for ready `Service/funkey-api` endpoints,
 then let GitOps prune the legacy Deployment. Do not mutate the old Deployment
 selector in place because Kubernetes Deployment selectors are immutable.
+
+
+## Pinned controller and CRD compatibility
+
+Chunk 35 is pinned to:
+
+- Envoy Gateway `v1.9.1`;
+- Gateway API `v1.6.1` standard channel;
+- Kubernetes `v1.36.4` for CI server-side schema validation;
+- kind `v0.33.0` with the pinned Kubernetes 1.36.4 node-image digest.
+
+The authoritative pins live in `VERSIONS.env`. Do not use `latest` in
+production install commands.
+
+`install-envoy-gateway.sh` installs the pinned Gateway API + Envoy CRDs first,
+verifies the Gateway API bundle annotation, then installs the pinned Envoy
+Gateway chart with chart-managed CRDs disabled.
+
+CI creates an ephemeral pinned kind cluster, installs the same CRDs, and runs
+server-side dry-run against the rendered Gateway resources and optional
+SecurityPolicy example. Plain `kubectl kustomize` rendering is retained but is
+not considered sufficient schema validation.

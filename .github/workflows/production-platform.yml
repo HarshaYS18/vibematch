@@ -67,8 +67,24 @@ jobs:
       - run: python scripts/check_gateway_architecture.py
       - uses: azure/setup-kubectl@v4
         with:
-          version: v1.31.0
+          version: v1.36.4
+      - uses: azure/setup-helm@v4
+        with:
+          version: v3.18.6
       - run: kubectl kustomize deploy/kubernetes/gateway > /tmp/funkey-gateway.yaml
+      - name: Validate pinned Gateway API / Envoy CRD schemas
+        shell: bash
+        run: |
+          set -euo pipefail
+          source deploy/kubernetes/gateway/VERSIONS.env
+          curl -fsSLo /tmp/kind "https://kind.sigs.k8s.io/dl/${KIND_VERSION}/kind-linux-amd64"
+          echo "${KIND_LINUX_AMD64_SHA256}  /tmp/kind" | sha256sum -c -
+          sudo install -m 0755 /tmp/kind /usr/local/bin/kind
+          kind create cluster             --name funkey-gateway-schema             --image "${KIND_NODE_IMAGE}"             --wait 120s
+          bash scripts/validate_gateway_schema.sh
+      - name: Cleanup Gateway schema cluster
+        if: always()
+        run: kind delete cluster --name funkey-gateway-schema || true
       - run: kubectl kustomize deploy/kubernetes/overlays/local > /tmp/funkey-local.yaml
       - run: kubectl kustomize deploy/kubernetes/overlays/staging > /tmp/funkey-staging.yaml
       - run: kubectl kustomize deploy/kubernetes/overlays/production > /tmp/funkey-production.yaml
