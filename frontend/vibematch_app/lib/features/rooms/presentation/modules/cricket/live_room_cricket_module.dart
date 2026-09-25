@@ -65,10 +65,8 @@ class LiveRoomCricketModule {
 
     bundle.seatController.changeLayout(restoreLayout);
     bundle.roomStateController.setSeatLayoutId(restoreLayout);
+    // Canonical settings command persists and publishes the restored theme.
     bundle.roomStateController.setSelectedBackgroundTheme(restoreBackground);
-    LiveRoomMediaSignalingService.instance.setRoomBackgroundTheme(
-      restoreBackground.id,
-    );
 
     bundle.preCricketLayoutId = null;
     bundle.preCricketBackgroundTheme = null;

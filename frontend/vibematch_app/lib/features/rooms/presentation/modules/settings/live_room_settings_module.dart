@@ -219,10 +219,8 @@ class LiveRoomSettingsModule {
         builder: (context) => CricketRoomBackgroundPickerSheet(
           currentTheme: currentCricketTheme,
           onThemeSelected: (theme) {
+            // The room state controller owns the durable settings command.
             bundle.roomStateController.setSelectedBackgroundTheme(theme);
-            LiveRoomMediaSignalingService.instance.setRoomBackgroundTheme(
-              theme.id,
-            );
             RoomToast.show(context, '${theme.name} applied');
             LiveRoomChatModule.insertSystemMessage(
               bundle,
@@ -249,10 +247,8 @@ class LiveRoomSettingsModule {
             );
             return;
           }
+          // The room state controller owns the durable settings command.
           bundle.roomStateController.setSelectedBackgroundTheme(theme);
-          LiveRoomMediaSignalingService.instance.setRoomBackgroundTheme(
-            theme.id,
-          );
           RoomToast.show(context, '${theme.name} applied');
           LiveRoomChatModule.insertSystemMessage(
             bundle,

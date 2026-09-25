@@ -415,3 +415,16 @@ deleted `dismissRoomSeatActionPill()` helper:
 
 Seat-menu lifetime is now controlled entirely by room-scoped seat selection and
 the mounted `RoomSeatLayout` overlay entry.
+
+
+### Post-M6 repair R3 — background command ownership
+
+R3 removes the remaining media-facade background-setting calls. Cricket restore
+and both background pickers already invoke
+`LiveRoomStateController.setSelectedBackgroundTheme`, whose canonical command
+persists the selected theme through `RoomSettingsRepository.updateBackground`
+and reconciles the returned settings snapshot. The redundant media command has
+been deleted.
+
+The media facade continues to carry transient Cricket Mode start/end signaling,
+but it no longer originates durable room-background mutations.

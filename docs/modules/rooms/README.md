@@ -163,3 +163,12 @@ Seat action menus are widget-local. Features that need to dismiss them clear
 the owning room's selected seat via `LiveRoomSeatController.clearSelectedSeat`
 (or an injected callback to it). No process-global seat-menu dismissal function
 or notifier may be reintroduced.
+
+
+### Background mutation ownership
+
+Room background changes are durable settings. Call
+`LiveRoomStateController.setSelectedBackgroundTheme`; it persists via
+`RoomSettingsRepository.updateBackground` and reconciles canonical state.
+Do not send a second background mutation through
+`LiveRoomMediaSignalingService`.
