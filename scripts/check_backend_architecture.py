@@ -834,11 +834,16 @@ def _validate_room_control_extraction(errors: list[str]) -> None:
             "room_themes",
             "user_room_theme_inventory",
             "room_theme_reviews",
+            "cricket_tournaments",
+            "cricket_matches",
+            "cricket_ball_events",
         ):
             if f"ALTER TABLE {table} OWNER TO funkey_room_control_owner" not in text:
                 errors.append("Room Control ownership missing table: " + table)
-        if "GRANT SELECT, INSERT, UPDATE ON TABLE user_room_presence" not in text:
-            errors.append("Room Control presence compatibility grant is missing")
+        if "REVOKE ALL ON TABLE user_room_presence FROM funkey_room_control_runtime" not in text:
+            errors.append("Room Control must revoke legacy PostgreSQL presence writes")
+        if "GRANT SELECT, INSERT, UPDATE ON TABLE user_room_presence" in text:
+            errors.append("Room Control must not retain writable PostgreSQL presence authority")
         if "GRANT INSERT ON TABLE event_outbox" not in text:
             errors.append("Room Control transactional outbox grant is missing")
 
@@ -1207,6 +1212,8 @@ def _validate_economy_service_cutover(errors: list[str]) -> None:
             "economy_house_reservations",
             "lucky_packets",
             "lucky_packet_claims",
+            "user_vip_statuses",
+            "user_vip_overrides",
         ):
             if f"ALTER TABLE {table} OWNER TO funkey_economy_owner" not in text:
                 errors.append("Economy ownership missing table: " + table)
@@ -1457,6 +1464,213 @@ def _validate_post_chunk28_platforms(errors: list[str]) -> None:
             errors.append(f"{state_id}: Chunk 31 contract status must be live")
 
 
+
+def _validate_post_chunk32_repair_wave(errors: list[str]) -> None:
+    """Lock the complete post-Chunk-32 anomaly repair into CI."""
+    required = (
+        ROOT / "backend" / "alembic" / "versions" / "20260925_0100_normalize_cricket_ball_events.py",
+        ROOT / "backend" / "alembic" / "versions" / "20260925_0200_user_vip_overrides.py",
+        ROOT / "backend" / "alembic" / "versions" / "20260925_0300_inbox_source_dedupe_key.py",
+        ROOT / "backend" / "tests" / "test_cricket_authority_repair.py",
+        ROOT / "backend" / "tests" / "test_rankings_read_only_projection.py",
+        ROOT / "backend" / "tests" / "test_vibes_inbox_fanout_idempotency.py",
+        ROOT / "backend" / "tests" / "test_media_multipart_retry_recovery.py",
+        ROOT / "frontend" / "vibematch_app" / "test" / "realtime_single_socket_source_test.dart",
+    )
+    for path in required:
+        if not path.exists():
+            errors.append(
+                "post-Chunk-32 repair evidence is missing: "
+                + str(path.relative_to(ROOT))
+            )
+
+    # Presence: Go/Redis is the sole connected-liveness authority.
+    presence_route = ROOT / "backend" / "app" / "api" / "routes" / "presence.py"
+    room_service = ROOT / "backend" / "app" / "services" / "rooms" / "room_service.py"
+    room_action = ROOT / "backend" / "app" / "services" / "rooms" / "room_action_service.py"
+    presence_projection = ROOT / "backend" / "app" / "services" / "presence_projection_service.py"
+    realtime_gateway = ROOT / "apps" / "realtime-gateway" / "internal" / "gateway" / "server.go"
+    app_shell = ROOT / "frontend" / "vibematch_app" / "lib" / "app" / "app_shell.dart"
+    room_shell = (
+        ROOT / "frontend" / "vibematch_app" / "lib" / "features" / "rooms" /
+        "presentation" / "live_room_presence_shell_page.dart"
+    )
+    room_repository = (
+        ROOT / "frontend" / "vibematch_app" / "lib" /
+        "room_session" / "data" / "room_session_repository.dart"
+    )
+    for path in (presence_route, room_service, room_action):
+        if path.exists():
+            text = path.read_text(encoding="utf-8")
+            for forbidden in (
+                "UserRoomPresence",
+                "last_heartbeat_at",
+                "mark_user_room_presence_active",
+                "_ACTIVE_PARTICIPANT_WINDOW",
+            ):
+                if forbidden in text:
+                    errors.append(
+                        "legacy PostgreSQL presence authority remains in "
+                        + str(path.relative_to(ROOT))
+                        + ": "
+                        + forbidden
+                    )
+    if presence_route.exists():
+        text = presence_route.read_text(encoding="utf-8")
+        if "project_user_presence(" not in text:
+            errors.append("public presence reads must project from realtime leases")
+    if presence_projection.exists():
+        text = presence_projection.read_text(encoding="utf-8")
+        for required_token in (
+            "funkey:realtime:gateway:user-active",
+            "funkey:realtime:gateway:user-rooms",
+            "funkey:realtime:gateway:room-users",
+        ):
+            if required_token not in text:
+                errors.append("presence projection missing Redis lease index: " + required_token)
+    if realtime_gateway.exists():
+        text = realtime_gateway.read_text(encoding="utf-8")
+        for required_token in ("userRoomPresenceLeaseKey", "roomUserPresenceLeaseKey"):
+            if required_token not in text:
+                errors.append("Go realtime gateway missing presence lease index: " + required_token)
+    if app_shell.exists():
+        text = app_shell.read_text(encoding="utf-8")
+        for forbidden in ("AppPresenceRuntime", "appPresenceRuntimeProvider"):
+            if forbidden in text:
+                errors.append("Flutter app shell retains retired DB presence runtime: " + forbidden)
+    if room_shell.exists():
+        text = room_shell.read_text(encoding="utf-8")
+        for forbidden in ("_heartbeatTimer", "Duration(seconds: 12)", "_startHeartbeat"):
+            if forbidden in text:
+                errors.append("live room still polls REST heartbeat: " + forbidden)
+    if room_repository.exists() and "/realtime/heartbeat" in room_repository.read_text(encoding="utf-8"):
+        errors.append("canonical RoomSessionRepository must not call REST heartbeat")
+
+    # Cricket: Room Control is the only durable writer; scoring is serialized.
+    cricket_route = ROOT / "backend" / "app" / "api" / "routes" / "rooms" / "cricket.py"
+    cricket_service = ROOT / "backend" / "app" / "services" / "rooms" / "cricket_service.py"
+    room_control_internal = ROOM_CONTROL_SERVICE_ROOT / "internal.py"
+    if cricket_route.exists():
+        text = cricket_route.read_text(encoding="utf-8")
+        if "room_control_service_client.execute_cricket_operation" not in text:
+            errors.append("core Cricket routes must proxy to Room Control")
+        for forbidden in ("Depends(get_db)", "services.rooms.cricket_service"):
+            if forbidden in text:
+                errors.append("core Cricket route retains durable authority: " + forbidden)
+    if cricket_service.exists():
+        text = cricket_service.read_text(encoding="utf-8")
+        for required_token in (
+            "require_room_admin",
+            "require_room_view",
+            "with_for_update()",
+            "CricketBallEvent(",
+            "func.max(CricketBallEvent.sequence)",
+        ):
+            if required_token not in text:
+                errors.append("Cricket authority/serialization invariant missing: " + required_token)
+        if "events.append(event)" in text:
+            errors.append("Cricket ball log must not use a growing mutable JSON array")
+    if room_control_internal.exists() and '"/cricket/operation"' not in room_control_internal.read_text(encoding="utf-8"):
+        errors.append("Room Control internal API must own Cricket operations")
+
+    # VIP/SVIP: manual adjustments and effective projection are Economy-owned.
+    super_owner = ROOT / "backend" / "app" / "api" / "routes" / "super_owner.py"
+    vip_status_service = ROOT / "backend" / "app" / "services" / "vip_status_service.py"
+    economy_level = ROOT / "backend" / "app" / "services" / "economy_level_service.py"
+    economy_internal = ROOT / "apps" / "economy-service" / "internal.py"
+    economy_ownership = ROOT / "deploy" / "postgres" / "economy-ownership.sql"
+    if super_owner.exists():
+        text = super_owner.read_text(encoding="utf-8")
+        if "db.query(UserVipStatus)" in text:
+            errors.append("Super Owner must not write VIP projection directly")
+        if "economy_service_client.adjust_vip_override" not in text:
+            errors.append("Super Owner VIP changes must route through Economy")
+    if vip_status_service.exists():
+        text = vip_status_service.read_text(encoding="utf-8")
+        if "economy_service_client.adjust_vip_override" not in text:
+            errors.append("VIP admin mutation must route through Economy")
+        if "get_or_create_vip_status" in text:
+            errors.append("VIP GET path must remain read-only")
+    if economy_level.exists():
+        text = economy_level.read_text(encoding="utf-8")
+        for required_token in (
+            "UserVipOverride",
+            "def set_vip_override(",
+            'event_type="economy.vip_projection.updated.v1"',
+        ):
+            if required_token not in text:
+                errors.append("Economy VIP projection invariant missing: " + required_token)
+    if economy_internal.exists() and '"/vip/admin-override"' not in economy_internal.read_text(encoding="utf-8"):
+        errors.append("Economy service must expose the idempotent VIP override command")
+    if economy_ownership.exists():
+        text = economy_ownership.read_text(encoding="utf-8")
+        for table in ("user_vip_statuses", "user_vip_overrides"):
+            if f"ALTER TABLE {table} OWNER TO funkey_economy_owner" not in text:
+                errors.append("Economy VIP ownership missing table: " + table)
+
+    # Vibes fanout: all side effects are idempotent and processed last.
+    worker = ROOT / "apps" / "worker" / "handlers.py"
+    inbox_model = ROOT / "backend" / "app" / "models" / "inbox.py"
+    if worker.exists():
+        handler = _function_source(worker.read_text(encoding="utf-8"), "handle_vibes_post_published")
+        send_at = handler.find("inbox_service_client.send_direct_message")
+        mark_at = handler.rfind("_mark_processed(event,handler_name)")
+        if send_at < 0 or mark_at < 0 or send_at > mark_at:
+            errors.append("Vibes worker must mark processed only after Inbox fanout")
+        if "source_dedupe_key=" not in handler:
+            errors.append("Vibes Inbox fanout must carry an idempotent source-effect key")
+        if "except (inbox_service_client.InboxServiceUnavailable" in handler:
+            errors.append("Vibes worker must not swallow Inbox delivery failures")
+    if inbox_model.exists():
+        text = inbox_model.read_text(encoding="utf-8")
+        if "source_dedupe_key" not in text or "unique=True" not in text:
+            errors.append("Inbox message source-effect dedupe key must be unique")
+
+    # Media: retry after successful S3 completion must recover from NoSuchUpload.
+    media_storage = ROOT / "backend" / "app" / "services" / "media_storage_service.py"
+    if media_storage.exists():
+        source = _function_source(
+            media_storage.read_text(encoding="utf-8"),
+            "complete_multipart_upload",
+        )
+        for required_token in ("NoSuchUpload", "head_object("):
+            if required_token not in source:
+                errors.append("multipart retry recovery missing: " + required_token)
+
+    # Rankings: bounded batched projection only; no read-side writes/N+1 helpers.
+    rankings = ROOT / "backend" / "app" / "api" / "routes" / "rankings.py"
+    if rankings.exists():
+        text = rankings.read_text(encoding="utf-8")
+        for forbidden in (
+            "get_or_create_user_exp",
+            "profile_service.vip_summary",
+            "db.add(",
+            "db.commit(",
+            "db.flush(",
+        ):
+            if forbidden in text:
+                errors.append("rankings projection must remain read-only: " + forbidden)
+        for required_token in (
+            "UserExperienceStatus.user_id.in_(resolved_ids)",
+            "UserVipStatus.user_id.in_(resolved_ids)",
+            "limit: int = Query(default=100, ge=1, le=100)",
+        ):
+            if required_token not in text:
+                errors.append("rankings bounded batch invariant missing: " + required_token)
+
+    # Repair migrations must form one linear deployment chain.
+    migration_chain = (
+        ("20260925_0100_normalize_cricket_ball_events.py", 'down_revision = "20260924_1200"'),
+        ("20260925_0200_user_vip_overrides.py", 'down_revision = "20260925_0100"'),
+        ("20260925_0300_inbox_source_dedupe_key.py", 'down_revision = "20260925_0200"'),
+    )
+    versions = ROOT / "backend" / "alembic" / "versions"
+    for filename, expected in migration_chain:
+        path = versions / filename
+        if path.exists() and expected not in path.read_text(encoding="utf-8"):
+            errors.append("repair migration chain is broken: " + filename)
+
+
 def main() -> int:
     errors: list[str] = []
     _validate_authority_registry(errors)
@@ -1470,6 +1684,7 @@ def main() -> int:
     _validate_game_platform_extraction(errors)
     _validate_economy_service_cutover(errors)
     _validate_post_chunk28_platforms(errors)
+    _validate_post_chunk32_repair_wave(errors)
 
     for path in REQUIRED_PATHS:
         if not path.exists():
@@ -1579,6 +1794,7 @@ def main() -> int:
     print(" - Game Platform owns game lifecycle while Economy owns all game value movement")
     print(" - Economy Service is the exclusive financial writer with balanced journal reconciliation")
     print(" - Notification, Worker Platform and Media v2 post-extraction boundaries are present")
+    print(" - post-Chunk-32 presence/Cricket/VIP/fanout/media/rankings repair invariants are enforced")
     return 0
 
 
