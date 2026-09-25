@@ -49,8 +49,6 @@ class _LiveRoomControllerScopeState
           LiveRoomLifecycleModule.onRoomStateChanged(bundle),
       onSeatInviteUpdate: () =>
           LiveRoomSeatsModule.handleSeatInviteUpdate(bundle),
-      onMembershipChanged: () => bundle.notifyRoomChanged(),
-      onMemberRequestChanged: () => bundle.notifyRoomChanged(),
     );
 
     LiveRoomLifecycleModule.startRoomPresence(bundle);
