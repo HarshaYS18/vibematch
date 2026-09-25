@@ -1,3 +1,47 @@
+import '../../../foundation/realtime/realtime_event_envelope.dart';
+
+LiveRoomSystemEvent? decodeLiveRoomSystemEvent(
+  RealtimeEventEnvelope envelope, {
+  String? roomId,
+}) {
+  final decoded = envelope.toLegacyEvent();
+  final wireType = decoded['type']?.toString() ?? '';
+  final rawPayload = decoded['payload'];
+  final payload = rawPayload is Map
+      ? rawPayload.cast<String, dynamic>()
+      : <String, dynamic>{};
+
+  final eventType =
+      payload['event_type']?.toString() ??
+      payload['type']?.toString() ??
+      (wireType == 'room/system_event' ? '' : wireType);
+  if (wireType != 'room/system_event' &&
+      eventType != 'global_gift_broadcast' &&
+      !eventType.startsWith('lucky_packet_') &&
+      eventType != 'room_gift_sent') {
+    return null;
+  }
+
+  final event = LiveRoomSystemEvent.fromJson(<String, dynamic>{
+    ...payload,
+    if ((payload['event_type']?.toString().trim() ?? '').isEmpty)
+      'event_type': eventType,
+    if ((payload['room_id']?.toString().trim() ?? '').isEmpty &&
+        decoded['room_id'] != null)
+      'room_id': decoded['room_id'],
+  });
+
+  final expectedRoomId = roomId?.trim();
+  if (event.type != 'global_gift_broadcast' &&
+      expectedRoomId != null &&
+      expectedRoomId.isNotEmpty &&
+      event.roomId.trim().isNotEmpty &&
+      event.roomId.trim() != expectedRoomId) {
+    return null;
+  }
+  return event;
+}
+
 class LiveRoomSystemEvent {
   const LiveRoomSystemEvent({
     required this.id,
