@@ -28,6 +28,18 @@ base_kustomization = require(
     K8S / 'base' / 'kustomization.yaml',
     ('api.yaml', 'realtime.yaml'),
 )
+network_policy_text = require(
+    K8S / 'base' / 'network-policy.yaml',
+    (
+        'kubernetes.io/metadata.name: envoy-gateway-system',
+        'funkey.io/observability-access: "true"',
+        '- podSelector: {}',
+    ),
+)
+if 'namespaceSelector: {}' in network_policy_text:
+    violations.append(
+        'deploy/kubernetes/base/network-policy.yaml: empty namespaceSelector would trust every namespace'
+    )
 if 'ingress.yaml' in base_kustomization:
     violations.append('deploy/kubernetes/base/kustomization.yaml: legacy Ingress must stay removed')
 if (K8S / 'base' / 'ingress.yaml').exists():

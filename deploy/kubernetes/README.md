@@ -37,3 +37,18 @@ Use the Terraform preflight contract to enforce `api_max_pods × api_pool_per_po
 `funkey-room-control` is independently deployable on port 8085 with a 3-pod HA floor and a max of 20 replicas. It is cluster-internal in Chunk 26: the public API continues through the core compatibility proxy because paid room-theme purchase and contribution ranking are cross-domain orchestration/projection routes that remain in core.
 
 Bind `funkey-room-control-secrets` externally with `ROOM_CONTROL_DATABASE_URL`, the strong shared `ROOM_CONTROL_INTERNAL_TOKEN`, JWT verification material required by the current identity contract, and any service-specific secrets. The same internal token is required by core for authenticated internal quote/grant/room-resolution calls. Do not put it in a ConfigMap.
+
+
+### Chunk 35 ingress network-policy boundary
+
+`base/network-policy.yaml` no longer permits ingress from arbitrary
+namespaces. Public gateway backends (API, realtime, Inbox, Vibes) accept:
+
+- callers from the same `funkey` namespace;
+- the Envoy data plane in `envoy-gateway-system`;
+- namespaces explicitly labeled
+  `funkey.io/observability-access=true`.
+
+Internal-only services accept same-namespace and labeled observability traffic
+but not Envoy directly. If the Envoy deployment mode/namespace changes, update
+the NetworkPolicy and architecture guard in the same change.

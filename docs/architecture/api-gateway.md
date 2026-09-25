@@ -77,3 +77,14 @@ not be able to bypass the provider edge and reach the Envoy load balancer
 directly. The attestation flag is intentionally false in the example variables
 and must only be enabled by the provider-binding layer/operator after
 verification.
+
+
+## Namespace ingress isolation
+
+The application namespace has default-deny ingress. Public HTTP/WebSocket
+backends admit the Envoy data-plane namespace, same-namespace service traffic,
+and namespaces explicitly labeled for observability. Internal-only services do
+not admit Envoy directly.
+
+This replaces the original empty `namespaceSelector`, which effectively
+trusted all namespaces and undermined the gateway boundary.

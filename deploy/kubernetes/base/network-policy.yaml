@@ -6,6 +6,8 @@ spec:
   podSelector: {}
   policyTypes: [Ingress]
 ---
+# Public dynamic backends: same-namespace callers, Envoy data plane, and
+# explicitly labeled observability namespaces.
 apiVersion: networking.k8s.io/v1
 kind: NetworkPolicy
 metadata:
@@ -15,7 +17,13 @@ spec:
   policyTypes: [Ingress]
   ingress:
     - from:
-        - namespaceSelector: {}
+        - podSelector: {}
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: envoy-gateway-system
+        - namespaceSelector:
+            matchLabels:
+              funkey.io/observability-access: "true"
       ports: [{protocol: TCP, port: 8000}]
 ---
 apiVersion: networking.k8s.io/v1
@@ -27,7 +35,13 @@ spec:
   policyTypes: [Ingress]
   ingress:
     - from:
-        - namespaceSelector: {}
+        - podSelector: {}
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: envoy-gateway-system
+        - namespaceSelector:
+            matchLabels:
+              funkey.io/observability-access: "true"
       ports: [{protocol: TCP, port: 8081}]
 ---
 apiVersion: networking.k8s.io/v1
@@ -39,9 +53,14 @@ spec:
   policyTypes: [Ingress]
   ingress:
     - from:
-        - namespaceSelector: {}
+        - podSelector: {}
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: envoy-gateway-system
+        - namespaceSelector:
+            matchLabels:
+              funkey.io/observability-access: "true"
       ports: [{protocol: TCP, port: 8083}]
-
 ---
 apiVersion: networking.k8s.io/v1
 kind: NetworkPolicy
@@ -52,10 +71,17 @@ spec:
   policyTypes: [Ingress]
   ingress:
     - from:
-        - namespaceSelector: {}
+        - podSelector: {}
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: envoy-gateway-system
+        - namespaceSelector:
+            matchLabels:
+              funkey.io/observability-access: "true"
       ports: [{protocol: TCP, port: 8084}]
-
 ---
+# Internal-only HTTP services: same FunKey namespace plus explicitly labeled
+# observability namespaces. Envoy is intentionally not admitted here.
 apiVersion: networking.k8s.io/v1
 kind: NetworkPolicy
 metadata:
@@ -65,9 +91,11 @@ spec:
   policyTypes: [Ingress]
   ingress:
     - from:
-        - namespaceSelector: {}
+        - podSelector: {}
+        - namespaceSelector:
+            matchLabels:
+              funkey.io/observability-access: "true"
       ports: [{protocol: TCP, port: 8085}]
-
 ---
 apiVersion: networking.k8s.io/v1
 kind: NetworkPolicy
@@ -76,7 +104,11 @@ spec:
   podSelector: {matchLabels: {app: funkey-identity}}
   policyTypes: [Ingress]
   ingress:
-    - from: [{namespaceSelector: {}}]
+    - from:
+        - podSelector: {}
+        - namespaceSelector:
+            matchLabels:
+              funkey.io/observability-access: "true"
       ports: [{protocol: TCP, port: 8086}]
 ---
 apiVersion: networking.k8s.io/v1
@@ -86,25 +118,27 @@ spec:
   podSelector: {matchLabels: {app: funkey-profile-social}}
   policyTypes: [Ingress]
   ingress:
-    - from: [{namespaceSelector: {}}]
+    - from:
+        - podSelector: {}
+        - namespaceSelector:
+            matchLabels:
+              funkey.io/observability-access: "true"
       ports: [{protocol: TCP, port: 8087}]
-
 ---
 apiVersion: networking.k8s.io/v1
 kind: NetworkPolicy
 metadata:
   name: funkey-economy-ingress
 spec:
-  podSelector:
-    matchLabels:
-      app: funkey-economy
+  podSelector: {matchLabels: {app: funkey-economy}}
   policyTypes: [Ingress]
   ingress:
     - from:
-        - namespaceSelector: {}
-      ports:
-        - protocol: TCP
-          port: 8088
+        - podSelector: {}
+        - namespaceSelector:
+            matchLabels:
+              funkey.io/observability-access: "true"
+      ports: [{protocol: TCP, port: 8088}]
 ---
 apiVersion: networking.k8s.io/v1
 kind: NetworkPolicy
@@ -115,5 +149,8 @@ spec:
   policyTypes: [Ingress]
   ingress:
     - from:
-        - namespaceSelector: {}
+        - podSelector: {}
+        - namespaceSelector:
+            matchLabels:
+              funkey.io/observability-access: "true"
       ports: [{protocol: TCP, port: 8090}]

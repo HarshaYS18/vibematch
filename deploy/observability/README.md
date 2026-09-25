@@ -34,3 +34,14 @@ Sentry is optional at Flutter build time through `SENTRY_DSN`, `SENTRY_ENVIRONME
 Existing Prometheus rules cover API errors/latency, database pool pressure, realtime subscription/capacity, worker DLQ, media registry, and an API query-count regression signal. These are initial guardrails, not measured capacity claims; tune only from staging/load-test evidence.
 
 See `docs/runbooks/observability-degraded.md` and `docs/architecture/observability-platform.md`.
+
+
+## Namespace access label
+
+`namespace.yaml` creates/maintains the `monitoring` namespace with
+`funkey.io/observability-access=true`. Chunk 35 NetworkPolicies use this label
+to allow metrics/observability access without opening application pods to every
+Kubernetes namespace.
+
+If an external managed Prometheus stack runs in a different namespace, label
+that namespace explicitly only after reviewing the workloads that share it.

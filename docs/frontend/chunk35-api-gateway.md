@@ -92,3 +92,14 @@ explicit verified binding flag.
 This preserves provider neutrality while preventing the repository from
 claiming production edge protection when the provider binding has not actually
 been completed.
+
+
+## Repair audit: NetworkPolicy least privilege
+
+The anomaly audit found that every backend policy used
+`namespaceSelector: {}`, allowing traffic from pods in any namespace.
+
+The repair keeps default-deny ingress and narrows allowed sources to
+same-namespace service calls, the exact Envoy data-plane namespace only for
+public backends, and explicitly labeled observability namespaces. The
+architecture guard now rejects empty namespace selectors.

@@ -108,3 +108,16 @@ explicit verified-binding attestation.
 The origin restriction must prevent clients from reaching the Envoy public
 origin around the WAF/CDN. Never set the verification flag merely to satisfy
 Terraform; verify the provider attachment and bypass protection first.
+
+
+## Kubernetes NetworkPolicy boundary
+
+With the default Envoy Gateway deployment mode, managed Envoy proxy pods run in
+`envoy-gateway-system`. FunKey public backend policies therefore admit that
+exact namespace via Kubernetes' automatic
+`kubernetes.io/metadata.name` namespace label.
+
+Internal-only domain services do not admit Envoy directly. Observability access
+requires an explicit `funkey.io/observability-access=true` namespace label.
+An empty `namespaceSelector: {}` is forbidden by the Chunk 35 architecture
+guard.
