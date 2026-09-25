@@ -2,20 +2,27 @@ import 'dart:async';
 
 import '../../../realtime/app_realtime_hub.dart';
 import '../presentation/controllers/live_room_gift_controller.dart';
-import 'active_room_context.dart';
-import 'live_room_media_signaling_service.dart';
 import 'live_room_system_event_bus.dart';
 import 'lucky_packet_api_service.dart';
 
 class LuckyPacketRealtimeService {
-  LuckyPacketRealtimeService._();
-
-  static final LuckyPacketRealtimeService instance = LuckyPacketRealtimeService._();
+  LuckyPacketRealtimeService({
+    required String roomId,
+    required LiveRoomGiftController giftController,
+    LuckyPacketApiService api = const LuckyPacketApiService(),
+    AppRealtimeHub? realtimeHub,
+  }) : _roomId = roomId.trim(),
+       _giftController = giftController,
+       _api = api,
+       _realtimeHub = realtimeHub ?? AppRealtimeHub.shared;
 
   static const int _claimWindowSeconds = 20;
   static const int _resultsSeconds = 6;
 
-  final LuckyPacketApiService _api = const LuckyPacketApiService();
+  final String _roomId;
+  final LiveRoomGiftController _giftController;
+  final LuckyPacketApiService _api;
+  final AppRealtimeHub _realtimeHub;
   final Set<String> _handledEventIds = <String>{};
   Timer? _timer;
   StreamSubscription<dynamic>? _eventSubscription;
@@ -23,21 +30,20 @@ class LuckyPacketRealtimeService {
   bool _finalizeInFlight = false;
 
   void attach() {
-    if (!_attached) {
-      _attached = true;
-      _eventSubscription = AppRealtimeHub.shared.events.listen((envelope) {
-        final event = decodeLiveRoomSystemEvent(
-          envelope,
-          roomId: ActiveRoomContext.roomPublicId,
-        );
-        if (event != null) _handleSystemEvent(event);
-      });
-      unawaited(AppRealtimeHub.shared.start());
-    }
+    if (_attached || _roomId.isEmpty) return;
+    _attached = true;
+    _eventSubscription = _realtimeHub.events.listen((envelope) {
+      final event = decodeLiveRoomSystemEvent(
+        envelope,
+        roomId: _roomId,
+      );
+      if (event != null) _handleSystemEvent(event);
+    });
+    unawaited(_realtimeHub.start());
     unawaited(refreshActive());
   }
 
-  void detach() {
+  void dispose() {
     _attached = false;
     unawaited(_eventSubscription?.cancel());
     _eventSubscription = null;
@@ -51,12 +57,11 @@ class LuckyPacketRealtimeService {
     required int winnerCount,
     required String message,
   }) async {
-    final roomId = ActiveRoomContext.roomPublicId?.trim();
-    if (roomId == null || roomId.isEmpty) {
-      throw Exception('No active room is available for Lucky Packet');
+    if (_roomId.isEmpty) {
+      throw StateError('No active room is available for Lucky Packet');
     }
     final result = await _api.create(
-      roomPublicId: roomId,
+      roomPublicId: _roomId,
       coinAmount: coinAmount,
       winnerCount: winnerCount,
       message: message,
@@ -66,14 +71,16 @@ class LuckyPacketRealtimeService {
   }
 
   Future<void> refreshActive() async {
-    final roomId = ActiveRoomContext.roomPublicId?.trim();
-    if (roomId == null || roomId.isEmpty) return;
+    if (_roomId.isEmpty) return;
     try {
-      final result = await _api.fetchActive(roomPublicId: roomId);
-      if (result == null) return;
+      final result = await _api.fetchActive(roomPublicId: _roomId);
+      if (result == null) {
+        _giftController.applyAuthoritativeLuckyPacket(null);
+        return;
+      }
       _applyApiResult(result);
     } catch (_) {
-      // Room entry must remain usable if the packet refresh is temporarily down.
+      // Room entry remains usable while packet state retries via realtime.
     }
   }
 
@@ -82,12 +89,12 @@ class LuckyPacketRealtimeService {
     try {
       _applyApiResult(await _api.fetchPacket(packetId));
     } catch (_) {
-      // Realtime state remains visible while a refresh is retried by later events.
+      // Realtime state remains visible while a later event retries refresh.
     }
   }
 
   Future<void> claim() async {
-    final packet = LuckyPacketRoomBus.packet.value;
+    final packet = _giftController.activeLuckyPacket;
     if (packet == null || packet.phase != LuckyPacketPhase.claim) return;
     try {
       _applyApiResult(await _api.claim(packet.id));
@@ -99,7 +106,7 @@ class LuckyPacketRealtimeService {
   void dismiss() {
     _timer?.cancel();
     _timer = null;
-    LuckyPacketRoomBus.publish(null);
+    _giftController.applyAuthoritativeLuckyPacket(null);
   }
 
   void _handleSystemEvent(LiveRoomSystemEvent event) {
@@ -111,22 +118,23 @@ class LuckyPacketRealtimeService {
     }
 
     if (event.type == 'lucky_packet_created') {
-      final packet = LuckyPacketRoomEvent(
-        id: event.giftId,
-        senderName: event.actorName.trim().isEmpty
-            ? 'Vibe User'
-            : event.actorName.trim(),
-        coinAmount: event.giftTotalCoinValue,
-        winnerCount: event.giftQuantity,
-        message: event.giftName,
-        phase: _phaseFrom(event.giftCategory),
-        remainingSeconds: event.autoDismissSeconds ?? 30,
+      _publish(
+        LuckyPacketRoomEvent(
+          id: event.giftId,
+          senderName: event.actorName.trim().isEmpty
+              ? 'Vibe User'
+              : event.actorName.trim(),
+          coinAmount: event.giftTotalCoinValue,
+          winnerCount: event.giftQuantity,
+          message: event.giftName,
+          phase: _phaseFrom(event.giftCategory),
+          remainingSeconds: event.autoDismissSeconds ?? 30,
+        ),
       );
-      _publish(packet);
       return;
     }
 
-    final current = LuckyPacketRoomBus.packet.value;
+    final current = _giftController.activeLuckyPacket;
     if (current == null || current.id != event.giftId) {
       unawaited(refreshPacket(event.giftId));
       return;
@@ -138,10 +146,8 @@ class LuckyPacketRealtimeService {
       if (claimName.isNotEmpty && event.luckyRewardCoinAmount > 0) {
         distributions[claimName] = event.luckyRewardCoinAmount;
       }
-      final currentRoomUserId =
-          LiveRoomMediaSignalingService.instance.activeLoggedInSeatUser?.id;
       final isCurrentClaim = _sameRoomUserId(
-        currentRoomUserId,
+        _giftController.currentUser.id,
         event.targetUserId,
       );
       _publish(
@@ -198,21 +204,21 @@ class LuckyPacketRealtimeService {
   }
 
   void _publish(LuckyPacketRoomEvent packet) {
-    LuckyPacketRoomBus.publish(packet);
+    _giftController.applyAuthoritativeLuckyPacket(packet);
     _startClock(packet.id);
   }
 
   void _startClock(String packetId) {
     _timer?.cancel();
     _timer = Timer.periodic(const Duration(seconds: 1), (_) {
-      final packet = LuckyPacketRoomBus.packet.value;
+      final packet = _giftController.activeLuckyPacket;
       if (packet == null || packet.id != packetId) {
         _timer?.cancel();
         _timer = null;
         return;
       }
       if (packet.remainingSeconds > 1) {
-        LuckyPacketRoomBus.publish(
+        _giftController.applyAuthoritativeLuckyPacket(
           packet.copyWith(remainingSeconds: packet.remainingSeconds - 1),
         );
         return;
@@ -220,7 +226,7 @@ class LuckyPacketRealtimeService {
 
       switch (packet.phase) {
         case LuckyPacketPhase.countdown:
-          LuckyPacketRoomBus.publish(
+          _giftController.applyAuthoritativeLuckyPacket(
             packet.copyWith(
               phase: LuckyPacketPhase.claim,
               remainingSeconds: _claimWindowSeconds,
@@ -228,7 +234,7 @@ class LuckyPacketRealtimeService {
           );
           return;
         case LuckyPacketPhase.claim:
-          LuckyPacketRoomBus.publish(
+          _giftController.applyAuthoritativeLuckyPacket(
             packet.copyWith(
               phase: LuckyPacketPhase.results,
               remainingSeconds: _resultsSeconds,
