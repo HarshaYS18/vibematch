@@ -62,21 +62,6 @@ spec:
   minAvailable: 1
   selector: {matchLabels: {app: funkey-kafka-event-bridge}}
 ---
-apiVersion: autoscaling/v2
-kind: HorizontalPodAutoscaler
-metadata: {name: funkey-kafka-event-bridge}
-spec:
-  scaleTargetRef: {apiVersion: apps/v1, kind: Deployment, name: funkey-kafka-event-bridge}
-  minReplicas: 2
-  maxReplicas: 12
-  behavior:
-    scaleDown: {stabilizationWindowSeconds: 300}
-  metrics:
-    - type: Resource
-      resource:
-        name: cpu
-        target: {type: Utilization, averageUtilization: 65}
----
 apiVersion: networking.k8s.io/v1
 kind: NetworkPolicy
 metadata: {name: funkey-kafka-event-bridge-ingress}
