@@ -13,6 +13,7 @@ resources:
   - economy.yaml
   - game-platform.yaml
   - notification.yaml
+  - graphql-bff.yaml
   - realtime.yaml
   - worker.yaml
   - autoscaling.yaml

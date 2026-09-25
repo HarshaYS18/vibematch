@@ -100,3 +100,20 @@ spec:
     local:
       rules:
         - limit: {requests: 200, unit: Second}
+
+---
+apiVersion: gateway.envoyproxy.io/v1alpha1
+kind: BackendTrafficPolicy
+metadata:
+  name: funkey-graphql-traffic
+spec:
+  targetRefs:
+    - group: gateway.networking.k8s.io
+      kind: HTTPRoute
+      name: funkey-graphql
+  requestBuffer:
+    limit: 64Ki
+  rateLimit:
+    local:
+      rules:
+        - limit: {requests: 200, unit: Second}

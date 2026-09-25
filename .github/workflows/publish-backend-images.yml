@@ -49,6 +49,9 @@ jobs:
           - name: notification
             dockerfile: apps/notification-service/Dockerfile
             context: .
+          - name: graphql-bff
+            dockerfile: apps/graphql-bff/Dockerfile
+            context: .
           - name: worker
             dockerfile: apps/worker/Dockerfile
             context: .

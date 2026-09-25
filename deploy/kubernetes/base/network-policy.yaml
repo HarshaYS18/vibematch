@@ -154,3 +154,22 @@ spec:
             matchLabels:
               funkey.io/observability-access: "true"
       ports: [{protocol: TCP, port: 8090}]
+
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: funkey-graphql-bff-ingress
+spec:
+  podSelector: {matchLabels: {app: funkey-graphql-bff}}
+  policyTypes: [Ingress]
+  ingress:
+    - from:
+        - podSelector: {}
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: envoy-gateway-system
+        - namespaceSelector:
+            matchLabels:
+              funkey.io/observability-access: "true"
+      ports: [{protocol: TCP, port: 8091}]
