@@ -77,7 +77,7 @@ void main() {
     bridgeVersion: GameManifest.supportedBridgeVersion,
     bundleFormat: GameManifest.supportedBundleFormat,
     entryUri: Uri.parse('https://cdn.example.com/games/demo/index.html'),
-    entrySha256: 'a' * 64,
+    entrySha256: List<String>.filled(64, 'a').join(),
     allowedOrigins: <String>{'https://cdn.example.com'},
   );
   final bundle = VerifiedGameBundle(
