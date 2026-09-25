@@ -49,6 +49,37 @@ for root in CANONICAL_ROOTS:
             violations.append(f"{rel}: websocket creation belongs in foundation/realtime")
 
 
+# Chunk 33: mutable feature state must be scoped instead of process-global.
+#
+# This intentionally scans the whole Flutter app, including legacy feature
+# directories. Constants and immutable service singletons are allowed; static
+# ValueNotifier/ChangeNotifier instances are not because they create hidden
+# process-wide state authorities that outlive a room/page/provider scope.
+for path in APP.rglob("*.dart"):
+    text = path.read_text(encoding="utf-8-sig")
+    rel = path.relative_to(ROOT).as_posix()
+
+    if re.search(r"\bstatic\s+(?:final\s+)?ValueNotifier\b", text):
+        violations.append(
+            f"{rel}: Chunk 33 forbids process-global static ValueNotifier state"
+        )
+
+    if re.search(r"\bstatic\s+(?:final\s+)?ChangeNotifier\b", text):
+        violations.append(
+            f"{rel}: Chunk 33 forbids process-global static ChangeNotifier state"
+        )
+
+    if "class LiveRoomRestrictionsService" in text:
+        violations.append(
+            f"{rel}: room restrictions must come from RoomSessionRepository, not a parallel cache"
+        )
+
+    if "class CricketRoomModeSignal" in text:
+        violations.append(
+            f"{rel}: Cricket Mode runtime must be room-scoped, not a static signal"
+        )
+
+
 # Chunk 21: one physical application WebSocket.
 #
 # Application features subscribe through AppRealtimeHub. Raw websocket creation
