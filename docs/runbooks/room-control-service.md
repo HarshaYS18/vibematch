@@ -29,3 +29,10 @@ PostgreSQL state/version/event data remain authoritative. If a durable room comm
 ## Rollback
 
 Roll back the Room Control/core images as a compatible pair while retaining the expanded schema and service ownership roles. Keep exactly one writer authority. Do not point both core direct room routers and Room Control at production write credentials simultaneously.
+
+
+## Presence and Cricket repair boundaries
+
+Connected room liveness is not recovered from PostgreSQL heartbeat timestamps. The Go realtime gateway owns TTL Redis leases; if those leases are unavailable, restore the realtime Redis/gateway path and allow sockets to rebuild them. Do not grant Room Control or core write access to `user_room_presence`.
+
+Room Cricket is durable Room Control state. Public core Cricket routes proxy to Room Control; mutations require host/admin permission, reads require room view membership, scoring serializes on the match row, and ball events are stored in `cricket_ball_events`. Do not bypass Room Control with direct core DB writes during an incident.
