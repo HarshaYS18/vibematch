@@ -192,6 +192,51 @@ for resource_root in (
                 f"{rel}: feature-owned resources must depend on foundation media_resource_lifecycle.dart, not app/runtime coordinator"
             )
 
+# Chunk 34-M7: the remote game WebView is feature-owned and registers through
+# the foundation resource port. It must never import the concrete App runtime.
+_GAME_WEBVIEW_RESOURCE = (
+    APP / "game_platform" / "runtime" / "game_webview_resource_participant.dart"
+)
+if not _GAME_WEBVIEW_RESOURCE.exists():
+    violations.append(
+        "game_platform/runtime/game_webview_resource_participant.dart: Chunk 34-M7 game WebView participant is required"
+    )
+else:
+    game_webview_resource_text = _GAME_WEBVIEW_RESOURCE.read_text(
+        encoding="utf-8-sig"
+    )
+    for marker in (
+        "implements MediaResourceParticipant",
+        "MediaResourceKind.gameWebView",
+        "'app.lifecycle'",
+        "'app.memory_pressure'",
+        "_runtime.dispose()",
+    ):
+        if marker not in game_webview_resource_text:
+            violations.append(
+                "game_platform/runtime/game_webview_resource_participant.dart: "
+                f"missing Chunk 34-M7 lifecycle marker: {marker}"
+            )
+
+_REMOTE_GAME_PLAYER = (
+    APP / "game_platform" / "presentation" / "remote_game_player_page.dart"
+)
+if _REMOTE_GAME_PLAYER.exists():
+    remote_game_text = _REMOTE_GAME_PLAYER.read_text(encoding="utf-8-sig")
+    for marker in (
+        "mediaResourceRegistryProvider",
+        "GameWebViewResourceParticipant",
+        "registry.register(participant)",
+        "registry.unregister(",
+        "onReady:",
+    ):
+        if marker not in remote_game_text:
+            violations.append(
+                "game_platform/presentation/remote_game_player_page.dart: "
+                f"missing Chunk 34-M7 resource marker: {marker}"
+            )
+
+
 # Chunk 34-M1: heavyweight media/resource lifecycle coordination must be
 # session-scoped. The coordinator is an app/runtime implementation, not a
 # feature singleton or a new domain-state authority.

@@ -4,13 +4,20 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../foundation/di/app_dependencies.dart';
+import '../../foundation/runtime/media_resource_lifecycle.dart';
 import '../../session/data/session_repository.dart';
 import '../application/game_host_bridge.dart';
 import '../data/game_manifest_repository.dart';
 import '../domain/game_manifest.dart';
 import '../runtime/game_runtime.dart';
+import '../runtime/game_webview_resource_participant.dart';
 import '../runtime/web/in_app_webview_game_runtime.dart';
 
+/// Hosts one verified remote game runtime without becoming game-domain authority.
+///
+/// Chunk 34 lifecycle registration flows through the foundation resource
+/// registry. Game Platform still owns the WebView/runtime; AppShell only
+/// broadcasts generic app/session resource pressure.
 class RemoteGamePlayerPage extends ConsumerStatefulWidget {
   const RemoteGamePlayerPage({
     super.key,
@@ -32,6 +39,8 @@ class _RemoteGamePlayerPageState extends ConsumerState<RemoteGamePlayerPage> {
   VerifiedGameBundle? _bundle;
   GameRuntime? _runtime;
   GameHostBridge? _bridge;
+  GameWebViewResourceParticipant? _resourceParticipant;
+  MediaResourceRegistry? _resourceRegistry;
   String? _error;
   bool _loading = true;
 
@@ -43,6 +52,7 @@ class _RemoteGamePlayerPageState extends ConsumerState<RemoteGamePlayerPage> {
 
   @override
   void dispose() {
+    _detachRuntimeResource();
     final runtime = _runtime;
     if (runtime != null) unawaited(runtime.dispose());
     final bridge = _bridge;
@@ -51,6 +61,7 @@ class _RemoteGamePlayerPageState extends ConsumerState<RemoteGamePlayerPage> {
   }
 
   Future<void> _load() async {
+    _detachRuntimeResource();
     final previous = _runtime;
     if (previous != null) {
       await previous.dispose();
@@ -97,10 +108,16 @@ class _RemoteGamePlayerPageState extends ConsumerState<RemoteGamePlayerPage> {
         return;
       }
 
-      final runtime = InAppWebViewGameRuntime(
+      late final InAppWebViewGameRuntime runtime;
+      runtime = InAppWebViewGameRuntime(
         bundle: bundle,
         bridge: bridge,
         onError: _showRuntimeError,
+        onReady: () {
+          unawaited(
+            _attachRuntimeResource(runtime, bundle.manifest.cacheKey),
+          );
+        },
       );
 
       setState(() {
@@ -116,6 +133,42 @@ class _RemoteGamePlayerPageState extends ConsumerState<RemoteGamePlayerPage> {
         _error = _displayError(error);
       });
     }
+  }
+
+  Future<void> _attachRuntimeResource(
+    GameRuntime runtime,
+    String resourceKey,
+  ) async {
+    if (!mounted || !identical(_runtime, runtime)) return;
+    if (_resourceParticipant != null) return;
+
+    final registry = ref.read(mediaResourceRegistryProvider);
+    if (registry == null) return;
+
+    final participant = GameWebViewResourceParticipant(
+      resourceId: 'game:webview:$resourceKey',
+      runtime: runtime,
+    );
+    try {
+      if (!registry.register(participant)) return;
+      _resourceRegistry = registry;
+      _resourceParticipant = participant;
+      await participant.onForegroundChanged(registry.isForeground);
+    } catch (error) {
+      debugPrint('[FK:W:GameResource:Register] $error');
+    }
+  }
+
+  void _detachRuntimeResource() {
+    final registry = _resourceRegistry;
+    final participant = _resourceParticipant;
+    _resourceRegistry = null;
+    _resourceParticipant = null;
+    if (registry == null || participant == null) return;
+    registry.unregister(
+      participant.resourceId,
+      expectedParticipant: participant,
+    );
   }
 
   void _showRuntimeError(String message) {

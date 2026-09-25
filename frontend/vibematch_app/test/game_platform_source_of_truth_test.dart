@@ -38,6 +38,34 @@ void main() {
     }
   });
 
+  test('remote game WebView registers through the foundation resource port', () {
+    final page = File(
+      'lib/game_platform/presentation/remote_game_player_page.dart',
+    ).readAsStringSync();
+    final participant = File(
+      'lib/game_platform/runtime/game_webview_resource_participant.dart',
+    ).readAsStringSync();
+    final runtime = File(
+      'lib/game_platform/runtime/web/in_app_webview_game_runtime.dart',
+    ).readAsStringSync();
+
+    expect(page, contains('mediaResourceRegistryProvider'));
+    expect(page, contains('GameWebViewResourceParticipant'));
+    expect(page, contains('registry.register(participant)'));
+    expect(page, contains('registry.unregister('));
+    expect(page, isNot(contains('media_resource_coordinator.dart')));
+
+    expect(
+      participant,
+      contains("foundation/runtime/media_resource_lifecycle.dart"),
+    );
+    expect(participant, contains('MediaResourceKind.gameWebView'));
+    expect(participant, contains("'app.lifecycle'"));
+    expect(participant, contains("'app.memory_pressure'"));
+    expect(runtime, contains('GameRuntimeReadyHandler? onReady'));
+    expect(runtime, contains('_onReady?.call();'));
+  });
+
   test('Flutter no longer bundles gameplay assets', () {
     final pubspec = File('pubspec.yaml').readAsStringSync();
     expect(pubspec, isNot(contains('assets/games/')));

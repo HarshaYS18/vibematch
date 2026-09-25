@@ -264,3 +264,48 @@ participant without importing or knowing about `MediaResourceCoordinator`.
 The architecture guard requires the foundation contract and rejects imports of
 `media_resource_coordinator.dart` from features, Game Platform, Watch Party or
 room media.
+
+
+## M7: remote Game Platform WebView lifecycle
+
+M7 migrates the first feature-owned heavyweight runtime through the M6
+foundation registry: the verified remote Game Platform WebView.
+
+### Ownership boundary
+
+`GameWebViewResourceParticipant` lives inside `game_platform/runtime` and
+depends only on `foundation/runtime/media_resource_lifecycle.dart`.
+Game Platform continues to own the concrete `GameRuntime`,
+`InAppWebViewController`, Host Bridge and durable game-session interaction.
+The App resource runtime never becomes game-domain authority.
+
+### Registration lifecycle
+
+`RemoteGamePlayerPage` registers the participant only after
+`InAppWebViewGameRuntime` reports that its concrete WebView controller has
+been created. This avoids losing the coordinator's initial foreground/background
+state before the WebView exists.
+
+Normal page retry/reload and page disposal explicitly unregister the participant
+before disposing the old runtime. Authenticated-session teardown remains safe:
+the coordinator may call participant `release()`, and the underlying
+`GameRuntime.dispose()` is idempotent.
+
+### Lifecycle signals
+
+The participant forwards non-authoritative host events through the existing
+`GameRuntime.sendHostEvent` channel:
+
+- `app.lifecycle` with `foreground: true|false`;
+- `app.memory_pressure` when Flutter reports memory pressure.
+
+These signals let remote game HTML voluntarily pause animation/audio or trim
+reconstructable caches. M7 deliberately does **not** destroy/reload the WebView
+on ordinary memory pressure, because that could interrupt an active round.
+
+### Security and authority
+
+No bearer token is exposed to remote HTML, no second WebSocket is created, and
+game financial/durable state remains backend authority. The feature imports the
+foundation registry port only; the architecture guard continues to reject
+imports of the concrete App coordinator.

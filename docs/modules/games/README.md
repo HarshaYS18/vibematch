@@ -72,3 +72,17 @@ Before changing Games: identify whether the change is gameplay lifecycle or
 financial value. Lifecycle belongs here; value belongs in Economy. Preserve
 public compatibility, immutable retry context, bundle integrity, observability
 and rollback semantics.
+
+
+## Flutter resource lifecycle
+
+Chunk 34-M7 registers the remote Game Platform WebView through the foundation
+`MediaResourceRegistry` port. The Game Platform feature never imports the
+concrete AppShell coordinator.
+
+`GameWebViewResourceParticipant` forwards `app.lifecycle` and
+`app.memory_pressure` host events to verified remote game HTML. Games may use
+those events to pause presentation work or trim reconstructable caches.
+Ordinary memory pressure does not reload/destroy an active WebView. Session
+teardown releases the runtime, while durable sessions, rounds, bets and Economy
+settlement remain backend authority.

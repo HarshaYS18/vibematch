@@ -10,20 +10,30 @@ import '../game_runtime.dart';
 
 typedef GameRuntimeErrorHandler = void Function(String message);
 
+/// Invoked after the concrete WebView controller has been created.
+typedef GameRuntimeReadyHandler = void Function();
+
+/// Sandboxed single-HTML game runtime.
+///
+/// The runtime owns only the concrete WebView execution surface. Durable game
+/// sessions, rounds, bets and settlement remain backend/Game Platform authority.
 class InAppWebViewGameRuntime implements GameRuntime {
   InAppWebViewGameRuntime({
     required VerifiedGameBundle bundle,
     required GameHostBridge bridge,
     required GameRuntimeErrorHandler onError,
+    GameRuntimeReadyHandler? onReady,
   }) : _bundle = bundle,
        _bridge = bridge,
-       _onError = onError;
+       _onError = onError,
+       _onReady = onReady;
 
   static const String _handlerName = 'funkeyGameRequest';
 
   final VerifiedGameBundle _bundle;
   final GameHostBridge _bridge;
   final GameRuntimeErrorHandler _onError;
+  final GameRuntimeReadyHandler? _onReady;
   final GlobalKey _webViewKey = GlobalKey();
 
   InAppWebViewController? _controller;
@@ -64,6 +74,7 @@ class InAppWebViewGameRuntime implements GameRuntime {
             return _bridge.handle(arguments.first);
           },
         );
+        _onReady?.call();
       },
       onLoadStart: (controller, url) {
         if (!_initialDocumentLoaded || url == null) return;

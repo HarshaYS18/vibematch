@@ -86,3 +86,15 @@ The authenticated AppShell injects its session coordinator through
 `mediaResourceRegistryProvider` using a nested `ProviderScope`. This allows
 Game Platform, Watch Party and room media to register lifecycle participants
 while preserving foundation → feature → app dependency direction.
+
+
+## M7 remote game WebView
+
+Game Platform is the first feature-owned runtime registered through the M6
+foundation port. `RemoteGamePlayerPage` registers a
+`GameWebViewResourceParticipant` when its concrete WebView becomes ready and
+unregisters it before normal runtime disposal/retry.
+
+The participant forwards app lifecycle and memory-pressure notifications through
+the existing host-event bridge and releases the runtime on authenticated-session
+teardown. It does not own rounds, bets, settlement or game session state.
