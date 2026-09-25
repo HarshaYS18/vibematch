@@ -1,11 +1,14 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+
+import '../../../../room_session/data/room_session_repository.dart';
 
 import 'gifts/live_room_gifts_module.dart';
 import 'lifecycle/live_room_lifecycle_module.dart';
 import 'live_room_controller_bundle.dart';
 import 'seats/live_room_seats_module.dart';
 
-class LiveRoomControllerScope extends StatefulWidget {
+class LiveRoomControllerScope extends ConsumerStatefulWidget {
   const LiveRoomControllerScope({
     super.key,
     required this.config,
@@ -17,11 +20,12 @@ class LiveRoomControllerScope extends StatefulWidget {
   builder;
 
   @override
-  State<LiveRoomControllerScope> createState() =>
+  ConsumerState<LiveRoomControllerScope> createState() =>
       _LiveRoomControllerScopeState();
 }
 
-class _LiveRoomControllerScopeState extends State<LiveRoomControllerScope> {
+class _LiveRoomControllerScopeState
+    extends ConsumerState<LiveRoomControllerScope> {
   late final LiveRoomControllerBundle bundle;
 
   @override
@@ -30,6 +34,9 @@ class _LiveRoomControllerScopeState extends State<LiveRoomControllerScope> {
 
     bundle = LiveRoomControllerBundle(
       config: widget.config,
+      roomSessionRepository: ref.read(
+        roomSessionRepositoryProvider(widget.config.roomId).notifier,
+      ),
       contextGetter: () => context,
       mountedGetter: () => mounted,
     );
@@ -72,5 +79,8 @@ class _LiveRoomControllerScopeState extends State<LiveRoomControllerScope> {
   }
 
   @override
-  Widget build(BuildContext context) => widget.builder(context, bundle);
+  Widget build(BuildContext context) {
+    ref.watch(roomSessionRepositoryProvider(widget.config.roomId));
+    return widget.builder(context, bundle);
+  }
 }
