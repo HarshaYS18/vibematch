@@ -2,6 +2,8 @@ import 'dart:async';
 
 import 'package:flutter/material.dart';
 
+import '../../../../realtime/app_realtime_hub.dart';
+import '../../data/active_room_context.dart';
 import '../../data/live_room_system_event_bus.dart';
 import '../../modules/gift_slide/presentation/gift_slide_overlay.dart';
 import '../../modules/ribbon_chat/models/ribbon_message.dart';
@@ -56,23 +58,26 @@ class _LiveRoomGiftOverlayState extends State<LiveRoomGiftOverlay> {
   final Map<String, _SenderLuckyOutcome> _senderLuckyOutcomes =
       <String, _SenderLuckyOutcome>{};
   final Set<String> _handledBackendGiftIds = <String>{};
-  VoidCallback? _backendGiftListener;
+  StreamSubscription<dynamic>? _backendGiftSubscription;
 
   List<GiftItem> get _fullGiftCatalog => GiftPanel.withMockExtras(mockGiftItems);
 
   @override
   void initState() {
     super.initState();
-    _backendGiftListener = _handleBackendRoomEvent;
-    LiveRoomSystemEventBus.latestEvent.addListener(_backendGiftListener!);
+    _backendGiftSubscription = AppRealtimeHub.shared.events.listen((envelope) {
+      final event = decodeLiveRoomSystemEvent(
+        envelope,
+        roomId: ActiveRoomContext.roomPublicId,
+      );
+      if (event != null) _handleBackendRoomEvent(event);
+    });
+    unawaited(AppRealtimeHub.shared.start());
   }
 
   @override
   void dispose() {
-    final listener = _backendGiftListener;
-    if (listener != null) {
-      LiveRoomSystemEventBus.latestEvent.removeListener(listener);
-    }
+    unawaited(_backendGiftSubscription?.cancel());
     for (final timer in _backendGiftTimers.values) {
       timer.cancel();
     }
@@ -82,10 +87,9 @@ class _LiveRoomGiftOverlayState extends State<LiveRoomGiftOverlay> {
     super.dispose();
   }
 
-  void _handleBackendRoomEvent() {
-    final event = LiveRoomSystemEventBus.latestEvent.value;
-    final isGlobalBroadcast = event?.type == 'global_gift_broadcast';
-    if (event == null || (!event.isRoomGiftSent && !isGlobalBroadcast)) return;
+  void _handleBackendRoomEvent(LiveRoomSystemEvent event) {
+    final isGlobalBroadcast = event.type == 'global_gift_broadcast';
+    if (!event.isRoomGiftSent && !isGlobalBroadcast) return;
     if (!_handledBackendGiftIds.add(event.id)) return;
 
     final gift = _giftItemForEvent(event);
