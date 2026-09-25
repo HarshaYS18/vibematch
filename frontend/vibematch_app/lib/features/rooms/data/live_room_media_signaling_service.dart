@@ -186,7 +186,8 @@ class LiveRoomMediaSignalingService with WidgetsBindingObserver {
   void _bindNestedMediaResources(MediaResourceRegistry? registry) {
     final engine = _mediaEngine;
     if (engine is RoomMediaResourceRegistryBinding) {
-      engine.bindMediaResourceRegistry(registry);
+      (engine as RoomMediaResourceRegistryBinding)
+          .bindMediaResourceRegistry(registry);
     }
   }
 

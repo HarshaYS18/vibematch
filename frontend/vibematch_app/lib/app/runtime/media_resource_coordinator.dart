@@ -1,7 +1,9 @@
 import 'dart:async';
 
+import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../foundation/runtime/media_resource_budget.dart';
 import '../../foundation/runtime/media_resource_lifecycle.dart';
 
 export '../../foundation/runtime/media_resource_lifecycle.dart';
@@ -30,6 +32,32 @@ class MediaResourceCoordinator implements MediaResourceRegistry {
         _participants.values.map((participant) => participant.kind),
       );
 
+  Map<MediaResourceKind, int> get registeredCountByKind {
+    final counts = <MediaResourceKind, int>{};
+    for (final participant in _participants.values) {
+      counts.update(
+        participant.kind,
+        (value) => value + 1,
+        ifAbsent: () => 1,
+      );
+    }
+    return Map<MediaResourceKind, int>.unmodifiable(counts);
+  }
+
+  Set<MediaResourceKind> get overRecommendedBudgetKinds {
+    final counts = registeredCountByKind;
+    return Set<MediaResourceKind>.unmodifiable(
+      counts.entries
+          .where(
+            (entry) =>
+                entry.value >
+                MediaResourceBudgetPolicy.forKind(entry.key)
+                    .recommendedMaxActive,
+          )
+          .map((entry) => entry.key),
+    );
+  }
+
   /// Registers one feature-owned resource adapter.
   ///
   /// Re-registering the same object is idempotent and returns false. A new
@@ -53,6 +81,7 @@ class MediaResourceCoordinator implements MediaResourceRegistry {
     }
     if (identical(existing, participant)) return false;
     _participants[id] = participant;
+    _warnIfOverRecommendedBudget(participant.kind);
     return true;
   }
 
@@ -81,7 +110,8 @@ class MediaResourceCoordinator implements MediaResourceRegistry {
     _ensureOpen();
     if (_isForeground == isForeground) return;
     _isForeground = isForeground;
-    await _broadcast(
+    await _broadcastSafely(
+      'foreground',
       (participant) => participant.onForegroundChanged(isForeground),
     );
   }
@@ -90,7 +120,26 @@ class MediaResourceCoordinator implements MediaResourceRegistry {
   /// memory without changing any canonical domain state.
   Future<void> handleMemoryPressure() async {
     _ensureOpen();
-    await _broadcast((participant) => participant.onMemoryPressure());
+    final participants = _snapshotParticipants();
+    for (final tier in MediaResourcePressureTier.values) {
+      final tierParticipants = participants
+          .where(
+            (participant) =>
+                MediaResourceBudgetPolicy.forKind(participant.kind)
+                    .pressureTier ==
+                tier,
+          )
+          .toList(growable: false);
+      await Future.wait<void>(
+        tierParticipants.map(
+          (participant) => _runSafely(
+            participant,
+            'memory-pressure',
+            participant.onMemoryPressure,
+          ),
+        ),
+      );
+    }
   }
 
   /// Releases every resource still registered when the authenticated runtime
@@ -98,27 +147,64 @@ class MediaResourceCoordinator implements MediaResourceRegistry {
   Future<void> dispose() async {
     if (_disposed) return;
     _disposed = true;
-    final participants = List<MediaResourceParticipant>.of(
-      _participants.values,
-      growable: false,
-    );
+    final participants = _snapshotParticipants();
     _participants.clear();
     await Future.wait<void>(
-      participants.map((participant) async {
-        await participant.release();
-      }),
+      participants.map(
+        (participant) => _runSafely(
+          participant,
+          'session-release',
+          participant.release,
+        ),
+      ),
     );
   }
 
-  Future<void> _broadcast(
+  Future<void> _broadcastSafely(
+    String operationName,
     Future<void> Function(MediaResourceParticipant participant) operation,
   ) async {
-    final participants = List<MediaResourceParticipant>.of(
-      _participants.values,
-      growable: false,
-    );
+    final participants = _snapshotParticipants();
     await Future.wait<void>(
-      participants.map((participant) => operation(participant)),
+      participants.map(
+        (participant) => _runSafely(
+          participant,
+          operationName,
+          () => operation(participant),
+        ),
+      ),
+    );
+  }
+
+  List<MediaResourceParticipant> _snapshotParticipants() =>
+      List<MediaResourceParticipant>.of(
+        _participants.values,
+        growable: false,
+      );
+
+  Future<void> _runSafely(
+    MediaResourceParticipant participant,
+    String operationName,
+    Future<void> Function() operation,
+  ) async {
+    try {
+      await operation();
+    } catch (error, stackTrace) {
+      debugPrint(
+        '[FK:W:ResourceRuntime:$operationName] '
+        '${participant.resourceId} (${participant.kind.name}) failed: $error',
+      );
+      debugPrintStack(stackTrace: stackTrace);
+    }
+  }
+
+  void _warnIfOverRecommendedBudget(MediaResourceKind kind) {
+    final count = registeredCountByKind[kind] ?? 0;
+    final budget = MediaResourceBudgetPolicy.forKind(kind);
+    if (count <= budget.recommendedMaxActive) return;
+    debugPrint(
+      '[FK:W:ResourceRuntime:Budget] ${kind.name} active=$count '
+      'recommendedMax=${budget.recommendedMaxActive}',
     );
   }
 

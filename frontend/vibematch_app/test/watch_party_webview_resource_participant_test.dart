@@ -4,6 +4,7 @@ import 'package:flutter/widgets.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:vibematch_app/foundation/runtime/media_resource_lifecycle.dart';
 import 'package:vibematch_app/watch_party/domain/watch_party_state.dart';
+import 'package:vibematch_app/watch_party/domain/watch_provider_adapter.dart';
 import 'package:vibematch_app/watch_party/providers/web/ott_javascript_bridge.dart';
 import 'package:vibematch_app/watch_party/providers/web/ott_playback_probe_result.dart';
 import 'package:vibematch_app/watch_party/providers/web/ott_web_playback_host.dart';

@@ -2,6 +2,7 @@ import 'dart:io';
 
 import 'package:flutter_test/flutter_test.dart';
 import 'package:vibematch_app/app/runtime/media_resource_coordinator.dart';
+import 'package:vibematch_app/foundation/runtime/media_resource_budget.dart';
 
 /// Chunk 34-M1 contract tests.
 ///
@@ -110,6 +111,61 @@ void main() {
     await expectLater(coordinator.handleMemoryPressure(), throwsStateError);
   });
 
+  test('M14 budget policy covers every resource kind', () {
+    for (final kind in MediaResourceKind.values) {
+      expect(
+        MediaResourceBudgetPolicy.forKind(kind).recommendedMaxActive,
+        greaterThan(0),
+      );
+    }
+  });
+
+  test('M14 pressure reclaims speculative work before realtime media', () async {
+    final order = <String>[];
+    final coordinator = MediaResourceCoordinator()
+      ..register(
+        _FakeResource(
+          resourceId: 'room:critical',
+          kind: MediaResourceKind.roomWebRtc,
+          onPressure: () => order.add('room'),
+        ),
+      )
+      ..register(
+        _FakeResource(
+          resourceId: 'prefetch:reclaim',
+          kind: MediaResourceKind.imagePrefetch,
+          onPressure: () => order.add('prefetch'),
+        ),
+      );
+
+    await coordinator.handleMemoryPressure();
+
+    expect(order, <String>['prefetch', 'room']);
+  });
+
+  test('M14 participant failures do not block healthy cleanup', () async {
+    final healthy = _FakeResource(
+      resourceId: 'healthy',
+      kind: MediaResourceKind.gameBundleCache,
+    );
+    final coordinator = MediaResourceCoordinator()
+      ..register(
+        _FakeResource(
+          resourceId: 'failing',
+          kind: MediaResourceKind.giftVideo,
+          throwOnPressure: true,
+          throwOnRelease: true,
+        ),
+      )
+      ..register(healthy);
+
+    await coordinator.handleMemoryPressure();
+    await coordinator.dispose();
+
+    expect(healthy.memoryPressureCount, 1);
+    expect(healthy.releaseCount, 1);
+  });
+
   test('coordinator provider remains auto-disposed and non-global by source guard', () {
     final source = File(
       'lib/app/runtime/media_resource_coordinator.dart',
@@ -128,6 +184,9 @@ class _FakeResource implements MediaResourceParticipant {
   _FakeResource({
     required this.resourceId,
     required this.kind,
+    this.onPressure,
+    this.throwOnPressure = false,
+    this.throwOnRelease = false,
   });
 
   @override
@@ -137,6 +196,9 @@ class _FakeResource implements MediaResourceParticipant {
   final MediaResourceKind kind;
 
   final List<bool> foregroundTransitions = <bool>[];
+  final void Function()? onPressure;
+  final bool throwOnPressure;
+  final bool throwOnRelease;
   int memoryPressureCount = 0;
   int releaseCount = 0;
 
@@ -148,10 +210,13 @@ class _FakeResource implements MediaResourceParticipant {
   @override
   Future<void> onMemoryPressure() async {
     memoryPressureCount += 1;
+    onPressure?.call();
+    if (throwOnPressure) throw StateError('pressure failure');
   }
 
   @override
   Future<void> release() async {
     releaseCount += 1;
+    if (throwOnRelease) throw StateError('release failure');
   }
 }
