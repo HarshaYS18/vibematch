@@ -119,8 +119,8 @@ def _test_roots_and_package_imports(
     return roots, combined
 
 
-def _external_path_references(candidates: list[Path]) -> set[Path]:
-    references: set[Path] = set()
+def _external_path_references(candidates: list[Path]) -> dict[Path, list[Path]]:
+    references: dict[Path, list[Path]] = {candidate: [] for candidate in candidates}
     scan_roots = (
         ROOT / "scripts",
         ROOT / "docs",
@@ -147,11 +147,9 @@ def _external_path_references(candidates: list[Path]) -> set[Path]:
             except (UnicodeDecodeError, OSError):
                 continue
             for candidate, values in needles.items():
-                if candidate in references:
-                    continue
                 if any(value in text for value in values):
-                    references.add(candidate)
-    return references
+                    references[candidate].append(source)
+    return {candidate: sources for candidate, sources in references.items() if sources}
 
 
 def _asset_report(
@@ -277,6 +275,14 @@ def main() -> None:
         "externally_referenced_unreachable_lib_dart": sorted(
             path.relative_to(APP).as_posix() for path in external_refs
         ),
+        "unreachable_reference_sources": {
+            path.relative_to(APP).as_posix(): sorted(
+                source.relative_to(ROOT).as_posix() for source in sources
+            )
+            for path, sources in sorted(
+                external_refs.items(), key=lambda item: item[0].as_posix()
+            )
+        },
         "pure_orphan_lib_dart": pure_orphans,
         "direct_dependencies": sorted(dependencies),
         "imported_direct_dependencies": sorted(dependencies & set(imported_packages)),
