@@ -102,26 +102,19 @@ def check_flutter_legacy_paths() -> None:
             raise SystemExit(f"obsolete Android package remains: {path.relative_to(ROOT)}")
 
     alias = flutter / "lib/core/network/api_client.dart"
-    alias_rel = "core/network/api_client.dart"
+    if alias.exists():
+        raise SystemExit("deprecated ApiClient alias must stay decommissioned")
+
     import_offenders: list[str] = []
     for path in (flutter / "lib").rglob("*.dart"):
-        if path == alias:
-            continue
         text = path.read_text(encoding="utf-8", errors="replace")
         if "core/network/api_client.dart" in text or "../core/network/api_client.dart" in text:
             import_offenders.append(str(path.relative_to(ROOT)))
     if import_offenders:
         raise SystemExit(
-            "deprecated ApiClient alias still imported by supported sources: "
+            "decommissioned ApiClient path was reintroduced by supported sources: "
             + ", ".join(sorted(import_offenders))
         )
-
-    # The alias may stay through the source-compatibility window, but it must be
-    # a pure delegate and never regain transport ownership.
-    alias_text = alias.read_text(encoding="utf-8")
-    for forbidden in ("Dio(", "http.Client(", "WebSocket", "HttpClient("):
-        if forbidden in alias_text:
-            raise SystemExit(f"deprecated ApiClient alias regained transport ownership: {forbidden}")
 
 
 def check_dependency_hygiene() -> None:
