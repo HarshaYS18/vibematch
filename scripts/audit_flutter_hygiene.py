@@ -98,14 +98,59 @@ def _pubspec_dependencies() -> tuple[set[str], list[str]]:
     return deps, asset_prefixes
 
 
-def _all_package_imports(packages: dict[str, set[Path]]) -> dict[str, set[Path]]:
+def _test_roots_and_package_imports(
+    packages: dict[str, set[Path]],
+) -> tuple[list[Path], dict[str, set[Path]]]:
     combined = {name: set(paths) for name, paths in packages.items()}
+    roots: list[Path] = []
     for source in (APP / "test").rglob("*.dart"):
         text = source.read_text(encoding="utf-8-sig", errors="replace")
         for name in PACKAGE_IMPORT_RE.findall(text):
             if name != "vibematch_app":
                 combined.setdefault(name, set()).add(source)
-    return combined
+        for directive in DIRECTIVE_RE.finditer(text):
+            kind, body = directive.groups()
+            if kind == "part" and body.lstrip().startswith("of "):
+                continue
+            for uri in URI_RE.findall(body):
+                resolved = _resolve_uri(source, uri)
+                if resolved is not None and str(resolved).startswith(str(LIB)):
+                    roots.append(resolved)
+    return roots, combined
+
+
+def _external_path_references(candidates: list[Path]) -> set[Path]:
+    references: set[Path] = set()
+    scan_roots = (
+        ROOT / "scripts",
+        ROOT / "docs",
+        ROOT / "contracts",
+        ROOT / ".github",
+    )
+    needles = {
+        path: (
+            path.relative_to(APP).as_posix(),
+            path.relative_to(LIB).as_posix(),
+            f"package:vibematch_app/{path.relative_to(LIB).as_posix()}",
+        )
+        for path in candidates
+    }
+    for scan_root in scan_roots:
+        if not scan_root.exists():
+            continue
+        for source in scan_root.rglob("*"):
+            if not source.is_file():
+                continue
+            try:
+                text = source.read_text(encoding="utf-8-sig")
+            except (UnicodeDecodeError, OSError):
+                continue
+            for candidate, values in needles.items():
+                if candidate in references:
+                    continue
+                if any(value in text for value in values):
+                    references.add(candidate)
+    return references
 
 
 def _asset_report(asset_literals: set[str], declared_prefixes: list[str]) -> tuple[list[str], list[str]]:
@@ -148,7 +193,18 @@ def main() -> None:
     ]
 
     dependencies, asset_prefixes = _pubspec_dependencies()
-    imported_packages = _all_package_imports(packages)
+    test_roots, imported_packages = _test_roots_and_package_imports(packages)
+    test_reachable = _reachable(graph, test_roots)
+    external_refs = _external_path_references(
+        [path for path in lib_files if path not in reachable]
+    )
+    pure_orphans = [
+        path.relative_to(APP).as_posix()
+        for path in lib_files
+        if path not in reachable
+        and path not in test_reachable
+        and path not in external_refs
+    ]
     unused_dependencies = sorted(dependencies - set(imported_packages))
     unbundled_assets, literal_unreferenced_assets = _asset_report(
         asset_literals, asset_prefixes
@@ -158,6 +214,15 @@ def main() -> None:
         "lib_dart_files": len(lib_files),
         "reachable_lib_dart_files": len(reachable),
         "unreachable_lib_dart": unreachable,
+        "test_only_or_test_reachable_lib_dart": sorted(
+            path.relative_to(APP).as_posix()
+            for path in test_reachable
+            if path not in reachable
+        ),
+        "externally_referenced_unreachable_lib_dart": sorted(
+            path.relative_to(APP).as_posix() for path in external_refs
+        ),
+        "pure_orphan_lib_dart": pure_orphans,
         "direct_dependencies": sorted(dependencies),
         "imported_direct_dependencies": sorted(dependencies & set(imported_packages)),
         "unused_direct_dependencies": unused_dependencies,
