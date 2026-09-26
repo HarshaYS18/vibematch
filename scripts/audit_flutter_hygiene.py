@@ -20,12 +20,8 @@ APP = ROOT / "frontend" / "vibematch_app"
 LIB = APP / "lib"
 PUBSPEC = APP / "pubspec.yaml"
 
-SUPPORTED_PLATFORM_DIRS = {"android", "ios", "web"}
 UNSUPPORTED_PLATFORM_DIRS = {"linux", "macos", "windows"}
 APPROVED_UNREACHABLE_LIB_DART = {
-    "lib/core/network/api_client.dart": (
-        "deprecated source-compatibility alias retained by the decommission registry"
-    ),
     "lib/foundation/offline/offline_projection_store.dart": (
         "Chunk 46 offline projection policy component retained by focused tests/guard"
     ),
@@ -35,14 +31,6 @@ DIRECTIVE_RE = re.compile(r"(?ms)^\s*(import|export|part)\s+([^;]+);")
 URI_RE = re.compile(r"['\"]([^'\"]+)['\"]")
 ASSET_LITERAL_RE = re.compile(r"['\"](assets/[^'\"]+)['\"]")
 PACKAGE_IMPORT_RE = re.compile(r"package:([A-Za-z0-9_]+)/")
-
-# This file is intentionally kept as a bounded Chunk 46 offline capability.
-# It is exercised by policy tests and architecture guards even though current UI
-# routes do not instantiate it directly.
-ALLOWED_UNREACHABLE_LIB_DART = {
-    "lib/foundation/offline/offline_projection_store.dart",
-}
-
 
 def _norm(path: Path) -> Path:
     return Path(*path.parts)
@@ -294,16 +282,6 @@ def main() -> None:
 
     unexpected_unreachable = sorted(
         path for path in unreachable
-        if path not in ALLOWED_UNREACHABLE_LIB_DART
-    )
-    dead_literal_assets = sorted(
-        asset for asset in literal_unreferenced_assets
-        if asset not in external_asset_references
-        and not any(asset.startswith(prefix) for prefix in dynamic_asset_prefixes)
-    )
-
-    unexpected_unreachable = sorted(
-        path for path in unreachable
         if path not in APPROVED_UNREACHABLE_LIB_DART
     )
     dead_bundled_assets = sorted(
@@ -315,6 +293,25 @@ def main() -> None:
         for platform in UNSUPPORTED_PLATFORM_DIRS
         if (APP / platform).exists()
     )
+
+    asset_files = sorted(
+        path.relative_to(APP).as_posix()
+        for path in (APP / "assets").rglob("*")
+        if path.is_file()
+    )
+    empty_dynamic_asset_prefixes = sorted(
+        prefix
+        for prefix in dynamic_asset_prefixes
+        if not any(asset.startswith(prefix) for asset in asset_files)
+    )
+    empty_dynamic_asset_prefix_sources: dict[str, list[str]] = {}
+    for prefix in empty_dynamic_asset_prefixes:
+        sources: list[str] = []
+        for source in LIB.rglob("*.dart"):
+            text = source.read_text(encoding="utf-8-sig", errors="replace")
+            if prefix in text:
+                sources.append(source.relative_to(APP).as_posix())
+        empty_dynamic_asset_prefix_sources[prefix] = sorted(sources)
 
     report = {
         "lib_dart_files": len(lib_files),
@@ -343,16 +340,18 @@ def main() -> None:
             if path in unreachable
         },
         "unexpected_unreachable_lib_dart": unexpected_unreachable,
-        "unexpected_unreachable_lib_dart": unexpected_unreachable,
         "direct_dependencies": sorted(dependencies),
         "imported_direct_dependencies": sorted(dependencies & set(imported_packages)),
         "unused_direct_dependencies": unused_dependencies,
         "unbundled_assets": unbundled_assets,
         "dynamic_asset_prefixes": dynamic_asset_prefixes,
+        "empty_dynamic_asset_prefixes": empty_dynamic_asset_prefixes,
+        "empty_dynamic_asset_prefix_sources": empty_dynamic_asset_prefix_sources,
         "asset_manifest_consumers": sorted(asset_manifest_consumers),
         "external_asset_references": external_asset_references,
         "literal_unreferenced_assets": literal_unreferenced_assets,
-        "dead_literal_assets": dead_literal_assets,
+        "dead_bundled_assets": dead_bundled_assets,
+        "unsupported_platform_directories": present_unsupported_platforms,
     }
     print(json.dumps(report, indent=2))
 
@@ -375,15 +374,25 @@ def main() -> None:
             failures.append(
                 "unbundled asset files: " + ", ".join(unbundled_assets)
             )
-        if dead_literal_assets:
+        if dead_bundled_assets:
             failures.append(
-                "unreferenced bundled assets: " + ", ".join(dead_literal_assets)
+                "unreferenced bundled assets: " + ", ".join(dead_bundled_assets)
+            )
+        if empty_dynamic_asset_prefixes:
+            failures.append(
+                "dynamic asset prefixes with no bundled files: "
+                + json.dumps(empty_dynamic_asset_prefix_sources, sort_keys=True)
+            )
+        if present_unsupported_platforms:
+            failures.append(
+                "unsupported Flutter platform runners: "
+                + ", ".join(present_unsupported_platforms)
             )
         if failures:
             raise SystemExit(
                 "Flutter hygiene audit FAILED:\n - " + "\n - ".join(failures)
             )
-        print("Flutter hygiene audit: zero unnecessary sources/dependencies/assets")
+        print("Flutter hygiene audit: zero unnecessary sources/dependencies/assets/platforms")
 
 
 if __name__ == "__main__":
