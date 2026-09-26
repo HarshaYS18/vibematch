@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 
+import '../../../../core/assets/funkey_cdn_assets.dart';
+
 import '../../../../core/icons/vm_icons.dart';
 
 class RoomColors {
@@ -252,13 +254,10 @@ class RoomBackgroundTheme {
   }
 }
 
-const String roomDefaultBackgroundAssetBase =
-    'assets/images/room_backgrounds/chat_room/default';
-
-const RoomBackgroundTheme celestialFallsRoomBackgroundTheme = RoomBackgroundTheme(
+final RoomBackgroundTheme celestialFallsRoomBackgroundTheme = RoomBackgroundTheme(
   id: 'celestial_falls',
   name: 'Celestial Falls',
-  assetPath: '$roomDefaultBackgroundAssetBase/celestial_falls.webp',
+  imageUrl: FunKeyCdnAssets.url('ui/rooms/chat/backgrounds/v1/celestial_falls.webp'),
   accent: RoomColors.aqua,
   sourceType: RoomBackgroundSourceType.chatRoom,
   unlockType: RoomBackgroundUnlockType.free,
@@ -268,10 +267,10 @@ const RoomBackgroundTheme celestialFallsRoomBackgroundTheme = RoomBackgroundThem
   fallbackColors: [Color(0xFF07131F), Color(0xFF183953)],
 );
 
-const RoomBackgroundTheme moonlitBiolumeShoreRoomBackgroundTheme = RoomBackgroundTheme(
+final RoomBackgroundTheme moonlitBiolumeShoreRoomBackgroundTheme = RoomBackgroundTheme(
   id: 'moonlit_biolume_shore',
   name: 'Moonlit Biolume Shore',
-  assetPath: '$roomDefaultBackgroundAssetBase/moonlit_biolume_shore.webp',
+  imageUrl: FunKeyCdnAssets.url('ui/rooms/chat/backgrounds/v1/moonlit_biolume_shore.webp'),
   accent: RoomColors.violet,
   sourceType: RoomBackgroundSourceType.chatRoom,
   unlockType: RoomBackgroundUnlockType.free,
@@ -281,10 +280,10 @@ const RoomBackgroundTheme moonlitBiolumeShoreRoomBackgroundTheme = RoomBackgroun
   fallbackColors: [Color(0xFF050A18), Color(0xFF182C4D)],
 );
 
-const RoomBackgroundTheme auroraFrostLakeRoomBackgroundTheme = RoomBackgroundTheme(
+final RoomBackgroundTheme auroraFrostLakeRoomBackgroundTheme = RoomBackgroundTheme(
   id: 'aurora_frost_lake',
   name: 'Aurora Frost Lake',
-  assetPath: '$roomDefaultBackgroundAssetBase/aurora_frost_lake.webp',
+  imageUrl: FunKeyCdnAssets.url('ui/rooms/chat/backgrounds/v1/aurora_frost_lake.webp'),
   accent: RoomColors.aqua,
   sourceType: RoomBackgroundSourceType.chatRoom,
   unlockType: RoomBackgroundUnlockType.free,
@@ -294,10 +293,10 @@ const RoomBackgroundTheme auroraFrostLakeRoomBackgroundTheme = RoomBackgroundThe
   fallbackColors: [Color(0xFF07121E), Color(0xFF0D4051)],
 );
 
-const RoomBackgroundTheme desertDuskOasisRoomBackgroundTheme = RoomBackgroundTheme(
+final RoomBackgroundTheme desertDuskOasisRoomBackgroundTheme = RoomBackgroundTheme(
   id: 'desert_dusk_oasis',
   name: 'Desert Dusk Oasis',
-  assetPath: '$roomDefaultBackgroundAssetBase/desert_dusk_oasis.webp',
+  imageUrl: FunKeyCdnAssets.url('ui/rooms/chat/backgrounds/v1/desert_dusk_oasis.webp'),
   accent: RoomColors.gold,
   sourceType: RoomBackgroundSourceType.chatRoom,
   unlockType: RoomBackgroundUnlockType.free,
@@ -307,10 +306,10 @@ const RoomBackgroundTheme desertDuskOasisRoomBackgroundTheme = RoomBackgroundThe
   fallbackColors: [Color(0xFF180B10), Color(0xFF4A2538)],
 );
 
-const RoomBackgroundTheme alpineTwilightMirrorRoomBackgroundTheme = RoomBackgroundTheme(
+final RoomBackgroundTheme alpineTwilightMirrorRoomBackgroundTheme = RoomBackgroundTheme(
   id: 'alpine_twilight_mirror',
   name: 'Alpine Twilight Mirror',
-  assetPath: '$roomDefaultBackgroundAssetBase/alpine_twilight_mirror.webp',
+  imageUrl: FunKeyCdnAssets.url('ui/rooms/chat/backgrounds/v1/alpine_twilight_mirror.webp'),
   accent: RoomColors.violet,
   sourceType: RoomBackgroundSourceType.chatRoom,
   unlockType: RoomBackgroundUnlockType.free,
@@ -320,10 +319,10 @@ const RoomBackgroundTheme alpineTwilightMirrorRoomBackgroundTheme = RoomBackgrou
   fallbackColors: [Color(0xFF090B17), Color(0xFF2A1C45)],
 );
 
-const RoomBackgroundTheme crimsonCoastBeaconRoomBackgroundTheme = RoomBackgroundTheme(
+final RoomBackgroundTheme crimsonCoastBeaconRoomBackgroundTheme = RoomBackgroundTheme(
   id: 'crimson_coast_beacon',
   name: 'Crimson Coast Beacon',
-  assetPath: '$roomDefaultBackgroundAssetBase/crimson_coast_beacon.webp',
+  imageUrl: FunKeyCdnAssets.url('ui/rooms/chat/backgrounds/v1/crimson_coast_beacon.webp'),
   accent: RoomColors.coral,
   sourceType: RoomBackgroundSourceType.chatRoom,
   unlockType: RoomBackgroundUnlockType.free,
@@ -333,10 +332,10 @@ const RoomBackgroundTheme crimsonCoastBeaconRoomBackgroundTheme = RoomBackground
   fallbackColors: [Color(0xFF160711), Color(0xFF4B1628)],
 );
 
-const RoomBackgroundTheme moonlitWhisperGroveRoomBackgroundTheme = RoomBackgroundTheme(
+final RoomBackgroundTheme moonlitWhisperGroveRoomBackgroundTheme = RoomBackgroundTheme(
   id: 'moonlit_whisper_grove',
   name: 'Moonlit Whisper Grove',
-  assetPath: '$roomDefaultBackgroundAssetBase/moonlit_whisper_grove.webp',
+  imageUrl: FunKeyCdnAssets.url('ui/rooms/chat/backgrounds/v1/moonlit_whisper_grove.webp'),
   accent: RoomColors.aqua,
   sourceType: RoomBackgroundSourceType.chatRoom,
   unlockType: RoomBackgroundUnlockType.free,
@@ -346,10 +345,10 @@ const RoomBackgroundTheme moonlitWhisperGroveRoomBackgroundTheme = RoomBackgroun
   fallbackColors: [Color(0xFF030B12), Color(0xFF0F2937)],
 );
 
-const RoomBackgroundTheme cosmicHorizonVeilRoomBackgroundTheme = RoomBackgroundTheme(
+final RoomBackgroundTheme cosmicHorizonVeilRoomBackgroundTheme = RoomBackgroundTheme(
   id: 'cosmic_horizon_veil',
   name: 'Cosmic Horizon Veil',
-  assetPath: '$roomDefaultBackgroundAssetBase/cosmic_horizon_veil.webp',
+  imageUrl: FunKeyCdnAssets.url('ui/rooms/chat/backgrounds/v1/cosmic_horizon_veil.webp'),
   accent: RoomColors.violet,
   sourceType: RoomBackgroundSourceType.chatRoom,
   unlockType: RoomBackgroundUnlockType.free,
@@ -359,10 +358,10 @@ const RoomBackgroundTheme cosmicHorizonVeilRoomBackgroundTheme = RoomBackgroundT
   fallbackColors: [Color(0xFF070414), Color(0xFF251538)],
 );
 
-const RoomBackgroundTheme defaultRoomBackgroundTheme =
+final RoomBackgroundTheme defaultRoomBackgroundTheme =
     celestialFallsRoomBackgroundTheme;
 
-const List<RoomBackgroundTheme> ownedRoomBackgroundThemes = [
+final List<RoomBackgroundTheme> ownedRoomBackgroundThemes = [
   celestialFallsRoomBackgroundTheme,
   moonlitBiolumeShoreRoomBackgroundTheme,
   auroraFrostLakeRoomBackgroundTheme,
@@ -373,7 +372,7 @@ const List<RoomBackgroundTheme> ownedRoomBackgroundThemes = [
   cosmicHorizonVeilRoomBackgroundTheme,
 ];
 
-const List<RoomBackgroundTheme> mockRoomBackgroundThemes = ownedRoomBackgroundThemes;
+final List<RoomBackgroundTheme> mockRoomBackgroundThemes = ownedRoomBackgroundThemes;
 
 /// Renders the room background selected by the owning room state.
 ///
@@ -381,13 +380,14 @@ const List<RoomBackgroundTheme> mockRoomBackgroundThemes = ownedRoomBackgroundTh
 /// callbacks. This file intentionally owns no process-global mutable notifier;
 /// the canonical room background remains part of the scoped room state.
 class RoomBackground extends StatelessWidget {
-  const RoomBackground({super.key, this.theme = defaultRoomBackgroundTheme});
+  const RoomBackground({super.key, this.theme});
 
-  final RoomBackgroundTheme theme;
+  final RoomBackgroundTheme? theme;
 
   @override
   Widget build(BuildContext context) {
     final screenSize = MediaQuery.sizeOf(context);
+    final resolvedTheme = theme ?? defaultRoomBackgroundTheme;
     return RepaintBoundary(
       child: OverflowBox(
         alignment: Alignment.topCenter,
@@ -398,7 +398,7 @@ class RoomBackground extends StatelessWidget {
         child: SizedBox(
           width: screenSize.width,
           height: screenSize.height,
-          child: _RoomBackgroundImage(theme: theme),
+          child: _RoomBackgroundImage(theme: resolvedTheme),
         ),
       ),
     );
@@ -421,12 +421,9 @@ class _RoomBackgroundImage extends StatelessWidget {
             theme.imageUrl!,
             fit: BoxFit.cover,
             alignment: Alignment.center,
-            errorBuilder: (context, error, stackTrace) {
-              return _AssetFallbackImage(theme: theme);
-            },
-          )
-        else
-          _AssetFallbackImage(theme: theme),
+            errorBuilder: (context, error, stackTrace) =>
+                const SizedBox.shrink(),
+          ),
         DecoratedBox(
           decoration: BoxDecoration(
             gradient: LinearGradient(
@@ -441,26 +438,6 @@ class _RoomBackgroundImage extends StatelessWidget {
           ),
         ),
       ],
-    );
-  }
-}
-
-class _AssetFallbackImage extends StatelessWidget {
-  const _AssetFallbackImage({required this.theme});
-
-  final RoomBackgroundTheme theme;
-
-  @override
-  Widget build(BuildContext context) {
-    if (!theme.isAssetBacked) return const SizedBox.shrink();
-
-    return Image.asset(
-      theme.assetPath!,
-      fit: BoxFit.cover,
-      alignment: Alignment.center,
-      errorBuilder: (context, error, stackTrace) {
-        return const SizedBox.shrink();
-      },
     );
   }
 }
@@ -640,12 +617,9 @@ class _BackgroundThemeTile extends StatelessWidget {
                         Image.network(
                           theme.thumbnailUrl ?? theme.imageUrl!,
                           fit: BoxFit.cover,
-                          errorBuilder: (context, error, stackTrace) {
-                            return _AssetFallbackImage(theme: theme);
-                          },
-                        )
-                      else
-                        _AssetFallbackImage(theme: theme),
+                          errorBuilder: (context, error, stackTrace) =>
+                              const SizedBox.shrink(),
+                        ),
                       Container(color: Colors.black.withValues(alpha: locked ? 0.45 : 0.12)),
                       if (selected && !locked)
                         const Align(
