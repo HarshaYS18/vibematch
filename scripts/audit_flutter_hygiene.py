@@ -330,6 +330,27 @@ def main() -> None:
         for path in (APP / "assets").rglob("*")
         if path.is_file()
     )
+    unexpected_bundled_assets = sorted(
+        asset for asset in asset_files
+        if asset not in ALLOWED_BUNDLED_ASSETS
+    )
+    forbidden_asset_literal_sources: dict[str, list[str]] = {}
+    local_media_renderer_sources: list[str] = []
+    for source in LIB.rglob("*.dart"):
+        text = source.read_text(encoding="utf-8-sig", errors="replace")
+        disallowed_literals = sorted(
+            literal
+            for literal in ASSET_LITERAL_RE.findall(text)
+            if literal not in ALLOWED_BUNDLED_ASSETS
+        )
+        if disallowed_literals:
+            forbidden_asset_literal_sources[
+                source.relative_to(APP).as_posix()
+            ] = disallowed_literals
+        if LOCAL_MEDIA_RENDER_RE.search(text):
+            local_media_renderer_sources.append(
+                source.relative_to(APP).as_posix()
+            )
     empty_dynamic_asset_prefixes = sorted(
         prefix
         for prefix in dynamic_asset_prefixes
