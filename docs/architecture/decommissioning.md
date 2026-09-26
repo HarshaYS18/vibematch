@@ -20,12 +20,13 @@ source imports `package:http/http.dart`.
 Some compatibility paths are intentionally retained:
 
 - `backend/legacy_snapshot.py` is migration-history infrastructure;
-- the deprecated Flutter `ApiClient` is a transport-free compatibility alias;
+- the deprecated Flutter `ApiClient` compatibility alias has been removed after repository reachability dropped to zero;
 - the historical `vibematch_app` directory/package path is retained to avoid a
   risky package-rename migration during this roadmap;
 - mediasoup Socket.IO is media signaling, not a second application WebSocket;
 - room presentation compatibility adapters may remain only while they are
   read-only projections over `RoomSessionRepository`.
 
-Every retained seam has an explicit reason and removal condition. Future cleanup
-must update the registry and prove tests/builds/migrations before deletion.
+Every retained seam has an explicit reason and removal condition. Removed seams
+remain recorded in the registry so CI prevents accidental reintroduction. Future
+cleanup must update the registry and prove tests/builds/migrations before deletion.
