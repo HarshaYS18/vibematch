@@ -32,6 +32,19 @@ Feature folders may not instantiate raw Dio/http/HttpClient. The canonical
 transport owns bearer injection, request/trace IDs, cancellation, timeouts,
 connection reuse, retry safety and normalized errors.
 
+## Bundled media policy
+
+The Flutter application bundle contains exactly one product media asset:
+`assets/branding/funkey_logo.png`. Gifts, gift videos, room backgrounds,
+VIP/SVIP tags, family badges, profile decorations and other presentation media
+are CDN-owned and must be addressed through `VmApiConfig.cdnOrigin` or an
+authoritative backend payload.
+
+Use `VM_CDN_BASE_URL` for non-production CDN overrides. Production defaults to
+`https://cdn.funkey.com`. Never add a local `Image.asset`, `AssetImage` or
+asset-backed video fallback for product media. Network failures must preserve
+layout with lightweight Flutter-drawn/icon/gradient fallbacks instead.
+
 ## Realtime and media
 
 There is one application WebSocket: the Go `funkey.v2` gateway. Room/inbox/
