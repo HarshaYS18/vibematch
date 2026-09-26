@@ -85,6 +85,12 @@ def check_roadmap_documentation_state() -> None:
     deployment = (ROOT / "docs" / "architecture" / "deployment.md").read_text(
         encoding="utf-8"
     )
+    master_source = (ROOT / "docs" / "master-source-of-truth-architecture.md").read_text(
+        encoding="utf-8"
+    )
+    capacity = (ROOT / "docs" / "architecture" / "capacity-model.md").read_text(
+        encoding="utf-8"
+    )
 
     required = {
         "authority-registry.md": (
@@ -116,6 +122,20 @@ def check_roadmap_documentation_state() -> None:
             (deployment, "Analytics Sink"),
             (deployment, "GraphQL Read BFF"),
         ),
+        "master-source-of-truth-architecture.md": (
+            (master_source, "Chunks 15–56"),
+            (master_source, "GraphQL Read BFF"),
+            (master_source, "NATS-to-Kafka bridge"),
+            (master_source, "Search/OpenSearch"),
+            (master_source, "ClickHouse"),
+        ),
+        "capacity-model.md": (
+            (capacity, "Kafka"),
+            (capacity, "Search / OpenSearch"),
+            (capacity, "Recommendation"),
+            (capacity, "Analytics"),
+            (capacity, "GraphQL Read BFF"),
+        ),
     }
     for document, checks in required.items():
         for text, marker in checks:
@@ -136,6 +156,10 @@ def check_roadmap_documentation_state() -> None:
         "overview.md": (
             (overview, "Repository reality through\nChunk 32"),
             (overview, "remain future chunks"),
+        ),
+        "master-source-of-truth-architecture.md": (
+            (master_source, "Chunk 20–32 architecture work"),
+            (master_source, "current room presence in `room_participants`"),
         ),
     }
     for document, checks in stale_markers.items():
