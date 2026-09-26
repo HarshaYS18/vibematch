@@ -250,14 +250,19 @@ type Hub struct {
 	shards   []routeShard
 	draining bool
 	dedupe   *boundedDedupe
+	hotRoomSubscriberThreshold int
 	stats    Stats
 }
 
 func NewHub() *Hub {
-	return newHubWithShards(defaultHubShardCount)
+	return newHubWithQoS(defaultHubShardCount, 500)
 }
 
 func newHubWithShards(count int) *Hub {
+	return newHubWithQoS(count, 500)
+}
+
+func newHubWithQoS(count int, hotRoomSubscriberThreshold int) *Hub {
 	if count < 1 {
 		count = 1
 	}
@@ -268,11 +273,15 @@ func newHubWithShards(count int) *Hub {
 			byRoom: make(map[string]map[*Client]struct{}),
 		}
 	}
+	if hotRoomSubscriberThreshold < 1 {
+		hotRoomSubscriberThreshold = 1
+	}
 	return &Hub{
 		clients: make(map[*Client]struct{}),
 		staff:   make(map[*Client]struct{}),
 		shards:  shards,
 		dedupe:  newBoundedDedupe(defaultDedupeEntries, defaultDedupeTTL),
+		hotRoomSubscriberThreshold: hotRoomSubscriberThreshold,
 	}
 }
 
@@ -574,7 +583,26 @@ func (h *Hub) CloseAll() {
 	}
 }
 
+func (h *Hub) roomQoSStats() (hotRooms int, maxSubscribers int) {
+	for index := range h.shards {
+		shard := &h.shards[index]
+		shard.mu.RLock()
+		for _, clients := range shard.byRoom {
+			count := len(clients)
+			if count > maxSubscribers {
+				maxSubscribers = count
+			}
+			if count >= h.hotRoomSubscriberThreshold {
+				hotRooms++
+			}
+		}
+		shard.mu.RUnlock()
+	}
+	return hotRooms, maxSubscribers
+}
+
 func (h *Hub) Metrics() string {
+	hotRooms, maxRoomSubscribers := h.roomQoSStats()
 	return "funkey_realtime_connections " + strconv.FormatInt(h.stats.Connections.Load(), 10) + "\n" +
 		"funkey_realtime_connections_accepted_total " + strconv.FormatUint(h.stats.Accepted.Load(), 10) + "\n" +
 		"funkey_realtime_auth_denied_total " + strconv.FormatUint(h.stats.AuthDenied.Load(), 10) + "\n" +
@@ -585,5 +613,8 @@ func (h *Hub) Metrics() string {
 		"funkey_realtime_capacity_denied_total " + strconv.FormatUint(h.stats.CapacityDenied.Load(), 10) + "\n" +
 		"funkey_realtime_best_effort_dropped_total " + strconv.FormatUint(h.stats.BestEffortDropped.Load(), 10) + "\n" +
 		"funkey_realtime_lower_priority_evicted_total " + strconv.FormatUint(h.stats.LowerPriorityEvict.Load(), 10) + "\n" +
-		"funkey_realtime_dedupe_entries " + strconv.Itoa(h.dedupe.size()) + "\n"
+		"funkey_realtime_dedupe_entries " + strconv.Itoa(h.dedupe.size()) + "\n" +
+		"funkey_realtime_hot_rooms " + strconv.Itoa(hotRooms) + "\n" +
+		"funkey_realtime_max_room_subscribers " + strconv.Itoa(maxRoomSubscribers) + "\n" +
+		"funkey_realtime_hot_room_threshold " + strconv.Itoa(h.hotRoomSubscriberThreshold) + "\n"
 }

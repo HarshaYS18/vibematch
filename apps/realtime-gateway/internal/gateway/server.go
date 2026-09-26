@@ -52,7 +52,7 @@ func NewServer(
 ) *Server {
 	return &Server{
 		Config: cfg, Auth: auth, Commands: commands, Redis: client,
-		Hub: NewHub(), Logger: logger,
+		Hub: newHubWithQoS(defaultHubShardCount, cfg.HotRoomSubscriberThreshold), Logger: logger,
 		authSlots:    make(chan struct{}, 512),
 		commandSlots: make(chan struct{}, 256),
 	}

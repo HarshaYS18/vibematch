@@ -1,0 +1,18 @@
+{
+  "schema_version": 1,
+  "offline_projection": {
+    "max_rows": 64,
+    "max_payload_bytes": 65536,
+    "max_ttl_days": 7,
+    "allowed_scopes": ["home", "public_profile", "room_preview", "vibe_feed", "search_recent"]
+  },
+  "forbidden_offline_command_prefixes": [
+    "wallet.", "gift.", "purchase.", "payment.", "economy.",
+    "room.membership.", "room.seat.", "moderation.", "auth.", "game.settlement."
+  ],
+  "battery": {
+    "constrained_below_percent": 20,
+    "disable_speculative_prefetch_in_low_power_mode": true,
+    "channel": "funkey/power_state"
+  }
+}

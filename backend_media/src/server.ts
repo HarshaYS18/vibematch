@@ -51,6 +51,12 @@ app.get('/metrics', (_request, response) => {
     `funkey_media_rooms ${stats.roomCount}`,
     '# TYPE funkey_media_peers gauge',
     `funkey_media_peers ${stats.peerCount}`,
+    '# TYPE funkey_media_hot_rooms gauge',
+    `funkey_media_hot_rooms ${stats.hotRoomCount}`,
+    '# TYPE funkey_media_max_room_peers gauge',
+    `funkey_media_max_room_peers ${stats.maxRoomPeers}`,
+    '# TYPE funkey_media_hot_room_peer_threshold gauge',
+    `funkey_media_hot_room_peer_threshold ${config.registry.hotRoomPeers}`,
     '# TYPE funkey_media_max_rooms gauge',
     `funkey_media_max_rooms ${config.registry.maxRooms}`,
     '# TYPE funkey_media_max_peers gauge',
@@ -62,6 +68,15 @@ app.get('/metrics', (_request, response) => {
     '# TYPE funkey_media_joins_total counter',
     `funkey_media_joins_total{result="success"} ${joins.succeeded}`,
     `funkey_media_joins_total{result="failure"} ${joins.failed}`,
+    '# TYPE funkey_media_join_duration_milliseconds histogram',
+    ...joins.durationBucketsMs.map((bucket, index) =>
+      `funkey_media_join_duration_milliseconds_bucket{le="${bucket}"} ${joins.durationCounts[index]}`
+    ),
+    `funkey_media_join_duration_milliseconds_bucket{le="+Inf"} ${joins.durationObservations}`,
+    `funkey_media_join_duration_milliseconds_sum ${joins.durationTotalMs}`,
+    `funkey_media_join_duration_milliseconds_count ${joins.durationObservations}`,
+    '# TYPE funkey_media_join_p95_target_milliseconds gauge',
+    `funkey_media_join_p95_target_milliseconds ${config.qos.joinP95TargetMs}`,
     '',
   ].join('\n'));
 });

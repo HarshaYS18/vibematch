@@ -113,14 +113,21 @@ export class RoomManager {
     return undefined;
   }
 
-  getStats(): { roomCount: number; peerCount: number; roomIds: string[] } {
+  getStats(): { roomCount: number; peerCount: number; hotRoomCount: number; maxRoomPeers: number; roomIds: string[] } {
     let peerCount = 0;
+    let hotRoomCount = 0;
+    let maxRoomPeers = 0;
     for (const room of this.rooms.values()) {
-      peerCount += room.peers.size;
+      const peers = room.peers.size;
+      peerCount += peers;
+      if (peers >= config.registry.hotRoomPeers) hotRoomCount += 1;
+      if (peers > maxRoomPeers) maxRoomPeers = peers;
     }
     return {
       roomCount: this.rooms.size,
       peerCount,
+      hotRoomCount,
+      maxRoomPeers,
       roomIds: [...this.rooms.keys()],
     };
   }
@@ -184,7 +191,7 @@ export class RoomManager {
       enableUdp: true,
       enableTcp: true,
       preferUdp: true,
-      initialAvailableOutgoingBitrate: 800000,
+      initialAvailableOutgoingBitrate: config.qos.initialAvailableOutgoingBitrate,
     });
 
     params.peer.transports.set(transport.id, transport);

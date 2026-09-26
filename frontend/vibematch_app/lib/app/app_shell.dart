@@ -29,6 +29,7 @@ import 'runtime/app_shell_navigation_controller.dart';
 import 'runtime/game_bundle_cache_resource_participant.dart';
 import 'runtime/flutter_image_cache_resource_participant.dart';
 import 'runtime/media_resource_coordinator.dart';
+import '../foundation/runtime/mobile_runtime_budget.dart';
 import 'runtime/vibes_media_resource_participant.dart';
 import 'runtime/app_wallet_runtime.dart';
 import 'app_routes.dart';
@@ -89,6 +90,7 @@ class _AppShellState extends ConsumerState<AppShell>
       unawaited(_startShellRuntimes());
       unawaited(_validateAppSourceRegistry());
       unawaited(_permissionService.requestAppLaunchPermissions());
+      unawaited(ref.read(mobileRuntimeBudgetProvider).refresh());
     });
   }
 
@@ -125,9 +127,9 @@ class _AppShellState extends ConsumerState<AppShell>
   void didChangeAppLifecycleState(AppLifecycleState state) {
     // The coordinator receives lifecycle pressure only. It does not become
     // authority for session, navigation, playback, room, or game state.
-    unawaited(
-      _notifyResourceForegroundState(state == AppLifecycleState.resumed),
-    );
+    final isForeground = state == AppLifecycleState.resumed;
+    unawaited(_notifyResourceForegroundState(isForeground));
+    unawaited(ref.read(mobileRuntimeBudgetProvider).setForeground(isForeground));
     if (state == AppLifecycleState.resumed) {
       unawaited(_reconcileCanonicalShellState());
     }

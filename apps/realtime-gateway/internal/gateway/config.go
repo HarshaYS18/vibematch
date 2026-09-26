@@ -39,6 +39,7 @@ type Config struct {
 	OutboundQueue          int
 	MaxConnections         int64
 	MaxConnectionsPerUser  int
+	HotRoomSubscriberThreshold int
 }
 
 func env(key, fallback string) string {
@@ -100,6 +101,7 @@ func LoadConfig() (Config, error) {
 		OutboundQueue:          64,
 		MaxConnections:         10000,
 		MaxConnectionsPerUser:  4,
+		HotRoomSubscriberThreshold: 500,
 	}
 	cfg.NATSURL = strings.TrimSpace(os.Getenv("REALTIME_NATS_URL"))
 	cfg.NATSEnabled = cfg.NATSURL != ""
@@ -157,6 +159,9 @@ func LoadConfig() (Config, error) {
 		cfg.MaxConnections = value
 	}
 	if cfg.MaxConnectionsPerUser, err = positiveIntEnv("REALTIME_MAX_CONNECTIONS_PER_USER", cfg.MaxConnectionsPerUser); err != nil {
+		return cfg, err
+	}
+	if cfg.HotRoomSubscriberThreshold, err = positiveIntEnv("REALTIME_HOT_ROOM_SUBSCRIBER_THRESHOLD", cfg.HotRoomSubscriberThreshold); err != nil {
 		return cfg, err
 	}
 	for _, origin := range strings.Split(os.Getenv("REALTIME_ORIGINS"), ",") {

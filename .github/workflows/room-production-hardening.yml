@@ -21,6 +21,9 @@ on:
       - 'frontend/vibematch_app/**'
       - 'scripts/check_backend_architecture.py'
       - 'scripts/check_contracts.py'
+      - 'scripts/check_realtime_media_qos.py'
+      - 'scripts/check_mobile_runtime.py'
+      - 'scripts/check_cache_edge_architecture.py'
       - 'contracts/**'
       - 'docs/architecture/**'
       - 'docs/modules/**'
@@ -46,6 +49,9 @@ jobs:
         run: |
           python scripts/check_backend_architecture.py
           python scripts/check_contracts.py
+          python scripts/check_realtime_media_qos.py
+          python scripts/check_mobile_runtime.py
+          python scripts/check_cache_edge_architecture.py
 
   backend-tests:
     runs-on: ubuntu-latest

@@ -478,6 +478,7 @@ async function safeAck<T>(eventName: string, socketId: string, ack: Ack<T> | und
 }
 
 async function executeAck<T>(eventName: string, socketId: string, ack: Ack<T> | undefined, handler: () => Promise<T>): Promise<void> {
+  const startedAt = Date.now();
   try {
     const data = await withMediaSpan(
       `media.signal.${eventName}`,
@@ -485,10 +486,10 @@ async function executeAck<T>(eventName: string, socketId: string, ack: Ack<T> | 
       socketTraceparents.get(socketId),
       { 'funkey.media.event': eventName },
     );
-    if (eventName === 'joinRoom') recordJoin(true);
+    if (eventName === 'joinRoom') recordJoin(true, Date.now() - startedAt);
     ack?.(ackPayload(data));
   } catch (error) {
-    if (eventName === 'joinRoom') recordJoin(false);
+    if (eventName === 'joinRoom') recordJoin(false, Date.now() - startedAt);
     const message = error instanceof MediaAuthorizationError
       ? error.reason ?? error.message
       : error instanceof Error

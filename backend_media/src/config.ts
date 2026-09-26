@@ -15,6 +15,9 @@ const envSchema = z.object({
   MEDIA_HEARTBEAT_INTERVAL_MS: z.coerce.number().int().min(3000).default(10000),
   MEDIA_MAX_ROOMS: z.coerce.number().int().min(1).default(250),
   MEDIA_MAX_PEERS: z.coerce.number().int().min(1).default(5000),
+  MEDIA_HOT_ROOM_PEERS: z.coerce.number().int().min(2).default(250),
+  MEDIA_INITIAL_AVAILABLE_OUTGOING_BITRATE: z.coerce.number().int().min(100000).max(5000000).default(800000),
+  MEDIA_JOIN_P95_TARGET_MS: z.coerce.number().int().min(50).max(5000).default(750),
   FASTAPI_BASE_URL: z.string().url().default('http://127.0.0.1:8000'),
   CORS_ORIGIN: z.string().default('*'),
   MEDIASOUP_LISTEN_IP: z.string().default('0.0.0.0'),
@@ -59,10 +62,15 @@ export const config = {
     heartbeatIntervalMs: parsed.MEDIA_HEARTBEAT_INTERVAL_MS,
     maxRooms: parsed.MEDIA_MAX_ROOMS,
     maxPeers: parsed.MEDIA_MAX_PEERS,
+    hotRoomPeers: parsed.MEDIA_HOT_ROOM_PEERS,
   },
   socket: {
     pingTimeout: parsed.SOCKET_PING_TIMEOUT_MS,
     pingInterval: parsed.SOCKET_PING_INTERVAL_MS,
+  },
+  qos: {
+    joinP95TargetMs: parsed.MEDIA_JOIN_P95_TARGET_MS,
+    initialAvailableOutgoingBitrate: parsed.MEDIA_INITIAL_AVAILABLE_OUTGOING_BITRATE,
   },
   mediasoup: {
     listenIp: parsed.MEDIASOUP_LISTEN_IP,
