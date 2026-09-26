@@ -78,7 +78,6 @@ class _VmAvatarFrameHostState extends State<VmAvatarFrameHost>
 
     final frameSize = widget.size + widget.framePadding;
     final imageUrl = frame.imageUrl?.trim();
-    final assetPath = frame.assetPath?.trim();
 
     return SizedBox(
       width: frameSize,
@@ -90,20 +89,6 @@ class _VmAvatarFrameHostState extends State<VmAvatarFrameHost>
           if (imageUrl != null && imageUrl.isNotEmpty)
             AppImage.network(
               imageUrl,
-              width: frameSize,
-              height: frameSize,
-              fit: BoxFit.contain,
-              filterQuality: FilterQuality.high,
-              fallback: _GeneratedVmAvatarFrame(
-                frame: frame,
-                size: frameSize,
-                controller: _controller,
-                staticStrokeWidth: widget.staticStrokeWidth,
-              ),
-            )
-          else if (assetPath != null && assetPath.isNotEmpty)
-            AppImage.asset(
-              assetPath,
               width: frameSize,
               height: frameSize,
               fit: BoxFit.contain,
