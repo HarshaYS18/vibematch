@@ -1,0 +1,18 @@
+# Repository-wide fallback.
+* @HarshaYS18
+
+# Client
+/frontend/vibematch_app/ @HarshaYS18
+
+# Domain/platform services
+/backend/ @HarshaYS18
+/apps/ @HarshaYS18
+/backend_media/ @HarshaYS18
+
+# Contracts, infrastructure and production operations
+/contracts/ @HarshaYS18
+/deploy/ @HarshaYS18
+/infra/ @HarshaYS18
+/.github/workflows/ @HarshaYS18
+/docs/architecture/ @HarshaYS18
+/docs/runbooks/ @HarshaYS18

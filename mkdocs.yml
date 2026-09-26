@@ -1,0 +1,22 @@
+site_name: FunKey Engineering Portal
+site_description: FunKey production architecture, ownership, runbooks and developer guides
+docs_dir: docs
+theme:
+  name: readthedocs
+nav:
+  - Home: developer-portal/index.md
+  - Architecture:
+      - Overview: architecture/overview.md
+      - Authority registry: architecture/authority-registry.md
+      - Service boundaries: architecture/service-boundaries.md
+      - Realtime / media QoS: architecture/realtime-media-qos.md
+      - Analytics: architecture/analytics-platform.md
+      - Release safety: architecture/release-safety.md
+      - SRE / FinOps: architecture/sre-finops.md
+  - Operations:
+      - Runbooks: runbooks/README.md
+      - External prerequisites: EXTERNAL_PREREQUISITES.md
+  - Governance:
+      - Architecture review: governance/architecture-review.md
+      - RFC process: governance/rfc-process.md
+  - Modules: MODULE_INDEX.md

@@ -1,74 +1,89 @@
-# FunKey Flutter client
+# FunKey Flutter client architecture
 
-This directory contains the production FunKey Flutter client. The historical
-`vibematch_app` folder/package name is retained for compatibility.
+The directory/package name `vibematch_app` is retained for source compatibility;
+the product is FunKey. This client preserves the existing UI while using
+backend-authoritative domain state.
 
-## Architecture rules
+## Authority model
 
-- Backend domain services are durable authority; Flutter owns display/cache/UI state only.
-- Feature REST/control-plane traffic must flow through:
-  `Repository / feature service -> AppNetworkClient -> CanonicalNetworkTransport -> Dio`.
-- Feature folders may not import `package:http`, `package:dio`, or raw `HttpClient`.
-- `RoomSessionRepository` is the single Flutter room-state authority.
-- Room media engines own WebRTC transport lifecycle only.
-- Application realtime uses the single Go `funkey.v2` socket; mediasoup signaling is separate.
-- Watch Party state is backend/Room-Control authoritative.
-- Remote games load through the verified Game Platform HTML runtime; gameplay is not bundled as Flutter packages.
-- Media v2 streams large uploads directly to object storage; Flutter does not transcode large media.
-- Preserve the existing visual language unless a product/UI change is explicitly requested.
+Flutter owns presentation, navigation, short-lived view models and reconstructable
+cache state. It does not own identity/session truth, room membership/permissions,
+wallet/ledger, gifts/purchases, game settlement, moderation, Inbox durability,
+Vibes durability or Watch Party canonical playback state.
 
-Architecture enforcement lives in `test/architecture/` and the repository CI.
-
-## Important foundations
-
-| Area | Path |
-|---|---|
-| canonical networking | `lib/foundation/networking/` |
-| persistence | `lib/foundation/persistence/` |
-| app source-of-truth registry | `lib/` source registry / feature repositories |
-| room session | room feature repository/controller boundaries |
-| room media | media engine abstractions |
-| Watch Party | provider-neutral Watch Party domain/adapters |
-| remote games | Game Platform runtime/bridge |
-| media upload v2 | foundation streaming upload transport |
-| Inbox | `lib/features/inbox/` |
+`RoomSessionRepository` remains the single client room-state authority. Do not
+create a competing room singleton or feature-local global bus.
 
 ## Networking
 
-`CanonicalNetworkTransport` owns timeouts, bearer-token injection, request IDs,
-W3C trace headers, cancellation, safe/idempotent retry behavior, normalized
-errors, connection reuse and request metrics. A foundation compatibility facade
-exists only as a migration seam and still delegates to the same Dio transport.
+Feature traffic follows:
 
-Do not create a feature-local HTTP client.
+```text
+feature repository/service
+  -> AppNetworkClient
+  -> CanonicalNetworkTransport
+  -> Dio
+```
 
-## Realtime
+Feature folders may not instantiate raw Dio/http/HttpClient. The canonical
+transport owns bearer injection, request/trace IDs, cancellation, timeouts,
+connection reuse, retry safety and normalized errors.
 
-The client mints a connect capability before opening the application socket and
-room-specific subscribe capabilities as needed. Reconnect/resume uses canonical
-room snapshot/replay semantics. Do not add another application WebSocket manager.
+## Realtime and media
 
-## Inbox
+There is one application WebSocket: the Go `funkey.v2` gateway. Room/inbox/
+wallet events reconcile back to authoritative snapshots after reconnect.
 
-Conversation pages are cursor-paged summaries and contain no message history.
-Opening a chat fetches a bounded message window; older history is independently
-cursor-paged. Realtime events update the active model after authoritative commit.
+mediasoup signaling is separate because it is media transport, not a second
+application state channel. The room media engine owns WebRTC transport lifecycle
+only.
 
-## Media
+## Watch Party
 
-Images/video/audio uploaded through Media v2 use upload-session control and
-streamed direct upload. Interactive image crop/preview may use bounded in-memory
-data; large media must not be buffered wholesale in Dart memory.
+Provider adapters control YouTube or approved OTT companion/embedded behavior,
+but Room Control remains canonical for playback revision, host authority and
+late-join/reconnect reconciliation. Provider limitations must fail to companion
+mode rather than bypassing DRM or permissions.
 
 ## Remote games
 
-Remote game bundles are HTTPS-only, manifest/version/SHA-256 verified and run
-behind the narrow Host Bridge. Remote JavaScript never receives the FunKey bearer
-token. Fail closed when bundle integrity/configuration is invalid.
+Games are CDN/HTML runtime assets verified by manifest/version/SHA-256 and loaded
+behind the narrow game Host Bridge. Remote JavaScript never receives the FunKey
+bearer token. Gameplay/settlement authority remains Game Platform + Economy.
+
+## Persistence and offline behavior
+
+Persistent client storage is reconstructable. The bounded offline projection may
+cache small Home/public-profile/room-preview/Vibe/recent-search payloads.
+Authoritative wallet, gift, purchase, membership, seat, moderation, auth and
+settlement commands are never queued offline.
+
+## Heavy resource lifecycle
+
+The authenticated AppShell owns one session-scoped resource coordinator for video
+decoders, WebViews, WebRTC, image cache, verified game bundles and related
+memory-pressure/background lifecycle. Feature code registers participants rather
+than creating a second coordinator.
+
+## State management
+
+Riverpod is the app-wide composition mechanism. Prefer selective provider
+watching and immutable state. Persistent tab branches remain mounted to preserve
+scroll/navigation state; inactive branches disable tickers and interaction.
+
+## Performance rules
+
+- one active Vibes decoder
+- one canonical room WebRTC engine
+- bounded image/game-bundle caches
+- lazy lists and resized thumbnails
+- no duplicate network fetches for the same canonical state
+- background/low-power mode disables speculative prefetch
+- profile before optimizing; do not hide latency with retries
 
 ## Local development
 
-Install Flutter matching CI, then from this directory:
+From this directory:
 
 ```bash
 flutter pub get
@@ -77,17 +92,15 @@ flutter analyze
 flutter build web --release
 ```
 
-Use the repository local-development guide for backend/realtime/media services.
-Do not hand-edit `pubspec.lock`; dependency changes must resolve and commit a
-consistent lockfile.
+Dependency changes must update and commit `pubspec.lock`. Use the repository
+local-development guide for backend/realtime/media dependencies.
 
-## Before changing architecture
+## Architecture change checklist
 
-Read:
-- `../../docs/master-source-of-truth-architecture.md`
-- `../../docs/architecture/service-boundaries.md`
-- `../../docs/architecture/flutter-canonical-networking.md`
-- the relevant feature/module documentation
+Before adding a cache, socket, singleton, persistence layer or network client:
 
-Any new authority/cache/socket/network abstraction needs a regression or
-architecture guard so it cannot silently become a second source of truth.
+- identify the existing authority
+- use the canonical foundation abstraction
+- add regression/architecture tests
+- update module/architecture docs and compatibility notes
+- preserve the existing visual design unless product explicitly changes it
