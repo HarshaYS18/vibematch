@@ -1,7 +1,7 @@
 # Architecture Authority Registry
 
 **Owner:** Platform Architecture  
-**Status:** canonical human guide synchronized through Chunk 32 repair  
+**Status:** canonical human guide synchronized through Chunk 56 closure  
 **Machine contract:** `contracts/architecture/authorities.yaml`  
 **Guard:** `scripts/check_backend_architecture.py`
 
@@ -38,9 +38,10 @@ copy or route traffic.
 | Game catalog/session/round/bet/risk/stats | Game Platform | `game-platform-service` | Never mutates wallet/financial tables. |
 | Notifications + push delivery state | Notification | `notification-service` | FCM/provider is transport only. |
 | Media upload/processing metadata | Media Control | core control + media workers | PostgreSQL is control-plane authority; object storage is bytes only. |
-| Search | Search Projection | direct DB search today | Future OpenSearch remains rebuildable. |
-| Analytics | Analytics Projection | not deployed | Future Kafka/ClickHouse copies are downstream only. |
-| Recommendations | Recommendation Projection | not deployed | Ranking output is rebuildable. |
+| Search | Search Projection | `search-service` + OpenSearch | Versioned indexes/aliases are rebuildable from owner events and never authorize commands. |
+| Kafka retained event stream | Analytics Projection | `kafka-event-bridge` + Kafka | Retained analytics/replay/ML copy downstream of NATS; never synchronous RPC or business truth. |
+| Analytics warehouse/lake | Analytics Projection | `analytics-sink` + ClickHouse/Parquet | Rebuildable analytical projections derived from Kafka. |
+| Recommendations | Recommendation Projection | `recommendation-service` + Redis | Candidate/ranking feed projections are reconstructable from retained events and owner state. |
 | Flutter room/display cache | Flutter client cache | Flutter | Backend snapshot/delta wins durable conflicts. |
 
 ## Important resolved boundaries
@@ -76,8 +77,21 @@ while the old writer still has mutation rights.
 Rollback must preserve exactly one durable writer. Never recover by enabling
 dual writes.
 
-## Known future projections
+## Current projection and read platforms
 
-OpenSearch, Kafka/ClickHouse, Recommendation Platform and GraphQL read BFF are
-not deployed business authorities. Their future introduction must preserve the
-current owner graph.
+Chunks 36–39 and 48 introduced the GraphQL Read BFF, Kafka retained event
+platform, Search/OpenSearch, Recommendation and Analytics Sink/ClickHouse/Parquet
+deployables. They are repository-deployed boundaries, but none becomes durable
+business authority:
+
+- GraphQL composes approved read-only owner APIs and has no database mutation
+  authority.
+- Kafka receives retained analytical copies through the NATS-to-Kafka bridge.
+- OpenSearch contains versioned, rebuildable search projections.
+- Recommendation uses rebuildable candidate/ranking projections and caches.
+- ClickHouse and Parquet/object storage are analytical/lake projections.
+
+External production activation still requires environment prerequisites,
+credentials and the evidence-based production certification plan. Repository
+deployment support must never be described as proof of measured production
+capacity or SLO compliance.
