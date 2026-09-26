@@ -30,11 +30,18 @@ Route stateless/read/reconstructable traffic to the nearest healthy region only
 after its dependencies are ready. Realtime clients reconnect and resync from
 authoritative snapshots. Search and Recommendation may rebuild/degrade.
 
+## Restore validation
+
+If the incident required PostgreSQL PITR, object-store restore or another
+authoritative restore, complete the isolated restore-validation procedure from
+`disaster-recovery.md` before routing production writes. Record the exact
+backup/PITR position, schema head, reconciliation evidence and achieved RPO/RTO.
+
 ## Recovery validation
 
 Critical identity, room and Economy flows pass in the surviving region; ledgers
 reconcile; no dual writer exists; delayed NATS/Kafka work drains; realtime/media
-reconnect succeeds; achieved RPO/RTO is recorded.
+reconnect succeeds; any restore has been validated; achieved RPO/RTO is recorded.
 
 ## Failback
 

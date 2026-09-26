@@ -29,15 +29,19 @@ def run_guard(name: str) -> None:
 
 def check_frontend_network_boundary() -> None:
     features = ROOT / "frontend" / "vibematch_app" / "lib" / "features"
-    forbidden = (
+    forbidden_imports = (
         "package:dio/dio.dart",
         "package:http/http.dart",
-        "dart:io';",
     )
     offenders: list[str] = []
     for path in features.rglob("*.dart"):
         text = path.read_text(encoding="utf-8", errors="replace")
-        if any(marker in text for marker in forbidden):
+        if (
+            any(marker in text for marker in forbidden_imports)
+            or "HttpClient(" in text
+            or "WebSocket.connect" in text
+            or "WebSocketChannel.connect" in text
+        ):
             offenders.append(str(path.relative_to(ROOT)))
     if offenders:
         raise SystemExit(
