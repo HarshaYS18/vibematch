@@ -287,6 +287,7 @@ class ChatEntry {
     this.systemEventType = RoomSystemEventType.none,
     this.autoDismissAt,
     this.giftAssetPath,
+    this.giftAssetUrl,
     this.imageUrl,
     this.imageContentType,
   });
@@ -309,6 +310,7 @@ class ChatEntry {
   final RoomSystemEventType systemEventType;
   final DateTime? autoDismissAt;
   final String? giftAssetPath;
+  final String? giftAssetUrl;
   final String? imageUrl;
   final String? imageContentType;
   bool get isSystemMessage =>
@@ -333,6 +335,7 @@ class ChatEntry {
     bool? applicationExpired,
     RoomSystemEventType? systemEventType,
     DateTime? autoDismissAt,
+    String? giftAssetUrl,
     String? imageUrl,
     String? imageContentType,
   }) => ChatEntry(
@@ -358,6 +361,7 @@ class ChatEntry {
     systemEventType: systemEventType ?? this.systemEventType,
     autoDismissAt: autoDismissAt ?? this.autoDismissAt,
     giftAssetPath: giftAssetPath,
+    giftAssetUrl: giftAssetUrl ?? this.giftAssetUrl,
     imageUrl: imageUrl ?? this.imageUrl,
     imageContentType: imageContentType ?? this.imageContentType,
   );
