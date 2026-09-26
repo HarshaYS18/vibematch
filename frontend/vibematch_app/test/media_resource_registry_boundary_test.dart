@@ -3,7 +3,6 @@ import 'dart:io';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:vibematch_app/app/runtime/media_resource_coordinator.dart';
-import 'package:vibematch_app/foundation/runtime/media_resource_lifecycle.dart';
 
 /// Chunk 34-M6 contract coverage for feature-safe resource registration.
 void main() {

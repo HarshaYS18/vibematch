@@ -9,7 +9,6 @@ import '../../controllers/live_room_sheet_controller.dart';
 import '../../live_room_models.dart';
 import '../../widgets/cricket_room_backgrounds.dart';
 import '../../widgets/live_room_announcement_sheet.dart';
-import '../../widgets/live_room_background_sheet.dart';
 import '../../widgets/live_room_info_sheet.dart';
 import '../../widgets/live_room_join_requests_sheet.dart';
 import '../../widgets/live_room_privacy_sheet.dart';

@@ -6,7 +6,6 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../core/ui/vm_motion.dart';
 import '../../../foundation/runtime/media_resource_lifecycle.dart';
 import '../../../room_session/data/room_session_repository.dart';
-import '../../../room_session/domain/room_session_state.dart';
 import '../../auth/models/current_user.dart';
 import '../data/live_room_media_signaling_service.dart';
 import '../data/live_room_presence_repository.dart';

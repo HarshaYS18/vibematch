@@ -2,7 +2,6 @@ import 'package:flutter/material.dart';
 
 import '../../models/vibe_models.dart';
 import '../widgets/vibe_card_modular.dart';
-import '../widgets/vibe_media_playback_gate.dart';
 import '../widgets/vibes_status_widgets.dart';
 
 /// Builds the visible Vibes feed from immutable controller state.

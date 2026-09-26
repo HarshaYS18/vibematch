@@ -1,7 +1,6 @@
 import 'dart:async';
 import 'dart:math';
 
-import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart' show Alignment, Color;
 
 import '../../../auth/data/auth_api_service.dart';
