@@ -28,3 +28,14 @@ Every production component must document:
 
 Use the service README template for new components. Documentation changes ship in
 the same pull request as architecture changes.
+
+## Final architecture closure
+
+- [System map](../architecture/system-map.md)
+- [Docs-as-code / conformance](../architecture/docs-as-code.md)
+- [Decommissioning policy](../architecture/decommissioning.md)
+- [Dependency hygiene](../architecture/dependency-hygiene.md)
+- [Release compatibility matrix](../release/compatibility-matrix.md)
+- [Production architecture completion report](../../FUNKEY_PRODUCTION_ARCHITECTURE_COMPLETION_REPORT.md)
+
+Repository completion never substitutes for measured production-certification evidence.

@@ -1,0 +1,38 @@
+name: Final Architecture Audit
+
+on:
+  pull_request:
+  push:
+    branches: [main, 'chatgpt/**', 'codex/**']
+
+permissions:
+  contents: read
+
+jobs:
+  final-audit:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.13'
+      - name: Compile audit tooling
+        run: >-
+          python -m py_compile
+          scripts/check_final_architecture_audit.py
+          scripts/generate_final_architecture_inventory.py
+          scripts/check_docs_links.py
+      - name: Check docs links
+        run: python scripts/check_docs_links.py
+      - name: Generate final structural inventory
+        run: python scripts/generate_final_architecture_inventory.py --output /tmp/funkey-final-inventory.json
+      - name: Run final architecture/decommission audit
+        run: python scripts/check_final_architecture_audit.py
+      - name: Upload final inventory
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: funkey-final-architecture-inventory
+          path: /tmp/funkey-final-inventory.json
+          if-no-files-found: error

@@ -50,6 +50,8 @@ Kafka is fed only through the transactional-outbox -> NATS -> Kafka Event Bridge
 See `docs/architecture/authority-registry.md`,
 `contracts/architecture/authorities.yaml`, and
 `docs/architecture/service-boundaries.md` before moving any domain boundary.
+The final Chunks 15–56 architecture/decommission closure is documented in
+[`FUNKEY_PRODUCTION_ARCHITECTURE_COMPLETION_REPORT.md`](FUNKEY_PRODUCTION_ARCHITECTURE_COMPLETION_REPORT.md).
 
 ## Repository map
 
