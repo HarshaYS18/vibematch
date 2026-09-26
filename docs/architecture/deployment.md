@@ -22,7 +22,7 @@ not keep duplicate application socket authorities.
 
 ## Release sequence
 
-1. Verify external prerequisites, secrets, DNS/TLS, PostgreSQL/PgBouncer, three Redis roles, NATS, object storage/CDN, TURN and monitoring.
+1. Verify external prerequisites, secrets, DNS/TLS, PostgreSQL/PgBouncer, three Redis roles, NATS, object storage/CDN, TURN and monitoring. For the full Chunk 37–48 platform, also verify Kafka, OpenSearch, ClickHouse and lake/object-storage dependencies.
 2. Build/scan/sign immutable images and run all repository CI gates.
 3. Apply additive Alembic migration using the direct migration DSN.
 4. Apply/verify PostgreSQL ownership roles for extracted domains.
@@ -30,10 +30,16 @@ not keep duplicate application socket authorities.
 6. Deploy Inbox, Vibes, Room Control, Game Platform and Notification/provider workers.
 7. Deploy core compatibility API with only documented reader roles for extracted domains.
 8. Deploy specialized workers and verify JetStream consumers, retry/DLQ and readiness.
-9. Deploy Go realtime, verify public capability key, connect/room grants, Redis replay and drain.
-10. Roll media nodes by drain; verify discovery, direct WebRTC and TURN-only paths.
-11. Verify Media v2 signed upload -> completion -> processing/status in staging.
-12. Promote client traffic after smoke, dashboards and rollback evidence pass.
+9. Deploy the Kafka Event Bridge only after NATS and Kafka are healthy; verify source-lag, ACK-after-Kafka-ACK behavior and outage recovery.
+10. Deploy Search, rebuild a versioned OpenSearch index from owner events, validate it, then switch the query alias.
+11. Deploy Recommendation, replay/warm its reconstructable candidate/ranking projection and verify blocked-content filtering.
+12. Deploy the Analytics Sink after Kafka, ClickHouse and lake storage are healthy; verify idempotent ClickHouse writes and deterministic Parquet objects.
+13. Deploy the GraphQL Read BFF after all owner read APIs are healthy; verify persisted-operation, auth, complexity and latency smoke tests.
+14. Deploy/verify Envoy Gateway routes and canary weights only after their backends are ready; keep realtime upgrade-safe and media data-plane traffic outside HTTP Gateway.
+15. Deploy Go realtime, verify public capability key, connect/room grants, Redis replay and drain.
+16. Roll media nodes by drain; verify discovery, direct WebRTC and TURN-only paths.
+17. Verify Media v2 signed upload -> completion -> processing/status in staging.
+18. Promote client traffic after GraphQL/Search/Recommendation/data-platform smoke, application smoke, dashboards and rollback evidence pass.
 
 ## Rollback
 
@@ -42,9 +48,13 @@ otherwise. Roll back application routing/images while preserving exactly one
 durable owner per domain. Do not re-enable old DB mutation grants or dual writes.
 
 For Economy, preserve transaction/ledger/journal history and the Economy writer
-role. For realtime/media, drain before removal. After rollback verify snapshots,
-Inbox pagination, room replay, Watch Party/game control, notification delivery,
-media upload/RTC and Economy reconciliation.
+role. For realtime/media, drain before removal. Kafka/Search/Recommendation/
+Analytics are downstream projection/read systems: disable their consumers or
+routes when necessary, then replay/rebuild from the retained owner event path;
+never recover them by enabling a second business writer. After rollback verify
+snapshots, Inbox pagination, room replay, Watch Party/game control, notification
+delivery, GraphQL reads, Search/Recommendation behavior, analytics lag, media
+upload/RTC and Economy reconciliation.
 
 ## Evidence
 
