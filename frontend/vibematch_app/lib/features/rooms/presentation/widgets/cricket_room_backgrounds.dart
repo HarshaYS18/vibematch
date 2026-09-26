@@ -1,12 +1,14 @@
 import 'package:flutter/material.dart';
 
+import '../../../../core/assets/funkey_cdn_assets.dart';
+
 import '../../data/room_background_config_repository.dart';
 import 'room_theme.dart';
 
-const RoomBackgroundTheme cricketFloodlightArenaBackgroundTheme = RoomBackgroundTheme(
+final RoomBackgroundTheme cricketFloodlightArenaBackgroundTheme = RoomBackgroundTheme(
   id: 'cricket_floodlight_arena',
   name: 'Floodlight Arena',
-  assetPath: 'assets/images/room_backgrounds/cricket/default/floodlight_arena.webp',
+  imageUrl: FunKeyCdnAssets.cricketBackground('floodlight_arena'),
   accent: Color(0xFF65FF8F),
   sourceType: RoomBackgroundSourceType.event,
   unlockType: RoomBackgroundUnlockType.free,
@@ -16,10 +18,10 @@ const RoomBackgroundTheme cricketFloodlightArenaBackgroundTheme = RoomBackground
   fallbackColors: [Color(0xFF04130A), Color(0xFF0B3E1F)],
 );
 
-const RoomBackgroundTheme cricketStadiumNightBackgroundTheme = RoomBackgroundTheme(
+final RoomBackgroundTheme cricketStadiumNightBackgroundTheme = RoomBackgroundTheme(
   id: 'cricket_stadium_night',
   name: 'Stadium Night',
-  assetPath: 'assets/images/room_backgrounds/cricket/default/stadium_night.webp',
+  imageUrl: FunKeyCdnAssets.cricketBackground('stadium_night'),
   accent: Color(0xFFFFD36A),
   sourceType: RoomBackgroundSourceType.event,
   unlockType: RoomBackgroundUnlockType.free,
@@ -28,10 +30,10 @@ const RoomBackgroundTheme cricketStadiumNightBackgroundTheme = RoomBackgroundThe
   fallbackColors: [Color(0xFF07160D), Color(0xFF254B1D)],
 );
 
-const RoomBackgroundTheme cricketRoyalPitchBackgroundTheme = RoomBackgroundTheme(
+final RoomBackgroundTheme cricketRoyalPitchBackgroundTheme = RoomBackgroundTheme(
   id: 'cricket_royal_pitch',
   name: 'Royal Pitch',
-  assetPath: 'assets/images/room_backgrounds/cricket/default/royal_pitch.webp',
+  imageUrl: FunKeyCdnAssets.cricketBackground('royal_pitch'),
   accent: Color(0xFF12C7B7),
   sourceType: RoomBackgroundSourceType.event,
   unlockType: RoomBackgroundUnlockType.free,
@@ -40,7 +42,7 @@ const RoomBackgroundTheme cricketRoyalPitchBackgroundTheme = RoomBackgroundTheme
   fallbackColors: [Color(0xFF051B13), Color(0xFF0C6040)],
 );
 
-const List<RoomBackgroundTheme> cricketRoomBackgroundThemes = [
+final List<RoomBackgroundTheme> cricketRoomBackgroundThemes = [
   cricketFloodlightArenaBackgroundTheme,
   cricketStadiumNightBackgroundTheme,
   cricketRoyalPitchBackgroundTheme,
@@ -89,7 +91,7 @@ class _CricketRoomBackgroundPickerSheetState
       );
       if (remoteThemes.isNotEmpty) return remoteThemes;
     } catch (_) {
-      // Keep bundled cricket backgrounds available when backend is offline.
+      // Keep CDN-backed cricket defaults available when backend is offline.
     }
     return cricketRoomBackgroundThemes;
   }
@@ -304,24 +306,11 @@ class _CricketBackgroundPreview extends StatelessWidget {
           Image.network(
             theme.thumbnailUrl ?? theme.imageUrl!,
             fit: BoxFit.cover,
-            errorBuilder: (context, error, stackTrace) {
-              return _assetPreview();
-            },
-          )
-        else
-          _assetPreview(),
+            errorBuilder: (context, error, stackTrace) =>
+                const SizedBox.shrink(),
+          ),
       ],
     );
   }
 
-  Widget _assetPreview() {
-    if (!theme.isAssetBacked) return const SizedBox.shrink();
-    return Image.asset(
-      theme.assetPath!,
-      fit: BoxFit.cover,
-      errorBuilder: (context, error, stackTrace) {
-        return const SizedBox.shrink();
-      },
-    );
-  }
 }
