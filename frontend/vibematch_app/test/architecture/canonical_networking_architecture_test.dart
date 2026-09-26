@@ -26,11 +26,8 @@ void main() {
     expect(transport, contains('NetworkCancellation'));
   });
 
-  test('legacy ApiClient cannot own an HTTP transport', () {
-    final legacy = read('lib/core/network/api_client.dart');
-    expect(legacy, contains('extends DioAppNetworkClient'));
-    expect(legacy, isNot(contains(rawHttpImport)));
-    expect(legacy, isNot(contains('http.Client')));
+  test('deprecated ApiClient compatibility alias stays removed', () {
+    expect(File('${root.path}/lib/core/network/api_client.dart').existsSync(), isFalse);
   });
 
   test('foundation http compatibility facade delegates to shared client', () {
@@ -75,9 +72,8 @@ void main() {
       if (!foundationNetworking && RegExp(r'\bHttpClient\b').hasMatch(source)) {
         violations.add('$path uses HttpClient directly');
       }
-      if (!path.endsWith('/core/network/api_client.dart') &&
-          source.contains('core/network/api_client.dart')) {
-        violations.add('$path imports legacy ApiClient');
+      if (source.contains('core/network/api_client.dart')) {
+        violations.add('$path imports decommissioned ApiClient');
       }
     }
 
