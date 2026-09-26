@@ -3,8 +3,8 @@ class AppConstants {
 
   static const String appName = 'Vibe Match';
 
-  // Official app logo asset path.
-  static const String logoPath = 'assets/images/branding/vibe_match_logo.png';
+  // The FunKey logo is the only product media intentionally bundled in Flutter.
+  static const String logoPath = 'assets/branding/funkey_logo.png';
 
   // Default local backend URL for Flutter Web / Edge testing on the same laptop.
   // Override when testing on Android emulator or a physical phone:
