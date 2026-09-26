@@ -89,8 +89,6 @@ GiftItem _giftFromJson(Map<String, dynamic> json) {
     coins: _int(json['coin_value']),
     icon: _iconFor(json['icon_key']?.toString(), categoryKey),
     chatSymbol: (json['chat_symbol'] ?? '*').toString(),
-    assetPath: _text(json['asset_path']),
-    videoAssetPath: _text(json['video_asset_path']),
     assetUrl: _text(json['asset_url']),
     videoUrl: _text(json['video_url']),
     colors: _colorsFor(categoryKey, isPremium: premium, isLucky: lucky),
