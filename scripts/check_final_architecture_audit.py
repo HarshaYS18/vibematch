@@ -13,6 +13,8 @@ COMPOSED_GUARDS = (
     "check_backend_architecture.py",
     "check_frontend_architecture.py",
     "check_contracts.py",
+    "check_gateway_architecture.py",
+    "check_graphql_bff_architecture.py",
     "check_kafka_data_platform.py",
     "check_search_platform.py",
     "check_recommendation_platform.py",
@@ -31,6 +33,7 @@ COMPOSED_GUARDS = (
     "check_ownership_governance.py",
     "check_developer_experience.py",
     "check_release_management.py",
+    "check_architecture_conformance.py",
 )
 
 
