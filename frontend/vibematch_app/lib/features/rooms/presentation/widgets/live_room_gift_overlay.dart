@@ -2,6 +2,8 @@ import 'dart:async';
 
 import 'package:flutter/material.dart';
 
+import '../../../../core/assets/funkey_cdn_assets.dart';
+
 import '../../../../realtime/app_realtime_hub.dart';
 import '../../data/live_room_system_event_bus.dart';
 import '../../modules/gift_slide/presentation/gift_slide_overlay.dart';
@@ -111,14 +113,12 @@ class _LiveRoomGiftOverlayState extends State<LiveRoomGiftOverlay> {
     if (!_handledBackendGiftIds.add(event.id)) return;
 
     final gift = _giftItemForEvent(event);
-    final videoUrl = _clean(event.giftVideoUrl) ?? _clean(gift.videoUrl);
-    final videoPath =
-        _clean(event.giftVideoAssetPath) ??
-        _clean(gift.videoAssetPath) ??
-        _videoPathFromNormalizedId(_normalize(event.giftId)) ??
-        _videoPathFromNormalizedId(_normalize(event.giftName));
+    final videoUrl =
+        _clean(event.giftVideoUrl) ??
+        _clean(gift.videoUrl) ??
+        _videoUrlFromNormalizedId(_normalize(event.giftId)) ??
+        _videoUrlFromNormalizedId(_normalize(event.giftName));
     final assetUrl = _clean(event.giftAssetUrl) ?? _clean(gift.assetUrl);
-    final assetPath = _clean(event.giftAssetPath) ?? _clean(gift.assetPath);
 
     final slide = GiftSlide(
       id: event.id,
@@ -130,9 +130,7 @@ class _LiveRoomGiftOverlayState extends State<LiveRoomGiftOverlay> {
           : event.targetName.trim(),
       giftName: _giftDisplayName(event, gift),
       giftIcon: gift.icon,
-      giftAssetPath: assetPath,
       giftAssetUrl: assetUrl,
-      videoAssetPath: videoPath,
       videoUrl: videoUrl,
       colors: _colorsForBackendEvent(event, gift),
       combo: event.giftQuantity <= 0 ? 1 : event.giftQuantity,
@@ -276,12 +274,10 @@ class _LiveRoomGiftOverlayState extends State<LiveRoomGiftOverlay> {
           ? const <Color>[Color(0xFFFFD166), Color(0xFF8C5CF6)]
           : const <Color>[Color(0xFFFFC857), Color(0xFF12C7B7)],
       assetUrl: event.giftAssetUrl,
-      videoUrl: event.giftVideoUrl,
-      assetPath: event.giftAssetPath,
-      videoAssetPath:
-          event.giftVideoAssetPath ??
-          _videoPathFromNormalizedId(cleanGiftId) ??
-          _videoPathFromNormalizedId(cleanGiftName),
+      videoUrl:
+          event.giftVideoUrl ??
+          _videoUrlFromNormalizedId(cleanGiftId) ??
+          _videoUrlFromNormalizedId(cleanGiftName),
       giftType: event.giftType,
       animationType: event.animationType,
       categoryKey: event.giftCategory,
@@ -293,31 +289,23 @@ class _LiveRoomGiftOverlayState extends State<LiveRoomGiftOverlay> {
     );
   }
 
-  String? _videoPathFromNormalizedId(String normalized) {
-    switch (normalized) {
-      case 'love_rocket':
-        return 'assets/videos/gifts/love_rocket.mp4';
-      case 'proposal':
-      case 'propose':
-      case 'boy_proposing_girl':
-      case 'boy_proposing_girl_d_romantic':
-      case 'romantic_proposal':
-        return 'assets/videos/gifts/boy_proposing_girl_d_romantic.mp4';
-      case 'butterfly':
-      case 'pretty_girl_butterfly':
-      case 'pretty_girl_butterfly_animation':
-        return 'assets/videos/gifts/pretty_girl_butterfly_animation.mp4';
-      case 'magic_1':
-      case 'premium_magic_1':
-        return 'assets/videos/gifts/premium_magic_1.mp4';
-      case 'magic_2':
-      case 'premium_magic_2':
-        return 'assets/videos/gifts/premium_magic_2.mp4';
-      case 'magic_3':
-      case 'premium_magic_3':
-        return 'assets/videos/gifts/premium_magic_3.mp4';
-    }
-    return null;
+  String? _videoUrlFromNormalizedId(String normalized) {
+    final giftId = switch (normalized) {
+      'love_rocket' => 'love_rocket',
+      'proposal' ||
+      'propose' ||
+      'boy_proposing_girl' ||
+      'boy_proposing_girl_d_romantic' ||
+      'romantic_proposal' => 'proposal',
+      'butterfly' ||
+      'pretty_girl_butterfly' ||
+      'pretty_girl_butterfly_animation' => 'butterfly',
+      'magic_1' || 'premium_magic_1' => 'premium_magic_1',
+      'magic_2' || 'premium_magic_2' => 'premium_magic_2',
+      'magic_3' || 'premium_magic_3' => 'premium_magic_3',
+      _ => null,
+    };
+    return giftId == null ? null : FunKeyCdnAssets.giftVideo(giftId);
   }
 
   String? _clean(String? value) {
