@@ -53,14 +53,8 @@ def main() -> None:
                 )
 
     api_alias = ROOT / "frontend/vibematch_app/lib/core/network/api_client.dart"
-    alias_text = api_alias.read_text(encoding="utf-8")
-    for forbidden in ("package:http/http.dart", "HttpClient(", "Dio("):
-        if forbidden in alias_text:
-            raise SystemExit(
-                "deprecated ApiClient alias regained transport ownership: " + forbidden
-            )
-    if "DioAppNetworkClient" not in alias_text:
-        raise SystemExit("deprecated ApiClient must delegate to canonical networking")
+    if api_alias.exists():
+        raise SystemExit("deprecated ApiClient alias must stay decommissioned")
 
     legacy_snapshot = (ROOT / "backend/legacy_snapshot.py").read_text(encoding="utf-8")
     if "Frozen schema bridge" not in legacy_snapshot or "Alembic" not in legacy_snapshot:
