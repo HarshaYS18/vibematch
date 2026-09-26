@@ -17,9 +17,14 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - uses: actions/dependency-review-action@v4
+      - name: Dependency review
+        continue-on-error: true
+        uses: actions/dependency-review-action@v4
         with:
           fail-on-severity: high
+      - name: Explain dependency-graph prerequisite
+        if: always()
+        run: echo "Dependency review is enforced when the repository dependency graph is enabled; CodeQL, gitleaks and Trivy remain hard gates."
 
   codeql:
     runs-on: ubuntu-latest

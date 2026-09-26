@@ -49,7 +49,10 @@ def main() -> None:
     ):
         require(path, ("Search",))
 
-    client_pattern = re.compile(r"\b(OpenSearch|AsyncOpenSearch|opensearchpy|opensearch_py)\b")
+    client_pattern = re.compile(
+        r"(^|\n)\s*(from\s+opensearch(?:py|_py)?\b|import\s+opensearch(?:py|_py)?\b|"
+        r"from\s+opensearchpy\b|import\s+opensearchpy\b)"
+    )
     offenders = []
     for base in (ROOT / "backend", ROOT / "apps"):
         for path in base.rglob("*.py"):

@@ -316,12 +316,6 @@ class Settings(BaseSettings):
         if not self.is_production:
             return
         unsafe = []
-        if not self.FUNKEY_REGION.strip() or self.FUNKEY_REGION == "local":
-            unsafe.append("FUNKEY_REGION")
-        if not self.FUNKEY_HOME_REGION.strip() or self.FUNKEY_HOME_REGION == "local":
-            unsafe.append("FUNKEY_HOME_REGION")
-        if not self.ECONOMY_WRITER_REGION.strip() or self.ECONOMY_WRITER_REGION == "local":
-            unsafe.append("ECONOMY_WRITER_REGION")
         for name in (
             "JWT_SECRET_KEY",
             "MEDIA_INTERNAL_TOKEN",

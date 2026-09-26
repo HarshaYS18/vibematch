@@ -17,7 +17,7 @@ on:
       - 'scripts/check_contracts.py'
       - 'scripts/check_gateway_architecture.py'
       - 'scripts/check_graphql_bff_architecture.py'
-      - 'scripts/check_kafka_data_platform.py scripts/check_search_platform.py scripts/check_recommendation_platform.py scripts/check_multiregion_architecture.py scripts/check_disaster_recovery.py scripts/check_supply_chain.py scripts/check_privacy_governance.py scripts/check_trust_safety_integrity.py'
+      - 'scripts/check_kafka_data_platform.py'
       - 'scripts/check_search_platform.py'
       - 'scripts/check_recommendation_platform.py'
       - 'scripts/check_multiregion_architecture.py'
@@ -82,7 +82,20 @@ jobs:
       - run: terraform -chdir=infra/terraform fmt -check -recursive
       - run: terraform -chdir=infra/terraform init -backend=false
       - run: terraform -chdir=infra/terraform validate
-      - run: python -m py_compile scripts/prepare_gitops_promotion.py scripts/check_contracts.py scripts/check_gateway_architecture.py scripts/check_graphql_bff_architecture.py scripts/check_kafka_data_platform.py
+      - run: >-
+          python -m py_compile
+          scripts/prepare_gitops_promotion.py
+          scripts/check_contracts.py
+          scripts/check_gateway_architecture.py
+          scripts/check_graphql_bff_architecture.py
+          scripts/check_kafka_data_platform.py
+          scripts/check_search_platform.py
+          scripts/check_recommendation_platform.py
+          scripts/check_multiregion_architecture.py
+          scripts/check_disaster_recovery.py
+          scripts/check_supply_chain.py
+          scripts/check_privacy_governance.py
+          scripts/check_trust_safety_integrity.py
       - run: python scripts/check_gateway_architecture.py
       - run: python scripts/check_graphql_bff_architecture.py
       - run: python scripts/check_kafka_data_platform.py
