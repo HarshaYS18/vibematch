@@ -72,15 +72,11 @@ class _CleanVideoGiftCardState extends ConsumerState<_CleanVideoGiftCard> {
 
   Future<void> _load() async {
     final networkUrl = widget.slide.videoUrl?.trim();
-    final localPath = widget.slide.videoAssetPath?.trim();
-    if ((networkUrl == null || networkUrl.isEmpty) &&
-        (localPath == null || localPath.isEmpty)) {
+    if (networkUrl == null || networkUrl.isEmpty) {
       return;
     }
     try {
-      final controller = networkUrl != null && networkUrl.isNotEmpty
-          ? VideoPlayerController.networkUrl(Uri.parse(networkUrl))
-          : VideoPlayerController.asset(localPath!);
+      final controller = VideoPlayerController.networkUrl(Uri.parse(networkUrl));
       _controller = controller;
       controller.addListener(_onTick);
       await controller.initialize();
