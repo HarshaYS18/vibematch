@@ -34,6 +34,7 @@ COMPOSED_GUARDS = (
     "check_developer_experience.py",
     "check_release_management.py",
     "check_architecture_conformance.py",
+    "check_roadmap_closure.py",
 )
 
 
