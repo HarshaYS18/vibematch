@@ -1,9 +1,8 @@
-import 'dart:async';
 import 'dart:typed_data';
 
-import 'package:http/http.dart' as http;
-
 import '../../core/constants/app_constants.dart';
+import '../../core/network/api_exception.dart';
+import 'canonical_network_transport.dart';
 
 abstract interface class RemoteAssetClient {
   Future<Uint8List> getBytes(
@@ -14,10 +13,12 @@ abstract interface class RemoteAssetClient {
   void close();
 }
 
+/// Binary CDN client backed by FunKey's single canonical Dio owner.
 class HttpRemoteAssetClient implements RemoteAssetClient {
-  HttpRemoteAssetClient({http.Client? client}) : _client = client ?? http.Client();
+  HttpRemoteAssetClient({CanonicalNetworkTransport? transport})
+      : _transport = transport ?? CanonicalNetworkTransport.instance;
 
-  final http.Client _client;
+  final CanonicalNetworkTransport _transport;
 
   @override
   Future<Uint8List> getBytes(
@@ -28,27 +29,35 @@ class HttpRemoteAssetClient implements RemoteAssetClient {
       throw RemoteAssetException('Remote game assets must use HTTPS.', uri: uri);
     }
 
-    final response = await _client
-        .get(
-          uri,
-          headers: <String, String>{
-            'Accept': 'application/json,text/html;q=0.9,*/*;q=0.8',
-            ...headers,
-          },
-        )
-        .timeout(AppConstants.receiveTimeout);
-
-    if (response.statusCode < 200 || response.statusCode >= 300) {
+    try {
+      return await _transport.getBytes(
+        uri,
+        headers: <String, String>{
+          'Accept': 'application/json,text/html;q=0.9,*/*;q=0.8',
+          ...headers,
+        },
+        timeout: AppConstants.receiveTimeout,
+      );
+    } on ApiException catch (error) {
+      final status = error.statusCode;
       throw RemoteAssetException(
-        'Remote asset request failed (${response.statusCode}).',
+        status == null
+            ? 'Remote asset request failed.'
+            : 'Remote asset request failed ($status).',
+        uri: uri,
+      );
+    } catch (error) {
+      throw RemoteAssetException(
+        'Remote asset request failed: ${error.runtimeType}.',
         uri: uri,
       );
     }
-    return Uint8List.fromList(response.bodyBytes);
   }
 
   @override
-  void close() => _client.close();
+  void close() {
+    // CanonicalNetworkTransport is process-scoped and intentionally reused.
+  }
 }
 
 class RemoteAssetException implements Exception {
