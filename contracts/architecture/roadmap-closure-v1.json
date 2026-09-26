@@ -1,0 +1,544 @@
+{
+  "schema_version": 1,
+  "roadmap": {
+    "start_chunk": 15,
+    "end_chunk": 56,
+    "status": "repository engineering complete; external production provisioning and measured certification remain evidence-gated"
+  },
+  "chunks": [
+    {
+      "chunk": 15,
+      "title": "Architecture authority registry and state classification",
+      "status": "complete",
+      "docs": [
+        "docs/architecture/authority-registry.md",
+        "docs/architecture/state-classification.md"
+      ],
+      "evidence": [
+        "scripts/check_backend_architecture.py",
+        "backend/tests/test_architecture_authority_registry.py"
+      ]
+    },
+    {
+      "chunk": 16,
+      "title": "Observability platform",
+      "status": "complete",
+      "docs": [
+        "docs/architecture/observability-platform.md",
+        "docs/modules/observability/README.md"
+      ],
+      "evidence": [
+        "backend/tests/test_observability_contract.py",
+        "backend/tests/test_observability_repository_contract.py"
+      ]
+    },
+    {
+      "chunk": 17,
+      "title": "Service contracts",
+      "status": "complete",
+      "docs": [
+        "docs/architecture/service-contracts.md",
+        "contracts/proto/README.md"
+      ],
+      "evidence": [
+        "scripts/check_contracts.py",
+        ".github/workflows/contracts.yml"
+      ]
+    },
+    {
+      "chunk": 18,
+      "title": "PostgreSQL platform",
+      "status": "complete",
+      "docs": [
+        "docs/architecture/postgresql-platform.md"
+      ],
+      "evidence": [
+        "scripts/check_backend_architecture.py",
+        "backend/tests/test_database_platform_contract.py"
+      ]
+    },
+    {
+      "chunk": 19,
+      "title": "Redis/Valkey platform",
+      "status": "complete",
+      "docs": [
+        "docs/architecture/redis-valkey-platform.md"
+      ],
+      "evidence": [
+        "scripts/check_backend_architecture.py",
+        "backend/tests/test_redis_platform_contract.py"
+      ]
+    },
+    {
+      "chunk": 20,
+      "title": "Room State Engine v2",
+      "status": "complete",
+      "docs": [
+        "docs/architecture/room-state-engine-v2.md"
+      ],
+      "evidence": [
+        "scripts/check_backend_architecture.py",
+        "backend/tests/test_room_state_engine_v2.py"
+      ]
+    },
+    {
+      "chunk": 21,
+      "title": "Go Realtime Platform v2",
+      "status": "complete",
+      "docs": [
+        "docs/architecture/go-realtime-platform-v2.md"
+      ],
+      "evidence": [
+        "scripts/check_backend_architecture.py",
+        "frontend/vibematch_app/test/realtime_single_socket_source_test.dart"
+      ]
+    },
+    {
+      "chunk": 22,
+      "title": "Realtime capability authentication",
+      "status": "complete",
+      "docs": [
+        "docs/adr/ADR-018-realtime-capability-authentication.md"
+      ],
+      "evidence": [
+        "backend/tests/test_realtime_capability_service.py",
+        "backend/tests/test_realtime_revocation_service.py"
+      ]
+    },
+    {
+      "chunk": 23,
+      "title": "Inbox service extraction",
+      "status": "complete",
+      "docs": [
+        "docs/architecture/inbox-service.md",
+        "docs/runbooks/inbox-service.md"
+      ],
+      "evidence": [
+        "scripts/check_backend_architecture.py",
+        "backend/tests/test_inbox_summary_pagination_contract.py"
+      ]
+    },
+    {
+      "chunk": 24,
+      "title": "Vibes service extraction",
+      "status": "complete",
+      "docs": [
+        "docs/architecture/vibes-service.md",
+        "docs/runbooks/vibes-service.md"
+      ],
+      "evidence": [
+        "scripts/check_backend_architecture.py",
+        "backend/tests/test_vibes_feed_service.py"
+      ]
+    },
+    {
+      "chunk": 25,
+      "title": "PostgreSQL data-layer and Economy authority hardening",
+      "status": "complete",
+      "docs": [
+        "docs/architecture/postgres-data-layer.md",
+        "docs/architecture/economy-service.md"
+      ],
+      "evidence": [
+        "scripts/check_backend_architecture.py",
+        "backend/tests/test_postgres_query_plans.py",
+        "backend/tests/test_economy_authority_cutover.py"
+      ]
+    },
+    {
+      "chunk": 26,
+      "title": "Room Control service",
+      "status": "complete",
+      "docs": [
+        "docs/architecture/room-control-service.md",
+        "docs/runbooks/room-control-service.md"
+      ],
+      "evidence": [
+        "scripts/check_backend_architecture.py",
+        "backend/tests/test_room_control_service.py"
+      ]
+    },
+    {
+      "chunk": 27,
+      "title": "Identity / Profile / Social services",
+      "status": "complete",
+      "docs": [
+        "docs/architecture/identity-profile-social-services.md",
+        "docs/runbooks/identity-profile-social-services.md"
+      ],
+      "evidence": [
+        "scripts/check_backend_architecture.py",
+        "backend/tests/test_identity_profile_social_services.py"
+      ]
+    },
+    {
+      "chunk": 28,
+      "title": "Game Platform service",
+      "status": "complete",
+      "docs": [
+        "docs/architecture/game-platform-service.md",
+        "docs/runbooks/game-platform-service.md"
+      ],
+      "evidence": [
+        "scripts/check_backend_architecture.py",
+        "backend/tests/test_game_platform_cutover.py"
+      ]
+    },
+    {
+      "chunk": 29,
+      "title": "Notification service",
+      "status": "complete",
+      "docs": [
+        "docs/modules/notification/README.md",
+        "docs/runbooks/notification-service.md"
+      ],
+      "evidence": [
+        "scripts/check_backend_architecture.py",
+        "backend/tests/test_notification_service_boundary.py"
+      ]
+    },
+    {
+      "chunk": 30,
+      "title": "Worker platform",
+      "status": "complete",
+      "docs": [
+        "docs/modules/worker/README.md",
+        "docs/runbooks/worker-platform.md"
+      ],
+      "evidence": [
+        "scripts/check_backend_architecture.py",
+        "backend/tests/test_worker_pool_contract.py",
+        "backend/tests/test_worker_runtime_behavior.py"
+      ]
+    },
+    {
+      "chunk": 31,
+      "title": "Media Platform v2",
+      "status": "complete",
+      "docs": [
+        "docs/architecture/media-v2-upload.md",
+        "docs/runbooks/media-v2-upload.md"
+      ],
+      "evidence": [
+        "scripts/check_backend_architecture.py",
+        "backend/tests/test_media_v2_behavior.py",
+        "frontend/vibematch_app/test/architecture/media_v2_upload_architecture_test.dart"
+      ]
+    },
+    {
+      "chunk": 32,
+      "title": "Canonical Flutter networking",
+      "status": "complete",
+      "docs": [
+        "docs/architecture/flutter-canonical-networking.md"
+      ],
+      "evidence": [
+        "scripts/check_backend_architecture.py",
+        "frontend/vibematch_app/test/architecture/canonical_networking_architecture_test.dart"
+      ]
+    },
+    {
+      "chunk": 33,
+      "title": "Canonical Flutter state",
+      "status": "complete",
+      "docs": [
+        "docs/frontend/chunk33-canonical-flutter-state.md"
+      ],
+      "evidence": [
+        "scripts/check_frontend_architecture.py",
+        "frontend/vibematch_app/test/room_session_source_of_truth_test.dart"
+      ]
+    },
+    {
+      "chunk": 34,
+      "title": "Flutter resource runtime",
+      "status": "complete",
+      "docs": [
+        "docs/frontend/chunk34-flutter-resource-runtime.md",
+        "docs/modules/flutter-resource-runtime/README.md"
+      ],
+      "evidence": [
+        "scripts/check_frontend_architecture.py",
+        "frontend/vibematch_app/test/chunk34_resource_runtime_closure_test.dart"
+      ]
+    },
+    {
+      "chunk": 35,
+      "title": "API Gateway",
+      "status": "complete",
+      "docs": [
+        "docs/platform/chunk35-api-gateway.md",
+        "docs/architecture/api-gateway.md"
+      ],
+      "evidence": [
+        "scripts/check_gateway_architecture.py",
+        "frontend/vibematch_app/test/gateway_public_endpoint_source_of_truth_test.dart"
+      ]
+    },
+    {
+      "chunk": 36,
+      "title": "GraphQL Read BFF",
+      "status": "complete",
+      "docs": [
+        "docs/platform/chunk36-graphql-read-bff.md",
+        "docs/architecture/graphql-read-bff.md"
+      ],
+      "evidence": [
+        "scripts/check_graphql_bff_architecture.py",
+        "frontend/vibematch_app/test/graphql_persisted_read_source_of_truth_test.dart"
+      ]
+    },
+    {
+      "chunk": 37,
+      "title": "Kafka data platform",
+      "status": "complete",
+      "docs": [
+        "docs/platform/chunk37-kafka-data-platform.md",
+        "docs/architecture/kafka-data-platform.md"
+      ],
+      "evidence": [
+        "scripts/check_kafka_data_platform.py"
+      ]
+    },
+    {
+      "chunk": 38,
+      "title": "Search / OpenSearch discovery",
+      "status": "complete",
+      "docs": [
+        "docs/platform/chunk38-search-discovery.md",
+        "docs/architecture/search-platform.md"
+      ],
+      "evidence": [
+        "scripts/check_search_platform.py"
+      ]
+    },
+    {
+      "chunk": 39,
+      "title": "Recommendation platform",
+      "status": "complete",
+      "docs": [
+        "docs/platform/chunk39-recommendation-platform.md",
+        "docs/architecture/recommendation-platform.md"
+      ],
+      "evidence": [
+        "scripts/check_recommendation_platform.py"
+      ]
+    },
+    {
+      "chunk": 40,
+      "title": "Multi-region platform",
+      "status": "complete",
+      "docs": [
+        "docs/platform/chunk40-multi-region.md",
+        "docs/architecture/multi-region.md"
+      ],
+      "evidence": [
+        "scripts/check_multiregion_architecture.py"
+      ]
+    },
+    {
+      "chunk": 41,
+      "title": "Disaster recovery",
+      "status": "complete",
+      "docs": [
+        "docs/platform/chunk41-disaster-recovery.md",
+        "docs/runbooks/disaster-recovery.md"
+      ],
+      "evidence": [
+        "scripts/check_disaster_recovery.py"
+      ]
+    },
+    {
+      "chunk": 42,
+      "title": "Security and supply chain",
+      "status": "complete",
+      "docs": [
+        "docs/platform/chunk42-security-supply-chain.md",
+        "docs/modules/security/README.md"
+      ],
+      "evidence": [
+        "scripts/check_supply_chain.py"
+      ]
+    },
+    {
+      "chunk": 43,
+      "title": "Privacy and data governance",
+      "status": "complete",
+      "docs": [
+        "docs/platform/chunk43-privacy-data-governance.md",
+        "docs/architecture/privacy-data-governance.md"
+      ],
+      "evidence": [
+        "scripts/check_privacy_governance.py"
+      ]
+    },
+    {
+      "chunk": 44,
+      "title": "Trust, safety, fraud and Economy integrity",
+      "status": "complete",
+      "docs": [
+        "docs/platform/chunk44-trust-safety-fraud-economy.md",
+        "docs/architecture/trust-safety-integrity.md"
+      ],
+      "evidence": [
+        "scripts/check_trust_safety_integrity.py",
+        "backend/tests/test_risk_policy_service.py"
+      ]
+    },
+    {
+      "chunk": 45,
+      "title": "Realtime and media QoS",
+      "status": "complete",
+      "docs": [
+        "docs/platform/chunk45-realtime-media-qos.md",
+        "docs/architecture/realtime-media-qos.md"
+      ],
+      "evidence": [
+        "scripts/check_realtime_media_qos.py"
+      ]
+    },
+    {
+      "chunk": 46,
+      "title": "Mobile runtime, offline and battery",
+      "status": "complete",
+      "docs": [
+        "docs/platform/chunk46-mobile-runtime-offline.md",
+        "docs/architecture/mobile-runtime-offline.md"
+      ],
+      "evidence": [
+        "scripts/check_mobile_runtime.py",
+        "frontend/vibematch_app/test/mobile_runtime_budget_test.dart"
+      ]
+    },
+    {
+      "chunk": 47,
+      "title": "Cache and edge",
+      "status": "complete",
+      "docs": [
+        "docs/platform/chunk47-cache-edge.md",
+        "docs/architecture/cache-edge.md"
+      ],
+      "evidence": [
+        "scripts/check_cache_edge_architecture.py"
+      ]
+    },
+    {
+      "chunk": 48,
+      "title": "Analytics, ClickHouse and data lake",
+      "status": "complete",
+      "docs": [
+        "docs/platform/chunk48-analytics-clickhouse-lake.md",
+        "docs/architecture/analytics-platform.md"
+      ],
+      "evidence": [
+        "scripts/check_analytics_platform.py"
+      ]
+    },
+    {
+      "chunk": 49,
+      "title": "Compatibility, feature flags and release safety",
+      "status": "complete",
+      "docs": [
+        "docs/platform/chunk49-compatibility-flags-release-safety.md",
+        "docs/architecture/release-safety.md"
+      ],
+      "evidence": [
+        "scripts/check_release_safety.py",
+        "backend/tests/test_feature_flag_service.py"
+      ]
+    },
+    {
+      "chunk": 50,
+      "title": "SRE, FinOps and production certification",
+      "status": "complete",
+      "docs": [
+        "docs/platform/chunk50-sre-finops-certification.md",
+        "docs/architecture/sre-finops.md"
+      ],
+      "evidence": [
+        "scripts/check_sre_finops.py",
+        ".github/workflows/production-certification.yml"
+      ]
+    },
+    {
+      "chunk": 51,
+      "title": "Documentation platform and developer portal",
+      "status": "complete",
+      "docs": [
+        "docs/platform/chunk51-documentation-platform.md",
+        "docs/developer-portal/index.md"
+      ],
+      "evidence": [
+        "scripts/check_documentation_platform.py"
+      ]
+    },
+    {
+      "chunk": 52,
+      "title": "Ownership and governance",
+      "status": "complete",
+      "docs": [
+        "docs/platform/chunk52-ownership-governance.md",
+        "docs/governance/README.md"
+      ],
+      "evidence": [
+        "scripts/check_ownership_governance.py",
+        ".github/CODEOWNERS"
+      ]
+    },
+    {
+      "chunk": 53,
+      "title": "Developer experience and golden paths",
+      "status": "complete",
+      "docs": [
+        "docs/platform/chunk53-developer-experience.md",
+        "docs/developer-portal/golden-paths.md"
+      ],
+      "evidence": [
+        "scripts/check_developer_experience.py"
+      ]
+    },
+    {
+      "chunk": 54,
+      "title": "Docs-as-code and architecture conformance",
+      "status": "complete",
+      "docs": [
+        "docs/platform/chunk54-docs-conformance.md",
+        "docs/architecture/docs-as-code.md"
+      ],
+      "evidence": [
+        "scripts/check_architecture_conformance.py",
+        ".github/workflows/docs-conformance.yml"
+      ]
+    },
+    {
+      "chunk": 55,
+      "title": "Release engineering and change management",
+      "status": "complete",
+      "docs": [
+        "docs/platform/chunk55-release-management.md",
+        "docs/governance/release-management.md"
+      ],
+      "evidence": [
+        "scripts/check_release_management.py",
+        ".github/workflows/prepare-gitops-promotion.yml"
+      ]
+    },
+    {
+      "chunk": 56,
+      "title": "Final architecture audit, decommissioning and dependency hygiene",
+      "status": "complete",
+      "docs": [
+        "docs/platform/chunk56-final-architecture-audit.md",
+        "docs/platform/chunk56-decommissioning-dependency-hygiene.md",
+        "docs/architecture/decommissioning.md",
+        "docs/architecture/dependency-hygiene.md"
+      ],
+      "evidence": [
+        "scripts/check_final_architecture_audit.py",
+        "scripts/check_decommissioning.py",
+        "scripts/check_dependency_hygiene.py",
+        ".github/workflows/final-architecture-audit.yml"
+      ]
+    }
+  ]
+}
