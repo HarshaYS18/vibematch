@@ -4,6 +4,9 @@ The directory/package name `vibematch_app` is retained for source compatibility;
 the product is FunKey. This client preserves the existing UI while using
 backend-authoritative domain state.
 
+Supported Flutter targets are Android, iOS and Web. Desktop runner scaffolding
+(Linux, macOS and Windows) is intentionally not kept in this client repository.
+
 ## Authority model
 
 Flutter owns presentation, navigation, short-lived view models and reconstructable
