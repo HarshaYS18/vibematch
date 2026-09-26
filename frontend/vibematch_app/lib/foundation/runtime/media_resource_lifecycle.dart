@@ -17,8 +17,6 @@ enum MediaResourceKind {
   /// Flutter's decoded/network image cache owned by PaintingBinding.
   flutterImageCache,
 
-  /// Explicit feature-driven image prefetch work, migrated separately.
-  imagePrefetch,
   gameBundleCache,
 }
 

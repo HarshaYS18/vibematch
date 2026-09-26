@@ -120,7 +120,7 @@ void main() {
     }
   });
 
-  test('M14 pressure reclaims speculative work before realtime media', () async {
+  test('M14 pressure reclaims ephemeral media before realtime media', () async {
     final order = <String>[];
     final coordinator = MediaResourceCoordinator()
       ..register(
@@ -132,15 +132,15 @@ void main() {
       )
       ..register(
         _FakeResource(
-          resourceId: 'prefetch:reclaim',
-          kind: MediaResourceKind.imagePrefetch,
-          onPressure: () => order.add('prefetch'),
+          resourceId: 'gift:reclaim',
+          kind: MediaResourceKind.giftVideo,
+          onPressure: () => order.add('gift'),
         ),
       );
 
     await coordinator.handleMemoryPressure();
 
-    expect(order, <String>['prefetch', 'room']);
+    expect(order, <String>['gift', 'room']);
   });
 
   test('M14 participant failures do not block healthy cleanup', () async {

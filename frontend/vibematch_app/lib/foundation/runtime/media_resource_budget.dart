@@ -30,7 +30,6 @@ abstract final class MediaResourceBudgetPolicy {
         MediaResourceKind.audioInput: MediaResourceBudget(recommendedMaxActive: 2, pressureTier: MediaResourcePressureTier.realtimeCritical, rationale: 'Room and call capture may briefly overlap.'),
         MediaResourceKind.cameraInput: MediaResourceBudget(recommendedMaxActive: 1, pressureTier: MediaResourcePressureTier.realtimeCritical, rationale: 'One local call camera.'),
         MediaResourceKind.flutterImageCache: MediaResourceBudget(recommendedMaxActive: 1, pressureTier: MediaResourcePressureTier.reconstructable, rationale: 'One shared Flutter decoded image cache.'),
-        MediaResourceKind.imagePrefetch: MediaResourceBudget(recommendedMaxActive: 1, pressureTier: MediaResourcePressureTier.reclaimFirst, rationale: 'One bounded prefetch queue.'),
         MediaResourceKind.gameBundleCache: MediaResourceBudget(recommendedMaxActive: 1, pressureTier: MediaResourcePressureTier.reconstructable, rationale: 'One verified game-bundle cache.'),
       };
 

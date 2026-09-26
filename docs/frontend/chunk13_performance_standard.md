@@ -27,10 +27,9 @@ The Chunk 13 image-sizing rule is now centralized in
 surfaces.
 
 Decode dimensions use logical render size × device pixel ratio with a hard
-maximum dimension. Vibes avatars, shared avatar frames and the Story viewer
-avatar are guarded against raw `Image.network`/`NetworkImage` usage.
+maximum dimension. Vibes avatars and shared avatar frames are guarded against
+raw `Image.network`/`NetworkImage` usage.
 
-Speculative image loading uses a bounded `AppImagePrefetchQueue` (2 concurrent,
-12 queued). The queue is lifecycle-aware and drops speculative work on
-background/memory pressure/session teardown, while M5 independently trims the
-shared decoded image cache.
+The unused standalone speculative prefetch queue was removed after production
+reachability analysis. Flutter's shared decoded image cache remains
+lifecycle-managed, so the cleanup changes no visible image behavior.

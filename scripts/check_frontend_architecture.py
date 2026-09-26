@@ -529,9 +529,8 @@ if _ACTIVE_CALL_PAGE.exists():
         )
 
 
-# Chunk 34-M13: canonical image decode sizing + bounded prefetch runtime.
+# Chunk 34-M13: canonical image decode sizing.
 _APP_IMAGE = APP / "foundation" / "images" / "app_image.dart"
-_IMAGE_PREFETCH = APP / "foundation" / "images" / "app_image_prefetch.dart"
 
 if not _APP_IMAGE.exists():
     violations.append(
@@ -551,30 +550,10 @@ else:
                 f"foundation/images/app_image.dart: missing Chunk 34-M13 marker: {marker}"
             )
 
-if not _IMAGE_PREFETCH.exists():
-    violations.append(
-        "foundation/images/app_image_prefetch.dart: Chunk 34-M13 prefetch queue is required"
-    )
-else:
-    prefetch_text = _IMAGE_PREFETCH.read_text(encoding="utf-8-sig")
-    for marker in (
-        "implements MediaResourceParticipant",
-        "MediaResourceKind.imagePrefetch",
-        "maxConcurrent = 2",
-        "maxQueued = 12",
-        "precacheImage",
-        "provider.evict",
-        "registry.register(queue)",
-    ):
-        if marker not in prefetch_text:
-            violations.append(
-                f"foundation/images/app_image_prefetch.dart: missing Chunk 34-M13 marker: {marker}"
-            )
 
 for hot_image_path in (
     APP / "features" / "vibes" / "presentation" / "widgets" / "vibe_avatar.dart",
     APP / "core" / "widgets" / "vm_avatar_frame.dart",
-    APP / "features" / "stories" / "widgets" / "story_avatar_ring.dart",
 ):
     if not hot_image_path.exists():
         continue
@@ -611,7 +590,6 @@ else:
         "MediaResourceKind.audioInput",
         "MediaResourceKind.cameraInput",
         "MediaResourceKind.flutterImageCache",
-        "MediaResourceKind.imagePrefetch",
         "MediaResourceKind.gameBundleCache",
     ):
         if marker not in budget_text:
@@ -672,13 +650,6 @@ if _CALL_MEDIA_BRIDGE.exists():
                 f"features/inbox/data/inbox_call_media_bridge.dart: missing M14 call-audio marker: {marker}"
             )
 
-_IMAGE_PREFETCH_PROVIDER = APP / "foundation" / "images" / "app_image_prefetch.dart"
-if _IMAGE_PREFETCH_PROVIDER.exists():
-    prefetch_text = _IMAGE_PREFETCH_PROVIDER.read_text(encoding="utf-8-sig")
-    if "dependencies: [mediaResourceRegistryProvider]" not in prefetch_text:
-        violations.append(
-            "foundation/images/app_image_prefetch.dart: prefetch provider must declare the scoped registry dependency"
-        )
 
 # Chunk 34-M1: heavyweight media/resource lifecycle coordination must be
 # session-scoped. The coordinator is an app/runtime implementation, not a

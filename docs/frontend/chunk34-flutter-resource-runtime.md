@@ -6,8 +6,7 @@
 
 Chunk 34 addresses Flutter resource pressure caused by persistent tabs and
 simultaneous heavyweight resources such as Vibes video decoders, Watch Party
-and game WebViews, room WebRTC, gift video, camera/mic, image prefetches, and
-game bundle caches.
+and game WebViews, room WebRTC, gift video, camera/mic, and game bundle caches.
 
 M1 is deliberately an **expand-only** step. It adds the coordinator contract
 and lifecycle registry without changing UI or moving any existing resource
@@ -186,10 +185,9 @@ inside AppShell: Flutter's live decoded/network image cache.
 
 ### Resource taxonomy
 
-`MediaResourceKind.flutterImageCache` is added separately from
-`imagePrefetch`. The former represents Flutter's shared decoded image-cache
-memory; the latter is reserved for explicit feature-driven prefetch work that
-may be introduced or migrated later.
+`MediaResourceKind.flutterImageCache` represents Flutter's shared decoded
+image-cache memory. The separate unused prefetch resource kind was retired after
+the production graph showed no registered consumer.
 
 ### Adapter boundary
 
@@ -505,7 +503,7 @@ Inbox call session state remains Inbox/backend authority. The resource runtime
 does not answer/end calls or alter call participants.
 
 
-## M13: canonical AppImage and bounded prefetch pipeline
+## M13: canonical AppImage decode pipeline
 
 M13 establishes one native Flutter image path for high-frequency network/image
 surfaces without adding a third-party cache package.
@@ -522,35 +520,22 @@ The first guarded migrations are:
 
 - Vibes avatars;
 - shared avatar-frame images;
-- Story viewer avatar.
 
 These hot surfaces may no longer use raw `Image.network`/`NetworkImage`.
 
-### Prefetch queue
+### Cleanup closure
 
-`AppImagePrefetchQueue` is a foundation-owned
-`MediaResourceKind.imagePrefetch` participant.
-
-It provides:
-
-- at most 2 concurrent prefetch decodes;
-- at most 12 queued requests;
-- URL/request deduplication;
-- decode-sized `ResizeImage` providers;
-- queue invalidation on background, memory pressure and session teardown;
-- post-invalidation eviction for an in-flight prefetch that could not be
-  cancelled.
-
-The queue registers itself through the foundation
-`mediaResourceRegistryProvider` and is created lazily inside the authenticated
-subtree. Story avatar opening is the first real prefetch consumer.
+M13's durable production value is per-widget decode sizing through `AppImage`.
+The standalone prefetch queue was subsequently proven unreachable from
+`main.dart`, production feature imports and native/config references, so it
+was removed during repository minimization.
 
 ### Relationship to M5
 
-M5 owns Flutter's shared decoded-image cache pressure. M13 owns future/queued
-prefetch work and per-widget decode sizing. They are deliberately separate
-resource kinds so memory pressure can both stop new speculative work and trim
-the shared cache.
+M5 continues to own Flutter's shared decoded-image cache pressure. M13 retains
+per-widget decode sizing only; there is no duplicate speculative prefetch
+resource to coordinate.
+
 
 ### UI and authority
 
@@ -597,8 +582,8 @@ Watch Party lifecycle test imports the domain contract that defines
 `WatchLiveTimeline`.
 
 Gift-video async initialization disposes stale/failed controllers, failed Inbox
-call startup performs best-effort teardown, and the image-prefetch provider
-explicitly declares its scoped registry dependency.
+call startup performs best-effort teardown, and all retained resource participants are
+wired to concrete production owners.
 
 No further Chunk 34 micro-chunk remains after M14.
 

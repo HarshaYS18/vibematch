@@ -29,7 +29,7 @@ a process-global singleton is forbidden.
 
 Chunk 34 is complete through M14. Vibes decoders, Game and Watch Party WebViews,
 room WebRTC, gift video, live-room and Inbox-call microphone capture, Inbox call
-camera input, Flutter image cache, image prefetch and verified game-bundle cache
+camera input, Flutter image cache and verified game-bundle cache
 are represented by the authenticated-session resource runtime.
 
 
@@ -74,8 +74,9 @@ memory-pressure cleanup path. AppShell injects Flutter's existing
 `ImageCache.clearLiveImages` callback and registers the participant beside the
 Vibes and game-cache adapters.
 
-The resource kind is `flutterImageCache`; explicit image-prefetch jobs remain
-a separate `imagePrefetch` category for later work.
+The resource kind is `flutterImageCache`. The unused standalone image-prefetch
+category was retired during repository minimization; no production surface
+registered it.
 
 
 ## M6 feature registration boundary
@@ -157,16 +158,15 @@ pause. Memory pressure is non-destructive; session teardown releases the
 camera track.
 
 
-## M13 AppImage + prefetch
+## M13 AppImage decode sizing
 
-High-frequency image surfaces now use the foundation `AppImage` wrapper for
-device-pixel-ratio-aware bounded decoding. A bounded
-`AppImagePrefetchQueue` registers as `MediaResourceKind.imagePrefetch`, with
-2 active and 12 queued requests maximum.
+High-frequency image surfaces use the foundation `AppImage` wrapper for
+device-pixel-ratio-aware bounded decoding. The shared Flutter image cache remains
+managed by the M5 participant.
 
-Background, memory pressure and session teardown invalidate speculative queued
-work. In-flight work that finishes after invalidation is evicted. The shared
-Flutter image cache remains independently managed by the M5 participant.
+The standalone speculative prefetch queue created during M13 was later proven
+unreachable from the production entrypoint and removed. This cleanup changes no
+visible image loading behavior because no production surface instantiated it.
 
 
 ## M14 closure
@@ -174,4 +174,4 @@ Flutter image cache remains independently managed by the M5 participant.
 Every resource kind now has an advisory budget and pressure tier. The
 coordinator performs tiered memory-pressure cleanup and isolates failures per
 participant. The final audit also adds the Inbox-call microphone and verifies
-that speculative image prefetch stays scoped to the AppShell registry.
+that every retained resource participant is wired to a production owner.

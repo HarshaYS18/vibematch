@@ -9,7 +9,6 @@ void main() {
     final player = File('lib/features/vibes/presentation/widgets/vibe_media_player.dart').readAsStringSync();
     final network = File('lib/foundation/networking/app_network_client.dart').readAsStringSync();
     final appImage = File('lib/foundation/images/app_image.dart').readAsStringSync();
-    final prefetch = File('lib/foundation/images/app_image_prefetch.dart').readAsStringSync();
     final vibeAvatar = File('lib/features/vibes/presentation/widgets/vibe_avatar.dart').readAsStringSync();
     final avatarFrame = File('lib/core/widgets/vm_avatar_frame.dart').readAsStringSync();
 
@@ -21,10 +20,6 @@ void main() {
     expect(network, contains('DeduplicatingAppNetworkClient'));
     expect(appImage, contains('AppImageDecodePolicy'));
     expect(appImage, contains('cacheWidth:'));
-    expect(prefetch, contains('MediaResourceKind.imagePrefetch'));
-    expect(prefetch, contains('maxConcurrent = 2'));
-    expect(prefetch, contains('maxQueued = 12'));
-    expect(prefetch, contains('precacheImage'));
     for (final hotSurface in <String>[vibeAvatar, avatarFrame]) {
       expect(hotSurface, contains('AppImage.network'));
       final rawSurface = hotSurface.replaceAll('AppImage.network(', '');
