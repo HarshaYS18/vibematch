@@ -1,6 +1,6 @@
 import 'dart:async';
 
-import 'package:http/http.dart' as http;
+import 'canonical_network_transport.dart';
 
 typedef UploadRangeStreamFactory = Stream<List<int>> Function(
   int start,
@@ -27,13 +27,17 @@ class DirectUploadTransportException implements Exception {
   String toString() => message;
 }
 
+/// Specialized streaming adapter for direct object-store uploads.
+///
+/// Dio ownership stays inside [CanonicalNetworkTransport]. This adapter keeps
+/// media uploads streaming and preserves server-provided pre-signed headers.
 class DirectUploadTransport {
   DirectUploadTransport({
-    http.Client? client,
+    CanonicalNetworkTransport? transport,
     this.timeout = const Duration(minutes: 10),
-  }) : _client = client ?? http.Client();
+  }) : _transport = transport ?? CanonicalNetworkTransport.instance;
 
-  final http.Client _client;
+  final CanonicalNetworkTransport _transport;
   final Duration timeout;
 
   Future<String?> putRange({
@@ -51,18 +55,14 @@ class DirectUploadTransport {
       );
     }
 
-    final request = http.StreamedRequest('PUT', url)
-      ..headers.addAll(headers)
-      ..contentLength = endExclusive - start;
-
-    final responseFuture = _client.send(request).timeout(timeout);
     try {
-      await request.sink
-          .addStream(source.openRange(start, endExclusive))
-          .timeout(timeout);
-      await request.sink.close();
-      final response = await responseFuture;
-      await response.stream.drain<void>().timeout(timeout);
+      final response = await _transport.putStream(
+        url,
+        headers: headers,
+        body: source.openRange(start, endExclusive),
+        contentLength: endExclusive - start,
+        timeout: timeout,
+      );
       if (response.statusCode < 200 || response.statusCode >= 300) {
         throw DirectUploadTransportException(
           'Object upload failed (${response.statusCode}).',
@@ -71,11 +71,6 @@ class DirectUploadTransport {
       }
       return response.headers['etag'];
     } catch (error) {
-      try {
-        await request.sink.close();
-      } catch (_) {
-        // Best-effort cleanup after a transport failure.
-      }
       if (error is DirectUploadTransportException) rethrow;
       throw DirectUploadTransportException(
         'Object upload transport failed: ${error.runtimeType}.',
@@ -83,5 +78,7 @@ class DirectUploadTransport {
     }
   }
 
-  void close() => _client.close();
+  void close() {
+    // CanonicalNetworkTransport is process-scoped and intentionally reused.
+  }
 }
