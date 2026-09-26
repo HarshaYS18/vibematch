@@ -153,7 +153,9 @@ def _external_path_references(candidates: list[Path]) -> set[Path]:
     return references
 
 
-def _asset_report(asset_literals: set[str], declared_prefixes: list[str]) -> tuple[list[str], list[str]]:
+def _asset_report(
+    asset_literals: set[str], declared_prefixes: list[str]
+) -> tuple[list[str], list[str], list[str], dict[str, list[str]]]:
     asset_files = sorted(
         path.relative_to(APP).as_posix()
         for path in (APP / "assets").rglob("*")
@@ -179,7 +181,36 @@ def _asset_report(asset_literals: set[str], declared_prefixes: list[str]) -> tup
         if asset not in asset_literals
         and not any(asset.startswith(prefix) for prefix in dynamic_prefixes)
     ]
-    return unbundled, literal_unreferenced
+
+    external_refs: dict[str, list[str]] = {asset: [] for asset in literal_unreferenced}
+    text_suffixes = {
+        ".dart", ".yaml", ".yml", ".json", ".xml", ".plist", ".html",
+        ".js", ".ts", ".gradle", ".kts", ".properties", ".md",
+    }
+    for source in APP.rglob("*"):
+        if not source.is_file() or source.is_relative_to(APP / "assets"):
+            continue
+        if any(part in {".dart_tool", "build", ".git"} for part in source.parts):
+            continue
+        if source == PUBSPEC or source.suffix.lower() not in text_suffixes:
+            continue
+        try:
+            text = source.read_text(encoding="utf-8-sig")
+        except (UnicodeDecodeError, OSError):
+            continue
+        for asset in literal_unreferenced:
+            if asset in text:
+                external_refs[asset].append(source.relative_to(APP).as_posix())
+
+    external_refs = {
+        asset: refs for asset, refs in external_refs.items() if refs
+    }
+    return (
+        unbundled,
+        literal_unreferenced,
+        sorted(dynamic_prefixes),
+        external_refs,
+    )
 
 
 def main() -> None:
@@ -206,9 +237,12 @@ def main() -> None:
         and path not in external_refs
     ]
     unused_dependencies = sorted(dependencies - set(imported_packages))
-    unbundled_assets, literal_unreferenced_assets = _asset_report(
-        asset_literals, asset_prefixes
-    )
+    (
+        unbundled_assets,
+        literal_unreferenced_assets,
+        dynamic_asset_prefixes,
+        external_asset_references,
+    ) = _asset_report(asset_literals, asset_prefixes)
 
     report = {
         "lib_dart_files": len(lib_files),
@@ -227,6 +261,8 @@ def main() -> None:
         "imported_direct_dependencies": sorted(dependencies & set(imported_packages)),
         "unused_direct_dependencies": unused_dependencies,
         "unbundled_assets": unbundled_assets,
+        "dynamic_asset_prefixes": dynamic_asset_prefixes,
+        "external_asset_references": external_asset_references,
         "literal_unreferenced_assets": literal_unreferenced_assets,
     }
     print(json.dumps(report, indent=2))
