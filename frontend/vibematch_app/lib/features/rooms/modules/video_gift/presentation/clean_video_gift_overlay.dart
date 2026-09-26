@@ -234,7 +234,6 @@ class _CleanVideoGiftCardState extends ConsumerState<_CleanVideoGiftCard> {
                     )
                   : _GiftFallback(
                       assetUrl: widget.slide.giftAssetUrl,
-                      assetPath: widget.slide.giftAssetPath,
                       colors: widget.slide.colors,
                       icon: widget.slide.giftIcon,
                       fit: fit,
@@ -250,14 +249,12 @@ class _CleanVideoGiftCardState extends ConsumerState<_CleanVideoGiftCard> {
 class _GiftFallback extends StatelessWidget {
   const _GiftFallback({
     required this.assetUrl,
-    required this.assetPath,
     required this.colors,
     required this.icon,
     required this.fit,
   });
 
   final String? assetUrl;
-  final String? assetPath;
   final List<Color> colors;
   final IconData icon;
   final BoxFit fit;
@@ -270,45 +267,27 @@ class _GiftFallback extends StatelessWidget {
         networkUrl,
         fit: fit,
         gaplessPlayback: true,
-        errorBuilder: (context, error, stackTrace) => _LocalOrIconFallback(
-          assetPath: assetPath,
+        errorBuilder: (context, error, stackTrace) => _GiftIconFallback(
           colors: colors,
           icon: icon,
-          fit: fit,
         ),
       );
     }
-    return _LocalOrIconFallback(
-      assetPath: assetPath,
-      colors: colors,
-      icon: icon,
-      fit: fit,
-    );
+    return _GiftIconFallback(colors: colors, icon: icon);
   }
 }
 
-class _LocalOrIconFallback extends StatelessWidget {
-  const _LocalOrIconFallback({
-    required this.assetPath,
+class _GiftIconFallback extends StatelessWidget {
+  const _GiftIconFallback({
     required this.colors,
     required this.icon,
-    required this.fit,
   });
 
-  final String? assetPath;
   final List<Color> colors;
   final IconData icon;
-  final BoxFit fit;
 
   @override
   Widget build(BuildContext context) {
-    final path = assetPath?.toLowerCase().trim() ?? '';
-    if (path.endsWith('.webp') ||
-        path.endsWith('.gif') ||
-        path.endsWith('.png') ||
-        path.endsWith('.apng')) {
-      return Image.asset(assetPath!, fit: fit, gaplessPlayback: true);
-    }
     return Center(
       child: Container(
         width: 180,
