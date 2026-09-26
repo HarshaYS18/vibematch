@@ -35,6 +35,20 @@
         "canonical networking architecture test forbids reintroduction",
         "AppNetworkClient -> CanonicalNetworkTransport -> Dio is authoritative"
       ]
+    },
+    {
+      "id": "unsupported-flutter-desktop-runners",
+      "paths": [
+        "frontend/vibematch_app/linux/",
+        "frontend/vibematch_app/macos/",
+        "frontend/vibematch_app/windows/"
+      ],
+      "replacement": "supported Flutter targets: Android, iOS and Web",
+      "evidence": [
+        "no repository workflow builds Flutter Linux, macOS or Windows",
+        "frontend Flutter metadata now tracks only Android, iOS and Web",
+        "the application architecture and release paths target Android, iOS and Web"
+      ]
     }
   ],
   "retained_compatibility": [
