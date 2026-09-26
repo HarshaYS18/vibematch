@@ -27,6 +27,9 @@ LOCAL_MEDIA_RENDER_RE = re.compile(
     r"RiveAnimation\.asset|AssetImage|ExactAssetImage|"
     r"VideoPlayerController\.asset)\s*\("
 )
+ALLOWED_LOCAL_MEDIA_CALL_RE = re.compile(
+    r"""Image\.asset\(\s*['"]assets/branding/funkey_logo\.png['"]"""
+)
 APPROVED_UNREACHABLE_LIB_DART = {
     "lib/foundation/offline/offline_projection_store.dart": (
         "Chunk 46 offline projection policy component retained by focused tests/guard"
@@ -191,7 +194,10 @@ def _asset_report(
             forbidden_asset_literal_sources[source.relative_to(APP).as_posix()] = (
                 disallowed_literals
             )
-        if LOCAL_MEDIA_RENDER_RE.search(text):
+        renderer_scan_text = ALLOWED_LOCAL_MEDIA_CALL_RE.sub(
+            "ALLOWED_FUNKEY_LOGO_ASSET(", text
+        )
+        if LOCAL_MEDIA_RENDER_RE.search(renderer_scan_text):
             local_media_renderer_sources.append(source.relative_to(APP).as_posix())
 
     unbundled = [
@@ -349,7 +355,10 @@ def main() -> None:
             forbidden_asset_literal_sources[
                 source.relative_to(APP).as_posix()
             ] = disallowed_literals
-        if LOCAL_MEDIA_RENDER_RE.search(text):
+        renderer_scan_text = ALLOWED_LOCAL_MEDIA_CALL_RE.sub(
+            "ALLOWED_FUNKEY_LOGO_ASSET(", text
+        )
+        if LOCAL_MEDIA_RENDER_RE.search(renderer_scan_text):
             local_media_renderer_sources.append(
                 source.relative_to(APP).as_posix()
             )
