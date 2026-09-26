@@ -7,6 +7,7 @@ reviewed and repaired, this script becomes the permanent regression guard.
 
 from __future__ import annotations
 
+import argparse
 import json
 import re
 from collections import defaultdict, deque
@@ -21,6 +22,13 @@ DIRECTIVE_RE = re.compile(r"(?ms)^\s*(import|export|part)\s+([^;]+);")
 URI_RE = re.compile(r"['\"]([^'\"]+)['\"]")
 ASSET_LITERAL_RE = re.compile(r"['\"](assets/[^'\"]+)['\"]")
 PACKAGE_IMPORT_RE = re.compile(r"package:([A-Za-z0-9_]+)/")
+
+# This file is intentionally kept as a bounded Chunk 46 offline capability.
+# It is exercised by policy tests and architecture guards even though current UI
+# routes do not instantiate it directly.
+ALLOWED_UNREACHABLE_LIB_DART = {
+    "lib/foundation/offline/offline_projection_store.dart",
+}
 
 
 def _norm(path: Path) -> Path:
@@ -219,6 +227,14 @@ def _asset_report(
 
 
 def main() -> None:
+    parser = argparse.ArgumentParser()
+    parser.add_argument(
+        "--check",
+        action="store_true",
+        help="fail when unnecessary Flutter sources, dependencies or assets remain",
+    )
+    args = parser.parse_args()
+
     graph, packages, asset_literals, roots = _dart_graph()
     reachable = _reachable(graph, roots)
     lib_files = sorted(LIB.rglob("*.dart"))
@@ -263,6 +279,16 @@ def main() -> None:
         ):
             asset_manifest_consumers.append(source.relative_to(APP).as_posix())
 
+    unexpected_unreachable = sorted(
+        path for path in unreachable
+        if path not in ALLOWED_UNREACHABLE_LIB_DART
+    )
+    dead_literal_assets = sorted(
+        asset for asset in literal_unreferenced_assets
+        if asset not in external_asset_references
+        and not any(asset.startswith(prefix) for prefix in dynamic_asset_prefixes)
+    )
+
     report = {
         "lib_dart_files": len(lib_files),
         "reachable_lib_dart_files": len(reachable),
@@ -284,6 +310,7 @@ def main() -> None:
             )
         },
         "pure_orphan_lib_dart": pure_orphans,
+        "unexpected_unreachable_lib_dart": unexpected_unreachable,
         "direct_dependencies": sorted(dependencies),
         "imported_direct_dependencies": sorted(dependencies & set(imported_packages)),
         "unused_direct_dependencies": unused_dependencies,
@@ -292,8 +319,38 @@ def main() -> None:
         "asset_manifest_consumers": sorted(asset_manifest_consumers),
         "external_asset_references": external_asset_references,
         "literal_unreferenced_assets": literal_unreferenced_assets,
+        "dead_literal_assets": dead_literal_assets,
     }
     print(json.dumps(report, indent=2))
+
+    if args.check:
+        failures: list[str] = []
+        if pure_orphans:
+            failures.append(
+                "pure orphan Dart files: " + ", ".join(pure_orphans)
+            )
+        if unexpected_unreachable:
+            failures.append(
+                "unexpected unreachable Dart files: "
+                + ", ".join(unexpected_unreachable)
+            )
+        if unused_dependencies:
+            failures.append(
+                "unused direct dependencies: " + ", ".join(unused_dependencies)
+            )
+        if unbundled_assets:
+            failures.append(
+                "unbundled asset files: " + ", ".join(unbundled_assets)
+            )
+        if dead_literal_assets:
+            failures.append(
+                "unreferenced bundled assets: " + ", ".join(dead_literal_assets)
+            )
+        if failures:
+            raise SystemExit(
+                "Flutter hygiene audit FAILED:\n - " + "\n - ".join(failures)
+            )
+        print("Flutter hygiene audit: zero unnecessary sources/dependencies/assets")
 
 
 if __name__ == "__main__":
