@@ -549,14 +549,12 @@ class _CompactTextField extends StatelessWidget {
     required this.controller,
     this.maxLines = 1,
     this.maxLength,
-    this.keyboardType,
     this.onChanged,
   });
   final String hint;
   final TextEditingController controller;
   final int maxLines;
   final int? maxLength;
-  final TextInputType? keyboardType;
   final ValueChanged<String>? onChanged;
   @override
   Widget build(BuildContext context) => Padding(
@@ -565,7 +563,6 @@ class _CompactTextField extends StatelessWidget {
       controller: controller,
       maxLines: maxLines,
       maxLength: maxLength,
-      keyboardType: keyboardType,
       onChanged: onChanged,
       style: const TextStyle(
         color: Color(0xFF251538),

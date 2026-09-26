@@ -6,7 +6,6 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../app/app_shell.dart';
 import '../../../identity/data/identity_repository.dart';
 import '../../../session/data/session_repository.dart';
-import '../data/auth_api_service.dart';
 import '../data/google_sign_in_config.dart';
 import '../data/google_sign_in_session_service.dart';
 import '../models/current_user.dart';
@@ -26,7 +25,6 @@ class AuthGate extends ConsumerStatefulWidget {
 }
 
 class _AuthGateState extends ConsumerState<AuthGate> {
-  final AuthApiService _authApiService = AuthApiService();
   final GoogleSignInSessionService _googleSignIn =
       GoogleSignInSessionService.instance;
 

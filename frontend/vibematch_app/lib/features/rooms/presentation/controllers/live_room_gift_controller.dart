@@ -5,7 +5,6 @@ import 'package:flutter/material.dart' show Alignment, Color;
 
 import '../../../auth/data/auth_api_service.dart';
 import '../../../auth/models/current_user.dart';
-import '../../../gifts/data/lucky_gifts_api_service.dart';
 import '../../../relationships/data/relationship_exp_api_service.dart';
 import '../../../wallet/data/wallet_api_service.dart';
 import '../../data/gift_api_service.dart';
@@ -102,7 +101,6 @@ class LiveRoomGiftController {
   final ValueChangedLike<String> onToast;
   final WalletApiService _walletApi = const WalletApiService();
   final GiftApiService _giftApi = const GiftApiService();
-  final LuckyGiftsApiService _luckyGiftsApi = const LuckyGiftsApiService();
   final RelationshipExpApiService _relationshipExpApi =
       const RelationshipExpApiService();
 

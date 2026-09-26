@@ -34,18 +34,7 @@ class LiveRoomMessageController {
     unawaited(_realtimeHub.start());
   }
 
-  static const Duration _roomSettingsSystemMessageDuration = Duration(
-    seconds: 5,
-  );
   static const Duration _giftMessageMergeWindow = Duration(seconds: 20);
-  static const Set<String> _allowedRoomSettingsSystemMessages = <String>{
-    'Images enabled',
-    'Images disabled',
-    'Guest messages enabled',
-    'Guest messages disabled',
-    'Apply mode enabled',
-    'Free mode enabled',
-  };
 
   final SeatUser currentUser;
   final RoomSessionRepository? roomSessionRepository;

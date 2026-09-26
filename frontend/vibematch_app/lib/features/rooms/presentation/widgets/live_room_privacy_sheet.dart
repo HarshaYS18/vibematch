@@ -4,7 +4,6 @@ import 'package:flutter/material.dart';
 
 import '../../../../core/security/screenshot_guard_service.dart';
 import '../../../../core/ui/vm_motion.dart';
-import '../../data/room_api_service.dart';
 import '../../data/room_settings_repository.dart';
 import '../live_room_models.dart';
 import 'room_theme.dart';
@@ -32,7 +31,6 @@ class LiveRoomPrivacySheet extends StatefulWidget {
 class _LiveRoomPrivacySheetState extends State<LiveRoomPrivacySheet> {
   late RoomPrivacyMode _mode;
   final TextEditingController _passwordController = TextEditingController();
-  final RoomApiService _roomApi = const RoomApiService();
   final RoomSettingsRepository _settingsRepository = RoomSettingsRepository();
   bool _saving = false;
   bool _loadingSettings = false;

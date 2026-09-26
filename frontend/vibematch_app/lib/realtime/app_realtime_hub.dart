@@ -31,13 +31,10 @@ class RealtimeResyncRequest {
 }
 
 class _RoomSubscriptionCursor {
-  _RoomSubscriptionCursor({
-    this.stream,
-    this.lastSequence = 0,
-  });
+  _RoomSubscriptionCursor();
 
   String? stream;
-  int lastSequence;
+  int lastSequence = 0;
   RealtimeCapabilityGrant? capability;
   bool capabilityPending = false;
 }

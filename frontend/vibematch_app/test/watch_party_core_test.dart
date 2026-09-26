@@ -7,14 +7,13 @@ import 'package:vibematch_app/watch_party/domain/watch_provider_adapter.dart';
 class _FakeWatchAdapter implements WatchProviderAdapter {
   _FakeWatchAdapter({
     required this.providerId,
-    this.positionMs = 0,
     this.fineGrainedPlaybackRateControl = true,
   });
 
   @override
   final String providerId;
 
-  int positionMs;
+  int positionMs = 0;
   final bool fineGrainedPlaybackRateControl;
   double playbackRate = 1;
   bool playing = false;
