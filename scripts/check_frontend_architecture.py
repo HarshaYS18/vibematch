@@ -722,7 +722,8 @@ if _APP_SHELL.exists():
         "ref.watch(mediaResourceCoordinatorProvider);",
         "mediaResourceRegistryProvider.overrideWithValue(resourceCoordinator)",
         "_notifyResourceMemoryPressure()",
-        "_notifyResourceForegroundState(state == AppLifecycleState.resumed)",
+        "final isForeground = state == AppLifecycleState.resumed;",
+        "_notifyResourceForegroundState(isForeground)",
         "handleMemoryPressure()",
         "setForeground(isForeground)",
     )
