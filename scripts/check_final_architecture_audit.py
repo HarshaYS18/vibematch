@@ -65,8 +65,15 @@ def check_decommission_registry() -> None:
 
 def check_legacy_snapshot_scope() -> None:
     offenders: list[str] = []
+    migration_tooling = {
+        ROOT / "backend/check_migrations.py",
+    }
     for path in (ROOT / "backend").rglob("*.py"):
-        if path.name == "legacy_snapshot.py" or "alembic" in path.parts:
+        if (
+            path.name == "legacy_snapshot.py"
+            or "alembic" in path.parts
+            or path in migration_tooling
+        ):
             continue
         text = path.read_text(encoding="utf-8", errors="replace")
         if "legacy_snapshot" in text:

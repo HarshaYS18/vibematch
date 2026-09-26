@@ -13,7 +13,10 @@ export function recordJoin(success: boolean, durationMs: number): void {
   joinDurationTotalMs += bounded;
   joinDurationObservations += 1;
   for (let index = 0; index < joinDurationBucketsMs.length; index += 1) {
-    if (bounded <= joinDurationBucketsMs[index]) joinDurationCounts[index] += 1;
+    const bucket = joinDurationBucketsMs[index];
+    if (bucket !== undefined && bounded <= bucket) {
+      joinDurationCounts[index] = (joinDurationCounts[index] ?? 0) + 1;
+    }
   }
 }
 

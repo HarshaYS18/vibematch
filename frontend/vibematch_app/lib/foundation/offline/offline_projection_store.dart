@@ -1,16 +1,16 @@
 import 'dart:convert';
 
-import 'package:shared_preferences/shared_preferences.dart';
+import '../persistence/app_key_value_store.dart';
 
 /// Small, rebuildable offline read projection.
 ///
 /// This store is intentionally bounded and never queues authoritative commands.
-/// SharedPreferences is used as a portable bootstrap cache, not as business
-/// storage. Large media/content stays in normal HTTP/CDN caches.
+/// Persistence flows through [AppKeyValueStore], the canonical client key/value
+/// boundary. Large media/content stays in normal HTTP/CDN caches.
 class OfflineProjectionStore {
-  OfflineProjectionStore._(this._preferences);
+  OfflineProjectionStore._(this._store);
 
-  final SharedPreferences _preferences;
+  final AppKeyValueStore _store;
 
   static const String _prefix = 'funkey.offline.v1.';
   static const String _indexKey = 'funkey.offline.v1.__index__';
@@ -27,7 +27,9 @@ class OfflineProjectionStore {
   static const int maxRows = 64;
 
   static Future<OfflineProjectionStore> open() async {
-    return OfflineProjectionStore._(await SharedPreferences.getInstance());
+    return OfflineProjectionStore._(
+      await SharedPreferencesKeyValueStore.create(),
+    );
   }
 
   Future<void> put({
@@ -55,13 +57,13 @@ class OfflineProjectionStore {
       'expiresAtMs': now + ttl.inMilliseconds,
     });
 
-    await _preferences.setString(storageKey, envelope);
-    final index = await _readIndex();
+    await _store.writeString(storageKey, envelope);
+    final index = _readIndex();
     index.removeWhere((entry) => entry.key == storageKey);
     index.insert(0, _IndexEntry(storageKey, now));
     while (index.length > maxRows) {
       final removed = index.removeLast();
-      await _preferences.remove(removed.key);
+      await _store.remove(removed.key);
     }
     await _writeIndex(index);
     await clearExpired();
@@ -73,35 +75,35 @@ class OfflineProjectionStore {
   }) async {
     _validateScope(scope);
     final storageKey = _storageKey(scope, key);
-    final raw = _preferences.getString(storageKey);
+    final raw = _store.readString(storageKey);
     if (raw == null) return null;
 
     try {
       final envelope = jsonDecode(raw);
       if (envelope is! Map<String, dynamic>) {
-        await _preferences.remove(storageKey);
+        await _store.remove(storageKey);
         return null;
       }
       final expiresAtMs = envelope['expiresAtMs'];
       if (expiresAtMs is! int ||
           expiresAtMs <= DateTime.now().millisecondsSinceEpoch) {
-        await _preferences.remove(storageKey);
+        await _store.remove(storageKey);
         return null;
       }
       final payload = envelope['payload'];
       return payload is Map<String, dynamic> ? payload : null;
     } catch (_) {
-      await _preferences.remove(storageKey);
+      await _store.remove(storageKey);
       return null;
     }
   }
 
   Future<void> clearExpired() async {
     final now = DateTime.now().millisecondsSinceEpoch;
-    final index = await _readIndex();
+    final index = _readIndex();
     final kept = <_IndexEntry>[];
     for (final entry in index) {
-      final raw = _preferences.getString(entry.key);
+      final raw = _store.readString(entry.key);
       if (raw == null) continue;
       try {
         final envelope = jsonDecode(raw);
@@ -110,25 +112,25 @@ class OfflineProjectionStore {
         if (expiresAtMs is int && expiresAtMs > now) {
           kept.add(entry);
         } else {
-          await _preferences.remove(entry.key);
+          await _store.remove(entry.key);
         }
       } catch (_) {
-        await _preferences.remove(entry.key);
+        await _store.remove(entry.key);
       }
     }
     await _writeIndex(kept);
   }
 
   Future<void> clearAll() async {
-    final index = await _readIndex();
+    final index = _readIndex();
     for (final entry in index) {
-      await _preferences.remove(entry.key);
+      await _store.remove(entry.key);
     }
-    await _preferences.remove(_indexKey);
+    await _store.remove(_indexKey);
   }
 
-  Future<List<_IndexEntry>> _readIndex() async {
-    final raw = _preferences.getString(_indexKey);
+  List<_IndexEntry> _readIndex() {
+    final raw = _store.readString(_indexKey);
     if (raw == null) return <_IndexEntry>[];
     try {
       final decoded = jsonDecode(raw);
@@ -144,7 +146,7 @@ class OfflineProjectionStore {
   }
 
   Future<void> _writeIndex(List<_IndexEntry> index) {
-    return _preferences.setString(
+    return _store.writeString(
       _indexKey,
       jsonEncode(index.map((entry) => entry.toJson()).toList()),
     );

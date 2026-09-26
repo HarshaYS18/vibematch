@@ -9,7 +9,7 @@ def main():
     if "wallet." not in policy["forbidden_offline_command_prefixes"]:
         raise SystemExit("wallet mutations must be forbidden offline")
     store=(ROOT/"frontend/vibematch_app/lib/foundation/offline/offline_projection_store.dart").read_text()
-    for marker in ("SharedPreferences", "maxRows = 64", "OfflineMutationPolicy"):
+    for marker in ("AppKeyValueStore", "maxRows = 64", "OfflineMutationPolicy"):
         if marker not in store: raise SystemExit(f"offline store missing {marker}")
     runtime=(ROOT/"frontend/vibematch_app/lib/foundation/runtime/mobile_runtime_budget.dart").read_text()
     for marker in ("MethodChannel('funkey/power_state')", "MobileRuntimeTier.background", "batteryLevel"):

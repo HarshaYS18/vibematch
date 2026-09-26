@@ -24,9 +24,7 @@ void main() {
     expect(shell, contains('unawaited(_notifyResourceMemoryPressure());'));
     expect(
       shell,
-      contains(
-        '_notifyResourceForegroundState(state == AppLifecycleState.resumed)',
-      ),
+      contains('_notifyResourceForegroundState(isForeground)'),
     );
     expect(
       shell,
