@@ -244,14 +244,14 @@ func (d *boundedDedupe) size() int {
 }
 
 type Hub struct {
-	mu       sync.RWMutex
-	clients  map[*Client]struct{}
-	staff    map[*Client]struct{}
-	shards   []routeShard
-	draining bool
-	dedupe   *boundedDedupe
+	mu                         sync.RWMutex
+	clients                    map[*Client]struct{}
+	staff                      map[*Client]struct{}
+	shards                     []routeShard
+	draining                   bool
+	dedupe                     *boundedDedupe
 	hotRoomSubscriberThreshold int
-	stats    Stats
+	stats                      Stats
 }
 
 func NewHub() *Hub {
@@ -277,10 +277,10 @@ func newHubWithQoS(count int, hotRoomSubscriberThreshold int) *Hub {
 		hotRoomSubscriberThreshold = 1
 	}
 	return &Hub{
-		clients: make(map[*Client]struct{}),
-		staff:   make(map[*Client]struct{}),
-		shards:  shards,
-		dedupe:  newBoundedDedupe(defaultDedupeEntries, defaultDedupeTTL),
+		clients:                    make(map[*Client]struct{}),
+		staff:                      make(map[*Client]struct{}),
+		shards:                     shards,
+		dedupe:                     newBoundedDedupe(defaultDedupeEntries, defaultDedupeTTL),
 		hotRoomSubscriberThreshold: hotRoomSubscriberThreshold,
 	}
 }
