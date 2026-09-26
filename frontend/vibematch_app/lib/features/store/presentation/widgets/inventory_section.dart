@@ -73,19 +73,13 @@ class _InventoryCard extends StatelessWidget {
                   gradient: const LinearGradient(colors: [Color(0xFF251538), Color(0xFF12C7B7)]),
                 ),
                 clipBehavior: Clip.antiAlias,
-                child: item.imageUrl != null
+                child: item.imageUrl != null && item.imageUrl!.trim().isNotEmpty
                     ? Image.network(
                         item.imageUrl!,
                         fit: BoxFit.contain,
                         errorBuilder: (context, error, stackTrace) => const Icon(Icons.inventory_2_rounded, color: Colors.white),
                       )
-                    : item.assetPath != null
-                        ? Image.asset(
-                            item.assetPath!,
-                            fit: BoxFit.contain,
-                            errorBuilder: (context, error, stackTrace) => const Icon(Icons.inventory_2_rounded, color: Colors.white),
-                          )
-                        : const Icon(Icons.inventory_2_rounded, color: Colors.white),
+                    : const Icon(Icons.inventory_2_rounded, color: Colors.white),
               ),
               const SizedBox(width: 12),
               Expanded(
