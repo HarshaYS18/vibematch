@@ -334,7 +334,6 @@ class _GiftImageChip extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final assetPath = visual.assetPath?.trim();
     final assetUrl = visual.assetUrl?.trim();
     return Container(
       width: 36,
@@ -361,13 +360,6 @@ class _GiftImageChip extends StatelessWidget {
                 errorBuilder: (_, _, _) =>
                     Icon(visual.icon, color: Colors.white, size: 22),
               )
-            : assetPath != null && assetPath.isNotEmpty
-            ? Image.asset(
-                assetPath,
-                fit: BoxFit.contain,
-                errorBuilder: (_, _, _) =>
-                    Icon(visual.icon, color: Colors.white, size: 22),
-              )
             : Icon(visual.icon, color: Colors.white, size: 22),
       ),
     );
@@ -375,17 +367,16 @@ class _GiftImageChip extends StatelessWidget {
 }
 
 class _GiftChatVisual {
-  const _GiftChatVisual({this.assetPath, this.assetUrl, required this.icon});
+  const _GiftChatVisual({this.assetUrl, required this.icon});
 
-  final String? assetPath;
   final String? assetUrl;
   final IconData icon;
 
   static _GiftChatVisual? fromMessage(ChatEntry message) {
-    final explicitPath = message.giftAssetPath?.trim();
-    if (explicitPath != null && explicitPath.isNotEmpty) {
+    final explicitUrl = message.giftAssetUrl?.trim();
+    if (explicitUrl != null && explicitUrl.isNotEmpty) {
       return _GiftChatVisual(
-        assetPath: explicitPath,
+        assetUrl: explicitUrl,
         icon: Icons.card_giftcard_rounded,
       );
     }
@@ -394,7 +385,6 @@ class _GiftChatVisual {
       if (rawMessage.contains(gift.name.toLowerCase()) ||
           rawMessage.contains(gift.id.toLowerCase())) {
         return _GiftChatVisual(
-          assetPath: gift.assetPath,
           assetUrl: gift.assetUrl,
           icon: gift.icon,
         );
