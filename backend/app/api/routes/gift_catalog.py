@@ -48,8 +48,6 @@ class GiftItemAdminPayload(AdminReasonRequest):
     max_combo: int = Field(default=999, ge=1, le=999999)
     icon_key: str | None = Field(default=None, max_length=120)
     chat_symbol: str | None = Field(default=None, max_length=32)
-    asset_path: str | None = None
-    video_asset_path: str | None = None
     cdn_asset_path: str | None = None
     cdn_video_path: str | None = None
     animation_type: str = Field(default="image", min_length=1, max_length=40)
@@ -234,8 +232,8 @@ def upsert_gift_item(gift_id: str, payload: GiftItemAdminPayload, db: Session = 
     item.max_combo = payload.max_combo
     item.icon_key = payload.icon_key
     item.chat_symbol = payload.chat_symbol
-    item.asset_path = payload.asset_path
-    item.video_asset_path = payload.video_asset_path
+    item.asset_path = None
+    item.video_asset_path = None
     item.cdn_asset_path = payload.cdn_asset_path
     item.cdn_video_path = payload.cdn_video_path
     item.animation_type = _clean_key(payload.animation_type)
