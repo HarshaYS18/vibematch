@@ -188,10 +188,16 @@ def _asset_report(
         ".dart", ".yaml", ".yml", ".json", ".xml", ".plist", ".html",
         ".js", ".ts", ".gradle", ".kts", ".properties", ".md",
     }
-    for source in APP.rglob("*"):
+    for source in ROOT.rglob("*"):
         if not source.is_file() or source.is_relative_to(APP / "assets"):
             continue
-        if any(part in {".dart_tool", "build", ".git"} for part in source.parts):
+        if any(
+            part in {
+                ".dart_tool", "build", ".git", "node_modules", ".terraform",
+                "__pycache__", ".venv", "venv",
+            }
+            for part in source.parts
+        ):
             continue
         if source == PUBSPEC or source.suffix.lower() not in text_suffixes:
             continue
@@ -245,6 +251,20 @@ def main() -> None:
         external_asset_references,
     ) = _asset_report(asset_literals, asset_prefixes)
 
+    asset_manifest_consumers: list[str] = []
+    for source in LIB.rglob("*.dart"):
+        text = source.read_text(encoding="utf-8-sig", errors="replace")
+        if any(
+            token in text
+            for token in (
+                "AssetManifest",
+                "AssetManifest.json",
+                "loadString('AssetManifest",
+                'loadString("AssetManifest',
+            )
+        ):
+            asset_manifest_consumers.append(source.relative_to(APP).as_posix())
+
     report = {
         "lib_dart_files": len(lib_files),
         "reachable_lib_dart_files": len(reachable),
@@ -263,6 +283,7 @@ def main() -> None:
         "unused_direct_dependencies": unused_dependencies,
         "unbundled_assets": unbundled_assets,
         "dynamic_asset_prefixes": dynamic_asset_prefixes,
+        "asset_manifest_consumers": sorted(asset_manifest_consumers),
         "external_asset_references": external_asset_references,
         "literal_unreferenced_assets": literal_unreferenced_assets,
     }
