@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 
+import '../../../../core/assets/funkey_cdn_assets.dart';
+
 class PremiumGiftBroadcastEvent {
   const PremiumGiftBroadcastEvent({
     required this.id,
@@ -258,8 +260,8 @@ class _PremiumGiftBroadcastCardState extends State<_PremiumGiftBroadcastCard>
                     ),
                   ),
                   Positioned.fill(
-                    child: Image.asset(
-                      'assets/gifts/broadcast/premium_gift_broadcast_frame.png',
+                    child: Image.network(
+                      FunKeyCdnAssets.premiumGiftBroadcastFrame,
                       fit: BoxFit.fill,
                       errorBuilder: (context, error, stackTrace) =>
                           const _FallbackPremiumFrame(),
@@ -320,12 +322,10 @@ class _PremiumGiftBroadcastCardState extends State<_PremiumGiftBroadcastCard>
                               ],
                             ),
                           ),
-                          if ((widget.event.giftAssetUrl?.trim().isNotEmpty ?? false) ||
-                              (widget.event.giftAssetPath?.trim().isNotEmpty ?? false)) ...[
+                          if (widget.event.giftAssetUrl?.trim().isNotEmpty ?? false) ...[
                             const SizedBox(width: 7),
                             _BroadcastGiftImage(
                               assetUrl: widget.event.giftAssetUrl,
-                              assetPath: widget.event.giftAssetPath,
                             ),
                           ],
                         ],
@@ -411,15 +411,13 @@ class _BroadcastAvatar extends StatelessWidget {
 }
 
 class _BroadcastGiftImage extends StatelessWidget {
-  const _BroadcastGiftImage({this.assetUrl, this.assetPath});
+  const _BroadcastGiftImage({this.assetUrl});
 
   final String? assetUrl;
-  final String? assetPath;
 
   @override
   Widget build(BuildContext context) {
     final url = assetUrl?.trim();
-    final path = assetPath?.trim();
     Widget fallback() => const Icon(
       Icons.card_giftcard_rounded,
       color: Color(0xFFFFE7A1),
@@ -431,12 +429,6 @@ class _BroadcastGiftImage extends StatelessWidget {
       child: url != null && url.isNotEmpty
           ? Image.network(
               url,
-              fit: BoxFit.contain,
-              errorBuilder: (context, error, stackTrace) => fallback(),
-            )
-          : path != null && path.isNotEmpty
-          ? Image.asset(
-              path,
               fit: BoxFit.contain,
               errorBuilder: (context, error, stackTrace) => fallback(),
             )
