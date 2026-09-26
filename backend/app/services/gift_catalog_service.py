@@ -452,12 +452,19 @@ MULTIPLIER_TABLE = [
 ]
 
 
+def _gift_cdn_base_url() -> str:
+    return (
+        settings.GIFT_CDN_BASE_URL.strip()
+        or settings.MEDIA_CDN_BASE_URL.strip()
+    ).rstrip("/")
+
+
 def _cdn_url(relative_path: str | None) -> str | None:
     if not relative_path:
         return None
     if relative_path.startswith("http://") or relative_path.startswith("https://"):
         return relative_path
-    base = settings.GIFT_CDN_BASE_URL.strip().rstrip("/")
+    base = _gift_cdn_base_url()
     if not base:
         return None
     clean_path = relative_path.lstrip("/")
@@ -470,7 +477,12 @@ def _with_dynamic_urls(gift: dict) -> dict:
     item = deepcopy(gift)
     item["asset_url"] = _cdn_url(item.get("cdn_asset_path"))
     item["video_url"] = _cdn_url(item.get("cdn_video_path"))
-    item["cdn_enabled"] = bool(settings.GIFT_CDN_BASE_URL.strip())
+    # Local Flutter media paths are legacy migration metadata only. Public
+    # catalog payloads are CDN-only so clients cannot silently reintroduce
+    # bundled product media.
+    item["asset_path"] = None
+    item["video_asset_path"] = None
+    item["cdn_enabled"] = bool(_gift_cdn_base_url())
     item["catalog_version"] = GIFT_CATALOG_VERSION
     item["min_combo"] = max(1, int(item.get("min_combo") or 1))
     item["max_combo"] = max(item["min_combo"], int(item.get("max_combo") or 999))
@@ -611,7 +623,7 @@ def admin_catalog_snapshot(db: Session) -> dict:
     gifts = [_with_dynamic_urls(_item_to_gift_dict(item)) for item in items]
     return {
         "catalog_version": GIFT_CATALOG_VERSION,
-        "cdn_base_url": settings.GIFT_CDN_BASE_URL.strip(),
+        "cdn_base_url": _gift_cdn_base_url(),
         "categories": [_category_to_payload(category) for category in categories],
         "items": gifts,
         "normal": [gift for gift in gifts if gift.get("gift_type") == "normal"],
@@ -634,7 +646,7 @@ def list_gifts(db: Session | None = None) -> dict:
         all_gifts = [_with_dynamic_urls(_item_to_gift_dict(item)) for item in items]
         return {
             "catalog_version": GIFT_CATALOG_VERSION,
-            "cdn_base_url": settings.GIFT_CDN_BASE_URL.strip(),
+            "cdn_base_url": _gift_cdn_base_url(),
             "categories": [_category_to_payload(category) for category in categories],
             "normal": [gift for gift in all_gifts if gift.get("gift_type") == "normal"],
             "lucky": [gift for gift in all_gifts if gift.get("gift_type") == "lucky"],
@@ -646,7 +658,7 @@ def list_gifts(db: Session | None = None) -> dict:
     all_gifts = [_with_dynamic_urls(gift) for gift in _all_static_gifts() if gift.get("is_enabled")]
     return {
         "catalog_version": GIFT_CATALOG_VERSION,
-        "cdn_base_url": settings.GIFT_CDN_BASE_URL.strip(),
+        "cdn_base_url": _gift_cdn_base_url(),
         "categories": _static_categories_from_gifts(all_gifts),
         "normal": [gift for gift in all_gifts if gift.get("gift_type") == "normal"],
         "lucky": [gift for gift in all_gifts if gift.get("gift_type") == "lucky"],
