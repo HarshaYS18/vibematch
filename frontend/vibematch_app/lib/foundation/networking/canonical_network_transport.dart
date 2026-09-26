@@ -1,6 +1,7 @@
 import 'dart:async';
 import 'dart:convert';
 import 'dart:math';
+import 'dart:typed_data';
 
 import 'package:dio/dio.dart';
 import 'package:uuid/uuid.dart';
@@ -265,6 +266,86 @@ class CanonicalNetworkTransport {
       }
     } finally {
       _latencyMs += DateTime.now().difference(started).inMilliseconds;
+    }
+  }
+
+  /// Streams a raw PUT through the canonical Dio owner without adding app
+  /// authentication or trace headers. This is used for pre-signed object-store
+  /// uploads where the server-provided header set must remain authoritative.
+  Future<NetworkResponse> putStream(
+    Uri uri, {
+    required Stream<List<int>> body,
+    required int contentLength,
+    Map<String, String> headers = const <String, String>{},
+    Duration timeout = const Duration(minutes: 10),
+  }) async {
+    if (contentLength <= 0) {
+      throw const ApiException(message: 'Upload content length must be positive');
+    }
+
+    final response = await _dio
+        .requestUri<Object?>(
+          uri,
+          data: body,
+          options: Options(
+            method: 'PUT',
+            headers: <String, String>{
+              ...headers,
+              'Content-Length': '$contentLength',
+            },
+            sendTimeout: timeout,
+            receiveTimeout: timeout,
+            responseType: ResponseType.plain,
+            validateStatus: (_) => true,
+          ),
+        )
+        .timeout(timeout);
+
+    return NetworkResponse(
+      statusCode: response.statusCode ?? 0,
+      body: response.data?.toString() ?? '',
+      headers: <String, String>{
+        for (final entry in response.headers.map.entries)
+          entry.key.toLowerCase(): entry.value.join(','),
+      },
+      requestId: _header(headers, 'x-request-id') ?? '',
+    );
+  }
+
+  /// Fetches binary external assets through the canonical Dio owner.
+  Future<Uint8List> getBytes(
+    Uri uri, {
+    Map<String, String> headers = const <String, String>{},
+    Duration? timeout,
+  }) async {
+    final effectiveTimeout = timeout ?? AppConstants.receiveTimeout;
+    try {
+      final response = await _dio
+          .requestUri<List<int>>(
+            uri,
+            options: Options(
+              method: 'GET',
+              headers: headers,
+              receiveTimeout: effectiveTimeout,
+              responseType: ResponseType.bytes,
+              validateStatus: (_) => true,
+            ),
+          )
+          .timeout(effectiveTimeout);
+      final statusCode = response.statusCode ?? 0;
+      if (statusCode < 200 || statusCode >= 300) {
+        throw ApiException(
+          message: 'Binary request failed',
+          statusCode: statusCode,
+        );
+      }
+      return Uint8List.fromList(response.data ?? const <int>[]);
+    } on DioException catch (error) {
+      throw ApiException(
+        message: 'Binary request failed: ${error.type.name}',
+        statusCode: error.response?.statusCode,
+        body: error.response?.data,
+      );
     }
   }
 
