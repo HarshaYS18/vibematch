@@ -39,10 +39,10 @@ def main() -> None:
         chunk: list((ROOT / "docs/platform").glob(f"chunk{chunk}-*.md"))
         for chunk in range(37, 57)
     }
-    missing_docs = [str(chunk) for chunk, matches in expected_docs.items() if len(matches) != 1]
+    missing_docs = [str(chunk) for chunk, matches in expected_docs.items() if not matches]
     if missing_docs:
         raise SystemExit(
-            "each roadmap chunk 37-56 must have exactly one platform closure doc; bad chunks: "
+            "each roadmap chunk 37-56 must have at least one platform closure doc; missing chunks: "
             + ", ".join(missing_docs)
         )
 

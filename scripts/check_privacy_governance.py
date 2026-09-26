@@ -28,7 +28,12 @@ def main() -> None:
         if not path.is_file():
             raise SystemExit(f"missing privacy artifact: {path.relative_to(ROOT)}")
     privacy = (ROOT / "apps/identity-service/privacy.py").read_text()
-    for marker in ("privacy.export.requested", "privacy.delete.requested", "due_at", "CANCELLED"):
+    for marker in (
+        'Literal["export", "delete"]',
+        'event_type=f"privacy.{payload.request_type}.requested"',
+        "due_at",
+        "CANCELLED",
+    ):
         if marker not in privacy:
             raise SystemExit(f"privacy workflow missing {marker}")
 
