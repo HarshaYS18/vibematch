@@ -1,0 +1,15 @@
+{
+  "schema_version": 1,
+  "seed_id": "funkey-dev-seed-v1",
+  "users": [
+    {"public_user_id": 641899900001, "username": "dev_alice", "display_name": "Dev Alice"},
+    {"public_user_id": 641899900002, "username": "dev_bob", "display_name": "Dev Bob"},
+    {"public_user_id": 641899900003, "username": "dev_chandra", "display_name": "Dev Chandra"}
+  ],
+  "room": {"room_public_id": "FKDEV1001", "name": "FunKey Dev Lounge", "language": "English"},
+  "conversation": {"public_id": "dev-general-v1", "title": "Dev General"},
+  "family": {"family_id": 990001, "family_name": "FunKey Dev Family"},
+  "game": {"game_key": "dev-quick-tap-v1", "display_name": "Dev Quick Tap"},
+  "event_id": "11111111-2222-4333-8444-555555555555",
+  "notes": "Economy wallets are seeded at zero. No synthetic value/ledger history is created."
+}
