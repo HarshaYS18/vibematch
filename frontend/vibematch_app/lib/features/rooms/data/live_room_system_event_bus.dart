@@ -171,14 +171,10 @@ class LiveRoomSystemEvent {
       giftVideoUrl: _text(
         json['video_url'] ?? json['gift_video_url'] ?? json['giftVideoUrl'],
       ),
-      giftAssetPath: _text(
-        json['asset_path'] ?? json['gift_asset_path'] ?? json['giftAssetPath'],
-      ),
-      giftVideoAssetPath: _text(
-        json['video_asset_path'] ??
-            json['gift_video_asset_path'] ??
-            json['giftVideoAssetPath'],
-      ),
+      // Legacy local Flutter paths are intentionally ignored. Product media is
+      // CDN-owned and only public URLs are eligible for rendering.
+      giftAssetPath: null,
+      giftVideoAssetPath: null,
       giftCategory: (json['gift_category'] ?? json['category'] ?? 'classic')
           .toString(),
       giftType: (json['gift_type'] ?? 'normal').toString(),
