@@ -18,7 +18,8 @@ void main() {
     expect(api, contains('ApiClientNetworkAdapter'));
     expect(api, contains('StreamingUploadSource'));
     expect(api, isNot(contains('MultipartRequest')));
-    expect(transport, contains('http.StreamedRequest'));
+    expect(transport, contains('CanonicalNetworkTransport.instance'));
+    expect(transport, contains('_transport.putStream('));
     expect(transport, contains('openRange(start, endExclusive)'));
   });
 
