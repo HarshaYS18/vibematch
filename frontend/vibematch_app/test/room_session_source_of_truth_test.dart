@@ -8,6 +8,7 @@ import 'dart:io';
 import 'package:flutter_test/flutter_test.dart';
 
 void main() {
+  const rawHttpImport = 'package:' 'http/http.dart';
   test('Chunk 5 canonical room state keeps domain concepts separate', () {
     final state = File(
       'lib/room_session/domain/room_session_state.dart',
@@ -29,7 +30,7 @@ void main() {
     expect(repository, contains('/realtime/snapshot'));
     expect(shell, contains('roomSessionRepositoryProvider'));
     expect(repository, isNot(contains('ValueNotifier')));
-    expect(repository, isNot(contains('package:http/http.dart')));
+    expect(repository, isNot(contains(rawHttpImport)));
   });
   test('Chunk 33 image send awaits canonical repository before success UI', () {
     final controller = File(
