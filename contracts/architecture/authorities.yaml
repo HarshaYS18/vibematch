@@ -1,7 +1,7 @@
 {
   "schema_version": 1,
-  "updated_for_chunk": 32,
-  "status": "architecture contract; current fields describe repository reality and target fields describe approved migration direction",
+  "updated_for_chunk": 56,
+  "status": "architecture contract; current fields describe repository reality through Chunk 56 and target fields describe approved future migration direction",
   "classifications": [
     "AUTHORITY",
     "PROJECTION",
@@ -1026,15 +1026,15 @@
       "domain": "search",
       "classification": "PROJECTION",
       "logical_owner": "search-projection",
-      "current_deployable": "not deployed; core-api uses direct DB search",
+      "current_deployable": "search-service",
       "current_storage": [
-        "no OpenSearch index deployed"
+        "OpenSearch versioned indexes and aliases"
       ],
       "target_storage": [
-        "OpenSearch indexes"
+        "managed/private OpenSearch indexes"
       ],
       "mutated_by": [
-        "projection worker (future)"
+        "search-service projection consumer"
       ],
       "source_states": [
         "profiles.public",
@@ -1045,25 +1045,25 @@
       ],
       "rebuild_from": [],
       "change_contract": {
-        "status": "planned",
+        "status": "live",
         "name": "search.document.updated.v1"
       },
-      "migration_status": "Chunk 38"
+      "migration_status": "Chunk 38 Search/OpenSearch projection boundary live"
     },
     {
       "id": "analytics.event_stream",
       "domain": "analytics",
       "classification": "PROJECTION",
       "logical_owner": "analytics",
-      "current_deployable": "not deployed; NATS remains operational messaging",
+      "current_deployable": "kafka-event-bridge + Kafka",
       "current_storage": [
-        "no Kafka analytics stream deployed"
+        "Kafka retained analytics/replay topic families"
       ],
       "target_storage": [
-        "Kafka long-retained analytical stream"
+        "managed multi-AZ Kafka retained analytical stream"
       ],
       "mutated_by": [
-        "NATS-to-Kafka bridge (future)"
+        "kafka-event-bridge from durable NATS JetStream source"
       ],
       "source_states": [
         "rooms.activity",
@@ -1074,50 +1074,52 @@
       ],
       "rebuild_from": [],
       "change_contract": {
-        "status": "planned",
-        "name": "analytics bridge events"
+        "status": "live",
+        "name": "Kafka analytics envelope/topic contracts"
       },
-      "migration_status": "Chunk 37"
+      "migration_status": "Chunk 37 Kafka data platform live"
     },
     {
       "id": "analytics.warehouse",
       "domain": "analytics",
       "classification": "PROJECTION",
       "logical_owner": "analytics",
-      "current_deployable": "not deployed",
+      "current_deployable": "analytics-sink",
       "current_storage": [
-        "no ClickHouse/data-lake projection deployed"
+        "ClickHouse analytical projection",
+        "Parquet/object-storage data lake"
       ],
       "target_storage": [
-        "ClickHouse + object storage Parquet"
+        "ClickHouse analytical projection",
+        "private object-storage Parquet data lake"
       ],
       "mutated_by": [
-        "analytics consumers (future)"
+        "analytics-sink Kafka consumer"
       ],
       "source_states": [
         "analytics.event_stream"
       ],
       "rebuild_from": [],
       "change_contract": {
-        "status": "planned",
+        "status": "live",
         "name": "analytics materialization"
       },
-      "migration_status": "Chunk 48"
+      "migration_status": "Chunk 48 analytics/ClickHouse/data-lake projection live"
     },
     {
       "id": "recommendations.ranking",
       "domain": "recommendations",
       "classification": "PROJECTION",
       "logical_owner": "recommendation",
-      "current_deployable": "not deployed",
+      "current_deployable": "recommendation-service",
       "current_storage": [
-        "chronological/following reads only"
+        "Redis candidate/ranking feed projections"
       ],
       "target_storage": [
-        "candidate/ranking projection + caches"
+        "versioned candidate/ranking projection + reconstructable caches"
       ],
       "mutated_by": [
-        "recommendation platform (future)"
+        "recommendation-service projection consumer"
       ],
       "source_states": [
         "vibes.content",
@@ -1127,10 +1129,10 @@
       ],
       "rebuild_from": [],
       "change_contract": {
-        "status": "planned",
+        "status": "live",
         "name": "recommendation.projection.updated.v1"
       },
-      "migration_status": "Chunk 39"
+      "migration_status": "Chunk 39 recommendation projection boundary live"
     },
     {
       "id": "client.master_state_cache",
