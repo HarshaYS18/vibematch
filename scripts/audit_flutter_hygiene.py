@@ -23,7 +23,9 @@ PUBSPEC = APP / "pubspec.yaml"
 UNSUPPORTED_PLATFORM_DIRS = {"linux", "macos", "windows"}
 ALLOWED_BUNDLED_ASSETS = {"assets/branding/funkey_logo.png"}
 LOCAL_MEDIA_RENDER_RE = re.compile(
-    r"\b(?:Image\.asset|AssetImage|ExactAssetImage|VideoPlayerController\.asset)\s*\("
+    r"\b(?:Image\.asset|AppImage\.asset|SvgPicture\.asset|Lottie\.asset|"
+    r"RiveAnimation\.asset|AssetImage|ExactAssetImage|"
+    r"VideoPlayerController\.asset)\s*\("
 )
 APPROVED_UNREACHABLE_LIB_DART = {
     "lib/foundation/offline/offline_projection_store.dart": (
@@ -237,7 +239,7 @@ def _asset_report(
             continue
         for asset in literal_unreferenced:
             if asset in text:
-                external_refs[asset].append(source.relative_to(APP).as_posix())
+                external_refs[asset].append(source.relative_to(ROOT).as_posix())
 
     external_refs = {
         asset: refs for asset, refs in external_refs.items() if refs
