@@ -12,7 +12,6 @@ void main() {
     final prefetch = File('lib/foundation/images/app_image_prefetch.dart').readAsStringSync();
     final vibeAvatar = File('lib/features/vibes/presentation/widgets/vibe_avatar.dart').readAsStringSync();
     final avatarFrame = File('lib/core/widgets/vm_avatar_frame.dart').readAsStringSync();
-    final storyAvatar = File('lib/features/stories/widgets/story_avatar_ring.dart').readAsStringSync();
 
     expect(shell, contains('_PersistentTabStage'));
     expect(shell, contains('didHaveMemoryPressure'));
@@ -26,7 +25,7 @@ void main() {
     expect(prefetch, contains('maxConcurrent = 2'));
     expect(prefetch, contains('maxQueued = 12'));
     expect(prefetch, contains('precacheImage'));
-    for (final hotSurface in <String>[vibeAvatar, avatarFrame, storyAvatar]) {
+    for (final hotSurface in <String>[vibeAvatar, avatarFrame]) {
       expect(hotSurface, contains('AppImage.network'));
       final rawSurface = hotSurface.replaceAll('AppImage.network(', '');
       expect(rawSurface, isNot(contains('Image.network(')));

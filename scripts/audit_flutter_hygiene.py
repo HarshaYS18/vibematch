@@ -126,6 +126,7 @@ def _external_path_references(candidates: list[Path]) -> set[Path]:
         ROOT / "docs",
         ROOT / "contracts",
         ROOT / ".github",
+        APP / "test",
     )
     needles = {
         path: (
