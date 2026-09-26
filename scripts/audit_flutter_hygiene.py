@@ -246,6 +246,11 @@ def main() -> None:
     ]
 
     dependencies, asset_prefixes = _pubspec_dependencies()
+    runtime_imported_packages = {
+        name
+        for name, sources in packages.items()
+        if any(source in reachable for source in sources)
+    }
     test_roots, imported_packages = _test_roots_and_package_imports(packages)
     test_reachable = _reachable(graph, test_roots)
     external_refs = _external_path_references(
@@ -259,6 +264,9 @@ def main() -> None:
         and path not in external_refs
     ]
     unused_dependencies = sorted(dependencies - set(imported_packages))
+    runtime_unused_dependencies = sorted(
+        dependencies - runtime_imported_packages
+    )
     (
         unbundled_assets,
         literal_unreferenced_assets,
@@ -341,8 +349,12 @@ def main() -> None:
         },
         "unexpected_unreachable_lib_dart": unexpected_unreachable,
         "direct_dependencies": sorted(dependencies),
+        "runtime_imported_direct_dependencies": sorted(
+            dependencies & runtime_imported_packages
+        ),
         "imported_direct_dependencies": sorted(dependencies & set(imported_packages)),
         "unused_direct_dependencies": unused_dependencies,
+        "runtime_unused_direct_dependencies": runtime_unused_dependencies,
         "unbundled_assets": unbundled_assets,
         "dynamic_asset_prefixes": dynamic_asset_prefixes,
         "empty_dynamic_asset_prefixes": empty_dynamic_asset_prefixes,
@@ -369,6 +381,11 @@ def main() -> None:
         if unused_dependencies:
             failures.append(
                 "unused direct dependencies: " + ", ".join(unused_dependencies)
+            )
+        if runtime_unused_dependencies:
+            failures.append(
+                "production dependencies unused by reachable runtime Dart: "
+                + ", ".join(runtime_unused_dependencies)
             )
         if unbundled_assets:
             failures.append(
