@@ -1,0 +1,42 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://funkey.example/contracts/release/release-manifest-v1.schema.json",
+  "title": "FunKey Release Manifest v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "release_version",
+    "git_sha",
+    "generated_at",
+    "mobile_version",
+    "migration_head",
+    "contracts",
+    "feature_flags",
+    "images",
+    "rollback_target"
+  ],
+  "properties": {
+    "schema_version": {"const": 1},
+    "release_version": {"type": "string", "minLength": 1},
+    "git_sha": {"type": "string", "pattern": "^[0-9a-f]{40}$"},
+    "generated_at": {"type": "string", "format": "date-time"},
+    "mobile_version": {"type": "string", "minLength": 1},
+    "migration_head": {"type": "string", "minLength": 1},
+    "contracts": {
+      "type": "object",
+      "required": ["rest", "realtime_envelope", "graphql_persisted_operations", "game_bridge", "asset_manifest"],
+      "additionalProperties": true
+    },
+    "feature_flags": {"type": "object"},
+    "images": {
+      "type": "object",
+      "minProperties": 1,
+      "additionalProperties": {
+        "type": "string",
+        "pattern": "^[^@\\s]+@sha256:[0-9a-f]{64}$"
+      }
+    },
+    "rollback_target": {"type": "string", "minLength": 1}
+  }
+}
