@@ -1,5 +1,5 @@
 name: vibematch_app
-description: "A new Flutter project."
+description: "FunKey production Flutter client."
 publish_to: 'none'
 
 version: 1.0.0+1
@@ -12,7 +12,6 @@ dependencies:
     sdk: flutter
 
   cupertino_icons: ^1.0.8
-  http: ^1.6.0
   dio: ^5.9.0
   crypto: ^3.0.7
   flutter_riverpod: ^2.6.1

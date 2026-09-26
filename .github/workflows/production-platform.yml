@@ -31,6 +31,9 @@ on:
       - 'scripts/check_analytics_platform.py'
       - 'scripts/check_release_safety.py'
       - 'scripts/check_sre_finops.py'
+      - 'scripts/check_roadmap_closure.py'
+      - 'scripts/check_dependency_hygiene.py'
+      - 'scripts/check_decommissioning.py'
       - 'scripts/prepare_gitops_promotion.py'
       - 'docs/platform/chunk37-kafka-data-platform.md'
       - 'docs/architecture/kafka-data-platform.md'
@@ -108,6 +111,9 @@ jobs:
           scripts/check_analytics_platform.py
           scripts/check_release_safety.py
           scripts/check_sre_finops.py
+          scripts/check_decommissioning.py
+          scripts/check_dependency_hygiene.py
+          scripts/check_roadmap_closure.py
       - run: python scripts/check_gateway_architecture.py
       - run: python scripts/check_graphql_bff_architecture.py
       - run: python scripts/check_kafka_data_platform.py
@@ -124,6 +130,9 @@ jobs:
       - run: python scripts/check_analytics_platform.py
       - run: python scripts/check_release_safety.py
       - run: python scripts/check_sre_finops.py
+      - run: python scripts/check_decommissioning.py
+      - run: python scripts/check_dependency_hygiene.py
+      - run: python scripts/check_roadmap_closure.py
       - uses: azure/setup-kubectl@v4
         with:
           version: v1.36.4

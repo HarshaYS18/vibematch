@@ -42,3 +42,5 @@ jobs:
         run: python scripts/check_docs_links.py
       - name: Check architecture conformance
         run: python scripts/check_architecture_conformance.py
+      - name: Check final roadmap closure
+        run: python scripts/check_roadmap_closure.py

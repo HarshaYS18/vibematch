@@ -46,6 +46,7 @@ jobs:
         with:
           fetch-depth: 0
       - run: python scripts/check_supply_chain.py
+      - run: python scripts/check_dependency_hygiene.py
       - uses: gitleaks/gitleaks-action@v2
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

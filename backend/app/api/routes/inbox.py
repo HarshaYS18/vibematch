@@ -255,7 +255,7 @@ def verify_lock_recovery(request: InboxLockRecoveryVerifyRequest, db: Session = 
 @router.post("/lock/recovery/request-cs", response_model=InboxLockRecoveryRequestResponse)
 def request_cs_recovery(db: Session = Depends(get_db), current_user: User = Depends(get_current_user)):
     inbox_lock_service.request_cs_recovery(db, current_user)
-    return InboxLockRecoveryRequestResponse(status="submitted", message="Recovery request submitted. Vibe Match Team / CS can verify identity and escalate owner reset if OTP recovery is unavailable.")
+    return InboxLockRecoveryRequestResponse(status="submitted", message="Recovery request submitted. FunKey Team / CS can verify identity and escalate owner reset if OTP recovery is unavailable.")
 
 
 @router.post("/lock/owner-reset/{target_user_id}", response_model=InboxLockStatusResponse)
