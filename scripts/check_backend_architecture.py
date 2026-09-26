@@ -88,8 +88,8 @@ REQUIRED_AUTHORITY_STATE_IDS = {
     "economy.wallet_ledger", "gifts.settlement", "games.catalog_rounds",
     "games.financial_settlement", "missions.progress", "missions.reward_claims",
     "families.membership", "notifications.in_app", "media.metadata", "media.objects",
-    "search.index", "analytics.event_stream", "recommendations.ranking",
-    "client.room_session_cache",
+    "search.index", "analytics.event_stream", "analytics.warehouse",
+    "recommendations.ranking", "client.room_session_cache",
 }
 FINANCIAL_AUTHORITY_STATE_IDS = {
     "economy.wallet_ledger", "economy.supply_ledger", "gifts.settlement",
@@ -111,6 +111,9 @@ def _validate_authority_registry(errors: list[str]) -> None:
         return
     if payload.get("schema_version") != 1:
         errors.append("authority registry schema_version must be 1")
+    updated_for_chunk = payload.get("updated_for_chunk")
+    if not isinstance(updated_for_chunk, int) or updated_for_chunk < 56:
+        errors.append("authority registry must reflect repository reality through Chunk 56")
     states = payload.get("states")
     if not isinstance(states, list) or not states:
         errors.append("authority registry must contain a non-empty states list")
@@ -163,6 +166,31 @@ def _validate_authority_registry(errors: list[str]) -> None:
         item = by_id.get(state_id)
         if item and (item.get("classification") != "AUTHORITY" or item.get("logical_owner") != "economy"):
             errors.append(f"{state_id}: financial truth must be AUTHORITY owned by economy")
+
+    deployed_projection_expectations = {
+        "analytics.event_stream": ("kafka-event-bridge", "Chunk 37"),
+        "search.index": ("search-service", "Chunk 38"),
+        "recommendations.ranking": ("recommendation-service", "Chunk 39"),
+        "analytics.warehouse": ("analytics-sink", "Chunk 48"),
+    }
+    for state_id, (deployable_marker, chunk_marker) in deployed_projection_expectations.items():
+        item = by_id.get(state_id)
+        if not item:
+            continue
+        current_deployable = str(item.get("current_deployable") or "")
+        current_storage = " ".join(str(value) for value in (item.get("current_storage") or []))
+        migration_status = str(item.get("migration_status") or "")
+        change_status = str((item.get("change_contract") or {}).get("status") or "")
+        if deployable_marker not in current_deployable:
+            errors.append(
+                f"{state_id}: current_deployable must include {deployable_marker} after {chunk_marker}"
+            )
+        if "not deployed" in current_deployable.lower() or "no " in current_storage.lower():
+            errors.append(f"{state_id}: stale pre-deployment authority registry state remains")
+        if change_status != "live":
+            errors.append(f"{state_id}: change contract must be live after {chunk_marker}")
+        if chunk_marker not in migration_status:
+            errors.append(f"{state_id}: migration_status must record {chunk_marker} completion")
 
 
 
