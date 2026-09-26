@@ -3,6 +3,7 @@ import 'dart:io';
 import 'package:flutter_test/flutter_test.dart';
 
 void main() {
+  const rawHttpImport = 'package:' 'http/http.dart';
   final root = Directory.current.path.endsWith('vibematch_app')
       ? Directory.current
       : Directory('frontend/vibematch_app');
@@ -28,7 +29,7 @@ void main() {
   test('legacy ApiClient cannot own an HTTP transport', () {
     final legacy = read('lib/core/network/api_client.dart');
     expect(legacy, contains('extends DioAppNetworkClient'));
-    expect(legacy, isNot(contains("package:http/http.dart")));
+    expect(legacy, isNot(contains(rawHttpImport)));
     expect(legacy, isNot(contains('http.Client')));
   });
 
@@ -36,8 +37,22 @@ void main() {
     final compat =
         read('lib/foundation/networking/feature_http_compat.dart');
     expect(compat, contains('AppNetworkRuntime.shared.request'));
-    expect(compat, isNot(contains("package:http/http.dart")));
+    expect(compat, isNot(contains(rawHttpImport)));
     expect(compat, isNot(contains("package:dio/dio.dart")));
+  });
+
+  test('specialized foundation transports delegate to canonical Dio owner', () {
+    final upload =
+        read('lib/foundation/networking/direct_upload_transport.dart');
+    final assets =
+        read('lib/foundation/networking/remote_asset_client.dart');
+
+    expect(upload, contains('CanonicalNetworkTransport.instance'));
+    expect(upload, contains('_transport.putStream('));
+    expect(upload, isNot(contains(rawHttpImport)));
+    expect(assets, contains('CanonicalNetworkTransport.instance'));
+    expect(assets, contains('_transport.getBytes('));
+    expect(assets, isNot(contains(rawHttpImport)));
   });
 
   test('features cannot bypass the canonical transport', () {
@@ -50,7 +65,7 @@ void main() {
       final foundationNetworking = path.contains('/foundation/networking/');
 
       if (!foundationNetworking &&
-          source.contains("package:http/http.dart")) {
+          source.contains(rawHttpImport)) {
         violations.add('$path imports package:http');
       }
       if (!path.endsWith('/foundation/networking/canonical_network_transport.dart') &&
