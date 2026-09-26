@@ -23,6 +23,18 @@
         "pubspec.yaml does not declare assets/games/",
         "remote-game architecture requires manifest/version/SHA-256 verified CDN bundles"
       ]
+    },
+    {
+      "id": "flutter-api-client-alias",
+      "paths": [
+        "frontend/vibematch_app/lib/core/network/api_client.dart"
+      ],
+      "replacement": "frontend/vibematch_app/lib/foundation/networking/app_network_client.dart",
+      "evidence": [
+        "zero supported Flutter source imports",
+        "canonical networking architecture test forbids reintroduction",
+        "AppNetworkClient -> CanonicalNetworkTransport -> Dio is authoritative"
+      ]
     }
   ],
   "retained_compatibility": [
@@ -32,13 +44,6 @@
       "status": "required_migration_bridge",
       "reason": "Alembic history still uses the frozen bootstrap snapshot; deleting it would break database replay.",
       "removal_condition": "Only a formally approved migration-history compaction may retire it after every supported database is beyond the bridge."
-    },
-    {
-      "id": "flutter-api-client-alias",
-      "path": "frontend/vibematch_app/lib/core/network/api_client.dart",
-      "status": "deprecated_source_compatibility",
-      "reason": "The class delegates to canonical Dio networking and owns no transport.",
-      "removal_condition": "Zero supported-source imports plus expiry of the mobile/source-compatibility window."
     },
     {
       "id": "flutter-vibematch-directory-name",
