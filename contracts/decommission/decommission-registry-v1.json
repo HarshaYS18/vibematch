@@ -49,6 +49,21 @@
         "frontend Flutter metadata now tracks only Android, iOS and Web",
         "the application architecture and release paths target Android, iOS and Web"
       ]
+    },
+    {
+      "id": "flutter-bundled-product-media",
+      "paths": [
+        "frontend/vibematch_app/assets/gifts/",
+        "frontend/vibematch_app/assets/images/",
+        "frontend/vibematch_app/assets/videos/"
+      ],
+      "replacement": "versioned public CDN media via VmApiConfig.cdnOrigin and authoritative backend media URLs",
+      "evidence": [
+        "Flutter pubspec declares only assets/branding/funkey_logo.png",
+        "Flutter hygiene CI rejects every other bundled product-media file and local media renderer",
+        "gift catalog public payloads clear legacy local asset/video paths and publish CDN URLs",
+        "room backgrounds, VIP/SVIP tags, family badges and decorations resolve through CDN URLs"
+      ]
     }
   ],
   "retained_compatibility": [
