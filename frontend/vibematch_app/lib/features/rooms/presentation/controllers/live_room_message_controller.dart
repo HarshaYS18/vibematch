@@ -400,7 +400,7 @@ class LiveRoomMessageController {
           sendingLevel: event.actorSendingLevel,
           receivingLevel: event.actorReceivingLevel,
           isGift: true,
-          giftAssetPath: event.giftAssetPath,
+          giftAssetUrl: event.giftAssetUrl,
         ),
       );
       return;
@@ -495,6 +495,7 @@ class LiveRoomMessageController {
       receivingLevel: entry.receivingLevel,
       isGift: true,
       giftAssetPath: entry.giftAssetPath,
+      giftAssetUrl: entry.giftAssetUrl,
     );
     final key = _giftMessageKey(cleanEntry);
     final now = DateTime.now();
