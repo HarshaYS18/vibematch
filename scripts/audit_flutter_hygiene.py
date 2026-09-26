@@ -21,6 +21,10 @@ LIB = APP / "lib"
 PUBSPEC = APP / "pubspec.yaml"
 
 UNSUPPORTED_PLATFORM_DIRS = {"linux", "macos", "windows"}
+ALLOWED_BUNDLED_ASSETS = {"assets/branding/funkey_logo.png"}
+LOCAL_MEDIA_RENDER_RE = re.compile(
+    r"\b(?:Image\.asset|AssetImage|ExactAssetImage|VideoPlayerController\.asset)\s*\("
+)
 APPROVED_UNREACHABLE_LIB_DART = {
     "lib/foundation/offline/offline_projection_store.dart": (
         "Chunk 46 offline projection policy component retained by focused tests/guard"
@@ -169,6 +173,25 @@ def _asset_report(
         for path in (APP / "assets").rglob("*")
         if path.is_file()
     )
+    unexpected_bundled_assets = sorted(
+        asset for asset in asset_files
+        if asset not in ALLOWED_BUNDLED_ASSETS
+    )
+    forbidden_asset_literal_sources: dict[str, list[str]] = {}
+    local_media_renderer_sources: list[str] = []
+    for source in LIB.rglob("*.dart"):
+        text = source.read_text(encoding="utf-8-sig", errors="replace")
+        disallowed_literals = sorted(
+            literal for literal in ASSET_LITERAL_RE.findall(text)
+            if literal not in ALLOWED_BUNDLED_ASSETS
+        )
+        if disallowed_literals:
+            forbidden_asset_literal_sources[source.relative_to(APP).as_posix()] = (
+                disallowed_literals
+            )
+        if LOCAL_MEDIA_RENDER_RE.search(text):
+            local_media_renderer_sources.append(source.relative_to(APP).as_posix())
+
     unbundled = [
         asset for asset in asset_files
         if not any(asset.startswith(prefix) for prefix in declared_prefixes)
@@ -364,6 +387,10 @@ def main() -> None:
         "literal_unreferenced_assets": literal_unreferenced_assets,
         "dead_bundled_assets": dead_bundled_assets,
         "unsupported_platform_directories": present_unsupported_platforms,
+        "unexpected_bundled_assets": unexpected_bundled_assets,
+        "forbidden_asset_literal_sources": forbidden_asset_literal_sources,
+        "local_media_renderer_sources": sorted(local_media_renderer_sources),
+        "pubspec_asset_declarations": asset_prefixes,
     }
     print(json.dumps(report, indent=2))
 
@@ -405,11 +432,31 @@ def main() -> None:
                 "unsupported Flutter platform runners: "
                 + ", ".join(present_unsupported_platforms)
             )
+        if unexpected_bundled_assets:
+            failures.append(
+                "bundled media must be CDN-owned; only FunKey logo may remain: "
+                + ", ".join(unexpected_bundled_assets)
+            )
+        if forbidden_asset_literal_sources:
+            failures.append(
+                "local Flutter asset literals remain outside the FunKey logo exception: "
+                + json.dumps(forbidden_asset_literal_sources, sort_keys=True)
+            )
+        if local_media_renderer_sources:
+            failures.append(
+                "local Flutter media renderers remain: "
+                + ", ".join(sorted(local_media_renderer_sources))
+            )
+        if asset_prefixes != ["assets/branding/funkey_logo.png"]:
+            failures.append(
+                "pubspec must bundle only assets/branding/funkey_logo.png; found: "
+                + ", ".join(asset_prefixes)
+            )
         if failures:
             raise SystemExit(
                 "Flutter hygiene audit FAILED:\n - " + "\n - ".join(failures)
             )
-        print("Flutter hygiene audit: zero unnecessary sources/dependencies/assets/platforms")
+        print("Flutter hygiene audit: zero unnecessary sources/dependencies/assets/platforms; CDN-only media with FunKey-logo exception")
 
 
 if __name__ == "__main__":
