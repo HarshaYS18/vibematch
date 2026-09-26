@@ -7,6 +7,9 @@ immutable/revalidatable content only) -> service-local cache where safe ->
 cache Redis -> rebuildable Search/Recommendation projections -> authoritative
 domain/PostgreSQL.
 
+PostgreSQL/domain services remain business authority; every cache and projection
+in this hierarchy is reconstructable.
+
 Caches never own wallet, ledger, session, ban, authorization, private-message or
 settlement truth. Cache keys hash entity identifiers and use versioned namespaces.
 
