@@ -4,7 +4,6 @@ from datetime import timedelta
 
 from sqlalchemy.orm import Session
 
-from app.models.inbox import InboxMessageType
 from app.models.love_bond import (
     LoveBond,
     LoveBondCardType,
@@ -14,7 +13,7 @@ from app.models.love_bond import (
     LoveBondStatus,
 )
 from app.models.user import User
-from app.services.inbox_service import create_direct_conversation, send_message
+from app.services import inbox_service_client
 
 
 DEFAULT_CARD_NAMES = {
@@ -116,6 +115,30 @@ def grant_inventory_card(
     return item
 
 
+def _patch_request_message(
+    request: LoveBondRequest,
+    *,
+    text: str,
+    status: str,
+    extra_metadata: dict | None = None,
+) -> None:
+    message_id = (request.inbox_message_public_id or "").strip()
+    if not message_id:
+        return
+    metadata = {"status": status}
+    metadata.update(extra_metadata or {})
+    try:
+        inbox_service_client.patch_message(
+            message_id,
+            text=text,
+            metadata_patch=metadata,
+        )
+    except (inbox_service_client.InboxServiceUnavailable, ValueError):
+        # Relationship state is authoritative here. A later reconciliation
+        # pass may repair the Inbox presentation if the service was unavailable.
+        return
+
+
 def expire_stale_requests(db: Session, user: User | None = None) -> int:
     cutoff = datetime.utcnow() - timedelta(hours=24)
     query = db.query(LoveBondRequest).filter(
@@ -124,9 +147,11 @@ def expire_stale_requests(db: Session, user: User | None = None) -> int:
     )
     if user is not None:
         query = query.filter(
-            (LoveBondRequest.sender_user_id == user.id) | (LoveBondRequest.receiver_user_id == user.id)
+            (LoveBondRequest.sender_user_id == user.id)
+            | (LoveBondRequest.receiver_user_id == user.id)
         )
     expired = query.with_for_update().all()
+    patches: list[tuple[LoveBondRequest, str]] = []
     for request in expired:
         item = (
             db.query(LoveBondInventory)
@@ -142,14 +167,21 @@ def expire_stale_requests(db: Session, user: User | None = None) -> int:
             item.reserved_quantity -= 1
         request.status = LoveBondRequestStatus.CANCELLED.value
         request.responded_at = datetime.utcnow()
-        if request.inbox_message:
-            metadata = dict(request.inbox_message.metadata_json or {})
-            metadata["status"] = LoveBondRequestStatus.CANCELLED.value
-            metadata["expired_after_hours"] = 24
-            request.inbox_message.metadata_json = metadata
-            request.inbox_message.text = f"{request.card_name} request expired. The card returned to inventory."
+        patches.append(
+            (
+                request,
+                f"{request.card_name} request expired. The card returned to inventory.",
+            )
+        )
     if expired:
         db.commit()
+        for request, text in patches:
+            _patch_request_message(
+                request,
+                text=text,
+                status=LoveBondRequestStatus.CANCELLED.value,
+                extra_metadata={"expired_after_hours": 24},
+            )
     return len(expired)
 
 
@@ -215,30 +247,41 @@ def send_love_bond_request(
     db.add(request)
     db.flush()
 
-    conversation = create_direct_conversation(db, sender, receiver)
     sender_name = _display_name(sender)
     message_text = f"{sender_name} wants to be your {card_name}."
+    db.commit()
+    db.refresh(request)
 
-    message = send_message(
-        db=db,
-        conversation=conversation,
-        sender=sender,
-        text=message_text,
-        message_type=InboxMessageType.RELATIONSHIP_REQUEST.value,
-        metadata={
-            "action": "love_bond_request",
-            "love_bond_request_id": request.public_id,
-            "card_type": normalized,
-            "card_name": card_name,
-            "sender_user_id": sender.id,
-            "sender_public_user_id": sender.public_user_id,
-            "receiver_user_id": receiver.id,
-            "receiver_public_user_id": receiver.public_user_id,
-            "status": LoveBondRequestStatus.PENDING.value,
-        },
-    )
+    try:
+        delivered = inbox_service_client.send_direct_message(
+            sender_user_id=sender.id,
+            target_user_id=receiver.id,
+            text=message_text,
+            message_type="relationship_request",
+            metadata={
+                "action": "love_bond_request",
+                "love_bond_request_id": request.public_id,
+                "card_type": normalized,
+                "card_name": card_name,
+                "sender_user_id": sender.id,
+                "sender_public_user_id": sender.public_user_id,
+                "receiver_user_id": receiver.id,
+                "receiver_public_user_id": receiver.public_user_id,
+                "status": LoveBondRequestStatus.PENDING.value,
+            },
+        )
+    except (inbox_service_client.InboxServiceUnavailable, ValueError) as exc:
+        failed_item = _inventory_item_for_update(db, sender, normalized)
+        if failed_item.reserved_quantity > 0:
+            failed_item.reserved_quantity -= 1
+        request.status = LoveBondRequestStatus.CANCELLED.value
+        request.responded_at = datetime.utcnow()
+        db.add(request)
+        db.commit()
+        raise ValueError("Unable to deliver relationship request right now.") from exc
 
-    request.inbox_message_id = message.id
+    request.inbox_message_public_id = str(delivered.get("message_id") or "") or None
+    db.add(request)
     db.commit()
     db.refresh(request)
     return request
@@ -282,14 +325,13 @@ def accept_love_bond_request(db: Session, current_user: User, request_public_id:
     )
     db.add(bond)
 
-    if request.inbox_message:
-        metadata = dict(request.inbox_message.metadata_json or {})
-        metadata["status"] = LoveBondRequestStatus.ACCEPTED.value
-        request.inbox_message.metadata_json = metadata
-        request.inbox_message.text = f"You accepted {_display_name(request.sender)}'s {request.card_name} request."
-
     db.commit()
     db.refresh(bond)
+    _patch_request_message(
+        request,
+        text=f"You accepted {_display_name(request.sender)}'s {request.card_name} request.",
+        status=LoveBondRequestStatus.ACCEPTED.value,
+    )
     return bond
 
 
@@ -316,14 +358,13 @@ def reject_love_bond_request(db: Session, current_user: User, request_public_id:
     request.status = LoveBondRequestStatus.REJECTED.value
     request.responded_at = datetime.utcnow()
 
-    if request.inbox_message:
-        metadata = dict(request.inbox_message.metadata_json or {})
-        metadata["status"] = LoveBondRequestStatus.REJECTED.value
-        request.inbox_message.metadata_json = metadata
-        request.inbox_message.text = f"You rejected {_display_name(request.sender)}'s {request.card_name} request."
-
     db.commit()
     db.refresh(request)
+    _patch_request_message(
+        request,
+        text=f"You rejected {_display_name(request.sender)}'s {request.card_name} request.",
+        status=LoveBondRequestStatus.REJECTED.value,
+    )
     return request
 
 

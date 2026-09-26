@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../core/navigation/vm_navigator.dart';
 import '../application/search_controller.dart';
@@ -9,23 +10,20 @@ import 'widgets/search_discover_view.dart';
 import 'widgets/search_header.dart';
 import 'widgets/search_results_view.dart';
 
-class SearchPage extends StatefulWidget {
+class SearchPage extends ConsumerStatefulWidget {
   const SearchPage({super.key});
 
   @override
-  State<SearchPage> createState() => _SearchPageState();
+  ConsumerState<SearchPage> createState() => _SearchPageState();
 }
 
-class _SearchPageState extends State<SearchPage> {
-  final VibeSearchController _searchController = VibeSearchController();
+class _SearchPageState extends ConsumerState<SearchPage> {
   final TextEditingController _textController = TextEditingController();
   final FocusNode _focusNode = FocusNode();
 
   @override
   void initState() {
     super.initState();
-    _searchController.addListener(_handleSearchChanged);
-
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (!mounted) return;
       _focusNode.requestFocus();
@@ -34,32 +32,28 @@ class _SearchPageState extends State<SearchPage> {
 
   @override
   void dispose() {
-    _searchController.removeListener(_handleSearchChanged);
-    _searchController.dispose();
     _textController.dispose();
     _focusNode.dispose();
     super.dispose();
   }
 
-  void _handleSearchChanged() {
-    if (mounted) setState(() {});
-  }
-
   void _useSearchText(String text) {
     _textController.text = text;
     _textController.selection = TextSelection.collapsed(offset: text.length);
-    _searchController.setQuery(text);
-    _searchController.submitSearch(text);
+    final controller = ref.read(vibeSearchControllerProvider.notifier);
+    controller.setQuery(text);
+    controller.submitSearch(text);
   }
 
   void _clearSearch() {
     _textController.clear();
-    _searchController.clearQuery();
+    ref.read(vibeSearchControllerProvider.notifier).clearQuery();
     _focusNode.requestFocus();
   }
 
   void _openResult(SearchResultItem item) {
-    _searchController.submitSearch(_searchController.query);
+    final searchState = ref.read(vibeSearchControllerProvider);
+    ref.read(vibeSearchControllerProvider.notifier).submitSearch(searchState.query);
     FocusManager.instance.primaryFocus?.unfocus();
 
     switch (item.type) {
@@ -109,7 +103,9 @@ class _SearchPageState extends State<SearchPage> {
 
   @override
   Widget build(BuildContext context) {
-    final hasQuery = _searchController.hasQuery;
+    final search = ref.watch(vibeSearchControllerProvider);
+    final controller = ref.read(vibeSearchControllerProvider.notifier);
+    final hasQuery = search.hasQuery;
 
     return Scaffold(
       backgroundColor: const Color(0xFFFAF7F1),
@@ -122,28 +118,29 @@ class _SearchPageState extends State<SearchPage> {
               hasQuery: hasQuery,
               onBackTap: () => Navigator.pop(context),
               onClearTap: _clearSearch,
-              onChanged: _searchController.setQuery,
-              onSubmitted: _searchController.submitSearch,
+              onChanged: controller.setQuery,
+              onSubmitted: controller.submitSearch,
             ),
             if (hasQuery)
               SearchCategoryTabs(
-                selectedCategory: _searchController.selectedCategory,
-                countForCategory: _searchController.countForCategory,
-                onCategoryChanged: _searchController.selectCategory,
+                selectedCategory: search.selectedCategory,
+                countForCategory: search.countForCategory,
+                onCategoryChanged: controller.selectCategory,
               ),
             Expanded(
               child: hasQuery
                   ? _ProductionSearchResults(
-                      controller: _searchController,
+                      state: search,
+                      controller: controller,
                       onResultTap: _openResult,
                     )
                   : SearchDiscoverView(
-                      recentSearches: _searchController.recentSearches,
-                      topSearches: _searchController.topSearches,
+                      recentSearches: search.recentSearches,
+                      topSearches: search.topSearches,
                       onRecentTap: _useSearchText,
                       onTopSearchTap: _useSearchText,
-                      onRemoveRecentTap: _searchController.removeRecentSearch,
-                      onClearRecentTap: _searchController.clearRecentSearches,
+                      onRemoveRecentTap: controller.removeRecentSearch,
+                      onClearRecentTap: controller.clearRecentSearches,
                     ),
             ),
           ],
@@ -154,18 +151,23 @@ class _SearchPageState extends State<SearchPage> {
 }
 
 class _ProductionSearchResults extends StatelessWidget {
-  const _ProductionSearchResults({required this.controller, required this.onResultTap});
+  const _ProductionSearchResults({
+    required this.state,
+    required this.controller,
+    required this.onResultTap,
+  });
 
+  final VibeSearchState state;
   final VibeSearchController controller;
   final ValueChanged<SearchResultItem> onResultTap;
 
   @override
   Widget build(BuildContext context) {
-    if (controller.isLoading) {
+    if (state.isLoading) {
       return const Center(child: CircularProgressIndicator(color: Color(0xFF251538)));
     }
 
-    final error = controller.errorMessage;
+    final error = state.errorMessage;
     if (error != null) {
       return Center(
         child: Container(
@@ -189,9 +191,9 @@ class _ProductionSearchResults extends StatelessWidget {
     }
 
     return SearchResultsView(
-      query: controller.query,
-      results: controller.visibleResults,
-      selectedCategory: controller.selectedCategory,
+      query: state.query,
+      results: state.visibleResults,
+      selectedCategory: state.selectedCategory,
       onResultTap: onResultTap,
     );
   }

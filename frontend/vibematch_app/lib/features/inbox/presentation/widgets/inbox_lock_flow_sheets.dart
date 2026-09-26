@@ -642,7 +642,6 @@ class _LockField extends StatelessWidget {
     required this.icon,
     this.keyboardType,
     this.obscureText = false,
-    this.enabled = true,
   });
 
   final TextEditingController controller;
@@ -650,7 +649,6 @@ class _LockField extends StatelessWidget {
   final IconData icon;
   final TextInputType? keyboardType;
   final bool obscureText;
-  final bool enabled;
 
   @override
   Widget build(BuildContext context) {
@@ -658,7 +656,6 @@ class _LockField extends StatelessWidget {
       controller: controller,
       keyboardType: keyboardType,
       obscureText: obscureText,
-      enabled: enabled,
       decoration: InputDecoration(
         prefixIcon: Icon(icon, color: const Color(0xFF4A2A63), size: 20),
         labelText: label,

@@ -1,4 +1,5 @@
 import { config } from '../config.js';
+import { injectTraceHeaders } from '../telemetry.js';
 import type { MediaAction, MediaVerifyResponse } from '../types/mediaTypes.js';
 
 export class MediaAuthorizationError extends Error {
@@ -24,11 +25,11 @@ export async function verifyMediaAction(params: {
   try {
     const response = await fetch(`${config.fastApiBaseUrl}/api/v1/media-realtime/verify`, {
       method: 'POST',
-      headers: {
+      headers: injectTraceHeaders({
         'Content-Type': 'application/json',
         Authorization: `Bearer ${params.bearerToken}`,
         'X-Media-Internal-Token': config.registry.internalToken,
-      },
+      }),
       body: JSON.stringify({
         room_public_id: params.roomPublicId ?? null,
         device_id: params.deviceId ?? null,

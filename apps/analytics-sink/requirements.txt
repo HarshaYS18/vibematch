@@ -1,0 +1,7 @@
+aiokafka==0.12.0
+boto3==1.41.5
+fastapi==0.136.1
+httpx==0.28.1
+pyarrow==21.0.0
+pydantic==2.13.3
+uvicorn[standard]==0.46.0

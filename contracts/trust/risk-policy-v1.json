@@ -1,0 +1,23 @@
+{
+  "schema_version": 1,
+  "principles": [
+    "risk signals never directly rewrite financial history",
+    "high-impact enforcement requires durable evidence and auditable reason codes",
+    "duplicate settlement and negative-balance creation are forbidden",
+    "automated controls must be reversible unless an owning policy explicitly permits irreversible action"
+  ],
+  "signals": {
+    "account_velocity": {"review_score": 40, "block_score": 90},
+    "device_abuse": {"review_score": 50, "block_score": 95},
+    "payment_velocity": {"review_score": 55, "block_score": 95},
+    "gift_circularity": {"review_score": 60, "block_score": 98},
+    "game_settlement_anomaly": {"review_score": 70, "block_score": 99},
+    "moderation_repeat_offense": {"review_score": 50, "block_score": 90}
+  },
+  "actions": {
+    "0-39": "allow",
+    "40-69": "observe",
+    "70-89": "manual_review",
+    "90-100": "temporary_hold_and_manual_review"
+  }
+}

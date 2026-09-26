@@ -1,8 +1,5 @@
-import 'dart:async';
-
 import 'package:flutter/material.dart';
 
-import '../../../data/lucky_packet_realtime_service.dart';
 import '../../controllers/live_room_gift_controller.dart';
 import '../economy/gold_coin_icon.dart';
 import '../room_theme.dart';
@@ -21,51 +18,37 @@ class LuckyPacketRoomOverlay extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    LuckyPacketRealtimeService.instance.attach();
-    return ValueListenableBuilder<LuckyPacketRoomEvent?>(
-      valueListenable: LuckyPacketRoomBus.packet,
-      builder: (context, busPacket, child) {
-        final activePacket = packet ?? busPacket;
-        if (activePacket == null) return const SizedBox.shrink();
+    final activePacket = packet;
+    if (activePacket == null) return const SizedBox.shrink();
 
-        final isUsingBusPacket = packet == null && busPacket != null;
-        final resolvedGetTap = isUsingBusPacket
-            ? () => unawaited(LuckyPacketRealtimeService.instance.claim())
-            : onGetTap;
-        final resolvedDismissResults = isUsingBusPacket
-            ? LuckyPacketRealtimeService.instance.dismiss
-            : onDismissResults;
-
-        return Positioned.fill(
-          child: IgnorePointer(
-            ignoring: activePacket.phase == LuckyPacketPhase.countdown,
-            child: Stack(
-              children: [
-                if (activePacket.phase != LuckyPacketPhase.countdown)
-                  Positioned.fill(
-                    child: Container(
-                      color: Colors.black.withValues(alpha: 0.34),
-                    ),
-                  ),
-                if (activePacket.phase == LuckyPacketPhase.countdown)
-                  Positioned(
-                    right: 24,
-                    bottom: 160 + MediaQuery.paddingOf(context).bottom,
-                    child: _LuckyPacketTimerPill(packet: activePacket),
-                  )
-                else
-                  Center(
-                    child: _LuckyPacketDialog(
-                      packet: activePacket,
-                      onGetTap: resolvedGetTap,
-                      onDismissResults: resolvedDismissResults,
-                    ),
-                  ),
-              ],
-            ),
-          ),
-        );
-      },
+    return Positioned.fill(
+      child: IgnorePointer(
+        ignoring: activePacket.phase == LuckyPacketPhase.countdown,
+        child: Stack(
+          children: [
+            if (activePacket.phase != LuckyPacketPhase.countdown)
+              Positioned.fill(
+                child: Container(
+                  color: Colors.black.withValues(alpha: 0.34),
+                ),
+              ),
+            if (activePacket.phase == LuckyPacketPhase.countdown)
+              Positioned(
+                right: 24,
+                bottom: 160 + MediaQuery.paddingOf(context).bottom,
+                child: _LuckyPacketTimerPill(packet: activePacket),
+              )
+            else
+              Center(
+                child: _LuckyPacketDialog(
+                  packet: activePacket,
+                  onGetTap: onGetTap,
+                  onDismissResults: onDismissResults,
+                ),
+              ),
+          ],
+        ),
+      ),
     );
   }
 }

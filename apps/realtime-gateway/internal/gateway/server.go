@@ -15,7 +15,13 @@ import (
 	"time"
 
 	"github.com/gorilla/websocket"
+	"github.com/nats-io/nats.go"
 	"github.com/redis/go-redis/v9"
+	"go.opentelemetry.io/contrib/instrumentation/net/http/otelhttp"
+	"go.opentelemetry.io/otel"
+	"go.opentelemetry.io/otel/attribute"
+	"go.opentelemetry.io/otel/propagation"
+	"go.opentelemetry.io/otel/trace"
 )
 
 const commandRateScript = `
@@ -25,17 +31,31 @@ return count
 `
 
 type Server struct {
-	Config     Config
-	Auth       Authorizer
-	Redis      *redis.Client
-	Hub        *Hub
-	Logger     *slog.Logger
-	subscribed atomic.Bool
-	authSlots  chan struct{}
+	Config         Config
+	Auth           Authorizer
+	Commands       CommandExecutor
+	Redis          *redis.Client
+	Hub            *Hub
+	Logger         *slog.Logger
+	subscribed     atomic.Bool
+	natsSubscribed atomic.Bool
+	authSlots      chan struct{}
+	commandSlots   chan struct{}
 }
 
-func NewServer(cfg Config, auth Authorizer, client *redis.Client, logger *slog.Logger) *Server {
-	return &Server{Config: cfg, Auth: auth, Redis: client, Hub: NewHub(), Logger: logger, authSlots: make(chan struct{}, 512)}
+func NewServer(
+	cfg Config,
+	auth Authorizer,
+	commands CommandExecutor,
+	client *redis.Client,
+	logger *slog.Logger,
+) *Server {
+	return &Server{
+		Config: cfg, Auth: auth, Commands: commands, Redis: client,
+		Hub: newHubWithQoS(defaultHubShardCount, cfg.HotRoomSubscriberThreshold), Logger: logger,
+		authSlots:    make(chan struct{}, 512),
+		commandSlots: make(chan struct{}, 256),
+	}
 }
 
 func (s *Server) verify(ctx context.Context, token, action, roomID string) (Principal, error) {
@@ -63,13 +83,31 @@ func (s *Server) Handler() http.Handler {
 		} else {
 			_, _ = w.Write([]byte("funkey_realtime_redis_subscription_up 0\n"))
 		}
+		if !s.Config.NATSEnabled || s.natsSubscribed.Load() {
+			_, _ = w.Write([]byte("funkey_realtime_nats_inbox_subscription_up 1\n"))
+		} else {
+			_, _ = w.Write([]byte("funkey_realtime_nats_inbox_subscription_up 0\n"))
+		}
 	})
 	mux.HandleFunc("GET /ws", s.serveWS)
-	return mux
+	return otelhttp.NewHandler(
+		mux,
+		"realtime.http",
+		otelhttp.WithFilter(func(r *http.Request) bool {
+			switch r.URL.Path {
+			case "/ws", "/live", "/ready", "/metrics":
+				return false
+			default:
+				return true
+			}
+		}),
+	)
 }
 
 func (s *Server) ready(w http.ResponseWriter, r *http.Request) {
-	if s.Hub.IsDraining() || !s.subscribed.Load() {
+	if s.Hub.IsDraining() ||
+		!s.subscribed.Load() ||
+		(s.Config.NATSEnabled && !s.natsSubscribed.Load()) {
 		http.Error(w, "not ready", http.StatusServiceUnavailable)
 		return
 	}
@@ -97,6 +135,18 @@ func bearerToken(r *http.Request) string {
 	return ""
 }
 
+func capabilityToken(r *http.Request) string {
+	if token := strings.TrimSpace(r.Header.Get("X-Realtime-Capability")); token != "" {
+		return token
+	}
+	for _, protocol := range websocket.Subprotocols(r) {
+		if strings.HasPrefix(protocol, "capability.") {
+			return strings.TrimPrefix(protocol, "capability.")
+		}
+	}
+	return ""
+}
+
 func newID() string {
 	var bytes [16]byte
 	if _, err := rand.Read(bytes[:]); err != nil {
@@ -106,6 +156,21 @@ func newID() string {
 }
 
 func (s *Server) serveWS(w http.ResponseWriter, r *http.Request) {
+	traceContext := otel.GetTextMapPropagator().Extract(
+		r.Context(),
+		propagation.HeaderCarrier(r.Header),
+	)
+	traceContext, connectSpan := otel.Tracer("funkey.realtime").Start(
+		traceContext,
+		"realtime.connect",
+		trace.WithSpanKind(trace.SpanKindServer),
+	)
+	spanEnded := false
+	defer func() {
+		if !spanEnded {
+			connectSpan.End()
+		}
+	}()
 	if s.Hub.IsDraining() {
 		http.Error(w, "draining", http.StatusServiceUnavailable)
 		return
@@ -118,13 +183,14 @@ func (s *Server) serveWS(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 	token := bearerToken(r)
-	if token == "" {
+	capability := capabilityToken(r)
+	if token == "" || capability == "" {
 		s.Hub.stats.AuthDenied.Add(1)
 		http.Error(w, "unauthorized", http.StatusUnauthorized)
 		return
 	}
-	ctx, cancel := context.WithTimeout(r.Context(), s.Config.AuthTimeout)
-	principal, err := s.verify(ctx, token, "connect", "")
+	ctx, cancel := context.WithTimeout(traceContext, s.Config.AuthTimeout)
+	principal, err := s.verify(ctx, capability, "connect", "")
 	cancel()
 	if err != nil {
 		s.Hub.stats.AuthDenied.Add(1)
@@ -135,7 +201,7 @@ func (s *Server) serveWS(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "connection denied", status)
 		return
 	}
-	ctx, cancel = context.WithTimeout(r.Context(), time.Second)
+	ctx, cancel = context.WithTimeout(traceContext, time.Second)
 	err = s.Redis.Ping(ctx).Err()
 	cancel()
 	if err != nil || !s.subscribed.Load() {
@@ -143,21 +209,33 @@ func (s *Server) serveWS(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	upgrader := websocket.Upgrader{
-		Subprotocols: []string{"funkey.v1"},
+		Subprotocols: []string{"funkey.v2", "funkey.v1"},
 		CheckOrigin:  func(_ *http.Request) bool { return true }, // checked above
 	}
 	conn, err := upgrader.Upgrade(w, r, nil)
 	if err != nil {
 		return
 	}
-	client := newClient(newID(), principal.UserID, token, conn, s.Config.OutboundQueue)
+	client := newClient(
+		newID(),
+		principal.UserID,
+		principal.IsStaff,
+		token,
+		conn,
+		s.Config.OutboundQueue,
+	)
+	client.SessionID = principal.SessionID
+	client.DeviceID = principal.DeviceID
 	if !s.Hub.Add(client, s.Config.MaxConnections, s.Config.MaxConnectionsPerUser) {
 		_ = conn.WriteControl(websocket.CloseMessage, websocket.FormatCloseMessage(websocket.CloseTryAgainLater, "capacity"), time.Now().Add(time.Second))
 		_ = conn.Close()
 		return
 	}
 	s.touchClient(client)
-	s.Hub.Enqueue(client, []byte(`{"type":"connected","version":1}`))
+	s.Hub.EnqueueCritical(client, []byte(`{"type":"connected","version":2}`))
+	connectSpan.SetAttributes(attribute.String("funkey.result", "accepted"))
+	connectSpan.End()
+	spanEnded = true
 	go s.writePump(client)
 	s.readPump(client)
 	s.Hub.Remove(client)
@@ -165,8 +243,16 @@ func (s *Server) serveWS(w http.ResponseWriter, r *http.Request) {
 }
 
 type clientCommand struct {
-	Type         string `json:"type"`
-	RoomPublicID string `json:"room_public_id"`
+	Type           string         `json:"type"`
+	RoomPublicID   string         `json:"room_public_id,omitempty"`
+	Stream         string         `json:"stream,omitempty"`
+	LastSequence   int64          `json:"last_sequence,omitempty"`
+	ConversationID string         `json:"conversation_id,omitempty"`
+	Activity       string         `json:"activity,omitempty"`
+	CommandID      string         `json:"command_id,omitempty"`
+	Payload        map[string]any `json:"payload,omitempty"`
+	Traceparent    string         `json:"traceparent,omitempty"`
+	Capability     string         `json:"capability,omitempty"`
 }
 
 func validRoomID(roomID string) bool {
@@ -214,93 +300,357 @@ func (s *Server) readPump(c *Client) {
 		}
 		var command clientCommand
 		if err := json.Unmarshal(payload, &command); err != nil {
-			s.Hub.Enqueue(c, []byte(`{"type":"error","code":"invalid_message"}`))
+			s.Hub.EnqueueCritical(c, []byte(`{"type":"error","code":"invalid_message"}`))
 			continue
 		}
 		switch command.Type {
 		case "ping":
 			s.Hub.Enqueue(c, []byte(`{"type":"pong"}`))
 		case "subscribe":
-			if !validRoomID(command.RoomPublicID) {
-				s.Hub.Enqueue(c, []byte(`{"type":"error","code":"invalid_room"}`))
+			if !s.subscribeCommand(c, command) {
 				continue
 			}
-			ctx, cancel := context.WithTimeout(context.Background(), s.Config.AuthTimeout)
-			principal, err := s.verify(ctx, c.Token, "subscribe", command.RoomPublicID)
-			cancel()
-			if err != nil || principal.UserID != c.UserID {
-				s.Hub.stats.AuthDenied.Add(1)
-				s.Hub.Enqueue(c, []byte(`{"type":"error","code":"subscribe_denied"}`))
-				continue
-			}
-			if !s.Hub.Subscribe(c, command.RoomPublicID) {
-				s.Hub.Enqueue(c, []byte(`{"type":"error","code":"subscription_limit"}`))
-				continue
-			}
-			ack, _ := json.Marshal(map[string]string{"type": "subscribed", "room_public_id": command.RoomPublicID})
-			s.Hub.Enqueue(c, ack)
 		case "unsubscribe":
 			s.Hub.Unsubscribe(c, command.RoomPublicID)
+			s.deleteRoomLease(c, command.RoomPublicID)
 		default:
-			s.Hub.Enqueue(c, []byte(`{"type":"error","code":"unsupported_command"}`))
+			if _, allowed := allowedApplicationCommands[command.Type]; allowed {
+				s.executeApplicationCommand(c, command)
+				continue
+			}
+			s.Hub.EnqueueCritical(c, []byte(`{"type":"error","code":"unsupported_command"}`))
 		}
 	}
+}
+
+func (s *Server) executeApplicationCommand(c *Client, command clientCommand) {
+	parent := context.Background()
+	if command.Traceparent != "" {
+		parent = otel.GetTextMapPropagator().Extract(
+			parent,
+			propagation.MapCarrier{"traceparent": command.Traceparent},
+		)
+	}
+	parent, span := otel.Tracer("funkey.realtime").Start(
+		parent,
+		"realtime.command",
+		trace.WithSpanKind(trace.SpanKindServer),
+		trace.WithAttributes(
+			attribute.String("messaging.system", "websocket"),
+			attribute.String("funkey.command_type", command.Type),
+		),
+	)
+	defer span.End()
+
+	select {
+	case s.commandSlots <- struct{}{}:
+		defer func() { <-s.commandSlots }()
+	case <-parent.Done():
+		s.Hub.EnqueueCritical(c, []byte(`{"type":"command/error","code":"command_cancelled"}`))
+		return
+	default:
+		s.Hub.EnqueueCritical(c, []byte(`{"type":"command/error","code":"command_busy"}`))
+		return
+	}
+
+	ctx, cancel := context.WithTimeout(parent, s.Config.CommandTimeout)
+	err := s.Commands.Execute(ctx, c.Token, command)
+	cancel()
+	if err != nil {
+		if !errors.Is(err, ErrCommandRejected) {
+			span.RecordError(err)
+		}
+		code := "command_unavailable"
+		if errors.Is(err, ErrCommandRejected) {
+			code = "command_rejected"
+		}
+		body, _ := json.Marshal(map[string]any{
+			"type":         "command/error",
+			"code":         code,
+			"command_type": command.Type,
+			"command_id":   command.CommandID,
+		})
+		s.Hub.EnqueueCritical(c, body)
+		return
+	}
+
+	body, _ := json.Marshal(map[string]any{
+		"type":         "command/ack",
+		"command_type": command.Type,
+		"command_id":   command.CommandID,
+	})
+	s.Hub.Enqueue(c, body)
+}
+
+func (s *Server) subscribeCommand(c *Client, command clientCommand) bool {
+	if !validRoomID(command.RoomPublicID) {
+		s.Hub.EnqueueCritical(c, []byte(`{"type":"error","code":"invalid_room"}`))
+		return false
+	}
+	parent := context.Background()
+	if command.Traceparent != "" {
+		parent = otel.GetTextMapPropagator().Extract(
+			parent,
+			propagation.MapCarrier{"traceparent": command.Traceparent},
+		)
+	}
+	parent, span := otel.Tracer("funkey.realtime").Start(
+		parent,
+		"realtime.subscribe",
+		trace.WithSpanKind(trace.SpanKindServer),
+		trace.WithAttributes(attribute.String("messaging.system", "websocket")),
+	)
+	defer span.End()
+	ctx, cancel := context.WithTimeout(parent, s.Config.AuthTimeout)
+	principal, err := s.verify(ctx, command.Capability, "subscribe", command.RoomPublicID)
+	cancel()
+	if err != nil || principal.UserID != c.UserID {
+		s.Hub.stats.AuthDenied.Add(1)
+		s.Hub.EnqueueCritical(c, []byte(`{"type":"error","code":"subscribe_denied"}`))
+		if err != nil {
+			span.RecordError(err)
+		}
+		return false
+	}
+	if !s.Hub.Subscribe(c, command.RoomPublicID) {
+		s.Hub.EnqueueCritical(c, []byte(`{"type":"error","code":"subscription_limit"}`))
+		return false
+	}
+	s.touchRoomLease(c, command.RoomPublicID)
+
+	replayed := false
+	resyncRequired := false
+	currentSequence := int64(0)
+	if command.Stream != "" {
+		replayCtx, replayCancel := context.WithTimeout(parent, 2*time.Second)
+		replayed, currentSequence = s.replayRoom(
+			replayCtx,
+			c,
+			command.RoomPublicID,
+			command.Stream,
+			command.LastSequence,
+		)
+		replayCancel()
+		resyncRequired = !replayed
+	}
+	ack, _ := json.Marshal(map[string]any{
+		"type":             "subscribed",
+		"room_public_id":   command.RoomPublicID,
+		"replayed":         replayed,
+		"resync_required":  resyncRequired,
+		"stream":           command.Stream,
+		"current_sequence": currentSequence,
+	})
+	if !s.Hub.EnqueueCritical(c, ack) {
+		return false
+	}
+	return true
 }
 
 func (s *Server) writePump(c *Client) {
 	ticker := time.NewTicker(s.Config.PingInterval)
 	defer ticker.Stop()
-	reauth := time.NewTicker(s.Config.ReauthInterval)
-	defer reauth.Stop()
 	defer s.Hub.Remove(c)
 	for {
 		select {
 		case <-c.done:
 			return
-		case payload := <-c.send:
-			_ = c.Conn.SetWriteDeadline(time.Now().Add(s.Config.WriteTimeout))
-			if err := c.Conn.WriteMessage(websocket.TextMessage, payload); err != nil {
-				return
+		case <-c.queue.notify:
+			for {
+				payload, ok := c.queue.pop()
+				if !ok {
+					break
+				}
+				_ = c.Conn.SetWriteDeadline(time.Now().Add(s.Config.WriteTimeout))
+				if err := c.Conn.WriteMessage(websocket.TextMessage, payload); err != nil {
+					return
+				}
 			}
 		case <-ticker.C:
 			if err := c.Conn.WriteControl(websocket.PingMessage, nil, time.Now().Add(s.Config.WriteTimeout)); err != nil {
 				return
 			}
-		case <-reauth.C:
-			ctx, cancel := context.WithTimeout(context.Background(), s.Config.AuthTimeout)
-			principal, err := s.verify(ctx, c.Token, "connect", "")
-			cancel()
-			if err != nil || principal.UserID != c.UserID {
-				s.Hub.stats.AuthDenied.Add(1)
-				_ = c.Conn.WriteControl(websocket.CloseMessage, websocket.FormatCloseMessage(websocket.ClosePolicyViolation, "reauthorization failed"), time.Now().Add(time.Second))
-				return
-			}
-			for _, roomID := range s.Hub.Rooms(c) {
-				ctx, cancel := context.WithTimeout(context.Background(), s.Config.AuthTimeout)
-				principal, err := s.verify(ctx, c.Token, "subscribe", roomID)
-				cancel()
-				if err != nil || principal.UserID != c.UserID {
-					s.Hub.Unsubscribe(c, roomID)
-					notice, _ := json.Marshal(map[string]string{"type": "subscription_revoked", "room_public_id": roomID})
-					s.Hub.Enqueue(c, notice)
-				}
-			}
 		}
 	}
+}
+
+func roomLeaseKey(roomID string, userID int64) string {
+	return "funkey:realtime:room:leases:" + roomID + ":" + strconv.FormatInt(userID, 10)
+}
+
+func userRoomPresenceLeaseKey(userID int64) string {
+	return "funkey:realtime:gateway:user-rooms:" + strconv.FormatInt(userID, 10)
+}
+
+func roomUserPresenceLeaseKey(roomID string) string {
+	return "funkey:realtime:gateway:room-users:" + roomID
+}
+
+func roomStreamEpochKey(roomID string) string {
+	return "funkey:realtime:room:stream-epoch:" + roomID
+}
+
+func roomStreamSequenceKey(roomID string) string {
+	return "funkey:realtime:room:stream-sequence:" + roomID
+}
+
+func roomReplayKey(roomID, epoch string) string {
+	return "funkey:realtime:room:replay:" + roomID + ":" + epoch
+}
+
+func (s *Server) touchRoomLease(c *Client, roomID string) {
+	if !validRoomID(roomID) {
+		return
+	}
+	ctx, cancel := context.WithTimeout(context.Background(), time.Second)
+	defer cancel()
+	now := time.Now()
+	expiresAt := float64(now.Add(s.Config.LeaseTTL).UnixMilli()) / 1000.0
+	key := roomLeaseKey(roomID, c.UserID)
+	nowScore := strconv.FormatFloat(float64(now.UnixMilli())/1000.0, 'f', 3, 64)
+	userRoomsKey := userRoomPresenceLeaseKey(c.UserID)
+	roomUsersKey := roomUserPresenceLeaseKey(roomID)
+	userMember := strconv.FormatInt(c.UserID, 10)
+	pipe := s.Redis.Pipeline()
+	pipe.ZAdd(ctx, key, redis.Z{Score: expiresAt, Member: c.ID})
+	pipe.ZRemRangeByScore(ctx, key, "-inf", nowScore)
+	pipe.Expire(ctx, key, s.Config.LeaseTTL*3)
+	pipe.ZAdd(ctx, userRoomsKey, redis.Z{Score: expiresAt, Member: roomID})
+	pipe.ZRemRangeByScore(ctx, userRoomsKey, "-inf", nowScore)
+	pipe.Expire(ctx, userRoomsKey, s.Config.LeaseTTL*3)
+	pipe.ZAdd(ctx, roomUsersKey, redis.Z{Score: expiresAt, Member: userMember})
+	pipe.ZRemRangeByScore(ctx, roomUsersKey, "-inf", nowScore)
+	pipe.Expire(ctx, roomUsersKey, s.Config.LeaseTTL*3)
+	_, _ = pipe.Exec(ctx)
+}
+
+func (s *Server) deleteRoomLease(c *Client, roomID string) {
+	if !validRoomID(roomID) {
+		return
+	}
+	ctx, cancel := context.WithTimeout(context.Background(), time.Second)
+	defer cancel()
+	leaseKey := roomLeaseKey(roomID, c.UserID)
+	if err := s.Redis.ZRem(ctx, leaseKey, c.ID).Err(); err != nil {
+		return
+	}
+	if count, err := s.Redis.ZCard(ctx, leaseKey).Result(); err == nil && count == 0 {
+		pipe := s.Redis.Pipeline()
+		pipe.ZRem(ctx, userRoomPresenceLeaseKey(c.UserID), roomID)
+		pipe.ZRem(ctx, roomUserPresenceLeaseKey(roomID), strconv.FormatInt(c.UserID, 10))
+		_, _ = pipe.Exec(ctx)
+	}
+}
+
+func (s *Server) replayRoom(
+	ctx context.Context,
+	c *Client,
+	roomID string,
+	stream string,
+	afterSequence int64,
+) (bool, int64) {
+	prefix := "room:" + roomID + ":"
+	if afterSequence < 0 || !strings.HasPrefix(stream, prefix) {
+		return false, 0
+	}
+	epoch := strings.TrimPrefix(stream, prefix)
+	if epoch == "" || strings.HasPrefix(epoch, "degraded:") {
+		return false, 0
+	}
+
+	values, err := s.Redis.MGet(
+		ctx,
+		roomStreamEpochKey(roomID),
+		roomStreamSequenceKey(roomID),
+	).Result()
+	if err != nil || len(values) != 2 {
+		return false, 0
+	}
+	currentEpoch := fmt.Sprint(values[0])
+	currentSequence, err := strconv.ParseInt(fmt.Sprint(values[1]), 10, 64)
+	if err != nil || currentEpoch != epoch {
+		return false, 0
+	}
+	if afterSequence == currentSequence {
+		return true, currentSequence
+	}
+	if afterSequence > currentSequence {
+		return false, currentSequence
+	}
+
+	rawEvents, err := s.Redis.ZRangeByScore(
+		ctx,
+		roomReplayKey(roomID, epoch),
+		&redis.ZRangeBy{
+			Min: "(" + strconv.FormatInt(afterSequence, 10),
+			Max: "+inf",
+		},
+	).Result()
+	if err != nil || len(rawEvents) == 0 {
+		return false, currentSequence
+	}
+
+	expected := afterSequence + 1
+	for _, raw := range rawEvents {
+		var envelope struct {
+			Sequence int64 `json:"sequence"`
+		}
+		if err := json.Unmarshal([]byte(raw), &envelope); err != nil || envelope.Sequence != expected {
+			return false, currentSequence
+		}
+		expected++
+	}
+	if expected-1 != currentSequence {
+		return false, currentSequence
+	}
+	// Recovery replay is protocol-critical and must remain FIFO with the
+	// final subscribed acknowledgement. Using the critical tier prevents a
+	// later critical ack from overtaking replay deltas queued at normal priority.
+	for _, raw := range rawEvents {
+		if !s.Hub.EnqueueCritical(c, []byte(raw)) {
+			return false, currentSequence
+		}
+	}
+	return true, currentSequence
+}
+
+func userPresenceLeaseKey(userID int64) string {
+	return "funkey:realtime:gateway:user-active:" + strconv.FormatInt(userID, 10)
 }
 
 func (s *Server) touchClient(c *Client) {
 	ctx, cancel := context.WithTimeout(context.Background(), time.Second)
 	defer cancel()
-	key := "funkey:realtime:gateway:user:" + strconv.FormatInt(c.UserID, 10) + ":" + c.ID
-	_ = s.Redis.Set(ctx, key, s.Config.NodeID, s.Config.LeaseTTL).Err()
+
+	now := time.Now()
+	expiresAt := float64(now.Add(s.Config.LeaseTTL).UnixMilli()) / 1000.0
+	nowScore := strconv.FormatFloat(
+		float64(now.UnixMilli())/1000.0,
+		'f',
+		3,
+		64,
+	)
+	connectionKey := "funkey:realtime:gateway:user:" +
+		strconv.FormatInt(c.UserID, 10) + ":" + c.ID
+	presenceKey := userPresenceLeaseKey(c.UserID)
+
+	pipe := s.Redis.Pipeline()
+	pipe.Set(ctx, connectionKey, s.Config.NodeID, s.Config.LeaseTTL)
+	pipe.ZAdd(ctx, presenceKey, redis.Z{Score: expiresAt, Member: c.ID})
+	pipe.ZRemRangeByScore(ctx, presenceKey, "-inf", nowScore)
+	pipe.Expire(ctx, presenceKey, s.Config.LeaseTTL*3)
+	_, _ = pipe.Exec(ctx)
 }
 
 func (s *Server) deleteClientLease(c *Client) {
 	ctx, cancel := context.WithTimeout(context.Background(), time.Second)
 	defer cancel()
-	key := "funkey:realtime:gateway:user:" + strconv.FormatInt(c.UserID, 10) + ":" + c.ID
-	_ = s.Redis.Del(ctx, key).Err()
+	connectionKey := "funkey:realtime:gateway:user:" +
+		strconv.FormatInt(c.UserID, 10) + ":" + c.ID
+	pipe := s.Redis.Pipeline()
+	pipe.Del(ctx, connectionKey)
+	pipe.ZRem(ctx, userPresenceLeaseKey(c.UserID), c.ID)
+	_, _ = pipe.Exec(ctx)
 }
 
 func (s *Server) Heartbeat(ctx context.Context) {
@@ -329,12 +679,234 @@ func (s *Server) heartbeatOnce(ctx context.Context) {
 	})
 	pipe := s.Redis.Pipeline()
 	pipe.Set(ctx, "funkey:realtime:gateway:node:"+s.Config.NodeID, body, s.Config.LeaseTTL)
+	now := time.Now()
+	roomLeaseScore := float64(now.Add(s.Config.LeaseTTL).UnixMilli()) / 1000.0
+	roomLeaseExpiry := strconv.FormatFloat(float64(now.UnixMilli())/1000.0, 'f', 3, 64)
 	for _, c := range clients {
 		key := "funkey:realtime:gateway:user:" + strconv.FormatInt(c.UserID, 10) + ":" + c.ID
 		pipe.Set(ctx, key, s.Config.NodeID, s.Config.LeaseTTL)
+		presenceKey := userPresenceLeaseKey(c.UserID)
+		pipe.ZAdd(ctx, presenceKey, redis.Z{
+			Score:  roomLeaseScore,
+			Member: c.ID,
+		})
+		pipe.ZRemRangeByScore(ctx, presenceKey, "-inf", roomLeaseExpiry)
+		pipe.Expire(ctx, presenceKey, s.Config.LeaseTTL*3)
+		for _, roomID := range s.Hub.Rooms(c) {
+			leaseKey := roomLeaseKey(roomID, c.UserID)
+			pipe.ZAdd(ctx, leaseKey, redis.Z{Score: roomLeaseScore, Member: c.ID})
+			pipe.ZRemRangeByScore(ctx, leaseKey, "-inf", roomLeaseExpiry)
+			pipe.Expire(ctx, leaseKey, s.Config.LeaseTTL*3)
+
+			userRoomsKey := userRoomPresenceLeaseKey(c.UserID)
+			pipe.ZAdd(ctx, userRoomsKey, redis.Z{Score: roomLeaseScore, Member: roomID})
+			pipe.ZRemRangeByScore(ctx, userRoomsKey, "-inf", roomLeaseExpiry)
+			pipe.Expire(ctx, userRoomsKey, s.Config.LeaseTTL*3)
+
+			roomUsersKey := roomUserPresenceLeaseKey(roomID)
+			pipe.ZAdd(ctx, roomUsersKey, redis.Z{
+				Score:  roomLeaseScore,
+				Member: strconv.FormatInt(c.UserID, 10),
+			})
+			pipe.ZRemRangeByScore(ctx, roomUsersKey, "-inf", roomLeaseExpiry)
+			pipe.Expire(ctx, roomUsersKey, s.Config.LeaseTTL*3)
+		}
 	}
 	if _, err := pipe.Exec(ctx); err != nil {
 		s.Logger.Warn("redis heartbeat failed", "error", err)
+	}
+}
+
+func (s *Server) applyCapabilityRevocation(event Event) {
+	switch event.EventType {
+	case "auth.session_revoked":
+		if event.Scope != "user" || event.UserID <= 0 {
+			return
+		}
+		var payload struct {
+			SessionID string `json:"session_id"`
+			DeviceID  string `json:"device_id"`
+		}
+		_ = json.Unmarshal(event.Payload, &payload)
+		for _, client := range s.Hub.Clients() {
+			if client.UserID != event.UserID {
+				continue
+			}
+			if payload.SessionID != "" && client.SessionID != payload.SessionID {
+				continue
+			}
+			if payload.DeviceID != "" && client.DeviceID != payload.DeviceID {
+				continue
+			}
+			// The revocation event is already queued at critical priority.
+			// Give the writer a brief chance to deliver it before closing.
+			go func(c *Client) {
+				timer := time.NewTimer(100 * time.Millisecond)
+				defer timer.Stop()
+				select {
+				case <-c.done:
+					return
+				case <-timer.C:
+					s.Hub.Remove(c)
+					s.deleteClientLease(c)
+				}
+			}(client)
+		}
+	case "room.permission_revoked":
+		var payload struct {
+			RoomPublicID string `json:"room_public_id"`
+		}
+		_ = json.Unmarshal(event.Payload, &payload)
+		roomID := strings.TrimSpace(payload.RoomPublicID)
+		if roomID == "" {
+			roomID = strings.TrimSpace(event.RoomPublicID)
+		}
+		if !validRoomID(roomID) {
+			return
+		}
+		for _, client := range s.Hub.Clients() {
+			switch event.Scope {
+			case "user":
+				if client.UserID != event.UserID {
+					continue
+				}
+			case "users":
+				if !containsInt64(event.UserIDs, client.UserID) {
+					continue
+				}
+			case "room":
+				// Room-scoped permission changes intentionally force every
+				// current subscriber to mint a fresh room capability.
+			default:
+				continue
+			}
+			if !containsString(s.Hub.Rooms(client), roomID) {
+				continue
+			}
+			s.Hub.Unsubscribe(client, roomID)
+			s.deleteRoomLease(client, roomID)
+			notice, _ := json.Marshal(map[string]string{
+				"type":           "subscription_revoked",
+				"room_public_id": roomID,
+			})
+			s.Hub.EnqueueCritical(client, notice)
+		}
+	}
+}
+
+func containsInt64(values []int64, expected int64) bool {
+	for _, value := range values {
+		if value == expected {
+			return true
+		}
+	}
+	return false
+}
+
+func (s *Server) consumeEventPayload(raw []byte, messagingSystem string) {
+	if len(raw) > 64*1024 {
+		s.Hub.stats.InvalidEvents.Add(1)
+		return
+	}
+	var event Event
+	if err := json.Unmarshal(raw, &event); err != nil {
+		s.Hub.stats.InvalidEvents.Add(1)
+		return
+	}
+	eventContext := context.Background()
+	if event.Traceparent != "" {
+		eventContext = otel.GetTextMapPropagator().Extract(
+			eventContext,
+			propagation.MapCarrier{"traceparent": event.Traceparent},
+		)
+	}
+	_, span := otel.Tracer("funkey.realtime").Start(
+		eventContext,
+		"realtime.fanout",
+		trace.WithSpanKind(trace.SpanKindConsumer),
+		trace.WithAttributes(attribute.String("messaging.system", messagingSystem)),
+	)
+	s.Hub.Publish(event, raw)
+	s.applyCapabilityRevocation(event)
+	span.End()
+}
+
+func (s *Server) ConsumeNATSEvents(ctx context.Context) {
+	if !s.Config.NATSEnabled {
+		return
+	}
+
+	for ctx.Err() == nil {
+		nc, err := nats.Connect(
+			s.Config.NATSURL,
+			nats.Name("funkey-realtime-"+s.Config.NodeID),
+			nats.MaxReconnects(-1),
+			nats.ReconnectWait(time.Second),
+			nats.DisconnectErrHandler(func(_ *nats.Conn, err error) {
+				s.natsSubscribed.Store(false)
+				if err != nil {
+					s.Logger.Warn("nats inbox stream disconnected", "error", err)
+				}
+			}),
+			nats.ReconnectHandler(func(_ *nats.Conn) {
+				s.natsSubscribed.Store(true)
+			}),
+			nats.ClosedHandler(func(_ *nats.Conn) {
+				s.natsSubscribed.Store(false)
+			}),
+		)
+		if err != nil {
+			s.natsSubscribed.Store(false)
+			s.Logger.Warn("nats inbox connection failed", "error", err)
+			if !waitRetry(ctx, time.Second) {
+				return
+			}
+			continue
+		}
+
+		messages := make(chan *nats.Msg, 1024)
+		subscription, err := nc.ChanSubscribe(
+			s.Config.NATSInboxSubject,
+			messages,
+		)
+		if err == nil {
+			err = nc.FlushTimeout(time.Second)
+		}
+		if err != nil {
+			s.natsSubscribed.Store(false)
+			_ = nc.Drain()
+			s.Logger.Warn("nats inbox subscription failed", "error", err)
+			if !waitRetry(ctx, time.Second) {
+				return
+			}
+			continue
+		}
+		s.natsSubscribed.Store(true)
+
+		consume := true
+		for consume && ctx.Err() == nil {
+			select {
+			case <-ctx.Done():
+				consume = false
+			case msg := <-messages:
+				if msg == nil {
+					consume = false
+					continue
+				}
+				s.consumeEventPayload(msg.Data, "nats")
+			}
+		}
+
+		s.natsSubscribed.Store(false)
+		_ = subscription.Unsubscribe()
+		if ctx.Err() != nil {
+			_ = nc.Drain()
+			return
+		}
+		nc.Close()
+		if !waitRetry(ctx, time.Second) {
+			return
+		}
 	}
 }
 
@@ -355,7 +927,7 @@ func (s *Server) ConsumeEvents(ctx context.Context) {
 		s.subscribed.Store(true)
 		if interrupted {
 			for _, client := range s.Hub.Clients() {
-				if !s.Hub.Enqueue(client, []byte(`{"type":"resync_required"}`)) {
+				if !s.Hub.EnqueueCritical(client, []byte(`{"type":"resync_required"}`)) {
 					s.Hub.Remove(client)
 				}
 			}
@@ -368,16 +940,7 @@ func (s *Server) ConsumeEvents(ctx context.Context) {
 				interrupted = true
 				break
 			}
-			if len(msg.Payload) > 64*1024 {
-				s.Hub.stats.InvalidEvents.Add(1)
-				continue
-			}
-			var event Event
-			if err := json.Unmarshal([]byte(msg.Payload), &event); err != nil {
-				s.Hub.stats.InvalidEvents.Add(1)
-				continue
-			}
-			s.Hub.Publish(event, []byte(msg.Payload))
+			s.consumeEventPayload([]byte(msg.Payload), "redis")
 		}
 		s.subscribed.Store(false)
 		_ = pubsub.Close()
@@ -422,7 +985,7 @@ func (s *Server) DeleteNodeLease(ctx context.Context) {
 }
 
 func (s *Server) Validate() error {
-	if s.Auth == nil || s.Redis == nil || s.Hub == nil {
+	if s.Auth == nil || s.Commands == nil || s.Redis == nil || s.Hub == nil {
 		return fmt.Errorf("gateway dependencies are required")
 	}
 	return nil

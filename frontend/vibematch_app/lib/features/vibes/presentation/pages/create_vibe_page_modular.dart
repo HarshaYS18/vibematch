@@ -14,10 +14,11 @@ import '../widgets/create_vibe_media_picker.dart';
 import '../widgets/vibe_media_playback_gate.dart';
 
 class CreateVibePageModular extends StatefulWidget {
-  const CreateVibePageModular({super.key, required this.canUseMentionAllToday, required this.onPublish});
+  const CreateVibePageModular({super.key, required this.canUseMentionAllToday, required this.onPublish, required this.playbackGate});
 
   final bool canUseMentionAllToday;
   final Future<void> Function(VibeItem) onPublish;
+  final VibeMediaPlaybackGate playbackGate;
 
   @override
   State<CreateVibePageModular> createState() => _CreateVibePageModularState();
@@ -56,13 +57,13 @@ class _CreateVibePageModularState extends State<CreateVibePageModular> {
   @override
   void initState() {
     super.initState();
-    VibeMediaPlaybackGate.acquirePauseLock(_composerPauseLockKey);
+    widget.playbackGate.acquirePauseLock(_composerPauseLockKey);
     _captionController.addListener(_onCaptionChanged);
   }
 
   @override
   void dispose() {
-    VibeMediaPlaybackGate.releasePauseLock(_composerPauseLockKey);
+    widget.playbackGate.releasePauseLock(_composerPauseLockKey);
     _captionController.removeListener(_onCaptionChanged);
     _captionController.dispose();
     super.dispose();
@@ -97,10 +98,16 @@ class _CreateVibePageModularState extends State<CreateVibePageModular> {
       _postingStatusText = null;
     });
     try {
-      final picked = sourceType == VibeMediaType.video ? await _picker.pickVideo(source: ImageSource.gallery) : await _picker.pickImage(source: ImageSource.gallery, imageQuality: 92);
+      final picked = sourceType == VibeMediaType.video
+          ? await _picker.pickVideo(source: ImageSource.gallery)
+          : await _picker.pickImage(
+              source: ImageSource.gallery,
+              imageQuality: 90,
+              maxWidth: 2560,
+              maxHeight: 2560,
+            );
       if (picked == null) return;
-      final bytes = await picked.readAsBytes();
-      final size = bytes.length;
+      final size = await picked.length();
       if (size <= 0) {
         _showAction('Selected media is empty.');
         return;
@@ -109,10 +116,13 @@ class _CreateVibePageModularState extends State<CreateVibePageModular> {
         _showAction('Vibe media must be 20 MB or smaller.');
         return;
       }
+      final previewBytes = sourceType == VibeMediaType.photo
+          ? await picked.readAsBytes()
+          : null;
       setState(() {
         _selectedType = sourceType;
         _selectedMediaFile = picked;
-        _selectedMediaPreviewBytes = sourceType == VibeMediaType.photo ? bytes : null;
+        _selectedMediaPreviewBytes = previewBytes;
         _uploadedMediaUrl = null;
         _selectedMediaName = picked.name;
         _selectedMediaBytes = size;

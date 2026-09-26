@@ -1,0 +1,56 @@
+name: GraphQL Staging Smoke
+
+on:
+  workflow_dispatch:
+    inputs:
+      vus:
+        description: Virtual users for the controlled smoke
+        required: false
+        default: '5'
+      duration:
+        description: Smoke duration
+        required: false
+        default: '30s'
+  push:
+    branches:
+      - 'chatgpt/**'
+    paths:
+      - 'apps/graphql-bff/**'
+      - 'tests/load/graphql-read-smoke.js'
+      - 'tests/load/README.md'
+      - '.github/workflows/graphql-smoke.yml'
+
+permissions:
+  contents: read
+
+concurrency:
+  group: graphql-staging-smoke-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  graphql-staging-smoke:
+    runs-on: ubuntu-latest
+    environment: staging
+    timeout-minutes: 10
+    env:
+      FUNKEY_API_URL: https://api.staging.funkey.com
+      FUNKEY_TEST_TOKEN: ${{ secrets.FUNKEY_TEST_TOKEN }}
+      VUS: ${{ inputs.vus || '5' }}
+      DURATION: ${{ inputs.duration || '30s' }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Require staging smoke credential
+        shell: bash
+        run: |
+          set -euo pipefail
+          if [ -z "${FUNKEY_TEST_TOKEN}" ]; then
+            echo "::error::FUNKEY_TEST_TOKEN is not configured for the staging environment/repository."
+            exit 1
+          fi
+
+      - name: Run persisted GraphQL smoke
+        shell: bash
+        run: |
+          set -euo pipefail
+          docker run --rm             -e FUNKEY_API_URL             -e FUNKEY_TEST_TOKEN             -e VUS             -e DURATION             -v "${PWD}/tests/load:/scripts:ro"             grafana/k6:0.52.0             run /scripts/graphql-read-smoke.js

@@ -1,0 +1,63 @@
+apiVersion: v1
+kind: ServiceAccount
+metadata: {name: funkey-analytics-sink}
+automountServiceAccountToken: false
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: funkey-analytics-sink
+  labels: {app: funkey-analytics-sink}
+spec:
+  selector: {app: funkey-analytics-sink}
+  ports:
+    - {name: http, port: 8095, targetPort: http}
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: funkey-analytics-sink
+  labels: {app: funkey-analytics-sink}
+spec:
+  replicas: 2
+  selector: {matchLabels: {app: funkey-analytics-sink}}
+  template:
+    metadata: {labels: {app: funkey-analytics-sink}}
+    spec:
+      serviceAccountName: funkey-analytics-sink
+      automountServiceAccountToken: false
+      terminationGracePeriodSeconds: 60
+      nodeSelector: {funkey.io/workload: application}
+      securityContext: {runAsNonRoot: true, seccompProfile: {type: RuntimeDefault}}
+      containers:
+        - name: analytics-sink
+          image: funkey-analytics-sink:dev
+          ports: [{name: http, containerPort: 8095}]
+          envFrom:
+            - {configMapRef: {name: funkey-config}}
+          env:
+            - name: KAFKA_USERNAME
+              valueFrom: {secretKeyRef: {name: funkey-kafka-secrets, key: kafka_username, optional: true}}
+            - name: KAFKA_PASSWORD
+              valueFrom: {secretKeyRef: {name: funkey-kafka-secrets, key: kafka_password, optional: true}}
+            - name: ANALYTICS_OBJECT_STORE_ACCESS_KEY
+              valueFrom: {secretKeyRef: {name: funkey-analytics-secrets, key: object_store_access_key, optional: true}}
+            - name: ANALYTICS_OBJECT_STORE_SECRET_KEY
+              valueFrom: {secretKeyRef: {name: funkey-analytics-secrets, key: object_store_secret_key, optional: true}}
+          resources:
+            requests: {cpu: 250m, memory: 512Mi}
+            limits: {cpu: "2", memory: 2Gi}
+          startupProbe: {httpGet: {path: /live, port: http}, failureThreshold: 30, periodSeconds: 2}
+          livenessProbe: {httpGet: {path: /live, port: http}, periodSeconds: 20}
+          readinessProbe: {httpGet: {path: /ready, port: http}, periodSeconds: 5}
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            capabilities: {drop: [ALL]}
+---
+apiVersion: policy/v1
+kind: PodDisruptionBudget
+metadata: {name: funkey-analytics-sink}
+spec:
+  minAvailable: 1
+  selector: {matchLabels: {app: funkey-analytics-sink}}

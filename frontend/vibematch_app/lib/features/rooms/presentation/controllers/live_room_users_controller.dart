@@ -1,7 +1,6 @@
 import 'package:flutter/material.dart';
 
 import '../../data/live_room_media_signaling_service.dart';
-import '../../data/live_room_presence_repository.dart';
 import '../live_room_models.dart';
 
 class LiveRoomUsersController {
@@ -9,6 +8,7 @@ class LiveRoomUsersController {
 
   List<SeatUser> buildAllRoomUsers({
     required List<SeatUser> seatedUsers,
+    required List<SeatUser> canonicalUsers,
     required List<SeatUser> fallbackRoomUsers,
     required List<SeatUser> inviteUsers,
     required bool Function(String userId) isUserRemoved,
@@ -17,9 +17,14 @@ class LiveRoomUsersController {
     final rawIdToKey = <String, String>{};
     final media = LiveRoomMediaSignalingService.instance;
     final snapshot = media.roomSnapshot.value;
-    final presenceUsers = LiveRoomPresenceRepository.currentParticipantsForRoom(
-      media.roomId,
-    );
+    final presenceUsers = canonicalUsers;
+
+    SeatUser? canonicalUserFor(String userId) {
+      final key = _canonicalUserKey(userId);
+      return canonicalUsers.firstWhereOrNull(
+        (user) => _canonicalUserKey(user.id) == key,
+      );
+    }
 
     void rememberAlias(String rawId, String key) {
       final cleanRaw = rawId.trim();
@@ -72,7 +77,7 @@ class LiveRoomUsersController {
     }
 
     for (final user in seatedUsers) {
-      final presenceUser = LiveRoomPresenceRepository.userByRoomUserId(user.id);
+      final presenceUser = canonicalUserFor(user.id);
       addUser(
         _mergeSeatWithPresence(seatUser: user, presenceUser: presenceUser),
       );
@@ -83,9 +88,7 @@ class LiveRoomUsersController {
         final existingSeatUser = seatedUsers.firstWhereOrNull(
           (user) => keyForUser(user) == _canonicalUserKey(peer.userId),
         );
-        final presenceUser = LiveRoomPresenceRepository.userByRoomUserId(
-          peer.userId,
-        );
+        final presenceUser = canonicalUserFor(peer.userId);
         addUser(
           _seatUserFromPeer(
             peer: peer,
@@ -96,7 +99,7 @@ class LiveRoomUsersController {
     }
 
     for (final user in fallbackRoomUsers) {
-      final presenceUser = LiveRoomPresenceRepository.userByRoomUserId(user.id);
+      final presenceUser = canonicalUserFor(user.id);
       addUser(
         _mergeSeatWithPresence(seatUser: user, presenceUser: presenceUser),
       );

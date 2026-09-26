@@ -112,3 +112,20 @@ class StoreAssetManifest(Base):
     reason: Mapped[str | None] = mapped_column(String(255), nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime, nullable=False, default=datetime.utcnow)
     published_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
+
+
+class StorePurchaseOperation(Base):
+    __tablename__ = "store_purchase_operations"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, index=True)
+    purchase_id: Mapped[str] = mapped_column(String(36), unique=True, nullable=False, index=True)
+    user_id: Mapped[int] = mapped_column(Integer, nullable=False, index=True)
+    item_id: Mapped[str] = mapped_column(String(120), nullable=False, index=True)
+    status: Mapped[str] = mapped_column(String(40), nullable=False, default="PENDING", index=True)
+    economy_transaction_id: Mapped[str | None] = mapped_column(String(36), nullable=True, index=True)
+    compensation_transaction_id: Mapped[str | None] = mapped_column(String(36), nullable=True, index=True)
+    attempt_count: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
+    lease_until: Mapped[datetime | None] = mapped_column(DateTime, nullable=True, index=True)
+    error_detail: Mapped[str | None] = mapped_column(String(700), nullable=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime, nullable=False, default=datetime.utcnow)
+    updated_at: Mapped[datetime] = mapped_column(DateTime, nullable=False, default=datetime.utcnow, onupdate=datetime.utcnow)

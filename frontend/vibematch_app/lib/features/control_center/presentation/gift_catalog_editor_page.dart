@@ -269,8 +269,6 @@ class _GiftCatalogEditorPageState extends State<GiftCatalogEditorPage> {
     final maxComboController = TextEditingController(text: '${gift?['max_combo'] ?? 999}');
     final iconKeyController = TextEditingController(text: '${gift?['icon_key'] ?? ''}');
     final chatSymbolController = TextEditingController(text: '${gift?['chat_symbol'] ?? '🎁'}');
-    final assetPathController = TextEditingController(text: '${gift?['asset_path'] ?? ''}');
-    final videoAssetPathController = TextEditingController(text: '${gift?['video_asset_path'] ?? ''}');
     final cdnAssetPathController = TextEditingController(text: '${gift?['cdn_asset_path'] ?? ''}');
     final cdnVideoPathController = TextEditingController(text: '${gift?['cdn_video_path'] ?? ''}');
     final animationTypeController = TextEditingController(text: '${gift?['animation_type'] ?? 'image'}');
@@ -344,8 +342,6 @@ class _GiftCatalogEditorPageState extends State<GiftCatalogEditorPage> {
                   ),
                   _field(iconKeyController, 'Icon key'),
                   _field(chatSymbolController, 'Chat symbol'),
-                  _field(assetPathController, 'Local asset path fallback'),
-                  _field(videoAssetPathController, 'Local video path fallback'),
                   _field(cdnAssetPathController, 'CDN icon path or full URL'),
                   _field(cdnVideoPathController, 'CDN video path or full URL'),
                   _field(animationTypeController, 'Animation type: image / video'),
@@ -391,8 +387,6 @@ class _GiftCatalogEditorPageState extends State<GiftCatalogEditorPage> {
             'max_combo': maxCombo,
             'icon_key': _nullable(iconKeyController.text),
             'chat_symbol': _nullable(chatSymbolController.text),
-            'asset_path': _nullable(assetPathController.text),
-            'video_asset_path': _nullable(videoAssetPathController.text),
             'cdn_asset_path': _nullable(cdnAssetPathController.text),
             'cdn_video_path': _nullable(cdnVideoPathController.text),
             'animation_type': _cleanKey(animationTypeController.text),
@@ -428,8 +422,6 @@ class _GiftCatalogEditorPageState extends State<GiftCatalogEditorPage> {
       maxComboController,
       iconKeyController,
       chatSymbolController,
-      assetPathController,
-      videoAssetPathController,
       cdnAssetPathController,
       cdnVideoPathController,
       animationTypeController,

@@ -8,16 +8,48 @@ on:
       - 'apps/**'
       - 'backend/Dockerfile'
       - 'backend_media/Dockerfile'
+      - 'contracts/**'
       - 'deploy/**'
       - 'infra/**'
       - 'tests/load/**'
       - 'tests/chaos/**'
+      - 'tests/integration/**'
+      - 'scripts/check_contracts.py'
+      - 'scripts/check_gateway_architecture.py'
+      - 'scripts/check_graphql_bff_architecture.py'
+      - 'scripts/check_kafka_data_platform.py'
+      - 'scripts/check_search_platform.py'
+      - 'scripts/check_recommendation_platform.py'
+      - 'scripts/check_multiregion_architecture.py'
+      - 'scripts/check_disaster_recovery.py'
+      - 'scripts/check_supply_chain.py'
+      - 'scripts/check_privacy_governance.py'
+      - 'scripts/check_trust_safety_integrity.py'
+      - 'scripts/check_cache_edge_architecture.py'
+      - 'scripts/check_mobile_runtime.py'
+      - 'scripts/check_realtime_media_qos.py'
+      - 'scripts/check_analytics_platform.py'
+      - 'scripts/check_release_safety.py'
+      - 'scripts/check_sre_finops.py'
+      - 'scripts/check_roadmap_closure.py'
+      - 'scripts/check_dependency_hygiene.py'
+      - 'scripts/check_decommissioning.py'
       - 'scripts/prepare_gitops_promotion.py'
+      - 'docs/platform/chunk37-kafka-data-platform.md'
+      - 'docs/architecture/kafka-data-platform.md'
+      - 'docs/modules/kafka-event-bridge/**'
+      - 'docs/runbooks/kafka-data-platform.md'
+      - 'docs/adr/ADR-017-kafka-data-platform.md'
+      - '.github/workflows/contracts.yml'
       - '.github/workflows/production-platform.yml'
       - '.github/workflows/prepare-gitops-promotion.yml'
 
 permissions:
   contents: read
+
+concurrency:
+  group: production-platform-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
 
 jobs:
   go-gateway:
@@ -31,7 +63,22 @@ jobs:
         with:
           go-version-file: apps/realtime-gateway/go.mod
           cache-dependency-path: apps/realtime-gateway/go.sum
-      - run: test -z "$(gofmt -l .)"
+      - name: Check Go formatting
+        shell: bash
+        run: |
+          gofmt -w .
+          if ! git diff --exit-code -- .; then
+            echo "Go source differs from gofmt output."
+            exit 1
+          fi
+      - name: Check Go module graph is tidy
+        shell: bash
+        run: |
+          go mod tidy
+          if ! git diff --exit-code -- go.mod go.sum; then
+            echo "Go module files differ from go mod tidy output."
+            exit 1
+          fi
       - run: go vet ./...
       - run: go test ./...
       - run: go test -race ./...
@@ -44,25 +91,85 @@ jobs:
       - run: terraform -chdir=infra/terraform fmt -check -recursive
       - run: terraform -chdir=infra/terraform init -backend=false
       - run: terraform -chdir=infra/terraform validate
-      - run: python -m py_compile scripts/prepare_gitops_promotion.py
+      - run: >-
+          python -m py_compile
+          scripts/prepare_gitops_promotion.py
+          scripts/check_contracts.py
+          scripts/check_gateway_architecture.py
+          scripts/check_graphql_bff_architecture.py
+          scripts/check_kafka_data_platform.py
+          scripts/check_search_platform.py
+          scripts/check_recommendation_platform.py
+          scripts/check_multiregion_architecture.py
+          scripts/check_disaster_recovery.py
+          scripts/check_supply_chain.py
+          scripts/check_privacy_governance.py
+          scripts/check_trust_safety_integrity.py
+          scripts/check_realtime_media_qos.py
+          scripts/check_mobile_runtime.py
+          scripts/check_cache_edge_architecture.py
+          scripts/check_analytics_platform.py
+          scripts/check_release_safety.py
+          scripts/check_sre_finops.py
+          scripts/check_decommissioning.py
+          scripts/check_dependency_hygiene.py
+          scripts/check_roadmap_closure.py
+      - run: python scripts/check_gateway_architecture.py
+      - run: python scripts/check_graphql_bff_architecture.py
+      - run: python scripts/check_kafka_data_platform.py
+      - run: python scripts/check_search_platform.py
+      - run: python scripts/check_recommendation_platform.py
+      - run: python scripts/check_multiregion_architecture.py
+      - run: python scripts/check_disaster_recovery.py
+      - run: python scripts/check_supply_chain.py
+      - run: python scripts/check_privacy_governance.py
+      - run: python scripts/check_trust_safety_integrity.py
+      - run: python scripts/check_realtime_media_qos.py
+      - run: python scripts/check_mobile_runtime.py
+      - run: python scripts/check_cache_edge_architecture.py
+      - run: python scripts/check_analytics_platform.py
+      - run: python scripts/check_release_safety.py
+      - run: python scripts/check_sre_finops.py
+      - run: python scripts/check_decommissioning.py
+      - run: python scripts/check_dependency_hygiene.py
+      - run: python scripts/check_roadmap_closure.py
       - uses: azure/setup-kubectl@v4
         with:
-          version: v1.31.0
+          version: v1.36.4
+      - uses: azure/setup-helm@v4
+        with:
+          version: v3.18.6
+      - run: kubectl kustomize deploy/kubernetes/gateway > /tmp/funkey-gateway.yaml
+      - name: Validate pinned Gateway API / Envoy CRD schemas
+        shell: bash
+        run: |
+          set -euo pipefail
+          source deploy/kubernetes/gateway/VERSIONS.env
+          curl -fsSLo /tmp/kind "https://kind.sigs.k8s.io/dl/${KIND_VERSION}/kind-linux-amd64"
+          echo "${KIND_LINUX_AMD64_SHA256}  /tmp/kind" | sha256sum -c -
+          sudo install -m 0755 /tmp/kind /usr/local/bin/kind
+          kind create cluster             --name funkey-gateway-schema             --image "${KIND_NODE_IMAGE}"             --wait 120s
+          bash scripts/validate_gateway_schema.sh
+      - name: Cleanup Gateway schema cluster
+        if: always()
+        run: kind delete cluster --name funkey-gateway-schema || true
       - run: kubectl kustomize deploy/kubernetes/overlays/local > /tmp/funkey-local.yaml
       - run: kubectl kustomize deploy/kubernetes/overlays/staging > /tmp/funkey-staging.yaml
       - run: kubectl kustomize deploy/kubernetes/overlays/production > /tmp/funkey-production.yaml
       - run: kubectl kustomize deploy/kubernetes/media > /tmp/funkey-media.yaml
       - run: kubectl kustomize deploy/observability > /tmp/funkey-observability.yaml
+      - run: kubectl kustomize deploy/postgres > /tmp/funkey-postgres-platform.yaml
+      - run: kubectl kustomize deploy/redis > /tmp/funkey-redis-platform.yaml
       - name: Enforce immutable production images
         run: |
           python - <<'PY'
           from pathlib import Path
           manifest = Path("/tmp/funkey-production.yaml").read_text()
-          for image in ("funkey-api", "funkey-worker", "funkey-realtime", "funkey-media"):
+          for image in ("funkey-api", "funkey-inbox", "funkey-vibes", "funkey-room-control", "funkey-identity", "funkey-profile-social", "funkey-economy", "funkey-game-platform", "funkey-notification", "funkey-graphql-bff", "funkey-worker", "funkey-kafka-event-bridge", "funkey-search", "funkey-recommendation", "funkey-analytics-sink", "funkey-realtime", "funkey-media"):
               if f"{image}:dev" in manifest:
                   raise SystemExit(f"production render still contains mutable dev image: {image}")
-          if manifest.count("@sha256:") < 4:
-              raise SystemExit("production render must pin all backend workloads by digest")
+          if manifest.count("@sha256:") < 17:
+              raise SystemExit("production render must pin all 17 backend workloads by digest")
           PY
       - name: Parse load and chaos harnesses
         shell: bash
@@ -77,6 +184,19 @@ jobs:
       - uses: actions/checkout@v4
       - run: docker build -f backend/Dockerfile -t funkey-api:ci .
       - run: docker build -f apps/worker/Dockerfile -t funkey-worker:ci .
+      - run: docker build -f apps/kafka-event-bridge/Dockerfile -t funkey-kafka-event-bridge:ci .
+      - run: docker build -f apps/search-service/Dockerfile -t funkey-search:ci .
+      - run: docker build -f apps/recommendation-service/Dockerfile -t funkey-recommendation:ci .
+      - run: docker build -f apps/analytics-sink/Dockerfile -t funkey-analytics-sink:ci .
+      - run: docker build -f apps/inbox-service/Dockerfile -t funkey-inbox:ci .
+      - run: docker build -f apps/vibes-service/Dockerfile -t funkey-vibes:ci .
+      - run: docker build -f apps/room-control-service/Dockerfile -t funkey-room-control:ci .
+      - run: docker build -f apps/identity-service/Dockerfile -t funkey-identity:ci .
+      - run: docker build -f apps/profile-social-service/Dockerfile -t funkey-profile-social:ci .
+      - run: docker build -f apps/economy-service/Dockerfile -t funkey-economy:ci .
+      - run: docker build -f apps/game-platform-service/Dockerfile -t funkey-game-platform:ci .
+      - run: docker build -f apps/notification-service/Dockerfile -t funkey-notification:ci .
+      - run: docker build -f apps/graphql-bff/Dockerfile -t funkey-graphql-bff:ci .
       - run: docker build -f apps/realtime-gateway/Dockerfile -t funkey-realtime:ci .
       - run: docker build -f backend_media/Dockerfile -t funkey-media:ci backend_media
       - uses: aquasecurity/trivy-action@v0.36.0
@@ -85,6 +205,201 @@ jobs:
           format: table
           exit-code: '0'
           severity: CRITICAL,HIGH
+
+  graphql-bff:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.13'
+      - name: Install GraphQL BFF runtime
+        run: pip install -r backend/requirements.txt -r apps/graphql-bff/requirements.txt
+      - name: Compile GraphQL BFF
+        run: python -m compileall -q apps/graphql-bff
+      - name: Run GraphQL BFF unit and boundary tests
+        working-directory: apps/graphql-bff
+        run: python -m unittest discover -s tests -p 'test_*.py'
+      - name: Enforce GraphQL BFF architecture
+        run: python scripts/check_graphql_bff_architecture.py
+
+  kafka-data-platform:
+    name: Kafka data platform
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.13'
+      - name: Install Kafka bridge runtime
+        run: pip install -r apps/kafka-event-bridge/requirements.txt
+      - name: Compile Kafka platform
+        run: python -m compileall -q apps/kafka-event-bridge scripts/check_kafka_data_platform.py tests/integration/kafka_bridge_smoke.py tests/integration/kafka_bridge_recovery.py
+      - name: Run Kafka bridge unit tests
+        working-directory: apps/kafka-event-bridge
+        run: python -m unittest discover -s tests -p 'test_*.py' -v
+      - name: Enforce Kafka architecture
+        run: python scripts/check_kafka_data_platform.py
+      - name: Build Kafka bridge image
+        run: docker build -f apps/kafka-event-bridge/Dockerfile -t funkey-kafka-event-bridge:ci .
+      - name: Start disposable NATS and KRaft
+        run: docker compose -f infra/docker-compose.yml --profile data up -d --wait nats kafka
+      - name: Provision canonical Kafka topics
+        run: docker compose -f infra/docker-compose.yml --profile data run --rm kafka-topics
+      - name: Seed operational JetStream
+        shell: bash
+        run: |
+          python - <<'PY'
+          import asyncio
+          import nats
+
+          async def main():
+              nc = await nats.connect("nats://127.0.0.1:4222")
+              js = nc.jetstream(timeout=3)
+              try:
+                  await js.stream_info("FUNKEY_EVENTS")
+              except Exception:
+                  await js.add_stream(
+                      name="FUNKEY_EVENTS",
+                      subjects=["funkey.events.>"],
+                      max_age=7 * 86400,
+                  )
+              try:
+                  await js.stream_info("FUNKEY_DLQ")
+              except Exception:
+                  await js.add_stream(
+                      name="FUNKEY_DLQ",
+                      subjects=["funkey.dlq.>"],
+                      max_age=30 * 86400,
+                  )
+              await nc.drain()
+
+          asyncio.run(main())
+          PY
+      - name: Start Kafka event bridge
+        run: docker compose -f infra/docker-compose.yml --profile data up -d --wait kafka-event-bridge
+      - name: Run NATS to Kafka integration smoke
+        run: python tests/integration/kafka_bridge_smoke.py
+      - name: Prove Kafka outage retention and recovery
+        shell: bash
+        run: |
+          set -euo pipefail
+          state_file=/tmp/funkey-kafka-recovery.json
+
+          docker compose -f infra/docker-compose.yml --profile data stop kafka
+          python tests/integration/kafka_bridge_recovery.py publish --state-file "$state_file"
+
+          unhealthy=0
+          for attempt in $(seq 1 10); do
+            if ! curl -fsS http://127.0.0.1:8092/ready >/dev/null 2>&1; then
+              unhealthy=1
+              break
+            fi
+            sleep 1
+          done
+          if [ "$unhealthy" -ne 1 ]; then
+            echo "::error::Kafka bridge readiness remained green while Kafka was stopped."
+            exit 1
+          fi
+
+          docker compose -f infra/docker-compose.yml --profile data start kafka
+          kafka_ready=0
+          for attempt in $(seq 1 40); do
+            if docker compose -f infra/docker-compose.yml --profile data exec -T kafka               /opt/kafka/bin/kafka-topics.sh --bootstrap-server 127.0.0.1:9092 --list >/dev/null 2>&1; then
+              kafka_ready=1
+              break
+            fi
+            sleep 1
+          done
+          if [ "$kafka_ready" -ne 1 ]; then
+            echo "::error::Kafka did not recover after restart."
+            exit 1
+          fi
+
+          bridge_ready=0
+          for attempt in $(seq 1 30); do
+            if curl -fsS http://127.0.0.1:8092/ready >/dev/null 2>&1; then
+              bridge_ready=1
+              break
+            fi
+            sleep 1
+          done
+          if [ "$bridge_ready" -ne 1 ]; then
+            echo "::error::Kafka bridge readiness did not recover."
+            exit 1
+          fi
+
+          python tests/integration/kafka_bridge_recovery.py verify --state-file "$state_file"
+      - name: Capture Kafka bridge logs
+        if: failure()
+        run: docker compose -f infra/docker-compose.yml --profile data logs --tail=300 kafka kafka-event-bridge
+      - name: Cleanup Kafka integration
+        if: always()
+        run: docker compose -f infra/docker-compose.yml --profile data down -v --remove-orphans
+
+  search-platform:
+    name: Search platform
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.13'
+      - name: Install Search runtime
+        run: pip install -r apps/search-service/requirements.txt
+      - name: Compile Search service
+        run: python -m compileall -q apps/search-service scripts/check_search_platform.py
+      - name: Run Search tests
+        working-directory: apps/search-service
+        run: python -m unittest discover -s tests -p 'test_*.py' -v
+      - name: Enforce Search architecture
+        run: python scripts/check_search_platform.py
+      - name: Build Search image
+        run: docker build -f apps/search-service/Dockerfile -t funkey-search:ci .
+
+  recommendation-platform:
+    name: Recommendation platform
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.13'
+      - name: Install Recommendation runtime
+        run: pip install -r apps/recommendation-service/requirements.txt
+      - name: Compile Recommendation service
+        run: python -m compileall -q apps/recommendation-service scripts/check_recommendation_platform.py
+      - name: Run Recommendation tests
+        working-directory: apps/recommendation-service
+        run: python -m unittest discover -s tests -p 'test_*.py' -v
+      - name: Enforce Recommendation architecture
+        run: python scripts/check_recommendation_platform.py
+      - name: Build Recommendation image
+        run: docker build -f apps/recommendation-service/Dockerfile -t funkey-recommendation:ci .
+
+  analytics-platform:
+    name: Analytics / ClickHouse / data lake
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.13'
+      - name: Install analytics runtime
+        run: pip install -r apps/analytics-sink/requirements.txt
+      - name: Compile analytics sink
+        run: python -m compileall -q apps/analytics-sink scripts/check_analytics_platform.py
+      - name: Run analytics unit tests
+        working-directory: apps/analytics-sink
+        run: python -m unittest discover -s tests -p 'test_*.py' -v
+      - name: Enforce analytics authority boundary
+        run: python scripts/check_analytics_platform.py
+      - name: Build analytics image
+        run: docker build -f apps/analytics-sink/Dockerfile -t funkey-analytics-sink:ci .
 
   security-source:
     runs-on: ubuntu-latest

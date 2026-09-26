@@ -1,72 +1,91 @@
 import 'dart:async';
 
+import '../../../../foundation/realtime/realtime_event_envelope.dart';
+import '../../../../realtime/app_realtime_hub.dart';
 import '../../data/live_room_media_signaling_service.dart';
-import '../../data/live_room_presence_repository.dart';
-import '../../data/live_room_restrictions_service.dart';
+import '../../../../room_session/data/room_session_repository.dart';
+import '../../data/room_session_legacy_adapter.dart';
 import '../../data/live_room_seat_application_event_bus.dart';
 import '../../data/live_room_system_event_bus.dart';
 import '../live_room_models.dart';
 import '../live_room_restore_state.dart';
 
+/// Room-scoped chat/system-message projection for one live-room session.
+///
+/// Canonical room membership/settings come from RoomSessionRepository and
+/// realtime events come from the shared application hub. This controller owns
+/// only transient message presentation/deduplication and is disposed with the
+/// room bundle; it must never become a process-global chat authority.
 class LiveRoomMessageController {
   LiveRoomMessageController({
+    required String roomId,
+    this.roomSessionRepository,
     required SeatUser currentUser,
     required this.onChanged,
     LiveRoomMessageRestoreState? restoreState,
-  }) : currentUser = LiveRoomMediaSignalingService.instance
+    AppRealtimeHub? realtimeHub,
+  }) : _roomId = roomId.trim(),
+       _realtimeHub = realtimeHub ?? AppRealtimeHub.shared,
+       currentUser = LiveRoomMediaSignalingService.instance
            .effectiveCurrentUser(currentUser) {
     messages = List<ChatEntry>.from(restoreState?.messages ?? mockChatEntries);
     joinRequestUsers.addAll(restoreState?.joinRequestUsers ?? const []);
-    _activeController?._detachSystemEventListener();
-    _activeController = this;
-    _attachSystemEventListener();
+    _eventSubscription = _realtimeHub.events.listen(_handleRealtimeEvent);
+    unawaited(_realtimeHub.start());
   }
 
-  static const Duration _roomSettingsSystemMessageDuration = Duration(
-    seconds: 5,
-  );
   static const Duration _giftMessageMergeWindow = Duration(seconds: 20);
-  static const Set<String> _allowedRoomSettingsSystemMessages = <String>{
-    'Images enabled',
-    'Images disabled',
-    'Guest messages enabled',
-    'Guest messages disabled',
-    'Apply mode enabled',
-    'Free mode enabled',
-  };
-
-  static LiveRoomMessageController? _activeController;
-
-  static void clearActiveRoomChatForEveryone() {
-    _activeController?.clearChatForEveryone();
-  }
-
-  static void sendActiveRoomImageMessage({
-    required String imageUrl,
-    required String contentType,
-  }) {
-    _activeController?.sendImageMessage(
-      imageUrl: imageUrl,
-      contentType: contentType,
-    );
-  }
 
   final SeatUser currentUser;
+  final RoomSessionRepository? roomSessionRepository;
   final VoidCallbackLike onChanged;
 
   late List<ChatEntry> messages;
   final List<SeatUser> joinRequestUsers = <SeatUser>[];
   final Set<String> _handledSystemEventIds = <String>{};
   final Map<String, DateTime> _giftMessageUpdatedAt = <String, DateTime>{};
-  VoidCallbackLike? _systemEventListener;
-  VoidCallbackLike? _seatApplicationListener;
+  final String _roomId;
+  final AppRealtimeHub _realtimeHub;
+  StreamSubscription<RealtimeEventEnvelope>? _eventSubscription;
 
-  bool get _currentUserCanBypassGuestMessageBlock =>
-      currentUser.isHost || currentUser.isRoomAdmin;
+  bool get _currentUserCanBypassGuestMessageBlock {
+    if (currentUser.isHost || currentUser.isRoomAdmin) return true;
+    final repository = roomSessionRepository;
+    if (repository == null) return false;
+    final aliases = _identityAliases(currentUser.id);
+    for (final entry in repository.currentState.membershipRoster.values) {
+      final matchesIdentity =
+          aliases.contains(entry.backendUserId.toString()) ||
+          aliases.contains('user_${entry.backendUserId}') ||
+          aliases.contains(entry.publicUserId.toString()) ||
+          aliases.contains('user_${entry.publicUserId}');
+      if (matchesIdentity && (entry.isMember || entry.isAdmin || entry.isHost)) {
+        return true;
+      }
+    }
+    return false;
+  }
+
+  bool get _guestMessagesEnabled {
+    final repository = roomSessionRepository;
+    if (repository == null) return true;
+    return _canonicalBool(
+      repository.currentState.room['guest_messages_enabled'],
+      fallback: true,
+    );
+  }
+
+  bool get _roomImagesEnabled {
+    final repository = roomSessionRepository;
+    if (repository == null) return true;
+    return _canonicalBool(
+      repository.currentState.room['room_images_enabled'],
+      fallback: true,
+    );
+  }
 
   bool get _guestMessageAllowed =>
-      LiveRoomRestrictionsService.guestMessagesEnabled ||
-      _currentUserCanBypassGuestMessageBlock;
+      _guestMessagesEnabled || _currentUserCanBypassGuestMessageBlock;
 
   LiveRoomMessageRestoreState snapshotForRestore() {
     return LiveRoomMessageRestoreState(
@@ -75,21 +94,74 @@ class LiveRoomMessageController {
     );
   }
 
-  void sendMessage(String text) {
+  /// Persists a text message through the canonical room repository.
+  ///
+  /// The future completes only after the authoritative backend snapshot is
+  /// reconciled. No local durable chat row is inserted optimistically.
+  Future<void> sendMessage(String text) async {
     final trimmed = text.trim();
     if (trimmed.isEmpty) return;
-    if (!_guestMessageAllowed) return;
-    LiveRoomMediaSignalingService.instance.sendRoomChat(trimmed);
+    if (!_guestMessageAllowed) {
+      throw StateError('Guest messages are disabled in this room');
+    }
+    final repository = roomSessionRepository;
+    if (repository == null) {
+      throw StateError('Room session is unavailable');
+    }
+    await repository.sendChatMessage(text: trimmed);
   }
 
-  void sendImageMessage({
+  /// Persists an image message through RoomSessionRepository.
+  ///
+  /// The returned Future completes only after the canonical backend command
+  /// succeeds, allowing the input dock to avoid a false success toast.
+  Future<void> sendImageMessage({
     required String imageUrl,
     required String contentType,
-  }) {
+  }) async {
     final safeUrl = imageUrl.trim();
-    if (safeUrl.isEmpty) return;
-    if (!LiveRoomRestrictionsService.roomImagesEnabled) return;
-    if (!_guestMessageAllowed) return;
+    if (safeUrl.isEmpty) {
+      throw ArgumentError.value(imageUrl, 'imageUrl', 'Image URL is required');
+    }
+    if (!_roomImagesEnabled) {
+      throw StateError('Image messages are disabled in this room');
+    }
+    if (!_guestMessageAllowed) {
+      throw StateError('Guest messages are disabled in this room');
+    }
+
+    final repository = roomSessionRepository;
+    if (repository == null) {
+      throw StateError('Room session is unavailable');
+    }
+    await repository.sendChatMessage(
+      messageType: 'image',
+      mediaUrl: safeUrl,
+      contentType: contentType.trim(),
+    );
+  }
+
+  /// Replaces durable chat with the canonical snapshot while retaining only
+  /// local transient/system presentation entries.
+  void applyCanonicalMessages(List<ChatEntry> canonicalMessages) {
+    String key(ChatEntry entry) =>
+        '${entry.senderId ?? ''}|${entry.message}|${entry.imageUrl ?? ''}|${entry.isGift}';
+
+    final canonicalKeys = canonicalMessages.map(key).toSet();
+    final localPresentationOnly = messages.where((entry) {
+      if (!(entry.isSystemMessage ||
+          entry.isSeatApplication ||
+          entry.isGift ||
+          entry.shouldAutoDismiss)) {
+        return false;
+      }
+      return !canonicalKeys.contains(key(entry));
+    }).toList(growable: false);
+
+    messages = <ChatEntry>[
+      ...localPresentationOnly,
+      ...canonicalMessages,
+    ];
   }
 
   void insertSystemMessage(String message) =>
@@ -153,14 +225,6 @@ class LiveRoomMessageController {
     onChanged();
   }
 
-  void clearChatForEveryone() {
-    messages.clear();
-    _giftMessageUpdatedAt.clear();
-    insertPersistentSystemMessage(
-      'Chat cleared for everyone by ${currentUser.name}',
-    );
-  }
-
   void requestJoin() {
     final alreadyRequested = joinRequestUsers.any(
       (user) => user.id == currentUser.id,
@@ -193,34 +257,44 @@ class LiveRoomMessageController {
     onChanged();
   }
 
-  void _attachSystemEventListener() {
-    _systemEventListener = _handleLatestMediaSystemEvent;
-    LiveRoomSystemEventBus.latestEvent.addListener(_systemEventListener!);
-    _seatApplicationListener = _handleLatestSeatApplicationEvent;
-    LiveRoomSeatApplicationEventBus.latestEvent.addListener(
-      _seatApplicationListener!,
-    );
-  }
+  void _handleRealtimeEvent(RealtimeEventEnvelope envelope) {
+    final decoded = envelope.toLegacyEvent();
+    final type = decoded['type']?.toString() ?? '';
+    final rawPayload = decoded['payload'];
+    final payload = rawPayload is Map
+        ? rawPayload.cast<String, dynamic>()
+        : <String, dynamic>{};
 
-  void _detachSystemEventListener() {
-    final listener = _systemEventListener;
-    if (listener != null) {
-      LiveRoomSystemEventBus.latestEvent.removeListener(listener);
+    final eventRoomId =
+        payload['room_id']?.toString().trim() ??
+        payload['room_public_id']?.toString().trim() ??
+        decoded['room_id']?.toString().trim() ??
+        decoded['room_public_id']?.toString().trim() ??
+        '';
+    if (eventRoomId.isNotEmpty &&
+        _roomId.isNotEmpty &&
+        eventRoomId != _roomId) {
+      return;
     }
-    _systemEventListener = null;
-    final seatApplicationListener = _seatApplicationListener;
-    if (seatApplicationListener != null) {
-      LiveRoomSeatApplicationEventBus.latestEvent.removeListener(
-        seatApplicationListener,
+
+    if (type == 'room/system_event') {
+      _handleMediaSystemEvent(LiveRoomSystemEvent.fromJson(payload));
+      return;
+    }
+    if (type == 'seat_application/received') {
+      _handleSeatApplicationEvent(
+        LiveRoomSeatApplicationEvent.fromJson(payload),
       );
     }
-    _seatApplicationListener = null;
   }
 
-  void _handleLatestSeatApplicationEvent() {
-    final event = LiveRoomSeatApplicationEventBus.latestEvent.value;
-    if (event == null || _handledSystemEventIds.contains(event.id)) return;
-    if (event.seatIndex < 0) return;
+  void _handleSeatApplicationEvent(
+    LiveRoomSeatApplicationEvent event,
+  ) {
+    if (_handledSystemEventIds.contains(event.id) ||
+        event.seatIndex < 0) {
+      return;
+    }
     _handledSystemEventIds.add(event.id);
     _insertSeatApplicationRequest(
       applicantUserId: event.applicantUserId,
@@ -250,7 +324,12 @@ class LiveRoomMessageController {
     if (existingPending) return;
     final applicant = _sameRoomUserId(applicantUserId, currentUser.id)
         ? currentUser
-        : LiveRoomPresenceRepository.userByRoomUserId(applicantUserId);
+        : roomSessionRepository == null
+        ? null
+        : RoomSessionLegacyAdapter.findPresenceUser(
+            roomSessionRepository!.currentState,
+            applicantUserId,
+          );
     messages.insert(
       0,
       ChatEntry(
@@ -270,9 +349,12 @@ class LiveRoomMessageController {
     onChanged();
   }
 
-  void _handleLatestMediaSystemEvent() {
-    final event = LiveRoomSystemEventBus.latestEvent.value;
-    if (event == null || _handledSystemEventIds.contains(event.id)) return;
+  void applySystemEvent(LiveRoomSystemEvent event) {
+    _handleMediaSystemEvent(event);
+  }
+
+  void _handleMediaSystemEvent(LiveRoomSystemEvent event) {
+    if (_handledSystemEventIds.contains(event.id)) return;
     _handledSystemEventIds.add(event.id);
 
     if (event.isRoomChatMessage) {
@@ -318,7 +400,7 @@ class LiveRoomMessageController {
           sendingLevel: event.actorSendingLevel,
           receivingLevel: event.actorReceivingLevel,
           isGift: true,
-          giftAssetPath: event.giftAssetPath,
+          giftAssetUrl: event.giftAssetUrl,
         ),
       );
       return;
@@ -413,6 +495,7 @@ class LiveRoomMessageController {
       receivingLevel: entry.receivingLevel,
       isGift: true,
       giftAssetPath: entry.giftAssetPath,
+      giftAssetUrl: entry.giftAssetUrl,
     );
     final key = _giftMessageKey(cleanEntry);
     final now = DateTime.now();
@@ -555,6 +638,20 @@ class LiveRoomMessageController {
     return aliases;
   }
 
+  bool _canonicalBool(Object? value, {required bool fallback}) {
+    if (value == null) return fallback;
+    if (value is bool) return value;
+    if (value is num) return value != 0;
+    final normalized = value.toString().trim().toLowerCase();
+    if (normalized == 'true' || normalized == '1' || normalized == 'yes') {
+      return true;
+    }
+    if (normalized == 'false' || normalized == '0' || normalized == 'no') {
+      return false;
+    }
+    return fallback;
+  }
+
   void _scheduleAutoDismiss(ChatEntry entry) {
     final dismissAt = entry.autoDismissAt;
     if (dismissAt == null) return;
@@ -563,5 +660,10 @@ class LiveRoomMessageController {
       final removed = messages.remove(entry);
       if (removed) onChanged();
     });
+  }
+
+  void dispose() {
+    unawaited(_eventSubscription?.cancel());
+    _eventSubscription = null;
   }
 }

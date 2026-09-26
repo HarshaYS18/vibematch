@@ -1,10 +1,11 @@
 import 'dart:async';
 import 'dart:convert';
 
-import 'package:http/http.dart' as http;
+import 'package:vibematch_app/foundation/networking/feature_http_compat.dart' as http;
 import 'package:shared_preferences/shared_preferences.dart';
 
 import '../../../core/network/vm_api_config.dart';
+import '../../../foundation/networking/app_network_client.dart';
 import '../../../core/notifications/vm_push_notification_service.dart';
 import '../../../core/session/vm_session_cleanup_service.dart';
 import '../models/current_user.dart';
@@ -46,17 +47,64 @@ class AuthApiService {
     final prefs = await SharedPreferences.getInstance();
 
     _cachedAccessToken = prefs.getString(_tokenKey);
+    NetworkAuthCoordinator.seedAccessToken(_cachedAccessToken);
     _cachedDeviceId = prefs.getString(_deviceIdKey);
+    _cachedUser = null;
 
     final savedUserJson = prefs.getString(_userJsonKey);
     if (savedUserJson != null && savedUserJson.trim().isNotEmpty) {
       try {
-        _cachedUser = CurrentUser.fromJson(jsonDecode(savedUserJson) as Map<String, dynamic>);
-        AuthUserRealtimeService.instance.publish(_cachedUser!);
+        _cachedUser = CurrentUser.fromJson(
+          jsonDecode(savedUserJson) as Map<String, dynamic>,
+        );
       } catch (_) {
         _cachedUser = null;
       }
     }
+  }
+
+  /// Restores the locally persisted session, then reconciles it with the
+  /// backend master user snapshot before the authenticated app is shown.
+  ///
+  /// The cached user is only an offline fallback. Authentication failures and
+  /// server-side session replacement always win over local state.
+  Future<CurrentUser> restoreCurrentUser() async {
+    await restoreSavedSession();
+
+    final token = _cachedAccessToken;
+    final cachedUser = _cachedUser;
+    if (token == null || token.trim().isEmpty) {
+      throw Exception('No saved session is available.');
+    }
+
+    try {
+      return await getCurrentUser(accessToken: token, forceRefresh: true);
+    } catch (error) {
+      if (isAuthoritativeSessionFailure(error)) {
+        await _clearLocalSession(
+          reason: 'restored auth session rejected by backend',
+          publishSignedOut: true,
+        );
+        rethrow;
+      }
+      if (cachedUser == null) rethrow;
+
+      AuthUserRealtimeService.instance.publish(cachedUser);
+      return cachedUser;
+    }
+  }
+
+  bool isAuthoritativeSessionFailure(Object error) {
+    final message = error.toString().toLowerCase();
+    final hasAuthStatus = RegExp(
+      r'(^|[^0-9])(401|403)([^0-9]|$)',
+    ).hasMatch(message);
+    return hasAuthStatus ||
+        message.contains('invalid or expired token') ||
+        message.contains('session replaced') ||
+        message.contains('user is banned') ||
+        message.contains('user is inactive') ||
+        message.contains('please login again');
   }
 
   Future<void> _persistSession({
@@ -65,6 +113,7 @@ class AuthApiService {
     required String deviceId,
   }) async {
     _cachedAccessToken = accessToken;
+    NetworkAuthCoordinator.seedAccessToken(accessToken);
     _cachedUser = user;
     _cachedDeviceId = deviceId;
 
@@ -223,6 +272,8 @@ class AuthApiService {
         'Content-Type': 'application/json',
         'Authorization': 'Bearer $token',
       },
+      // Send only fields owned by this edit flow. The backend PATCH contract
+      // preserves every omitted canonical profile field.
       body: jsonEncode({
         'display_name': safeName,
         'bio': bio?.trim() ?? '',
@@ -241,14 +292,24 @@ class AuthApiService {
 
   Future<void> logout() async {
     await VmPushNotificationService.instance.deleteCurrentTokenOnLogout();
-    await VmSessionCleanupService.clearUserScopedState(reason: 'logout');
+    await _clearLocalSession(reason: 'logout', publishSignedOut: true);
+  }
+
+  Future<void> _clearLocalSession({
+    required String reason,
+    required bool publishSignedOut,
+  }) async {
+    await VmSessionCleanupService.clearUserScopedState(reason: reason);
     _cachedAccessToken = null;
+    NetworkAuthCoordinator.clear();
     _cachedUser = null;
 
     final prefs = await SharedPreferences.getInstance();
     await prefs.remove(_tokenKey);
     await prefs.remove(_userJsonKey);
-    AuthUserRealtimeService.instance.publishSignedOut();
+    if (publishSignedOut) {
+      AuthUserRealtimeService.instance.publishSignedOut();
+    }
   }
 
   String? get cachedAccessToken => _cachedAccessToken;

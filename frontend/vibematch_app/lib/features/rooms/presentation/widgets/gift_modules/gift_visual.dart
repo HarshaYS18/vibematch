@@ -15,6 +15,9 @@ class GiftVisual extends StatelessWidget {
 
   final IconData icon;
   final List<Color> colors;
+
+  /// Retained only for source compatibility while old catalog payloads expire.
+  /// Product media is CDN-owned and this value is never rendered.
   final String? assetPath;
   final String? assetUrl;
   final double size;
@@ -25,7 +28,6 @@ class GiftVisual extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final cleanUrl = assetUrl?.trim();
-    final cleanPath = assetPath?.trim();
     final visualSize = size - padding;
 
     final Widget visual = cleanUrl != null && cleanUrl.isNotEmpty
@@ -36,9 +38,9 @@ class GiftVisual extends StatelessWidget {
             fit: BoxFit.contain,
             filterQuality: FilterQuality.high,
             gaplessPlayback: true,
-            errorBuilder: (context, error, stackTrace) => _localOrIcon(cleanPath, visualSize),
+            errorBuilder: (context, error, stackTrace) => _iconFallback(),
           )
-        : _localOrIcon(cleanPath, visualSize);
+        : _iconFallback();
 
     if (plain) {
       return SizedBox(width: size, height: size, child: Center(child: visual));
@@ -52,10 +54,21 @@ class GiftVisual extends StatelessWidget {
         shape: square ? BoxShape.rectangle : BoxShape.circle,
         borderRadius: square ? BorderRadius.circular(14) : null,
         gradient: LinearGradient(colors: colors),
-        border: Border.all(color: Colors.white.withValues(alpha: 0.34), width: 0.9),
+        border: Border.all(
+          color: Colors.white.withValues(alpha: 0.34),
+          width: 0.9,
+        ),
         boxShadow: [
-          BoxShadow(color: colors.first.withValues(alpha: 0.35), blurRadius: size * 0.38, offset: Offset(0, size * 0.12)),
-          BoxShadow(color: Colors.white.withValues(alpha: 0.16), blurRadius: size * 0.22, spreadRadius: 0.5),
+          BoxShadow(
+            color: colors.first.withValues(alpha: 0.35),
+            blurRadius: size * 0.38,
+            offset: Offset(0, size * 0.12),
+          ),
+          BoxShadow(
+            color: Colors.white.withValues(alpha: 0.16),
+            blurRadius: size * 0.22,
+            spreadRadius: 0.5,
+          ),
         ],
       ),
       child: ClipRRect(
@@ -82,18 +95,6 @@ class GiftVisual extends StatelessWidget {
           ],
         ),
       ),
-    );
-  }
-
-  Widget _localOrIcon(String? cleanPath, double visualSize) {
-    if (cleanPath == null || cleanPath.isEmpty) return _iconFallback();
-    return Image.asset(
-      cleanPath,
-      width: visualSize,
-      height: visualSize,
-      fit: BoxFit.contain,
-      filterQuality: FilterQuality.high,
-      errorBuilder: (context, error, stackTrace) => _iconFallback(),
     );
   }
 

@@ -37,6 +37,7 @@ class StoreCatalogResponse(BaseModel):
 
 class StorePurchaseRequest(BaseModel):
     item_id: str = Field(..., min_length=1, max_length=120)
+    purchase_id: str | None = Field(default=None, min_length=8, max_length=36)
 
 
 class StoreEquipRequest(BaseModel):

@@ -1,0 +1,29 @@
+{
+  "schema_version": 1,
+  "flags": [
+    {
+      "key": "watch_party_companion_fallback",
+      "type": "boolean",
+      "default": true,
+      "kill_switch": false,
+      "rollout_percentage": 100,
+      "platforms": ["android", "ios", "web"],
+      "regions": [],
+      "cohorts": [],
+      "min_app_version": "1.0.0",
+      "client_visible": true
+    },
+    {
+      "key": "recommendation_personalization",
+      "type": "boolean",
+      "default": false,
+      "kill_switch": false,
+      "rollout_percentage": 25,
+      "platforms": ["android", "ios", "web"],
+      "regions": [],
+      "cohorts": [],
+      "min_app_version": "1.0.0",
+      "client_visible": true
+    }
+  ]
+}

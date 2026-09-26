@@ -1,0 +1,25 @@
+name: Production Certification
+
+on:
+  workflow_dispatch:
+    inputs:
+      evidence_path:
+        description: Path to completed production-like certification evidence JSON
+        required: true
+        default: docs/evidence/production-certification.json
+
+permissions:
+  contents: read
+
+jobs:
+  validate-evidence:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.13'
+      - name: Validate measured certification evidence
+        run: python scripts/production_certification.py --evidence "${{ inputs.evidence_path }}"
+      - name: Enforce SRE/FinOps architecture
+        run: python scripts/check_sre_finops.py

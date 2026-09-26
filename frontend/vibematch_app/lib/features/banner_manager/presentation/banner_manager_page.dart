@@ -1,18 +1,18 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../media/data/media_upload_service.dart';
 import '../controllers/banner_manager_controller.dart';
 import '../models/banner_manager_models.dart';
 
-class BannerManagerPage extends StatefulWidget {
+class BannerManagerPage extends ConsumerStatefulWidget {
   const BannerManagerPage({super.key});
 
   @override
-  State<BannerManagerPage> createState() => _BannerManagerPageState();
+  ConsumerState<BannerManagerPage> createState() => _BannerManagerPageState();
 }
 
-class _BannerManagerPageState extends State<BannerManagerPage> {
-  final BannerManagerController _controller = BannerManagerController();
+class _BannerManagerPageState extends ConsumerState<BannerManagerPage> {
   final MediaUploadService _mediaUploadService = const MediaUploadService();
   final TextEditingController _titleController = TextEditingController();
   final TextEditingController _sortController = TextEditingController(text: '1');
@@ -20,30 +20,21 @@ class _BannerManagerPageState extends State<BannerManagerPage> {
   @override
   void initState() {
     super.initState();
-    _controller.addListener(_handleControllerChanged);
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      if (mounted) _controller.loadBanners();
+      if (mounted) ref.read(bannerManagerControllerProvider.notifier).loadBanners();
     });
   }
 
   @override
   void dispose() {
-    _controller.removeListener(_handleControllerChanged);
-    _controller.dispose();
     _titleController.dispose();
     _sortController.dispose();
     super.dispose();
   }
 
-  void _handleControllerChanged() {
-    if (!mounted) return;
-    final value = _controller.sortOrder.toString();
-    if (_sortController.text != value) _sortController.text = value;
-    setState(() {});
-  }
-
   Future<void> _pickDate({required bool isStart}) async {
-    final initialDate = isStart ? _controller.startDate : _controller.endDate;
+    final state = ref.read(bannerManagerControllerProvider);
+    final initialDate = isStart ? state.startDate : state.endDate;
     final picked = await showDatePicker(
       context: context,
       initialDate: initialDate,
@@ -54,17 +45,19 @@ class _BannerManagerPageState extends State<BannerManagerPage> {
     if (picked == null) return;
 
     if (isStart) {
-      _controller.setStartDate(picked);
+      ref.read(bannerManagerControllerProvider.notifier).setStartDate(picked);
     } else {
-      _controller.setEndDate(picked);
+      ref.read(bannerManagerControllerProvider.notifier).setEndDate(picked);
     }
   }
 
   Future<void> _pickCropAndUploadImage() async {
-    if (_controller.isUploadingImage || _controller.isSaving) return;
-    _controller.setUploadingImage(true);
+    final state = ref.read(bannerManagerControllerProvider);
+    final controller = ref.read(bannerManagerControllerProvider.notifier);
+    if (state.isUploadingImage || state.isSaving) return;
+    controller.setUploadingImage(true);
     try {
-      final section = _controller.selectedSection;
+      final section = ref.read(bannerManagerControllerProvider).selectedSection;
       final upload = await _mediaUploadService.pickCropAndUploadHomeBanner(
         context,
         title: section == ManagedBannerSection.policyBanner ? 'Crop Policy Banner' : 'Crop Event Banner',
@@ -72,20 +65,20 @@ class _BannerManagerPageState extends State<BannerManagerPage> {
         outputWidth: section.outputWidth,
         outputHeight: section.outputHeight,
       );
-      _controller.setUploadedImage(url: upload.url);
+      controller.setUploadedImage(url: upload.url);
       _toast('Banner image uploaded');
     } on MediaUploadCancelledException {
       return;
     } catch (error) {
       _toast(error.toString().replaceFirst('Exception: ', ''));
     } finally {
-      _controller.setUploadingImage(false);
+      controller.setUploadingImage(false);
     }
   }
 
   Future<void> _saveBanner() async {
     try {
-      await _controller.saveBanner(title: _titleController.text.trim());
+      await ref.read(bannerManagerControllerProvider.notifier).saveBanner(title: _titleController.text.trim());
       _titleController.clear();
       _toast('Banner saved to backend');
     } catch (error) {
@@ -108,36 +101,43 @@ class _BannerManagerPageState extends State<BannerManagerPage> {
 
   @override
   Widget build(BuildContext context) {
+    final banner = ref.watch(bannerManagerControllerProvider);
+    final controller = ref.read(bannerManagerControllerProvider.notifier);
+    ref.listen<BannerManagerState>(bannerManagerControllerProvider, (previous, next) {
+      if (previous?.sortOrder == next.sortOrder) return;
+      final value = next.sortOrder.toString();
+      if (_sortController.text != value) _sortController.text = value;
+    });
     return Scaffold(
       backgroundColor: const Color(0xFFFAF7F1),
       body: SafeArea(
         child: RefreshIndicator(
-          onRefresh: _controller.loadBanners,
+          onRefresh: controller.loadBanners,
           child: CustomScrollView(
             physics: const AlwaysScrollableScrollPhysics(parent: BouncingScrollPhysics()),
             slivers: [
               SliverToBoxAdapter(child: _Header(onBackTap: () => Navigator.pop(context))),
-              SliverToBoxAdapter(child: _SectionSwitcher(selectedSection: _controller.selectedSection, onChanged: _controller.selectSection)),
-              if (_controller.errorMessage != null)
-                SliverToBoxAdapter(child: _ErrorCard(message: _controller.errorMessage!, onRetry: _controller.loadBanners)),
+              SliverToBoxAdapter(child: _SectionSwitcher(selectedSection: banner.selectedSection, onChanged: controller.selectSection)),
+              if (banner.errorMessage != null)
+                SliverToBoxAdapter(child: _ErrorCard(message: banner.errorMessage!, onRetry: controller.loadBanners)),
               SliverToBoxAdapter(
                 child: _BannerFormCard(
-                  controller: _controller,
+                  controller: controller,
                   titleController: _titleController,
                   sortController: _sortController,
                   onImageTap: _pickCropAndUploadImage,
-                  onTargetChanged: _controller.selectTarget,
+                  onTargetChanged: controller.selectTarget,
                   onStartDateTap: () => _pickDate(isStart: true),
                   onEndDateTap: () => _pickDate(isStart: false),
-                  onActiveChanged: _controller.setActive,
-                  onSortChanged: (value) => _controller.setSortOrder(int.tryParse(value) ?? 1),
+                  onActiveChanged: controller.setActive,
+                  onSortChanged: (value) => controller.setSortOrder(int.tryParse(value) ?? 1),
                   onSaveTap: _saveBanner,
                 ),
               ),
-              if (_controller.isLoading)
+              if (banner.isLoading)
                 const SliverToBoxAdapter(child: Padding(padding: EdgeInsets.fromLTRB(18, 0, 18, 12), child: LinearProgressIndicator(minHeight: 3, color: Color(0xFF12C7B7), backgroundColor: Color(0xFFECE2D8))))
               else
-                SliverToBoxAdapter(child: _SavedBannerList(banners: _controller.savedBanners, onToggleActive: _controller.toggleBannerActive)),
+                SliverToBoxAdapter(child: _SavedBannerList(banners: banner.savedBanners, onToggleActive: controller.toggleBannerActive)),
               const SliverToBoxAdapter(child: SizedBox(height: 28)),
             ],
           ),

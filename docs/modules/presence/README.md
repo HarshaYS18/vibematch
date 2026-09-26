@@ -2,92 +2,85 @@
 
 ## Purpose
 
-Tracks current room presence and filters visibility for privacy rules.
+Expose privacy-filtered connected-liveness and current-room projections without creating a second room-membership authority.
 
 ## Responsibilities
 
-The module owns user_room_presence and room participant facts. Routes should validate input and delegate business decisions to services.
+Connected liveness is an **ephemeral realtime projection**. The authenticated Go realtime gateway is the only writer of online/socket presence and refreshes TTL-scored Redis/Valkey leases. FastAPI presence routes are read-only compatibility surfaces over that projection.
+
+Durable room membership, admin state and seats belong to Room Control in PostgreSQL and are intentionally separate from connected liveness.
 
 ## What this module owns
 
-user_room_presence and room participant facts.
+The presence domain owns no durable PostgreSQL business authority. It owns the contract for projecting global online state, user-to-room live leases, room-to-user live leases, and privacy-filtered public presence responses.
 
 ## What this module does NOT own
 
-This module does not own SFU transport state, edge routing, or client UI state.
+Presence does not own `room_participants`, room seats, room permissions, SFU transport state, identity `last_seen_at`, or client UI state. The legacy `user_room_presence` table is non-authoritative and receives no production runtime write grant.
 
 ## Source of truth
 
-PostgreSQL is the durable source of truth for user_room_presence, room_participants.
+Connected online truth is the Go realtime gateway's Redis/Valkey lease set:
+
+- `funkey:realtime:gateway:user-active:{user_id}`
+- `funkey:realtime:gateway:user-rooms:{user_id}`
+- `funkey:realtime:gateway:room-users:{room_public_id}`
+
+Room membership truth remains PostgreSQL under Room Control. Redis loss must never be repaired by reviving database-heartbeat authority; presence reads fail closed/offline until leases rebuild from authenticated sockets.
 
 ## Important files
 
-`backend/app/api/routes/presence.py`, `backend/app/models/presence.py`, `backend/app/services/rooms/room_action_service.py`.
+- `apps/realtime-gateway/internal/gateway/server.go`
+- `backend/app/services/presence_projection_service.py`
+- `backend/app/api/routes/presence.py`
+- `backend/app/services/rooms/room_service.py`
+- `frontend/vibematch_app/lib/app/app_shell.dart`
+- `frontend/vibematch_app/lib/features/rooms/presentation/live_room_presence_shell_page.dart`
 
 ## Public API/contracts
 
-presence routes and room snapshot fields. Preserve deployed request and response shapes while migrating implementation.
+Public/batch presence reads preserve deployed response shapes. Legacy `/presence/heartbeat` and room enter/leave compatibility routes are read-only/deprecated. Room REST heartbeat is retired; the canonical socket lease supplies steady-state liveness.
 
-## Events published
+## Events published / consumed
 
-Current code may emit domain WebSocket updates after committed writes. A versioned broker event for this domain must be added only with a contract and transactional publication path; do not claim every proposed event is live. Consumers must handle duplicates and refetch a snapshot after a gap.
-
-## Events consumed
-
-No durable broker consumer is implied by this ownership guide. Add a consumer only with a versioned contract, idempotency, retry limits, and an integration test.
+No durable broker event is required to keep a connected user online. Socket connect/join/refresh/leave updates the bounded Redis leases directly. Durable room events remain Room Control events and must not be inferred from presence leases.
 
 ## Database tables/state owned
 
-Database tables and state: `user_room_presence, room_participants`.
+None for connected liveness. `user_room_presence` is legacy compatibility schema only and is not a writable production authority.
 
 ## Redis keys/state owned
 
-Future gateway routing and TTL presence may be cached in Redis, never sole room membership truth.
-
-## Dependencies
-
-Depends on FastAPI authentication, SQLAlchemy transaction/session handling, and the relevant domain services.
+Realtime gateway presence leases are ephemeral, TTL-bounded and rebuildable from active authenticated sockets plus durable room membership.
 
 ## Security considerations
 
-Secret rooms and hidden users must not leak through discovery or online lists. Never log tokens, OTPs, or payment secrets.
+Secret-room identity/location must not leak through public presence projection. Realtime leases are keyed by internal user IDs; public responses apply room/privacy visibility before exposing room metadata.
 
 ## Failure modes
 
-Redis loss may delay ephemeral online indicators; durable room state is reconciled from PostgreSQL.
+If realtime Redis is unavailable, presence renders users offline/unknown rather than falling back to stale PostgreSQL heartbeat timestamps. Durable membership remains intact and reconnect rebuilds ephemeral leases.
 
 ## Retry/idempotency behavior
 
-Reads and writes should use bounded timeouts. Retries are safe only for read operations or writes backed by an idempotency key and known commit outcome.
+Socket lease refreshes are naturally idempotent ZSET updates. Presence reads may retry with bounded timeouts. No client timer should perform database presence writes.
 
 ## Scaling behavior
 
-Scale stateless API replicas only within the PostgreSQL connection budget.
-
-## Autoscaling metrics
-
-Track route request rate, p95 latency, error rate, transaction latency, DB pool use, and domain-specific rejection counts. Trace commands through commit and fanout with a request ID; avoid user PII in metric labels.
+Presence scales with the Go gateway and dedicated realtime Redis role. FastAPI presence projection performs bounded Redis pipelines and bounded PostgreSQL metadata reads only for users/rooms that are actually leased.
 
 ## Observability
 
-Trace commands through commit and fanout with a request ID; avoid user PII in metric labels.
-
-## Local development
-
-Start dependencies with `.\\scripts\\dev-up.ps1`, then run affected backend tests with `python -m unittest discover -s backend/tests -p test_*.py` from the repository root with the backend import path configured, or use the test command in the root README.
+Track active socket leases, room lease counts, lease refresh failures, Redis latency/error rate, reconnect rate, and privacy-filter rejection counts without user PII in metric labels.
 
 ## Testing
 
-Add a regression test for authorization, transaction outcome, and duplicate/reconnect behavior when relevant.
+Regression coverage must prove that Flutter does not run periodic REST/database heartbeats, FastAPI does not write `UserRoomPresence`, and the Go gateway maintains both global and room lease indexes.
 
 ## Deployment notes
 
-Apply Alembic first; roll out compatible API behavior; check readiness and error metrics.
-
-## Change checklist
-
-Before changing this module: identify the owning table and contract, add an additive migration if needed, preserve Flutter compatibility, verify permission checks, and document rollback.
+Apply Redis topology/HA configuration and Room Control ownership SQL with the legacy `user_room_presence` write revocation. Do not grant any production runtime a compatibility DB heartbeat writer role.
 
 ## Known migration status
 
-Existing FastAPI domain; distributed gateway presence is a migration target.
+Post-Chunk-32 repair completed the one-Go-socket presence cutover: Flutter/REST/PostgreSQL heartbeat authority is retired and Go realtime is the sole connected-liveness writer.

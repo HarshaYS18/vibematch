@@ -2,13 +2,16 @@ import 'package:flutter/material.dart';
 
 import '../../../../core/ui/vm_motion.dart';
 import '../../../media/data/media_upload_service.dart';
-import '../controllers/live_room_message_controller.dart';
 import '../modules/live_room_games_module.dart';
 import '../modules/live_room_gift_module.dart';
 import '../modules/live_room_message_composer_module.dart';
-import 'room_seats.dart';
 import 'room_theme.dart';
 
+/// Bottom input/action dock for a single live-room route.
+///
+/// Every action is injected. Image sending is routed to the scoped room
+/// message controller instead of a static active-room controller, keeping this
+/// widget stateless and reusable.
 class RoomInputDock extends StatelessWidget {
   const RoomInputDock({
     super.key,
@@ -20,6 +23,8 @@ class RoomInputDock extends StatelessWidget {
     required this.onInboxTap,
     required this.onEmojiTap,
     required this.onSendTap,
+    required this.onImageMessage,
+    required this.onDismissSeatActions,
     required this.onMicTap,
     required this.onGamesTap,
     required this.onGiftTap,
@@ -34,13 +39,21 @@ class RoomInputDock extends StatelessWidget {
   final VoidCallback onInboxTap;
   final VoidCallback onEmojiTap;
   final VoidCallback onSendTap;
+  /// Completes only after the canonical room image-chat command succeeds.
+  final Future<void> Function({
+    required String imageUrl,
+    required String contentType,
+  }) onImageMessage;
+
+  /// Clears the owning room's selected seat/menu through scoped seat state.
+  final VoidCallback onDismissSeatActions;
   final VoidCallback onMicTap;
   final VoidCallback onGamesTap;
   final VoidCallback onGiftTap;
   final bool imagesEnabled;
 
   void _runAndHideSeatActions(VoidCallback action) {
-    dismissRoomSeatActionPill();
+    onDismissSeatActions();
     action();
   }
 
@@ -49,12 +62,12 @@ class RoomInputDock extends StatelessWidget {
       RoomToast.show(context, 'Image messages are disabled in this room');
       return;
     }
-    dismissRoomSeatActionPill();
+    onDismissSeatActions();
     FocusManager.instance.primaryFocus?.unfocus();
     try {
       RoomToast.show(context, 'Uploading image...');
       final upload = await const MediaUploadService().pickAndUploadChatImage();
-      LiveRoomMessageController.sendActiveRoomImageMessage(
+      await onImageMessage(
         imageUrl: upload.url,
         contentType: upload.contentType,
       );
@@ -72,7 +85,7 @@ class RoomInputDock extends StatelessWidget {
   }
 
   void _openMessageComposer(BuildContext context) {
-    dismissRoomSeatActionPill();
+    onDismissSeatActions();
     showModalBottomSheet<void>(
       context: context,
       isScrollControlled: true,
@@ -84,6 +97,7 @@ class RoomInputDock extends StatelessWidget {
           controller: controller,
           focusNode: focusNode,
           imagesEnabled: imagesEnabled,
+          onDismissSeatActions: onDismissSeatActions,
           onSendText: onSendTap,
           onImageTap: () => _pickAndSendImage(context),
           onSendFloatingText: onSendTap,

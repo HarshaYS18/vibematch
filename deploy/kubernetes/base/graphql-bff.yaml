@@ -1,0 +1,70 @@
+apiVersion: v1
+kind: ServiceAccount
+metadata: {name: funkey-graphql-bff}
+automountServiceAccountToken: false
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: funkey-graphql-bff
+  labels: {app: funkey-graphql-bff}
+spec:
+  replicas: 3
+  revisionHistoryLimit: 5
+  strategy: {type: RollingUpdate, rollingUpdate: {maxSurge: 1, maxUnavailable: 0}}
+  selector: {matchLabels: {app: funkey-graphql-bff}}
+  template:
+    metadata:
+      labels: {app: funkey-graphql-bff}
+      annotations:
+        prometheus.io/scrape: "true"
+        prometheus.io/path: /metrics
+        prometheus.io/port: "8091"
+    spec:
+      serviceAccountName: funkey-graphql-bff
+      automountServiceAccountToken: false
+      terminationGracePeriodSeconds: 30
+      nodeSelector: {funkey.io/workload: application}
+      securityContext: {runAsNonRoot: true, seccompProfile: {type: RuntimeDefault}}
+      topologySpreadConstraints:
+        - maxSkew: 1
+          topologyKey: topology.kubernetes.io/zone
+          whenUnsatisfiable: ScheduleAnyway
+          labelSelector: {matchLabels: {app: funkey-graphql-bff}}
+        - maxSkew: 1
+          topologyKey: kubernetes.io/hostname
+          whenUnsatisfiable: DoNotSchedule
+          labelSelector: {matchLabels: {app: funkey-graphql-bff}}
+      containers:
+        - name: graphql-bff
+          image: funkey-graphql-bff:dev
+          imagePullPolicy: IfNotPresent
+          ports: [{name: http, containerPort: 8091}]
+          envFrom:
+            - configMapRef: {name: funkey-config}
+          resources:
+            requests: {cpu: 200m, memory: 256Mi}
+            limits: {cpu: "1", memory: 512Mi}
+          startupProbe: {httpGet: {path: /live, port: http}, failureThreshold: 30, periodSeconds: 2}
+          livenessProbe: {httpGet: {path: /live, port: http}, periodSeconds: 20}
+          readinessProbe: {httpGet: {path: /ready, port: http}, periodSeconds: 5}
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            capabilities: {drop: [ALL]}
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: funkey-graphql-bff
+spec:
+  selector: {app: funkey-graphql-bff}
+  ports: [{name: http, port: 8091, targetPort: http}]
+---
+apiVersion: policy/v1
+kind: PodDisruptionBudget
+metadata:
+  name: funkey-graphql-bff
+spec:
+  minAvailable: 2
+  selector: {matchLabels: {app: funkey-graphql-bff}}

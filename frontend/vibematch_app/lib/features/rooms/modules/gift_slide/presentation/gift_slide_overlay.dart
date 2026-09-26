@@ -4,7 +4,6 @@ import 'package:flutter/material.dart';
 
 import '../../../presentation/live_room_models.dart';
 import '../../../presentation/widgets/gift_modules/gift_visual.dart';
-import '../../../presentation/widgets/room_theme.dart';
 
 class GiftSlideOverlay extends StatelessWidget {
   const GiftSlideOverlay({

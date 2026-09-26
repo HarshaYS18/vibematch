@@ -1,4 +1,5 @@
 ﻿import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../data/love_bond_realtime_service.dart';
 import '../love_bonds/models/love_bond_models.dart';
@@ -57,7 +58,11 @@ class MeVipSvipPanel extends StatelessWidget {
   }
 }
 
-class MeRelationshipPanel extends StatelessWidget {
+/// Signed-in profile Love Bond panel driven by the session-scoped provider.
+///
+/// The panel derives cards from an immutable request snapshot and does not seed
+/// or mutate a process-global relationship cache during build.
+class MeRelationshipPanel extends ConsumerWidget {
   const MeRelationshipPanel({
     super.key,
     required this.publicUserId,
@@ -70,18 +75,17 @@ class MeRelationshipPanel extends StatelessWidget {
   final ValueChanged<LoveBondCardData> onBondTap;
 
   @override
-  Widget build(BuildContext context) {
-    LoveBondRealtimeService.seedInventoryIfEmpty(publicUserId);
+  Widget build(BuildContext context, WidgetRef ref) {
+    final realtime = ref.watch(loveBondRealtimeProvider);
+    final activeBonds = realtime.requests
+        .where((request) => request.status == LoveBondRequestStatus.accepted)
+        .where((request) => request.involvesPublicUserId(publicUserId))
+        .toList(growable: false);
+    if (activeBonds.isEmpty) return const SizedBox.shrink();
 
-    return ValueListenableBuilder<List<LoveBondRequest>>(
-      valueListenable: LoveBondRealtimeService.requests,
-      builder: (context, requests, child) {
-        final activeBonds = LoveBondRealtimeService.activeBondsFor(publicUserId);
-        if (activeBonds.isEmpty) return const SizedBox.shrink();
+    final cards = loveBondCardsForProfile(publicUserId, realtime.requests);
 
-        final cards = loveBondCardsForProfile(publicUserId);
-
-        return Container(
+    return Container(
           padding: const EdgeInsets.all(15),
           decoration: meWhitePanelDecoration(),
           child: Column(
@@ -111,8 +115,6 @@ class MeRelationshipPanel extends StatelessWidget {
             ],
           ),
         );
-      },
-    );
   }
 }
 class MeAccountCard extends StatelessWidget {

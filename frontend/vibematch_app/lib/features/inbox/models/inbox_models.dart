@@ -196,6 +196,8 @@ class InboxConversation {
     this.lastSeenAt,
     required this.colors,
     required this.messages,
+    this.messagesNextCursor,
+    this.hasOlderMessages = false,
     this.avatarUrl,
     this.currentRoomName,
     this.currentRoomId,
@@ -228,6 +230,8 @@ class InboxConversation {
   final DateTime? lastSeenAt;
   final List<Color> colors;
   final List<InboxMessage> messages;
+  final String? messagesNextCursor;
+  final bool hasOlderMessages;
   final String? currentRoomName;
   final String? currentRoomId;
   final VmRoomPresenceSnapshot roomPresence;
@@ -338,6 +342,9 @@ class InboxConversation {
     DateTime? lastSeenAt,
     List<Color>? colors,
     List<InboxMessage>? messages,
+    String? messagesNextCursor,
+    bool clearMessagesNextCursor = false,
+    bool? hasOlderMessages,
     String? currentRoomName,
     String? currentRoomId,
     VmRoomPresenceSnapshot? roomPresence,
@@ -370,6 +377,10 @@ class InboxConversation {
       lastSeenAt: lastSeenAt ?? this.lastSeenAt,
       colors: colors ?? this.colors,
       messages: messages ?? this.messages,
+      messagesNextCursor: clearMessagesNextCursor
+          ? null
+          : messagesNextCursor ?? this.messagesNextCursor,
+      hasOlderMessages: hasOlderMessages ?? this.hasOlderMessages,
       currentRoomName: currentRoomName ?? this.currentRoomName,
       currentRoomId: currentRoomId ?? this.currentRoomId,
       roomPresence: roomPresence ?? this.roomPresence,

@@ -1,0 +1,47 @@
+apiVersion: v1
+kind: ServiceAccount
+metadata: {name: funkey-profile-social}
+automountServiceAccountToken: false
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: funkey-profile-social
+  labels: {app: funkey-profile-social}
+spec:
+  replicas: 3
+  revisionHistoryLimit: 5
+  strategy: {type: RollingUpdate, rollingUpdate: {maxSurge: 1, maxUnavailable: 0}}
+  selector: {matchLabels: {app: funkey-profile-social}}
+  template:
+    metadata:
+      annotations: {prometheus.io/scrape: "true", prometheus.io/path: /metrics, prometheus.io/port: "8087"}
+      labels: {app: funkey-profile-social}
+    spec:
+      serviceAccountName: funkey-profile-social
+      automountServiceAccountToken: false
+      terminationGracePeriodSeconds: 60
+      nodeSelector: {funkey.io/workload: application}
+      securityContext: {runAsNonRoot: true, seccompProfile: {type: RuntimeDefault}}
+      containers:
+        - name: profile-social
+          image: funkey-profile-social:dev
+          ports: [{name: http, containerPort: 8087}]
+          envFrom:
+            - configMapRef: {name: funkey-config}
+            - secretRef: {name: funkey-profile-social-secrets}
+          resources: {requests: {cpu: 300m, memory: 512Mi}, limits: {cpu: "1", memory: 1Gi}}
+          startupProbe: {httpGet: {path: /live, port: http}, failureThreshold: 30, periodSeconds: 2}
+          livenessProbe: {httpGet: {path: /live, port: http}, periodSeconds: 20}
+          readinessProbe: {httpGet: {path: /ready, port: http}, periodSeconds: 5}
+          securityContext: {allowPrivilegeEscalation: false, readOnlyRootFilesystem: true, capabilities: {drop: [ALL]}}
+---
+apiVersion: v1
+kind: Service
+metadata: {name: funkey-profile-social}
+spec: {selector: {app: funkey-profile-social}, ports: [{name: http, port: 8087, targetPort: http}]}
+---
+apiVersion: policy/v1
+kind: PodDisruptionBudget
+metadata: {name: funkey-profile-social}
+spec: {minAvailable: 2, selector: {matchLabels: {app: funkey-profile-social}}}

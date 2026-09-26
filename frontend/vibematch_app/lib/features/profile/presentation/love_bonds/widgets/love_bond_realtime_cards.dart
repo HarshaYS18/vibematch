@@ -1,10 +1,19 @@
-﻿import 'package:flutter/material.dart';
+import 'package:flutter/material.dart';
 
 import '../../../data/love_bond_realtime_service.dart';
 import '../models/love_bond_models.dart';
 
-List<LoveBondCardData> loveBondCardsForProfile(int publicUserId) {
-  final activeRequests = LoveBondRealtimeService.activeBondsFor(publicUserId);
+/// Builds the four Love Bond profile cards from an explicit request snapshot.
+///
+/// This helper is pure: callers provide the Riverpod-owned request list, so it
+/// cannot read or mutate a process-global relationship cache.
+List<LoveBondCardData> loveBondCardsForProfile(
+  int publicUserId,
+  Iterable<LoveBondRequest> requests,
+) {
+  final activeRequests = requests
+      .where((request) => request.status == LoveBondRequestStatus.accepted)
+      .where((request) => request.involvesPublicUserId(publicUserId));
   final cards = <LoveBondCardData>[
     _openSlot(type: LoveBondType.lover),
     _openSlot(type: LoveBondType.bestie),
@@ -17,7 +26,8 @@ List<LoveBondCardData> loveBondCardsForProfile(int publicUserId) {
     if (partner == null) continue;
 
     final profileTitle = request.profileTitleFor(publicUserId);
-    final slotType = _slotTypeForRequest(request: request, profileTitle: profileTitle);
+    final slotType =
+        _slotTypeForRequest(request: request, profileTitle: profileTitle);
     final slotIndex = cards.indexWhere((card) => card.type == slotType);
     if (slotIndex < 0) continue;
 
@@ -38,10 +48,8 @@ LoveBondType _slotTypeForRequest({
 }) {
   if (request.cardType == LoveBondType.lover) return LoveBondType.lover;
   if (request.cardType == LoveBondType.bestie) return LoveBondType.bestie;
-
   final normalizedTitle = profileTitle.trim().toLowerCase();
-  if (normalizedTitle == 'sister') return LoveBondType.sister;
-  return LoveBondType.brother;
+  return normalizedTitle == 'sister' ? LoveBondType.sister : LoveBondType.brother;
 }
 
 LoveBondCardData _openSlot({required LoveBondType type}) {
@@ -85,43 +93,39 @@ LoveBondCardData _activeCard({
   );
 }
 
-String _titleFor(LoveBondType type) {
-  return switch (type) {
-    LoveBondType.lover => 'Love',
-    LoveBondType.bestie => 'Bestie',
-    LoveBondType.brother => 'Brother',
-    LoveBondType.sister => 'Sister',
-  };
-}
+String _titleFor(LoveBondType type) => switch (type) {
+  LoveBondType.lover => 'Love',
+  LoveBondType.bestie => 'Bestie',
+  LoveBondType.brother => 'Brother',
+  LoveBondType.sister => 'Sister',
+};
 
-_LoveBondCardStyle _styleFor(LoveBondType type) {
-  return switch (type) {
-    LoveBondType.lover => const _LoveBondCardStyle(
-        primary: Color(0xFFFF5AAA),
-        secondary: Color(0xFFFFC2DC),
-        icon: Icons.favorite_rounded,
-        badgeIcon: Icons.favorite_rounded,
-      ),
-    LoveBondType.bestie => const _LoveBondCardStyle(
-        primary: Color(0xFF9C5CFF),
-        secondary: Color(0xFFE2CCFF),
-        icon: Icons.auto_awesome_rounded,
-        badgeIcon: Icons.stars_rounded,
-      ),
-    LoveBondType.brother => const _LoveBondCardStyle(
-        primary: Color(0xFF4C8DFF),
-        secondary: Color(0xFFCFE2FF),
-        icon: Icons.shield_rounded,
-        badgeIcon: Icons.bolt_rounded,
-      ),
-    LoveBondType.sister => const _LoveBondCardStyle(
-        primary: Color(0xFFFFA93D),
-        secondary: Color(0xFFFFE0A8),
-        icon: Icons.local_florist_rounded,
-        badgeIcon: Icons.local_florist_rounded,
-      ),
-  };
-}
+_LoveBondCardStyle _styleFor(LoveBondType type) => switch (type) {
+  LoveBondType.lover => const _LoveBondCardStyle(
+      primary: Color(0xFFFF5AAA),
+      secondary: Color(0xFFFFC2DC),
+      icon: Icons.favorite_rounded,
+      badgeIcon: Icons.favorite_rounded,
+    ),
+  LoveBondType.bestie => const _LoveBondCardStyle(
+      primary: Color(0xFF9C5CFF),
+      secondary: Color(0xFFE2CCFF),
+      icon: Icons.auto_awesome_rounded,
+      badgeIcon: Icons.stars_rounded,
+    ),
+  LoveBondType.brother => const _LoveBondCardStyle(
+      primary: Color(0xFF4C8DFF),
+      secondary: Color(0xFFCFE2FF),
+      icon: Icons.shield_rounded,
+      badgeIcon: Icons.bolt_rounded,
+    ),
+  LoveBondType.sister => const _LoveBondCardStyle(
+      primary: Color(0xFFFFA93D),
+      secondary: Color(0xFFFFE0A8),
+      icon: Icons.local_florist_rounded,
+      badgeIcon: Icons.local_florist_rounded,
+    ),
+};
 
 class _LoveBondCardStyle {
   const _LoveBondCardStyle({

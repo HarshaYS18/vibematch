@@ -1,4 +1,5 @@
 from datetime import datetime
+from uuid import uuid4
 
 from sqlalchemy import Boolean, DateTime, ForeignKey, Integer, JSON, String, Text, UniqueConstraint
 from sqlalchemy.orm import Mapped, mapped_column, relationship
@@ -56,14 +57,55 @@ class RoomRealtimeEvent(Base):
     room_id: Mapped[int] = mapped_column(ForeignKey("rooms.id"), nullable=False, index=True)
     room_public_id: Mapped[str] = mapped_column(String(32), nullable=False, index=True)
     event_type: Mapped[str] = mapped_column(String(80), nullable=False, index=True)
+    event_id: Mapped[str] = mapped_column(String(64), nullable=False, unique=True, index=True, default=lambda: uuid4().hex)
     actor_user_id: Mapped[int | None] = mapped_column(Integer, nullable=True, index=True)
     target_user_id: Mapped[int | None] = mapped_column(Integer, nullable=True, index=True)
     payload: Mapped[dict | None] = mapped_column(JSON, nullable=True)
     privacy_scope: Mapped[str] = mapped_column(String(40), nullable=False, default="room")
     sequence: Mapped[int] = mapped_column(Integer, nullable=False, index=True)
+    room_version: Mapped[int] = mapped_column(Integer, nullable=False, default=0, index=True)
     created_at: Mapped[datetime] = mapped_column(DateTime, nullable=False, default=datetime.utcnow, index=True)
 
     room = relationship("Room")
+
+
+class RoomMemberRequest(Base):
+    """Current-state membership request; event log remains audit/replay only."""
+
+    __tablename__ = "room_member_requests"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, index=True)
+    room_id: Mapped[int] = mapped_column(ForeignKey("rooms.id"), nullable=False, index=True)
+    requester_user_id: Mapped[int] = mapped_column(ForeignKey("users.id"), nullable=False, index=True)
+    status: Mapped[str] = mapped_column(String(24), nullable=False, default="pending", index=True)
+    source_event_id: Mapped[int | None] = mapped_column(ForeignKey("room_realtime_events.id"), nullable=True, index=True)
+    requested_at: Mapped[datetime] = mapped_column(DateTime, nullable=False, default=datetime.utcnow, index=True)
+    decided_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
+    decided_by_user_id: Mapped[int | None] = mapped_column(ForeignKey("users.id"), nullable=True)
+
+    room = relationship("Room")
+    requester = relationship("User", foreign_keys=[requester_user_id])
+
+
+class RoomSeatApplication(Base):
+    """Current-state seat application with bounded expiry and decision state."""
+
+    __tablename__ = "room_seat_applications"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, index=True)
+    application_id: Mapped[str] = mapped_column(String(120), nullable=False, unique=True, index=True)
+    room_id: Mapped[int] = mapped_column(ForeignKey("rooms.id"), nullable=False, index=True)
+    applicant_user_id: Mapped[int] = mapped_column(ForeignKey("users.id"), nullable=False, index=True)
+    seat_index: Mapped[int] = mapped_column(Integer, nullable=False, index=True)
+    status: Mapped[str] = mapped_column(String(24), nullable=False, default="pending", index=True)
+    source_event_id: Mapped[int | None] = mapped_column(ForeignKey("room_realtime_events.id"), nullable=True, index=True)
+    requested_at: Mapped[datetime] = mapped_column(DateTime, nullable=False, default=datetime.utcnow, index=True)
+    expires_at: Mapped[datetime] = mapped_column(DateTime, nullable=False, index=True)
+    decided_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
+    decided_by_user_id: Mapped[int | None] = mapped_column(ForeignKey("users.id"), nullable=True)
+
+    room = relationship("Room")
+    applicant = relationship("User", foreign_keys=[applicant_user_id])
 
 
 class RoomChatMessage(Base):

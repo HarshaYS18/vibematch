@@ -1,14 +1,14 @@
-import '../../../core/network/api_client.dart';
+import 'package:vibematch_app/foundation/networking/app_network_client.dart';
 import '../../auth/data/auth_api_service.dart';
 import '../models/notification_item.dart';
 import '../models/notification_type.dart';
 
 class NotificationsApiService {
-  NotificationsApiService({ApiClient? apiClient, AuthApiService? authApiService})
-      : _apiClient = apiClient ?? ApiClient(),
+  NotificationsApiService({AppNetworkClient? apiClient, AuthApiService? authApiService})
+      : _apiClient = apiClient ?? AppNetworkRuntime.shared,
         _authApiService = authApiService ?? const AuthApiService();
 
-  final ApiClient _apiClient;
+  final AppNetworkClient _apiClient;
   final AuthApiService _authApiService;
 
   Future<NotificationsLoadResult> loadNotifications({int limit = 50, bool unreadOnly = false}) async {

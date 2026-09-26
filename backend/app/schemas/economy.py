@@ -47,6 +47,7 @@ class MintCoinsRequest(BaseModel):
     target_user_id: int | None = None
     amount: int = Field(..., gt=0)
     reason: str = Field(..., min_length=3, max_length=255)
+    request_id: str | None = Field(default=None, min_length=8, max_length=36)
 
 
 class InternalWalletGrantRequest(BaseModel):
@@ -63,6 +64,7 @@ class OfficialRechargeRequest(BaseModel):
     payment_currency: str = "INR"
     reason: str = Field(..., min_length=3, max_length=255)
     proof_url: str | None = None
+    request_id: str | None = Field(default=None, min_length=8, max_length=36)
 
 
 class OfficialRechargeResponse(BaseModel):
@@ -82,6 +84,7 @@ class AllocatePoolCoinsRequest(BaseModel):
     target_user_id: int | None = None
     amount: int = Field(..., gt=0)
     reason: str = Field(..., min_length=3, max_length=255)
+    request_id: str | None = Field(default=None, min_length=8, max_length=36)
 
 
 class SellerSaleRequest(BaseModel):
@@ -91,6 +94,7 @@ class SellerSaleRequest(BaseModel):
     payment_amount: int = Field(default=0, ge=0)
     payment_currency: str = "INR"
     proof_url: str | None = None
+    request_id: str | None = Field(default=None, min_length=8, max_length=36)
 
 
 class GiftEconomyPreviewRequest(BaseModel):
@@ -128,6 +132,7 @@ class GiftSendPublicRequest(BaseModel):
     receiver_public_user_id: int
     gift_id: str = Field(..., min_length=1, max_length=80)
     quantity: int = Field(default=1, gt=0)
+    request_id: str | None = Field(default=None, min_length=8, max_length=36)
     room_public_id: str | None = None
     relationship_id: int | None = None
     is_relationship_gift: bool = False
@@ -186,6 +191,7 @@ class RubyWithdrawRequestCreate(BaseModel):
     ruby_amount: int = Field(..., gt=0)
     payout_method: str | None = None
     payout_account_snapshot: str | None = None
+    request_id: str | None = Field(default=None, min_length=8, max_length=36)
 
 
 class GamePoolCreateRequest(BaseModel):
@@ -196,6 +202,7 @@ class GamePoolCreateRequest(BaseModel):
     daily_loss_limit: int = Field(default=0, ge=0)
     max_single_payout: int = Field(default=0, ge=0)
     rtp_target_basis_points: int = Field(default=8000, ge=0, le=10000)
+    request_id: str | None = Field(default=None, min_length=8, max_length=36)
 
 
 class GameRoundCreateRequest(BaseModel):

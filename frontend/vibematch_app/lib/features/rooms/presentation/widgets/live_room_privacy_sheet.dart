@@ -4,13 +4,14 @@ import 'package:flutter/material.dart';
 
 import '../../../../core/security/screenshot_guard_service.dart';
 import '../../../../core/ui/vm_motion.dart';
-import '../../data/active_room_context.dart';
-import '../../data/live_room_settings_event_bus.dart';
-import '../../data/room_api_service.dart';
 import '../../data/room_settings_repository.dart';
 import '../live_room_models.dart';
 import 'room_theme.dart';
 
+/// Mutates durable privacy/access settings for one explicitly scoped room.
+///
+/// The caller supplies [roomId] from its RoomSessionRepository-backed bundle;
+/// this sheet never discovers room identity from a process-global singleton.
 class LiveRoomPrivacySheet extends StatefulWidget {
   const LiveRoomPrivacySheet({
     super.key,
@@ -30,7 +31,6 @@ class LiveRoomPrivacySheet extends StatefulWidget {
 class _LiveRoomPrivacySheetState extends State<LiveRoomPrivacySheet> {
   late RoomPrivacyMode _mode;
   final TextEditingController _passwordController = TextEditingController();
-  final RoomApiService _roomApi = const RoomApiService();
   final RoomSettingsRepository _settingsRepository = RoomSettingsRepository();
   bool _saving = false;
   bool _loadingSettings = false;
@@ -70,8 +70,7 @@ class _LiveRoomPrivacySheetState extends State<LiveRoomPrivacySheet> {
     super.dispose();
   }
 
-  String get _roomId =>
-      (widget.roomId ?? ActiveRoomContext.roomPublicId ?? '').trim();
+  String get _roomId => (widget.roomId ?? '').trim();
 
   Future<void> _loadSettings() async {
     final roomId = _roomId;
@@ -92,11 +91,6 @@ class _LiveRoomPrivacySheetState extends State<LiveRoomPrivacySheet> {
             ? privacyModeFromTitle(settings.mode!)
             : _mode;
       });
-      _publishSettingsEvent(
-        modeTitle: settings.mode,
-        language: settings.language,
-        allowScreenshots: settings.allowScreenshots,
-      );
     } catch (_) {
       // Settings sheet can still operate from current room state.
     } finally {
@@ -153,11 +147,6 @@ class _LiveRoomPrivacySheetState extends State<LiveRoomPrivacySheet> {
         _allowScreenshots = settings.allowScreenshots;
         _mode = confirmedMode;
       });
-      _publishSettingsEvent(
-        modeTitle: settings.mode,
-        language: settings.language,
-        allowScreenshots: settings.allowScreenshots,
-      );
       if (mode != null) widget.onModeChanged(confirmedMode);
       RoomToast.show(
         context,
@@ -178,24 +167,7 @@ class _LiveRoomPrivacySheetState extends State<LiveRoomPrivacySheet> {
     }
   }
 
-  void _publishSettingsEvent({
-    String? modeTitle,
-    String? language,
-    bool? allowScreenshots,
-  }) {
-    final roomId = _roomId;
-    if (roomId.isEmpty) return;
 
-    LiveRoomSettingsEventBus.publish(
-      LiveRoomSettingsEvent(
-        id: DateTime.now().microsecondsSinceEpoch.toString(),
-        roomId: roomId,
-        privacyModeTitle: modeTitle ?? _backendModeName(_mode),
-        allowScreenshots: allowScreenshots ?? _allowScreenshots,
-        language: language ?? _selectedLanguage,
-      ),
-    );
-  }
 
   String _backendModeName(RoomPrivacyMode mode) {
     switch (mode) {

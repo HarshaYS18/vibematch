@@ -12,7 +12,7 @@ router = APIRouter(tags=["Inbox Preferences"])
 
 @router.get("/preferences", response_model=InboxPreferenceResponse)
 def get_preferences(db: Session = Depends(get_db), current_user: User = Depends(get_current_user)):
-    pref = inbox_preference_service.get_or_create_preferences(db, current_user)
+    pref = inbox_preference_service.get_preferences_read_only(db, current_user)
     return InboxPreferenceResponse(**inbox_preference_service.serialize_preferences(pref))
 
 @router.patch("/preferences", response_model=InboxPreferenceResponse)
@@ -60,6 +60,6 @@ def update_conversation_theme(
             "conversation_id": conversation.public_id,
         },
     )
-    payload = inbox_service.conversation_to_dict(conversation, current_user)
+    payload = inbox_service.conversation_to_dict(conversation, current_user, db=db)
     payload.update(inbox_preference_service.conversation_theme_payload(db, conversation, current_user))
     return InboxConversationResponse(**payload)

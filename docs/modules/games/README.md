@@ -1,93 +1,88 @@
-# Games
+# Games / Game Platform
 
 ## Purpose
 
-Runs game definitions, rounds, bets, pool settlement, and risk audit.
+Own game catalog/configuration, durable sessions, round lifecycle, bets, risk
+state, game stats and game-domain leaderboards without becoming financial
+authority.
 
-## Responsibilities
+## Current deployable
 
-The module owns game_definitions, game_rounds, game_bets, game_pools, game_risk_audits. Routes should validate input and delegate business decisions to services.
+`apps/game-platform-service` is the extracted Chunk 28 authority. Core preserves
+stable `/api/v1/games/**` compatibility routes through `game_platform_proxy`.
 
-## What this module owns
+## Owns
 
-game_definitions, game_rounds, game_bets, game_pools, game_risk_audits.
+- `game_definitions`
+- `game_sessions`
+- `game_rounds`
+- `game_round_players`
+- `game_bets`
+- `game_risk_audits`
+- `user_game_stats`
 
-## What this module does NOT own
+## Does not own
 
-This module does not own SFU transport state, edge routing, or client UI state.
+Wallets, wallet ledger, coin supply/pool ledgers, game financial pools, final
+value settlement, room authority, realtime transport or client UI state.
 
-## Source of truth
+Economy Service owns all game value movement. A game wager or settlement is an
+idempotent Economy command.
 
-PostgreSQL is the durable source of truth for game_definitions, game_rounds, game_bets, game_pools, game_risk_audits, wallet_ledger.
+## Client/runtime boundary
 
-## Important files
+Gameplay code is remote CDN HTML verified by manifest version, SHA-256 and Host
+Bridge compatibility. Remote JavaScript receives no FunKey bearer token and no
+database/financial credentials. Flutter's Game Platform runtime is a client
+execution sandbox, not durable authority.
 
-`backend/app/services/game_service.py`, `backend/app/services/game_settlement_service.py`, `backend/app/api/routes/games.py`.
+## Realtime
 
-## Public API/contracts
+Committed lifecycle updates may publish through the canonical application
+realtime path. Games do not create another application WebSocket.
 
-game and settlement routes under /api/v1. Preserve deployed request and response shapes while migrating implementation.
+## Security
 
-## Events published
+Server-side lifecycle/risk rules, authenticated admin mutation, bundle integrity
+and Economy settlement identity are security-critical. Fail closed on unknown
+bundle integrity, foreign session/round IDs or ambiguous Economy outcomes.
 
-Current code may emit domain WebSocket updates after committed writes. A versioned broker event for this domain must be added only with a contract and transactional publication path; do not claim every proposed event is live. Consumers must handle duplicates and refetch a snapshot after a gap.
+## Scaling
 
-## Events consumed
+Scale stateless Game Platform replicas inside the PostgreSQL connection budget.
+Remote game byte delivery scales independently through CDN/object storage.
 
-No durable broker consumer is implied by this ownership guide. Add a consumer only with a versioned contract, idempotency, retry limits, and an integration test.
+## Operations
 
-## Database tables/state owned
+See:
+- `apps/game-platform-service/README.md`
+- `docs/architecture/game-platform-service.md`
+- `docs/runbooks/game-platform-service.md`
+- `deploy/postgres/game-platform-ownership.sql`
 
-Database tables and state: `game_definitions, game_rounds, game_bets, game_pools, game_risk_audits, wallet_ledger`.
+## Migration status
 
-## Redis keys/state owned
-
-Live score fanout may be cached; stakes and results remain durable.
-
-## Dependencies
-
-Depends on FastAPI authentication, SQLAlchemy transaction/session handling, and the relevant domain services.
-
-## Security considerations
-
-Server RNG, bet limits, settlement permissions, and value ledger are authoritative. Never log tokens, OTPs, or payment secrets.
-
-## Failure modes
-
-Round settlement must be idempotent and recover from interrupted execution.
-
-## Retry/idempotency behavior
-
-Reads and writes should use bounded timeouts. Retries are safe only for read operations or writes backed by an idempotency key and known commit outcome.
-
-## Scaling behavior
-
-Scale stateless API replicas only within the PostgreSQL connection budget.
-
-## Autoscaling metrics
-
-Track route request rate, p95 latency, error rate, transaction latency, DB pool use, and domain-specific rejection counts. Trace commands through commit and fanout with a request ID; avoid user PII in metric labels.
-
-## Observability
-
-Trace commands through commit and fanout with a request ID; avoid user PII in metric labels.
-
-## Local development
-
-Start dependencies with `.\\scripts\\dev-up.ps1`, then run affected backend tests with `python -m unittest discover -s backend/tests -p test_*.py` from the repository root with the backend import path configured, or use the test command in the root README.
-
-## Testing
-
-Add a regression test for authorization, transaction outcome, and duplicate/reconnect behavior when relevant.
-
-## Deployment notes
-
-Apply Alembic first; roll out compatible API behavior; check readiness and error metrics.
+Chunk 28 physical extraction is complete. Core no longer owns Game Platform
+mutations. Economy-backed financial facades remain separate and are registered
+before Game Platform proxy catch-alls.
 
 ## Change checklist
 
-Before changing this module: identify the owning table and contract, add an additive migration if needed, preserve Flutter compatibility, verify permission checks, and document rollback.
+Before changing Games: identify whether the change is gameplay lifecycle or
+financial value. Lifecycle belongs here; value belongs in Economy. Preserve
+public compatibility, immutable retry context, bundle integrity, observability
+and rollback semantics.
 
-## Known migration status
 
-Existing FastAPI domain; no Go migration started.
+## Flutter resource lifecycle
+
+Chunk 34-M7 registers the remote Game Platform WebView through the foundation
+`MediaResourceRegistry` port. The Game Platform feature never imports the
+concrete AppShell coordinator.
+
+`GameWebViewResourceParticipant` forwards `app.lifecycle` and
+`app.memory_pressure` host events to verified remote game HTML. Games may use
+those events to pause presentation work or trim reconstructable caches.
+Ordinary memory pressure does not reload/destroy an active WebView. Session
+teardown releases the runtime, while durable sessions, rounds, bets and Economy
+settlement remain backend authority.

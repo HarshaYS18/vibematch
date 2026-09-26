@@ -83,5 +83,10 @@ class Room(Base):
     announcement_updated_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
     announcement_updated_by_user_id: Mapped[int | None] = mapped_column(Integer, nullable=True)
 
+    # Chunk 20 Room State Engine v2 counters. room_version advances with
+    # authoritative mutation events; event_sequence identifies durable events.
+    realtime_version: Mapped[int] = mapped_column(Integer, nullable=False, default=0, server_default="0")
+    realtime_event_sequence: Mapped[int] = mapped_column(Integer, nullable=False, default=0, server_default="0")
+
     created_at: Mapped[datetime] = mapped_column(DateTime, nullable=False, default=datetime.utcnow)
     updated_at: Mapped[datetime] = mapped_column(DateTime, nullable=False, default=datetime.utcnow, onupdate=datetime.utcnow)

@@ -1,0 +1,5 @@
+fastapi==0.115.12
+httpx==0.28.1
+nats-py==2.14.0
+pydantic==2.13.3
+uvicorn[standard]==0.34.0

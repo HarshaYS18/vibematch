@@ -1,18 +1,17 @@
 import random
-from datetime import datetime, timedelta
+from datetime import datetime
 
 from fastapi import HTTPException, status
 from sqlalchemy.orm import Session
 
 from app.core.security import hash_password, verify_password
 from app.models.follow import UserFollow
-from app.models.presence import UserRoomPresence
 from app.models.room import Room
 from app.models.room_participant import RoomParticipant
 from app.models.room_realtime_state import RoomRealtimeEvent, RoomSeatState
 from app.models.user import User
 from app.schemas.rooms.room import RoomCreateRequest, RoomDetailResponse, RoomJoinResponse, RoomLeaveResponse, RoomParticipantUserResponse, RoomParticipantsResponse, RoomTrendingResponse
-from app.services import economy_level_service, profile_service
+from app.services import economy_level_service, presence_projection_service, profile_service
 from app.services.event_outbox_service import enqueue_event
 from app.services.permissions import room_permission_service
 from app.services.role_badge_service import get_primary_role_badge, get_role_badges
@@ -20,9 +19,8 @@ from app.services.role_service import get_primary_role, get_user_roles
 from app.services.rooms.room_kickout_service import active_kickout_for_user
 from app.services.rooms.room_state_service import room_sequence
 
-# Backend truth: a user is considered inside a room only while room heartbeat is fresh.
-# After 5 minutes without room heartbeat, backend closes the active participant row.
-_ACTIVE_PARTICIPANT_WINDOW = timedelta(minutes=5)
+# Durable RoomParticipant rows represent room lifecycle/membership. Connected
+# online liveness is projected exclusively from the Go gateway Redis leases.
 _UNLIMITED_ROOM_ROLES = {"founder_owner", "owner"}
 
 
@@ -197,7 +195,6 @@ def _upsert_active_participant(db: Session, room: Room, user: User) -> RoomParti
         participant.is_room_admin = True
         participant.member_added_at = participant.member_added_at or now
         participant.admin_added_at = participant.admin_added_at or now
-    user.last_seen_at = now
     return participant
 
 
@@ -302,45 +299,30 @@ def generate_room_public_id(db: Session) -> str:
     raise RuntimeError("Could not generate unique room ID")
 
 
-def _expire_stale_room_presence(db: Session, *, room_public_id: str | None = None, now: datetime | None = None) -> int:
-    now = now or datetime.utcnow()
-    cutoff = now - _ACTIVE_PARTICIPANT_WINDOW
-    query = db.query(UserRoomPresence).filter(
-        UserRoomPresence.is_active.is_(True),
-        UserRoomPresence.last_heartbeat_at < cutoff,
-    )
-    if room_public_id is not None:
-        query = query.filter(UserRoomPresence.room_public_id == room_public_id)
-    return int(
-        query.update(
-            {UserRoomPresence.is_active: False, UserRoomPresence.left_at: now},
-            synchronize_session=False,
-        )
-        or 0
-    )
-
-
-def _active_room_user_ids(db: Session, room: Room, cutoff: datetime) -> set[int]:
-    participant_ids = {
-        row[0]
+def _visible_active_participant_ids(db: Session, room: Room) -> set[int]:
+    return {
+        int(row[0])
         for row in db.query(RoomParticipant.user_id)
         .filter(
             RoomParticipant.room_id == room.id,
             RoomParticipant.is_active.is_(True),
             RoomParticipant.visible_in_online_count.is_(True),
-            RoomParticipant.last_seen_at >= cutoff,
         )
         .all()
     }
-    return participant_ids
+
+
+def _active_room_user_ids(db: Session, room: Room) -> set[int]:
+    leased_ids = presence_projection_service.room_online_user_ids(
+        room.room_public_id
+    )
+    if not leased_ids:
+        return set()
+    return _visible_active_participant_ids(db, room) & leased_ids
 
 
 def _refresh_room_online_count(db: Session, room: Room) -> int:
-    now = datetime.utcnow()
-    cutoff = now - _ACTIVE_PARTICIPANT_WINDOW
-    db.query(RoomParticipant).filter(RoomParticipant.room_id == room.id, RoomParticipant.is_active.is_(True), RoomParticipant.last_seen_at < cutoff).update({RoomParticipant.is_active: False, RoomParticipant.left_at: now}, synchronize_session=False)
-    _expire_stale_room_presence(db, room_public_id=room.room_public_id, now=now)
-    count = len(_active_room_user_ids(db, room, cutoff))
+    count = len(_active_room_user_ids(db, room))
     room.online_count = count
     room.trending_score = max(int(room.trending_score or 0), count)
     db.flush()
@@ -356,21 +338,27 @@ def deactivate_user_in_room(
     now: datetime | None = None,
 ) -> None:
     now = now or datetime.utcnow()
-    participant = db.query(RoomParticipant).filter(RoomParticipant.room_id == room.id, RoomParticipant.user_id == user_id).first()
+    participant = (
+        db.query(RoomParticipant)
+        .filter(
+            RoomParticipant.room_id == room.id,
+            RoomParticipant.user_id == user_id,
+        )
+        .first()
+    )
     if participant is not None:
         participant.is_active = False
         participant.left_at = now
         participant.last_seen_at = now
-    db.query(UserRoomPresence).filter(
-        UserRoomPresence.room_public_id == room.room_public_id,
-        UserRoomPresence.user_id == user_id,
-        UserRoomPresence.is_active.is_(True),
-    ).update(
-        {UserRoomPresence.is_active: False, UserRoomPresence.left_at: now, UserRoomPresence.last_heartbeat_at: now},
-        synchronize_session=False,
-    )
     if release_seats:
-        for seat in db.query(RoomSeatState).filter(RoomSeatState.room_id == room.id, RoomSeatState.occupant_user_id == user_id).all():
+        for seat in (
+            db.query(RoomSeatState)
+            .filter(
+                RoomSeatState.room_id == room.id,
+                RoomSeatState.occupant_user_id == user_id,
+            )
+            .all()
+        ):
             seat.occupant_user_id = None
             seat.mic_enabled = False
             seat.admin_muted = False
@@ -380,7 +368,12 @@ def deactivate_user_in_room(
     db.flush()
 
 
-def close_other_active_room_sessions(db: Session, user_id: int, except_room_public_id: str | None = None) -> set[str]:
+def close_other_active_room_sessions(
+    db: Session,
+    user_id: int,
+    except_room_public_id: str | None = None,
+) -> set[str]:
+    """Close durable room lifecycle rows; online truth remains in Redis leases."""
     now = datetime.utcnow()
     changed_room_ids: set[str] = set()
     room_ids: set[int] = set()
@@ -388,14 +381,20 @@ def close_other_active_room_sessions(db: Session, user_id: int, except_room_publ
     active_participants = (
         db.query(RoomParticipant)
         .join(Room, Room.id == RoomParticipant.room_id)
-        .filter(RoomParticipant.user_id == user_id, RoomParticipant.is_active.is_(True))
+        .filter(
+            RoomParticipant.user_id == user_id,
+            RoomParticipant.is_active.is_(True),
+        )
         .all()
     )
     for participant in active_participants:
         room = participant.room
         if room is None:
             continue
-        if except_room_public_id is not None and room.room_public_id == except_room_public_id:
+        if (
+            except_room_public_id is not None
+            and room.room_public_id == except_room_public_id
+        ):
             continue
         participant.is_active = False
         participant.left_at = now
@@ -403,21 +402,15 @@ def close_other_active_room_sessions(db: Session, user_id: int, except_room_publ
         changed_room_ids.add(room.room_public_id)
         room_ids.add(room.id)
 
-    active_presence = (
-        db.query(UserRoomPresence)
-        .filter(UserRoomPresence.user_id == user_id, UserRoomPresence.is_active.is_(True))
-        .all()
-    )
-    for presence in active_presence:
-        if except_room_public_id is not None and presence.room_public_id == except_room_public_id:
-            continue
-        presence.is_active = False
-        presence.left_at = now
-        presence.last_heartbeat_at = now
-        changed_room_ids.add(presence.room_public_id)
-
     if room_ids:
-        for seat in db.query(RoomSeatState).filter(RoomSeatState.room_id.in_(room_ids), RoomSeatState.occupant_user_id == user_id).all():
+        for seat in (
+            db.query(RoomSeatState)
+            .filter(
+                RoomSeatState.room_id.in_(room_ids),
+                RoomSeatState.occupant_user_id == user_id,
+            )
+            .all()
+        ):
             seat.occupant_user_id = None
             seat.mic_enabled = False
             seat.admin_muted = False
@@ -425,7 +418,11 @@ def close_other_active_room_sessions(db: Session, user_id: int, except_room_publ
             seat.updated_by_user_id = user_id
 
     for room_public_id in changed_room_ids:
-        room = db.query(Room).filter(Room.room_public_id == room_public_id).first()
+        room = (
+            db.query(Room)
+            .filter(Room.room_public_id == room_public_id)
+            .first()
+        )
         if room is not None:
             _refresh_room_online_count(db, room)
 
@@ -433,76 +430,53 @@ def close_other_active_room_sessions(db: Session, user_id: int, except_room_publ
     return changed_room_ids
 
 
-def user_has_active_room_conflict(db: Session, user_id: int, room_public_id: str) -> bool:
-    cutoff = datetime.utcnow() - _ACTIVE_PARTICIPANT_WINDOW
-    active_participant = (
-        db.query(RoomParticipant.id)
-        .join(Room, Room.id == RoomParticipant.room_id)
-        .filter(
-            RoomParticipant.user_id == user_id,
-            RoomParticipant.is_active.is_(True),
-            RoomParticipant.last_seen_at >= cutoff,
-            Room.room_public_id != room_public_id,
-        )
-        .first()
+def user_has_active_room_conflict(
+    db: Session,
+    user_id: int,
+    room_public_id: str,
+) -> bool:
+    del db
+    active_room_ids = presence_projection_service.active_room_ids_for_user(
+        user_id
     )
-    if active_participant is not None:
-        return True
-    active_presence = (
-        db.query(UserRoomPresence.id)
-        .filter(
-            UserRoomPresence.user_id == user_id,
-            UserRoomPresence.is_active.is_(True),
-            UserRoomPresence.last_heartbeat_at >= cutoff,
-            UserRoomPresence.room_public_id != room_public_id,
-        )
-        .first()
-    )
-    return active_presence is not None
-
-
-def mark_user_room_presence_active(db: Session, room: Room, user: User) -> None:
-    now = datetime.utcnow()
-    presence = (
-        db.query(UserRoomPresence)
-        .filter(
-            UserRoomPresence.user_id == user.id,
-            UserRoomPresence.room_public_id == room.room_public_id,
-            UserRoomPresence.is_active.is_(True),
-        )
-        .first()
-    )
-    if presence is None:
-        presence = UserRoomPresence(
-            user_id=user.id,
-            room_public_id=room.room_public_id,
-            room_name=room.name or "Live Room",
-            room_mode=room.mode,
-            is_secret=bool(room.is_secret),
-            is_active=True,
-            entered_at=now,
-            last_heartbeat_at=now,
-        )
-        db.add(presence)
-    else:
-        presence.room_name = room.name or presence.room_name
-        presence.room_mode = room.mode
-        presence.is_secret = bool(room.is_secret)
-        presence.last_heartbeat_at = now
-        presence.left_at = None
-    db.flush()
+    return any(room_id != room_public_id for room_id in active_room_ids)
 
 
 def cleanup_stale_room_participants(db: Session) -> int:
-    now = datetime.utcnow()
-    cutoff = now - _ACTIVE_PARTICIPANT_WINDOW
-    updated = db.query(RoomParticipant).filter(RoomParticipant.is_active.is_(True), RoomParticipant.last_seen_at < cutoff).update({RoomParticipant.is_active: False, RoomParticipant.left_at: now}, synchronize_session=False)
-    presence_updated = _expire_stale_room_presence(db, now=now)
+    """Refresh advisory room counts from Redis without expiring durable members."""
     rooms = db.query(Room).filter(Room.is_active.is_(True)).all()
+    if not rooms:
+        return 0
+
+    leases = presence_projection_service.room_online_user_ids_batch(
+        [room.room_public_id for room in rooms]
+    )
+    room_ids = [room.id for room in rooms]
+    visible_by_room: dict[int, set[int]] = {room_id: set() for room_id in room_ids}
+    rows = (
+        db.query(RoomParticipant.room_id, RoomParticipant.user_id)
+        .filter(
+            RoomParticipant.room_id.in_(room_ids),
+            RoomParticipant.is_active.is_(True),
+            RoomParticipant.visible_in_online_count.is_(True),
+        )
+        .all()
+    )
+    for room_id, user_id in rows:
+        visible_by_room.setdefault(int(room_id), set()).add(int(user_id))
+
+    changed = 0
     for room in rooms:
-        _refresh_room_online_count(db, room)
+        count = len(
+            visible_by_room.get(room.id, set())
+            & leases.get(room.room_public_id, set())
+        )
+        if int(room.online_count or 0) != count:
+            room.online_count = count
+            changed += 1
+        room.trending_score = max(int(room.trending_score or 0), count)
     db.commit()
-    return int(updated or 0) + int(presence_updated or 0)
+    return changed
 
 
 def room_to_trending_response(room: Room, followed_friends_inside: list[str] | None = None) -> RoomTrendingResponse:
@@ -513,12 +487,22 @@ def room_to_detail_response(room: Room) -> RoomDetailResponse:
     return RoomDetailResponse(id=room.room_public_id, name=room.name, subtitle=room.subtitle, avatar_url=room.avatar_url, cover_photo_url=room.cover_photo_url or room.avatar_url, language=room.language, mode=room.mode, type=room.room_type, online_count=room.online_count, trending_score=room.trending_score, followed_friends_inside=[], owner_user_id=room.owner_user_id, is_active=room.is_active, is_secret=room.is_secret, is_locked=room.is_locked, is_members_only=room.is_members_only, has_lock_password=bool((room.lock_password_hash or '').strip()))
 
 
-def participant_to_response(db: Session, participant: RoomParticipant, room: Room) -> RoomParticipantUserResponse:
+def participant_to_response(
+    db: Session,
+    participant: RoomParticipant,
+    room: Room,
+    *,
+    online_user_ids: set[int] | None = None,
+) -> RoomParticipantUserResponse:
     user = participant.user
     user_roles = get_user_roles(user)
     primary_role = get_primary_role(user)
     levels = economy_level_service.user_level_payload(db, user.id)
-    is_online = bool(participant.is_active)
+    if online_user_ids is None:
+        online_user_ids = presence_projection_service.room_online_user_ids(
+            room.room_public_id
+        )
+    is_online = user.id in online_user_ids
     is_owner = room.owner_user_id == user.id
     is_admin = participant.is_room_admin or is_owner
     is_member = participant.is_member or is_admin
@@ -567,8 +551,21 @@ def roster_participants(db: Session, room: Room) -> list[RoomParticipant]:
 
 def active_participants(db: Session, room: Room) -> list[RoomParticipant]:
     _refresh_room_online_count(db, room)
-    cutoff = datetime.utcnow() - _ACTIVE_PARTICIPANT_WINDOW
-    return db.query(RoomParticipant).filter(RoomParticipant.room_id == room.id, RoomParticipant.is_active.is_(True), RoomParticipant.last_seen_at >= cutoff).order_by(RoomParticipant.joined_at.asc()).all()
+    online_user_ids = presence_projection_service.room_online_user_ids(
+        room.room_public_id
+    )
+    if not online_user_ids:
+        return []
+    return (
+        db.query(RoomParticipant)
+        .filter(
+            RoomParticipant.room_id == room.id,
+            RoomParticipant.is_active.is_(True),
+            RoomParticipant.user_id.in_(online_user_ids),
+        )
+        .order_by(RoomParticipant.joined_at.asc())
+        .all()
+    )
 
 
 def create_room(db: Session, current_user: User, payload: RoomCreateRequest) -> RoomDetailResponse:
@@ -651,7 +648,6 @@ def join_room(db: Session, room_public_id: str, current_user: User, lock_passwor
     previous = db.query(RoomParticipant).filter(RoomParticipant.room_id == room.id, RoomParticipant.user_id == current_user.id).first()
     was_active = previous.is_active if previous is not None else False
     participant = _upsert_active_participant(db, room, current_user)
-    mark_user_room_presence_active(db, room, current_user)
     _refresh_room_online_count(db, room)
     if not was_active:
         _record_join_event(db, room, current_user.id)
@@ -660,38 +656,44 @@ def join_room(db: Session, room_public_id: str, current_user: User, lock_passwor
     db.refresh(participant)
     participants = roster_participants(db, room)
     db.commit()
-    response = RoomJoinResponse(room=room_to_detail_response(room), participants=[participant_to_response(db, item, room) for item in participants], joined_user=participant_to_response(db, participant, room), should_show_entered_message=not was_active, closed_room_ids=sorted(closed_room_ids))
-    # participant_to_response may create wallet, experience and VIP rows. Commit
-    # those writes before the async route broadcasts, or a concurrent room join
-    # can wait on this transaction while blocking the FastAPI event loop.
+    online_user_ids = presence_projection_service.room_online_user_ids(
+        room.room_public_id
+    )
+    response = RoomJoinResponse(
+        room=room_to_detail_response(room),
+        participants=[
+            participant_to_response(
+                db,
+                item,
+                room,
+                online_user_ids=online_user_ids,
+            )
+            for item in participants
+        ],
+        joined_user=participant_to_response(
+            db,
+            participant,
+            room,
+            online_user_ids=online_user_ids,
+        ),
+        should_show_entered_message=not was_active,
+        closed_room_ids=sorted(closed_room_ids),
+    )
     db.commit()
     return response
 
 
-def heartbeat_room(db: Session, room_public_id: str, current_user: User) -> RoomJoinResponse | None:
-    room = get_room_model_by_public_id(db, room_public_id)
-    if not room:
-        return None
-    assert_room_entry_allowed(db, room, current_user)
-    if user_has_active_room_conflict(db, current_user.id, room.room_public_id):
-        deactivate_user_in_room(db, room, current_user.id)
-        db.commit()
-        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="This account is already active in another chatroom")
-    participant = _existing_participant(db, room, current_user)
-    if participant is None or not participant.is_active:
-        participant = _upsert_active_participant(db, room, current_user)
-    else:
-        participant.last_seen_at = datetime.utcnow()
-        current_user.last_seen_at = participant.last_seen_at
-    mark_user_room_presence_active(db, room, current_user)
-    _refresh_room_online_count(db, room)
-    db.commit()
-    db.refresh(room)
-    participants = roster_participants(db, room)
-    db.commit()
-    response = RoomJoinResponse(room=room_to_detail_response(room), participants=[participant_to_response(db, item, room) for item in participants], joined_user=participant_to_response(db, participant, room), should_show_entered_message=False)
-    db.commit()
-    return response
+def heartbeat_room(
+    db: Session,
+    room_public_id: str,
+    current_user: User,
+) -> RoomJoinResponse | None:
+    """Retired compatibility helper; socket leases own connected liveness."""
+    del db, room_public_id, current_user
+    raise HTTPException(
+        status_code=status.HTTP_410_GONE,
+        detail="Room heartbeat retired; realtime socket lease owns liveness",
+    )
 
 
 def leave_room(db: Session, room_public_id: str, current_user: User) -> RoomLeaveResponse | None:
@@ -711,7 +713,22 @@ def list_room_participants(db: Session, room_public_id: str, current_user: User)
         return None
     participants = roster_participants(db, room)
     db.commit()
-    response = RoomParticipantsResponse(room_id=room.room_public_id, online_count=room.online_count, participants=[participant_to_response(db, participant, room) for participant in participants])
+    online_user_ids = presence_projection_service.room_online_user_ids(
+        room.room_public_id
+    )
+    response = RoomParticipantsResponse(
+        room_id=room.room_public_id,
+        online_count=room.online_count,
+        participants=[
+            participant_to_response(
+                db,
+                participant,
+                room,
+                online_user_ids=online_user_ids,
+            )
+            for participant in participants
+        ],
+    )
     db.commit()
     return response
 
@@ -727,67 +744,69 @@ def list_trending_rooms(db: Session, language: str | None = None, category: str 
     return [room_to_trending_response(room) for room in rooms]
 
 
-def list_following_rooms(db: Session, current_user: User, language: str | None = None, category: str | None = None, limit: int = 30) -> list[RoomTrendingResponse]:
+def list_following_rooms(
+    db: Session,
+    current_user: User,
+    language: str | None = None,
+    category: str | None = None,
+    limit: int = 30,
+) -> list[RoomTrendingResponse]:
     cleanup_stale_room_participants(db)
-    followed_ids = [row[0] for row in db.query(UserFollow.followed_user_id).filter(UserFollow.follower_user_id == current_user.id).all()]
-    if not followed_ids:
-        return []
-    cutoff = datetime.utcnow() - _ACTIVE_PARTICIPANT_WINDOW
-    room_ids = {
+    followed_ids = [
         row[0]
-        for row in db.query(RoomParticipant.room_id)
-        .filter(
-            RoomParticipant.user_id.in_(followed_ids),
-            RoomParticipant.is_active.is_(True),
-            RoomParticipant.last_seen_at >= cutoff,
-        )
-        .distinct()
-        .all()
-    }
-    room_public_ids = [
-        row[0]
-        for row in db.query(UserRoomPresence.room_public_id)
-        .filter(
-            UserRoomPresence.user_id.in_(followed_ids),
-            UserRoomPresence.is_active.is_(True),
-            UserRoomPresence.last_heartbeat_at >= cutoff,
-        )
-        .distinct()
+        for row in db.query(UserFollow.followed_user_id)
+        .filter(UserFollow.follower_user_id == current_user.id)
         .all()
     ]
-    if room_public_ids:
-        room_ids.update(
-            row[0]
-            for row in db.query(Room.id)
-            .filter(Room.room_public_id.in_(room_public_ids))
-            .all()
-        )
-    if not room_ids:
+    if not followed_ids:
         return []
-    query = db.query(Room).filter(Room.id.in_(room_ids), Room.is_active.is_(True), Room.is_secret.is_(False), Room.online_count > 0)
+
+    projections = presence_projection_service.project_user_presence(
+        db,
+        followed_ids,
+    )
+    followed_by_room: dict[str, list[int]] = {}
+    for user_id, projection in projections.items():
+        room = projection.room
+        if not projection.is_online or room is None or room.is_secret:
+            continue
+        followed_by_room.setdefault(room.room_public_id, []).append(user_id)
+
+    if not followed_by_room:
+        return []
+
+    query = db.query(Room).filter(
+        Room.room_public_id.in_(followed_by_room.keys()),
+        Room.is_active.is_(True),
+        Room.is_secret.is_(False),
+        Room.online_count > 0,
+    )
     if language and language.lower() != "all":
         query = query.filter(Room.language.ilike(language))
     if category and category.lower() not in {"all", "trending"}:
         query = query.filter(Room.room_type.ilike(category))
-    rooms = query.order_by(Room.online_count.desc(), Room.updated_at.desc()).limit(limit).all()
+    rooms = (
+        query.order_by(Room.online_count.desc(), Room.updated_at.desc())
+        .limit(limit)
+        .all()
+    )
+
     result: list[RoomTrendingResponse] = []
     for room in rooms:
-        names = [row[0] for row in db.query(User.display_name).join(RoomParticipant, RoomParticipant.user_id == User.id).filter(RoomParticipant.room_id == room.id, RoomParticipant.user_id.in_(followed_ids), RoomParticipant.is_active.is_(True)).limit(3).all()]
-        if len(names) < 3:
-            names.extend(
-                row[0]
-                for row in db.query(User.display_name)
-                .join(UserRoomPresence, UserRoomPresence.user_id == User.id)
-                .filter(
-                    UserRoomPresence.room_public_id == room.room_public_id,
-                    UserRoomPresence.user_id.in_(followed_ids),
-                    UserRoomPresence.is_active.is_(True),
-                    UserRoomPresence.last_heartbeat_at >= cutoff,
-                )
-                .limit(3 - len(names))
-                .all()
+        friend_ids = followed_by_room.get(room.room_public_id, [])
+        names = [
+            row[0]
+            for row in db.query(User.display_name)
+            .filter(User.id.in_(friend_ids))
+            .limit(3)
+            .all()
+        ]
+        result.append(
+            room_to_trending_response(
+                room,
+                list(dict.fromkeys(name for name in names if name))[:3],
             )
-        result.append(room_to_trending_response(room, list(dict.fromkeys(name for name in names if name))[:3]))
+        )
     return result
 
 
@@ -817,3 +836,48 @@ def set_room_admin(db: Session, room_public_id: str, current_user: User, target_
     db.commit()
     db.refresh(participant)
     return participant_to_response(db, participant, room)
+
+
+def quick_match_room(
+    db: Session,
+    current_user: User,
+    language: str | None = None,
+    category: str | None = None,
+) -> RoomTrendingResponse | None:
+    """Pick one publicly joinable room using the same discovery source of truth."""
+    cleanup_stale_room_participants(db)
+    query = db.query(Room).filter(
+        Room.is_active.is_(True),
+        Room.is_secret.is_(False),
+        Room.is_locked.is_(False),
+        Room.is_members_only.is_(False),
+        Room.online_count > 0,
+    )
+    if language and language.lower() != "all":
+        query = query.filter(Room.language.ilike(language))
+    if category and category.lower() not in {"all", "trending"}:
+        query = query.filter(Room.room_type.ilike(category))
+
+    current_room_ids = {
+        row[0]
+        for row in db.query(RoomParticipant.room_id)
+        .filter(
+            RoomParticipant.user_id == current_user.id,
+            RoomParticipant.is_active.is_(True),
+        )
+        .all()
+    }
+    candidates = (
+        query.order_by(
+            Room.trending_score.desc(),
+            Room.online_count.desc(),
+            Room.updated_at.desc(),
+            Room.id.asc(),
+        )
+        .limit(20)
+        .all()
+    )
+    room = next((item for item in candidates if item.id not in current_room_ids), None)
+    if room is None and candidates:
+        room = candidates[0]
+    return room_to_trending_response(room) if room is not None else None

@@ -1,11 +1,12 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../controllers/inbox_call_controller.dart';
 import '../../models/inbox_call_models.dart';
 import '../pages/inbox_active_call_page.dart';
 import 'inbox_call_overlay_sheet.dart';
 
-class InboxCallRealtimePresenter extends StatefulWidget {
+class InboxCallRealtimePresenter extends ConsumerStatefulWidget {
   const InboxCallRealtimePresenter({
     super.key,
     required this.callController,
@@ -16,46 +17,24 @@ class InboxCallRealtimePresenter extends StatefulWidget {
   final Widget child;
 
   @override
-  State<InboxCallRealtimePresenter> createState() => _InboxCallRealtimePresenterState();
+  ConsumerState<InboxCallRealtimePresenter> createState() =>
+      _InboxCallRealtimePresenterState();
 }
 
-class _InboxCallRealtimePresenterState extends State<InboxCallRealtimePresenter> {
+class _InboxCallRealtimePresenterState
+    extends ConsumerState<InboxCallRealtimePresenter> {
   String? _shownCallId;
   String? _lastSummaryCallId;
   bool _incomingSheetOpen = false;
   bool _activeCallPageOpen = false;
 
-  @override
-  void initState() {
-    super.initState();
-    widget.callController.addListener(_handleCallChanged);
-  }
-
-  @override
-  void didUpdateWidget(covariant InboxCallRealtimePresenter oldWidget) {
-    super.didUpdateWidget(oldWidget);
-    if (oldWidget.callController == widget.callController) return;
-    oldWidget.callController.removeListener(_handleCallChanged);
-    widget.callController.addListener(_handleCallChanged);
-    _shownCallId = null;
-    _lastSummaryCallId = null;
-    _incomingSheetOpen = false;
-    _activeCallPageOpen = false;
-  }
-
-  @override
-  void dispose() {
-    widget.callController.removeListener(_handleCallChanged);
-    super.dispose();
-  }
-
-  void _handleCallChanged() {
+  void _handleCallChanged(InboxCallState callState) {
     if (!mounted) return;
 
-    final session = widget.callController.activeCall;
+    final session = callState.activeCall;
     if (session == null) {
       _shownCallId = null;
-      _showLatestSummaryToast();
+      _showLatestSummaryToast(callState);
       return;
     }
 
@@ -82,20 +61,25 @@ class _InboxCallRealtimePresenterState extends State<InboxCallRealtimePresenter>
       isScrollControlled: true,
       enableDrag: false,
       isDismissible: false,
-      builder: (_) => AnimatedBuilder(
-        animation: widget.callController,
-        builder: (context, _) {
-          final session = widget.callController.activeCall ?? initialSession;
+      builder: (_) => Consumer(
+        builder: (context, ref, child) {
+          final callState = ref.watch(inboxCallControllerProvider);
+          final session = callState.activeCall ?? initialSession;
           return InboxCallOverlaySheet(
             session: session,
             onAccept: () async {
               await widget.callController.acceptActiveCall();
               if (context.mounted) Navigator.pop(context);
-              final active = widget.callController.activeCall;
-              if (mounted && active != null) _openActiveCallPage(active);
+              final active =
+                  ref.read(inboxCallControllerProvider).activeCall;
+              if (mounted && active != null) {
+                _openActiveCallPage(active);
+              }
             },
             onDecline: () async {
-              await widget.callController.declineActiveCall(reason: 'declined');
+              await widget.callController.declineActiveCall(
+                reason: 'declined',
+              );
               if (context.mounted) Navigator.pop(context);
             },
             onEnd: () async {
@@ -107,7 +91,9 @@ class _InboxCallRealtimePresenterState extends State<InboxCallRealtimePresenter>
       ),
     );
     _incomingSheetOpen = false;
-    if (mounted) _showLatestSummaryToast();
+    if (mounted) {
+      _showLatestSummaryToast(ref.read(inboxCallControllerProvider));
+    }
   }
 
   Future<void> _openActiveCallPage(InboxCallSession session) async {
@@ -123,11 +109,13 @@ class _InboxCallRealtimePresenterState extends State<InboxCallRealtimePresenter>
       ),
     );
     _activeCallPageOpen = false;
-    if (mounted) _showLatestSummaryToast();
+    if (mounted) {
+      _showLatestSummaryToast(ref.read(inboxCallControllerProvider));
+    }
   }
 
-  void _showLatestSummaryToast() {
-    final summary = widget.callController.lastSummary;
+  void _showLatestSummaryToast(InboxCallState callState) {
+    final summary = callState.lastSummary;
     if (summary == null || summary.callId == _lastSummaryCallId) return;
     _lastSummaryCallId = summary.callId;
 
@@ -150,23 +138,24 @@ class _InboxCallRealtimePresenterState extends State<InboxCallRealtimePresenter>
 
   @override
   Widget build(BuildContext context) {
-    return AnimatedBuilder(
-      animation: widget.callController,
-      builder: (context, child) {
-        final session = widget.callController.activeCall;
-        return Stack(
-          children: [
-            child!,
-            if (session != null && !session.isIncoming)
-              InboxMiniCallOverlay(
-                session: session,
-                onTap: () => _openActiveCallPage(session),
-                onEnd: () => widget.callController.endActiveCall(reason: 'ended'),
-              ),
-          ],
-        );
-      },
-      child: widget.child,
+    ref.listen<InboxCallState>(
+      inboxCallControllerProvider,
+      (previous, next) => _handleCallChanged(next),
+    );
+    final callState = ref.watch(inboxCallControllerProvider);
+    final session = callState.activeCall;
+
+    return Stack(
+      children: [
+        widget.child,
+        if (session != null && !session.isIncoming)
+          InboxMiniCallOverlay(
+            session: session,
+            onTap: () => _openActiveCallPage(session),
+            onEnd: () =>
+                widget.callController.endActiveCall(reason: 'ended'),
+          ),
+      ],
     );
   }
 }

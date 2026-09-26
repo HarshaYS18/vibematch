@@ -22,7 +22,7 @@ from app.models.economy import (
 )
 from app.models.room import Room
 from app.models.user import User
-from app.services import experience_service
+from app.services import economy_transaction_service, experience_service
 from app.services.get_or_create_service import get_or_create_unique
 
 RUBY_EARNING_BASIS_POINTS = 3000
@@ -126,27 +126,33 @@ def _debit_coin_pool(db: Session, pool: CoinSupplyPool, amount: int, source_type
     db.add(CoinPoolLedger(pool_id=pool.id, direction=EconomyDirection.DEBIT.value, amount=amount, before_balance=before, after_balance=pool.balance, source_type=source_type, target_pool_id=target_pool_id, target_user_id=target_user_id, created_by_user_id=created_by_user_id, reason=reason))
 
 
-def mint_to_pool(db: Session, actor: User, target_pool_type: str, amount: int, reason: str, target_user_id: int | None = None) -> CoinSupplyPool:
+def mint_to_pool(db: Session, actor: User, target_pool_type: str, amount: int, reason: str, target_user_id: int | None = None, *, commit: bool = True) -> CoinSupplyPool:
     pool = get_or_create_coin_pool(db, CoinSupplyPoolType(target_pool_type), target_user_id)
     _credit_coin_pool(db, pool, amount, "FOUNDER_MINT", actor.id, reason, target_user_id=target_user_id)
-    db.commit()
-    db.refresh(pool)
+    if commit:
+        db.commit()
+        db.refresh(pool)
+    else:
+        db.flush()
     return pool
 
 
-def allocate_pool_to_pool(db: Session, actor: User, source_pool_id: int, target_pool_type: str, amount: int, reason: str, target_user_id: int | None) -> CoinSupplyPool:
+def allocate_pool_to_pool(db: Session, actor: User, source_pool_id: int, target_pool_type: str, amount: int, reason: str, target_user_id: int | None, *, commit: bool = True) -> CoinSupplyPool:
     source = db.query(CoinSupplyPool).filter(CoinSupplyPool.id == source_pool_id).first()
     if not source:
         raise HTTPException(status_code=404, detail="Source pool not found")
     target = get_or_create_coin_pool(db, CoinSupplyPoolType(target_pool_type), target_user_id)
     _debit_coin_pool(db, source, amount, "SUPPLY_ALLOCATION", actor.id, reason, target_pool_id=target.id)
     _credit_coin_pool(db, target, amount, "SUPPLY_ALLOCATION", actor.id, reason, source_pool_id=source.id)
-    db.commit()
-    db.refresh(target)
+    if commit:
+        db.commit()
+        db.refresh(target)
+    else:
+        db.flush()
     return target
 
 
-def sell_pool_coins_to_user(db: Session, seller: User, buyer_user_id: int, source_pool_id: int, coin_amount: int, payment_amount: int, payment_currency: str, proof_url: str | None) -> CoinSaleOrder:
+def sell_pool_coins_to_user(db: Session, seller: User, buyer_user_id: int, source_pool_id: int, coin_amount: int, payment_amount: int, payment_currency: str, proof_url: str | None, *, tx=None, commit: bool = True) -> CoinSaleOrder:
     source = db.query(CoinSupplyPool).filter(CoinSupplyPool.id == source_pool_id).first()
     if not source:
         raise HTTPException(status_code=404, detail="Seller pool not found")
@@ -161,15 +167,40 @@ def sell_pool_coins_to_user(db: Session, seller: User, buyer_user_id: int, sourc
     db.add(order)
     db.flush()
     _debit_coin_pool(db, source, coin_amount, "SELLER_COIN_SALE", seller.id, "Coins sold to user", target_user_id=buyer_user_id)
-    wallet = get_or_create_wallet(db, buyer_user_id)
-    _credit_wallet(db, wallet, EconomyCurrency.COIN, coin_amount, "SELLER_COIN_SALE", str(order.id), seller.id, "Coins delivered from seller pool")
+    if tx is None:
+        wallet = get_or_create_wallet(db, buyer_user_id)
+        _credit_wallet(
+            db,
+            wallet,
+            EconomyCurrency.COIN,
+            coin_amount,
+            "SELLER_COIN_SALE",
+            str(order.id),
+            seller.id,
+            "Coins delivered from seller pool",
+        )
+    else:
+        wallet = economy_transaction_service.credit(
+            db,
+            user_id=buyer_user_id,
+            amount=coin_amount,
+            currency=EconomyCurrency.COIN.value,
+            source_type="SELLER_COIN_SALE",
+            source_id=str(order.id),
+            reason="Coins delivered from seller pool",
+            tx=tx,
+            actor_user_id=seller.id,
+        )
     db.flush()
     from app.services import economy_level_service
 
     levels = economy_level_service.wallet_level_payload(db, wallet)
     economy_level_service.sync_vip_status(db, buyer_user_id, levels)
-    db.commit()
-    db.refresh(order)
+    if commit:
+        db.commit()
+        db.refresh(order)
+    else:
+        db.flush()
     return order
 
 
@@ -245,7 +276,7 @@ def create_withdraw_request(db: Session, user: User, ruby_amount: int, payout_me
     return request
 
 
-def create_game_pool(db: Session, game_key: str, pool_type: str, opening_balance: int, daily_payout_cap: int, daily_loss_limit: int, max_single_payout: int, rtp_target_basis_points: int) -> GamePool:
+def create_game_pool(db: Session, game_key: str, pool_type: str, opening_balance: int, daily_payout_cap: int, daily_loss_limit: int, max_single_payout: int, rtp_target_basis_points: int, *, commit: bool = True) -> GamePool:
     pool = get_or_create_game_pool(db, game_key, GamePoolType(pool_type))
     pool.daily_payout_cap = daily_payout_cap
     pool.daily_loss_limit = daily_loss_limit
@@ -253,8 +284,11 @@ def create_game_pool(db: Session, game_key: str, pool_type: str, opening_balance
     pool.rtp_target_basis_points = rtp_target_basis_points
     if opening_balance > 0:
         pool.balance += opening_balance
-    db.commit()
-    db.refresh(pool)
+    if commit:
+        db.commit()
+        db.refresh(pool)
+    else:
+        db.flush()
     return pool
 
 
@@ -267,5 +301,77 @@ def create_game_round(db: Session, game_key: str, entry_fee: int, max_players: i
 
 
 def dashboard_for_user(db: Session, user: User) -> dict:
-    wallet = get_or_create_wallet(db, user.id)
-    return {"wallet": wallet, "seller_pool": get_pool_for_user(db, user.id, CoinSupplyPoolType.SELLER_SUPPLY_POOL), "merchant_pool": get_pool_for_user(db, user.id, CoinSupplyPoolType.MERCHANT_SUPPLY_POOL), "gaming_pool": get_pool_for_user(db, user.id, CoinSupplyPoolType.FRIENDS_GAMING_POOL)}
+    """Read-only Economy dashboard projection.
+
+    Missing wallet rows are represented as a zero wallet by the API serializer;
+    GET requests must never create Economy-owned state.
+    """
+    wallet = (
+        db.query(UserWallet)
+        .filter(UserWallet.user_id == user.id)
+        .first()
+    )
+    return {
+        "wallet": wallet,
+        "seller_pool": get_pool_for_user(
+            db, user.id, CoinSupplyPoolType.SELLER_SUPPLY_POOL
+        ),
+        "merchant_pool": get_pool_for_user(
+            db, user.id, CoinSupplyPoolType.MERCHANT_SUPPLY_POOL
+        ),
+        "gaming_pool": get_pool_for_user(
+            db, user.id, CoinSupplyPoolType.FRIENDS_GAMING_POOL
+        ),
+    }
+
+
+def credit_social_mission_reward(
+    db: Session,
+    user_id: int,
+    *,
+    mission_id: str,
+    cycle_key: str,
+    reward_coin_amount: int,
+) -> tuple[UserWallet, bool]:
+    """Idempotently credit a social mission reward through the existing wallet ledger.
+
+    The user's wallet row is locked before re-checking the ledger so concurrent
+    claim requests for the same mission/cycle converge on one credit without a
+    parallel rewards store.
+    """
+    wallet = get_or_create_wallet(db, user_id)
+    db.flush()
+    wallet = (
+        db.query(UserWallet)
+        .filter(UserWallet.user_id == user_id)
+        .with_for_update()
+        .one()
+    )
+    source_id = f"{mission_id}:{cycle_key}"
+    existing = (
+        db.query(WalletLedger.id)
+        .filter(
+            WalletLedger.user_id == user_id,
+            WalletLedger.source_type == "SOCIAL_MISSION_REWARD",
+            WalletLedger.source_id == source_id,
+        )
+        .first()
+    )
+    if existing is not None:
+        db.commit()
+        db.refresh(wallet)
+        return wallet, False
+
+    _credit_wallet(
+        db,
+        wallet,
+        EconomyCurrency.COIN,
+        reward_coin_amount,
+        "SOCIAL_MISSION_REWARD",
+        source_id,
+        user_id,
+        f"Social mission reward: {mission_id}",
+    )
+    db.commit()
+    db.refresh(wallet)
+    return wallet, True

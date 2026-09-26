@@ -1,4 +1,4 @@
-import 'package:flutter/foundation.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../data/inbox_api_service.dart';
 import '../data/inbox_backup_api_service.dart';
@@ -9,85 +9,266 @@ import '../data/inbox_socket_service.dart';
 import 'inbox_call_controller.dart';
 import '../models/inbox_models.dart';
 
-class InboxController extends ChangeNotifier {
-  InboxController({
-    InboxApiService? apiService,
-    InboxBackupApiService? backupApiService,
-    InboxPreferencesApiService? preferencesApiService,
-    InboxMessageToolsApiService? messageToolsApiService,
-    InboxSocketService? socketService,
-    InboxCallController? callController,
-  }) : _apiService = apiService ?? InboxApiService(),
-       _backupApiService = backupApiService ?? const InboxBackupApiService(),
-       _preferencesApiService =
-           preferencesApiService ?? const InboxPreferencesApiService(),
-       _messageToolsApiService =
-           messageToolsApiService ?? InboxMessageToolsApiService(),
-       _socketService = socketService ?? InboxSocketService(),
-       _callController = callController ?? InboxCallController();
+const Object _inboxUnset = Object();
 
-  final InboxApiService _apiService;
-  final InboxBackupApiService _backupApiService;
-  final InboxPreferencesApiService _preferencesApiService;
-  final InboxMessageToolsApiService _messageToolsApiService;
-  final InboxSocketService _socketService;
-  final InboxCallController _callController;
+class InboxState {
+  const InboxState({
+    this.selectedFilter = 'All',
+    this.lockedVaultUnlocked = false,
+    this.isLoading = false,
+    this.errorMessage,
+    this.lockStatus = const InboxLockStatus(isEnabled: false),
+    this.backupStatus = const InboxBackupStatus(
+      isEnabled: false,
+      isAuthorized: false,
+      provider: 'google_drive',
+      frequency: ChatBackupFrequency.weekly,
+      lastStatus: 'not_connected',
+    ),
+    this.lastBackupJob,
+    this.lastRestoreJob,
+    this.lastGoogleDriveAuthorizationUrl,
+    this.lastSecurityCode,
+    this.preferenceSettings = const InboxPreferenceSettings(
+      strangersCanMessage: true,
+      strangersCanMentionInVibes: true,
+      readReceiptsEnabled: true,
+      onlineVisibility: 'everyone',
+      lastSeenVisibility: 'everyone',
+      typingActivityVisibility: 'everyone',
+      storyVisibility: 'friends',
+      deviceUnlockEnabled: false,
+      defaultChatTheme: 'pearl',
+      defaultWallpaperKey: 'premium_pearl',
+    ),
+    this.activeConversationId,
+    this.remoteActivityByConversationId = const <String, String>{},
+    this.conversations = const <InboxConversation>[],
+    this.conversationNextCursor,
+    this.loadingMoreConversations = false,
+    this.reportTasks = const <InboxReportTask>[],
+  });
 
-  InboxCallController get callController => _callController;
+  final String selectedFilter;
+  final bool lockedVaultUnlocked;
+  final bool isLoading;
+  final String? errorMessage;
+  final InboxLockStatus lockStatus;
+  final InboxBackupStatus backupStatus;
+  final InboxBackupJob? lastBackupJob;
+  final InboxBackupJob? lastRestoreJob;
+  final String? lastGoogleDriveAuthorizationUrl;
+  final String? lastSecurityCode;
+  final InboxPreferenceSettings preferenceSettings;
+  final String? activeConversationId;
+  final Map<String, String> remoteActivityByConversationId;
+  final List<InboxConversation> conversations;
+  final String? conversationNextCursor;
+  final bool loadingMoreConversations;
+  final List<InboxReportTask> reportTasks;
 
-  String selectedFilter = 'All';
-  bool lockedVaultUnlocked = false;
-  bool isLoading = false;
-  bool _disposed = false;
-  String? errorMessage;
-  InboxLockStatus lockStatus = const InboxLockStatus(isEnabled: false);
-  InboxBackupStatus backupStatus = const InboxBackupStatus(
-    isEnabled: false,
-    isAuthorized: false,
-    provider: 'google_drive',
-    frequency: ChatBackupFrequency.weekly,
-    lastStatus: 'not_connected',
+  int get unreadCount => conversations.fold<int>(
+    0,
+    (sum, conversation) => sum + conversation.unreadCount,
   );
-  InboxBackupJob? lastBackupJob;
-  InboxBackupJob? lastRestoreJob;
-  String? lastGoogleDriveAuthorizationUrl;
-  String? lastSecurityCode;
-  InboxPreferenceSettings preferenceSettings = const InboxPreferenceSettings(
-    strangersCanMessage: true,
-    strangersCanMentionInVibes: true,
-    readReceiptsEnabled: true,
-    onlineVisibility: 'everyone',
-    lastSeenVisibility: 'everyone',
-    typingActivityVisibility: 'everyone',
-    storyVisibility: 'friends',
-    deviceUnlockEnabled: false,
-    defaultChatTheme: 'pearl',
-    defaultWallpaperKey: 'premium_pearl',
-  );
-  bool strangersCanMessage = true;
-  bool strangersCanMentionInVibes = true;
-  bool get readReceiptsEnabled => preferenceSettings.readReceiptsEnabled;
-  bool get deviceUnlockEnabled => preferenceSettings.deviceUnlockEnabled;
-  String get onlineVisibility => preferenceSettings.onlineVisibility;
-  String get lastSeenVisibility => preferenceSettings.lastSeenVisibility;
+
+  InboxState copyWith({
+    String? selectedFilter,
+    bool? lockedVaultUnlocked,
+    bool? isLoading,
+    Object? errorMessage = _inboxUnset,
+    InboxLockStatus? lockStatus,
+    InboxBackupStatus? backupStatus,
+    Object? lastBackupJob = _inboxUnset,
+    Object? lastRestoreJob = _inboxUnset,
+    Object? lastGoogleDriveAuthorizationUrl = _inboxUnset,
+    Object? lastSecurityCode = _inboxUnset,
+    InboxPreferenceSettings? preferenceSettings,
+    Object? activeConversationId = _inboxUnset,
+    Map<String, String>? remoteActivityByConversationId,
+    List<InboxConversation>? conversations,
+    Object? conversationNextCursor = _inboxUnset,
+    bool? loadingMoreConversations,
+    List<InboxReportTask>? reportTasks,
+  }) {
+    return InboxState(
+      selectedFilter: selectedFilter ?? this.selectedFilter,
+      lockedVaultUnlocked:
+          lockedVaultUnlocked ?? this.lockedVaultUnlocked,
+      isLoading: isLoading ?? this.isLoading,
+      errorMessage: identical(errorMessage, _inboxUnset)
+          ? this.errorMessage
+          : errorMessage as String?,
+      lockStatus: lockStatus ?? this.lockStatus,
+      backupStatus: backupStatus ?? this.backupStatus,
+      lastBackupJob: identical(lastBackupJob, _inboxUnset)
+          ? this.lastBackupJob
+          : lastBackupJob as InboxBackupJob?,
+      lastRestoreJob: identical(lastRestoreJob, _inboxUnset)
+          ? this.lastRestoreJob
+          : lastRestoreJob as InboxBackupJob?,
+      lastGoogleDriveAuthorizationUrl:
+          identical(lastGoogleDriveAuthorizationUrl, _inboxUnset)
+          ? this.lastGoogleDriveAuthorizationUrl
+          : lastGoogleDriveAuthorizationUrl as String?,
+      lastSecurityCode: identical(lastSecurityCode, _inboxUnset)
+          ? this.lastSecurityCode
+          : lastSecurityCode as String?,
+      preferenceSettings: preferenceSettings ?? this.preferenceSettings,
+      activeConversationId: identical(activeConversationId, _inboxUnset)
+          ? this.activeConversationId
+          : activeConversationId as String?,
+      remoteActivityByConversationId:
+          Map<String, String>.unmodifiable(
+            remoteActivityByConversationId ??
+                this.remoteActivityByConversationId,
+          ),
+      conversations: List<InboxConversation>.unmodifiable(
+        conversations ?? this.conversations,
+      ),
+      conversationNextCursor:
+          identical(conversationNextCursor, _inboxUnset)
+          ? this.conversationNextCursor
+          : conversationNextCursor as String?,
+      loadingMoreConversations:
+          loadingMoreConversations ?? this.loadingMoreConversations,
+      reportTasks: List<InboxReportTask>.unmodifiable(
+        reportTasks ?? this.reportTasks,
+      ),
+    );
+  }
+}
+
+class InboxController extends AutoDisposeNotifier<InboxState> {
+  late final InboxApiService _apiService;
+  late final InboxBackupApiService _backupApiService;
+  late final InboxPreferencesApiService _preferencesApiService;
+  late final InboxMessageToolsApiService _messageToolsApiService;
+  late final InboxSocketService _socketService;
+
+  @override
+  InboxState build() {
+    _apiService = InboxApiService();
+    _backupApiService = const InboxBackupApiService();
+    _preferencesApiService = const InboxPreferencesApiService();
+    _messageToolsApiService = InboxMessageToolsApiService();
+    _socketService = InboxSocketService();
+    ref.onDispose(_socketService.disconnect);
+    return const InboxState();
+  }
+
+  InboxCallController get callController =>
+      ref.read(inboxCallControllerProvider.notifier);
+
+  String get selectedFilter => state.selectedFilter;
+  set selectedFilter(String value) =>
+      state = state.copyWith(selectedFilter: value);
+  bool get lockedVaultUnlocked => state.lockedVaultUnlocked;
+  set lockedVaultUnlocked(bool value) =>
+      state = state.copyWith(lockedVaultUnlocked: value);
+  bool get isLoading => state.isLoading;
+  set isLoading(bool value) => state = state.copyWith(isLoading: value);
+  String? get errorMessage => state.errorMessage;
+  set errorMessage(String? value) =>
+      state = state.copyWith(errorMessage: value);
+  InboxLockStatus get lockStatus => state.lockStatus;
+  set lockStatus(InboxLockStatus value) =>
+      state = state.copyWith(lockStatus: value);
+  InboxBackupStatus get backupStatus => state.backupStatus;
+  set backupStatus(InboxBackupStatus value) =>
+      state = state.copyWith(backupStatus: value);
+  InboxBackupJob? get lastBackupJob => state.lastBackupJob;
+  set lastBackupJob(InboxBackupJob? value) =>
+      state = state.copyWith(lastBackupJob: value);
+  InboxBackupJob? get lastRestoreJob => state.lastRestoreJob;
+  set lastRestoreJob(InboxBackupJob? value) =>
+      state = state.copyWith(lastRestoreJob: value);
+  String? get lastGoogleDriveAuthorizationUrl =>
+      state.lastGoogleDriveAuthorizationUrl;
+  set lastGoogleDriveAuthorizationUrl(String? value) =>
+      state = state.copyWith(lastGoogleDriveAuthorizationUrl: value);
+  String? get lastSecurityCode => state.lastSecurityCode;
+  set lastSecurityCode(String? value) =>
+      state = state.copyWith(lastSecurityCode: value);
+  InboxPreferenceSettings get preferenceSettings =>
+      state.preferenceSettings;
+  set preferenceSettings(InboxPreferenceSettings value) =>
+      state = state.copyWith(preferenceSettings: value);
+
+  bool get strangersCanMessage =>
+      state.preferenceSettings.strangersCanMessage;
+  bool get strangersCanMentionInVibes =>
+      state.preferenceSettings.strangersCanMentionInVibes;
+  bool get readReceiptsEnabled =>
+      state.preferenceSettings.readReceiptsEnabled;
+  bool get deviceUnlockEnabled =>
+      state.preferenceSettings.deviceUnlockEnabled;
+  String get onlineVisibility =>
+      state.preferenceSettings.onlineVisibility;
+  String get lastSeenVisibility =>
+      state.preferenceSettings.lastSeenVisibility;
   String get typingActivityVisibility =>
-      preferenceSettings.typingActivityVisibility;
-  String get storyVisibility => preferenceSettings.storyVisibility;
-  String get defaultChatTheme => preferenceSettings.defaultChatTheme;
-  String get defaultWallpaperKey => preferenceSettings.defaultWallpaperKey;
-  String? get defaultWallpaperUrl => preferenceSettings.defaultWallpaperUrl;
-  String? _activeConversationId;
-  final Map<String, String> _remoteActivityByConversationId =
-      <String, String>{};
+      state.preferenceSettings.typingActivityVisibility;
+  String get storyVisibility =>
+      state.preferenceSettings.storyVisibility;
+  String get defaultChatTheme =>
+      state.preferenceSettings.defaultChatTheme;
+  String get defaultWallpaperKey =>
+      state.preferenceSettings.defaultWallpaperKey;
+  String? get defaultWallpaperUrl =>
+      state.preferenceSettings.defaultWallpaperUrl;
+
+  String? get _activeConversationId => state.activeConversationId;
+  set _activeConversationId(String? value) =>
+      state = state.copyWith(activeConversationId: value);
+
+  List<InboxConversation> get _conversations => state.conversations;
+  set _conversations(List<InboxConversation> value) =>
+      state = state.copyWith(conversations: value);
+  String? get _conversationNextCursor => state.conversationNextCursor;
+  set _conversationNextCursor(String? value) =>
+      state = state.copyWith(conversationNextCursor: value);
+  bool get _loadingMoreConversations => state.loadingMoreConversations;
+  set _loadingMoreConversations(bool value) =>
+      state = state.copyWith(loadingMoreConversations: value);
+  List<InboxReportTask> get _reportTasks => state.reportTasks;
+  set _reportTasks(List<InboxReportTask> value) =>
+      state = state.copyWith(reportTasks: value);
 
   String? remoteActivityForConversation(String conversationId) {
-    final value = _remoteActivityByConversationId[conversationId];
+    final value = state.remoteActivityByConversationId[conversationId];
     if (value == null || value == 'idle') return null;
     return value;
   }
 
-  bool get backupEnabled => backupStatus.isEnabled;
-  ChatBackupFrequency get backupFrequency => backupStatus.frequency;
+  bool get backupEnabled => state.backupStatus.isEnabled;
+  ChatBackupFrequency get backupFrequency => state.backupStatus.frequency;
+
+  List<InboxConversation> get conversations => state.conversations;
+  bool get hasMoreConversations => state.conversationNextCursor != null;
+  bool get isLoadingMoreConversations => state.loadingMoreConversations;
+  List<InboxReportTask> get reportTasks => state.reportTasks;
+  int get pendingReportTaskCount =>
+      state.reportTasks.where((task) => task.isPending).length;
+  int get lockedCount => lockedConversations.length;
+  int get unreadCount => state.conversations.fold<int>(
+    0,
+    (sum, chat) => sum + chat.unreadCount,
+  );
+
+  List<InboxConversation> get unlockedConversations =>
+      _sortedConversations(
+        state.conversations
+            .where((chat) => !chat.isLockedByBackend)
+            .toList(),
+      );
+
+  List<InboxConversation> get lockedConversations =>
+      _sortedConversations(
+        state.conversations
+            .where((chat) => chat.isLockedByBackend)
+            .toList(),
+      );
 
   final List<String> filters = const [
     'All',
@@ -96,25 +277,6 @@ class InboxController extends ChangeNotifier {
     'Unread',
     'Calls',
   ];
-
-  List<InboxConversation> _conversations = <InboxConversation>[];
-  final List<InboxReportTask> _reportTasks = <InboxReportTask>[];
-
-  List<InboxConversation> get conversations =>
-      List.unmodifiable(_conversations);
-  List<InboxReportTask> get reportTasks => List.unmodifiable(_reportTasks);
-  int get pendingReportTaskCount =>
-      _reportTasks.where((task) => task.isPending).length;
-  int get lockedCount => lockedConversations.length;
-  int get unreadCount =>
-      _conversations.fold<int>(0, (sum, chat) => sum + chat.unreadCount);
-
-  List<InboxConversation> get unlockedConversations => _sortedConversations(
-    _conversations.where((chat) => !chat.isLockedByBackend).toList(),
-  );
-  List<InboxConversation> get lockedConversations => _sortedConversations(
-    _conversations.where((chat) => chat.isLockedByBackend).toList(),
-  );
 
   List<InboxConversation> get visibleConversations {
     final base = unlockedConversations
@@ -157,16 +319,10 @@ class InboxController extends ChangeNotifier {
     }
   }
 
-  @override
-  void dispose() {
-    _disposed = true;
-    _socketService.disconnect();
-    _callController.dispose();
-    super.dispose();
-  }
+  void _safeNotify() {}
 
-  void _safeNotify() {
-    if (!_disposed) notifyListeners();
+  Future<void> ensureRealtimeConnected() {
+    return _socketService.connect(onEvent: _handleRealtimeEvent);
   }
 
   Future<void> loadFromBackend() async {
@@ -177,11 +333,11 @@ class InboxController extends ChangeNotifier {
       lockStatus = await _apiService.loadLockStatus();
       backupStatus = await _backupApiService.loadStatus();
       preferenceSettings = await _preferencesApiService.loadPreferences();
-      _syncLegacyPreferenceFlags();
-      _conversations = await _apiService.loadConversations();
-      _reportTasks
-        ..clear()
-        ..addAll(await _apiService.loadReportTasks());
+      await _apiService.bootstrapInbox();
+      final conversationPage = await _apiService.loadConversationPage();
+      _conversations = conversationPage.items;
+      _conversationNextCursor = conversationPage.nextCursor;
+      _reportTasks = await _apiService.loadReportTasks();
       await _socketService.connect(onEvent: _handleRealtimeEvent);
     } catch (error) {
       errorMessage = error.toString();
@@ -192,25 +348,38 @@ class InboxController extends ChangeNotifier {
     }
   }
 
-  void _syncLegacyPreferenceFlags() {
-    strangersCanMessage = preferenceSettings.strangersCanMessage;
-    strangersCanMentionInVibes = preferenceSettings.strangersCanMentionInVibes;
+  Future<void> loadMoreConversations() async {
+    final cursor = _conversationNextCursor;
+    if (cursor == null || _loadingMoreConversations || isLoading) return;
+    _loadingMoreConversations = true;
+    _safeNotify();
+    try {
+      final page = await _apiService.loadConversationPage(cursor: cursor);
+      final existingIds = _conversations.map((item) => item.id).toSet();
+      _conversations = [
+        ..._conversations,
+        ...page.items.where((item) => existingIds.add(item.id)),
+      ];
+      _conversationNextCursor = page.nextCursor;
+    } catch (error) {
+      errorMessage = error.toString();
+    } finally {
+      _loadingMoreConversations = false;
+      _safeNotify();
+    }
   }
 
   Future<void> _savePreferences(InboxPreferenceSettings settings) async {
     final previous = preferenceSettings;
     preferenceSettings = settings;
-    _syncLegacyPreferenceFlags();
     _safeNotify();
     try {
       preferenceSettings = await _preferencesApiService.updatePreferences(
         settings,
       );
-      _syncLegacyPreferenceFlags();
       _safeNotify();
     } catch (error) {
       preferenceSettings = previous;
-      _syncLegacyPreferenceFlags();
       errorMessage = error.toString();
       _safeNotify();
     }
@@ -365,7 +534,10 @@ class InboxController extends ChangeNotifier {
       case 'inbox_secret_drift_cleared':
         final conversationId = event['conversation_id']?.toString();
         if (conversationId != null) {
-          _remoteActivityByConversationId.remove(conversationId);
+          final activity = Map<String, String>.of(
+            state.remoteActivityByConversationId,
+          )..remove(conversationId);
+          state = state.copyWith(remoteActivityByConversationId: activity);
           loadFromBackend();
         }
         break;
@@ -446,7 +618,7 @@ class InboxController extends ChangeNotifier {
     final conversation = conversationById(conversationId);
     if (conversation == null) return true;
 
-    _callController.handleRealtimeEvent(
+    callController.handleRealtimeEvent(
       event: event,
       conversation: conversation,
     );
@@ -464,18 +636,25 @@ class InboxController extends ChangeNotifier {
   }
 
   void _setRemoteActivity(String conversationId, String activity) {
+    final next = Map<String, String>.of(
+      state.remoteActivityByConversationId,
+    );
     if (activity == 'idle') {
-      _remoteActivityByConversationId.remove(conversationId);
+      next.remove(conversationId);
     } else {
-      _remoteActivityByConversationId[conversationId] = activity;
+      next[conversationId] = activity;
       Future<void>.delayed(const Duration(seconds: 5), () {
-        if (_remoteActivityByConversationId[conversationId] == activity) {
-          _remoteActivityByConversationId.remove(conversationId);
-          _safeNotify();
+        if (state.remoteActivityByConversationId[conversationId] == activity) {
+          final expired = Map<String, String>.of(
+            state.remoteActivityByConversationId,
+          )..remove(conversationId);
+          state = state.copyWith(
+            remoteActivityByConversationId: expired,
+          );
         }
       });
     }
-    _safeNotify();
+    state = state.copyWith(remoteActivityByConversationId: next);
   }
 
   Future<InboxConversation?> createDirectConversation({
@@ -508,10 +687,53 @@ class InboxController extends ChangeNotifier {
   Future<void> openConversationFromBackend(String conversationId) async {
     try {
       final updated = await _apiService.getConversation(conversationId);
+      if (updated.secretDriftEnabled) {
+        await _apiService.openSecretDriftSession(conversationId);
+      }
       _upsertConversation(updated);
-      notifyListeners();
-    } catch (_) {
       markConversationRead(conversationId);
+    } catch (error) {
+      errorMessage = error.toString();
+      _safeNotify();
+    }
+  }
+
+  Future<int> loadOlderMessages(String conversationId) async {
+    final conversation = conversationById(conversationId);
+    final cursor = conversation?.messagesNextCursor;
+    if (conversation == null ||
+        !conversation.hasOlderMessages ||
+        cursor == null ||
+        cursor.isEmpty) {
+      return 0;
+    }
+
+    try {
+      final page = await _apiService.loadOlderMessages(
+        conversationId: conversationId,
+        before: cursor,
+      );
+      final existingIds = conversation.messages
+          .map((item) => item.id)
+          .whereType<String>()
+          .toSet();
+      final older = page.messages
+          .where((item) => item.id == null || existingIds.add(item.id!))
+          .toList();
+      _replaceConversation(
+        conversationId,
+        (chat) => chat.copyWith(
+          messages: [...older, ...chat.messages],
+          messagesNextCursor: page.nextCursor,
+          clearMessagesNextCursor: page.nextCursor == null,
+          hasOlderMessages: page.hasMore,
+        ),
+      );
+      return older.length;
+    } catch (error) {
+      errorMessage = error.toString();
+      _safeNotify();
+      return 0;
     }
   }
 
@@ -673,17 +895,14 @@ class InboxController extends ChangeNotifier {
       _updateState(conversation, isMuted: !conversation.isMuted);
   Future<void> togglePin(InboxConversation conversation) =>
       _updateState(conversation, isPinned: !conversation.isPinned);
-  void toggleArchive(InboxConversation conversation) {
-    _replaceConversation(
-      conversation.id,
-      (chat) => chat.copyWith(isArchived: !chat.isArchived),
-    );
-  }
+  Future<void> toggleArchive(InboxConversation conversation) =>
+      _updateState(conversation, isArchived: !conversation.isArchived);
 
   Future<void> _updateState(
     InboxConversation conversation, {
     bool? isMuted,
     bool? isPinned,
+    bool? isArchived,
     bool? isLocked,
     bool? isBlocked,
   }) async {
@@ -696,6 +915,7 @@ class InboxController extends ChangeNotifier {
       (chat) => chat.copyWith(
         isMuted: isMuted,
         isPinned: isPinned,
+        isArchived: isArchived,
         isLockedByBackend: isLocked,
         isBlocked: isBlocked,
       ),
@@ -705,6 +925,7 @@ class InboxController extends ChangeNotifier {
         conversationId: conversation.id,
         isMuted: isMuted,
         isPinned: isPinned,
+        isArchived: isArchived,
         isLocked: isLocked,
         isBlocked: isBlocked,
       );
@@ -712,6 +933,8 @@ class InboxController extends ChangeNotifier {
     } catch (_) {}
   }
 
+  /// Accepts an inbox Love Bond request through the session-scoped
+  /// [loveBondRealtimeProvider], then refreshes canonical inbox data.
   Future<void> acceptLoveBondRequest({
     required String conversationId,
     required InboxMessage message,
@@ -729,7 +952,7 @@ class InboxController extends ChangeNotifier {
     );
 
     try {
-      await LoveBondRealtimeService.acceptRequestOnBackend(
+      await ref.read(loveBondRealtimeProvider.notifier).acceptRequestOnBackend(
         requestId: requestId,
         receiverPublicUserId: 0,
       );
@@ -763,7 +986,7 @@ class InboxController extends ChangeNotifier {
     );
 
     try {
-      await LoveBondRealtimeService.rejectRequestOnBackend(
+      await ref.read(loveBondRealtimeProvider.notifier).rejectRequestOnBackend(
         requestId: requestId,
         receiverPublicUserId: 0,
       );
@@ -933,7 +1156,7 @@ class InboxController extends ChangeNotifier {
       createdAtLabel: 'Now',
       status: InboxReportStatus.pendingCsReview,
     );
-    _reportTasks.insert(0, local);
+    _reportTasks = <InboxReportTask>[local, ..._reportTasks];
     _safeNotify();
     try {
       final remote = await _apiService.submitReport(
@@ -1238,8 +1461,7 @@ class InboxController extends ChangeNotifier {
   ) {
     _conversations = _conversations
         .map((chat) => chat.id == conversationId ? mapper(chat) : chat)
-        .toList();
-    _safeNotify();
+        .toList(growable: false);
   }
 
   void _setConversationUnread(String conversationId, int unreadCount) =>
@@ -1248,35 +1470,36 @@ class InboxController extends ChangeNotifier {
         (chat) => chat.copyWith(unreadCount: unreadCount),
       );
   void _upsertConversation(InboxConversation conversation) {
-    final index = _conversations.indexWhere(
-      (item) => item.id == conversation.id,
-    );
+    final next = List<InboxConversation>.of(_conversations);
+    final index = next.indexWhere((item) => item.id == conversation.id);
     if (index == -1) {
-      _conversations.insert(0, conversation);
+      next.insert(0, conversation);
     } else {
-      _conversations[index] = conversation;
+      next[index] = conversation;
     }
-    _safeNotify();
+    _conversations = next;
   }
 
   void _replaceReportTask(String taskId, InboxReportTask replacement) {
-    for (var index = 0; index < _reportTasks.length; index++) {
-      if (_reportTasks[index].id == taskId) {
-        _reportTasks[index] = replacement;
-        _safeNotify();
+    final next = List<InboxReportTask>.of(_reportTasks);
+    for (var index = 0; index < next.length; index++) {
+      if (next[index].id == taskId) {
+        next[index] = replacement;
+        _reportTasks = next;
         return;
       }
     }
   }
 
   void _upsertReportTask(InboxReportTask task) {
-    final index = _reportTasks.indexWhere((item) => item.id == task.id);
+    final next = List<InboxReportTask>.of(_reportTasks);
+    final index = next.indexWhere((item) => item.id == task.id);
     if (index == -1) {
-      _reportTasks.insert(0, task);
+      next.insert(0, task);
     } else {
-      _reportTasks[index] = task;
+      next[index] = task;
     }
-    _safeNotify();
+    _reportTasks = next;
   }
 
   bool _sameMessage(InboxMessage a, InboxMessage b) =>
@@ -1303,3 +1526,9 @@ class InboxController extends ChangeNotifier {
         local.replyToText == remote.replyToText;
   }
 }
+
+
+final inboxControllerProvider =
+    NotifierProvider.autoDispose<InboxController, InboxState>(
+      InboxController.new,
+    );

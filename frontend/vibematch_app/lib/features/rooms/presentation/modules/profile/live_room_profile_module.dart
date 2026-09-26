@@ -2,7 +2,6 @@ import 'dart:async';
 
 import 'package:flutter/material.dart';
 
-import '../../../data/live_room_member_request_service.dart';
 import '../../../data/room_moderation_repository.dart';
 import '../../controllers/live_room_profile_navigator.dart';
 import '../../controllers/live_room_sheet_controller.dart';
@@ -240,7 +239,7 @@ class LiveRoomProfileModule {
       );
       return;
     }
-    LiveRoomMemberRequestService.instance.removeRoomMember(user);
+    bundle.removeRoomMembership(user);
     RoomToast.show(bundle.context, 'Removing ${user.name} from room members');
     LiveRoomLifecycleModule.clearFocus(bundle);
   }

@@ -16,6 +16,18 @@ import (
 
 func main() {
 	logger := slog.New(slog.NewJSONHandler(os.Stdout, nil))
+	shutdownTelemetry, telemetryErr := gateway.SetupTelemetry(context.Background(), "funkey-realtime", logger)
+	if telemetryErr != nil {
+		logger.Error("telemetry setup failed; continuing without exporter", "error", telemetryErr)
+	}
+	defer func() {
+		ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
+		defer cancel()
+		if err := shutdownTelemetry(ctx); err != nil {
+			logger.Warn("telemetry shutdown failed", "error", err)
+		}
+	}()
+
 	cfg, err := gateway.LoadConfig()
 	if err != nil {
 		logger.Error("invalid config", "error", err)
@@ -26,9 +38,30 @@ func main() {
 		logger.Error("invalid Redis URL", "error", err)
 		os.Exit(1)
 	}
+	options.PoolSize = cfg.RedisPoolSize
+	options.PoolTimeout = cfg.RedisPoolTimeout
+	options.ReadTimeout = cfg.RedisReadTimeout
+	options.WriteTimeout = cfg.RedisWriteTimeout
+	options.ClientName = "funkey-realtime-" + cfg.NodeID
 	client := redis.NewClient(options)
 	defer client.Close()
-	service := gateway.NewServer(cfg, gateway.NewHTTPAuthorizer(cfg.AuthVerifyURL, cfg.AuthTimeout), client, logger)
+	service := gateway.NewServer(
+		cfg,
+		gateway.NewCapabilityAuthorizer(
+			cfg.CapabilityKeyURL,
+			cfg.CapabilityIssuer,
+			cfg.CapabilityAudience,
+			cfg.CapabilityTokenVersion,
+			cfg.AuthTimeout,
+		),
+		gateway.NewRoutedHTTPCommandExecutor(
+			cfg.CommandURL,
+			cfg.InboxCommandURL,
+			cfg.CommandTimeout,
+		),
+		client,
+		logger,
+	)
 	if err := service.Validate(); err != nil {
 		logger.Error("invalid gateway", "error", err)
 		os.Exit(1)
@@ -36,6 +69,7 @@ func main() {
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 	go service.ConsumeEvents(ctx)
+	go service.ConsumeNATSEvents(ctx)
 	go service.Heartbeat(ctx)
 	httpServer := &http.Server{
 		Addr:              cfg.ListenAddr,

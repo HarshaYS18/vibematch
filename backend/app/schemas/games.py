@@ -75,8 +75,23 @@ class GameAdminUpsertRequest(BaseModel):
     risk: dict[str, Any] = Field(default_factory=dict)
 
 
+class GameSessionOpenRequest(BaseModel):
+    request_id: str = Field(..., min_length=8, max_length=160)
+    room_id: int | None = None
+    bridge_version: int = Field(default=1, ge=1, le=100)
+
+
+class GameSessionResponse(BaseModel):
+    session_id: str
+    game_key: str
+    room_id: int | None
+    bridge_version: int
+    status: str
+
+
 class GameRoundCreateRequest(BaseModel):
     room_id: int | None = None
+    session_id: str | None = Field(default=None, min_length=8, max_length=80)
 
 
 class GameRoundResponse(BaseModel):
@@ -95,6 +110,7 @@ class GameRoundResponse(BaseModel):
 class GameBetRequest(BaseModel):
     target_id: int
     amount: int
+    request_id: str | None = Field(default=None, min_length=8, max_length=160)
 
 
 class GameBetResponse(BaseModel):

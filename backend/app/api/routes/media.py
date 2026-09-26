@@ -10,7 +10,7 @@ from app.api.routes.users import get_current_user
 from app.database import get_db
 from app.models.cdn_media import CdnMediaLinkedEntityType, CdnMediaType
 from app.models.user import User
-from app.services import cdn_media_service, media_moderation_service, media_storage_service
+from app.services import cdn_media_service, media_storage_service
 from app.services.media_storage_service import MediaStorageError
 
 router = APIRouter(prefix="/media", tags=["Media"])
@@ -100,16 +100,10 @@ def _with_asset(result: MediaUploadResponse, asset) -> MediaUploadResponse:
     return result
 
 
-def _audit_if_supported_image(db: Session, asset, *, content_type: str, actor_user_id: int) -> None:
-    if content_type.startswith("image/"):
-        media_moderation_service.audit_image_media(db, asset=asset, actor_user_id=actor_user_id)
-
-
 @router.post("/avatar", response_model=MediaUploadResponse)
 def upload_avatar(request: Request, file: UploadFile = File(...), current_user: User = Depends(get_current_user), db: Session = Depends(get_db)):
     result, object_key = _save_upload(file, folder=f"avatars/user_{current_user.id}", max_size=MAX_AVATAR_BYTES, allowed_types=ALLOWED_IMAGE_TYPES, request=request)
     asset = cdn_media_service.register_uploaded_media(db, owner=current_user, media_type=CdnMediaType.PROFILE_PICTURE, public_url=result.url, object_key=object_key, mime_type=result.content_type, size_bytes=result.size_bytes, linked_entity_type=CdnMediaLinkedEntityType.USER_PROFILE, linked_entity_id=str(current_user.id))
-    _audit_if_supported_image(db, asset, content_type=result.content_type, actor_user_id=current_user.id)
     cdn_media_service.mark_profile_picture_replaced(db, user=current_user, new_asset=asset, actor_user_id=current_user.id)
     db.refresh(asset)
     return _with_asset(result, asset)
@@ -119,7 +113,6 @@ def upload_avatar(request: Request, file: UploadFile = File(...), current_user: 
 def upload_profile_cover(request: Request, file: UploadFile = File(...), current_user: User = Depends(get_current_user), db: Session = Depends(get_db)):
     result, object_key = _save_upload(file, folder=f"profile_covers/user_{current_user.id}", max_size=MAX_PROFILE_COVER_BYTES, allowed_types=ALLOWED_IMAGE_TYPES, request=request)
     asset = cdn_media_service.register_uploaded_media(db, owner=current_user, media_type=CdnMediaType.COVER_PHOTO, public_url=result.url, object_key=object_key, mime_type=result.content_type, size_bytes=result.size_bytes, linked_entity_type=CdnMediaLinkedEntityType.USER_PROFILE, linked_entity_id=str(current_user.id))
-    _audit_if_supported_image(db, asset, content_type=result.content_type, actor_user_id=current_user.id)
     cdn_media_service.add_cover_photo_reference(db, user=current_user, new_asset=asset, actor_user_id=current_user.id)
     db.refresh(asset)
     return _with_asset(result, asset)
@@ -178,7 +171,6 @@ def upload_chat_voice(request: Request, file: UploadFile = File(...), current_us
 def upload_vibe_media(request: Request, file: UploadFile = File(...), current_user: User = Depends(get_current_user), db: Session = Depends(get_db)):
     result, object_key = _save_upload(file, folder=f"vibes/user_{current_user.id}", max_size=MAX_VIBE_MEDIA_BYTES, allowed_types=ALLOWED_IMAGE_TYPES | ALLOWED_VIDEO_TYPES, request=request)
     asset = cdn_media_service.register_uploaded_media(db, owner=current_user, media_type=CdnMediaType.VIBES_MEDIA, public_url=result.url, object_key=object_key, mime_type=result.content_type, size_bytes=result.size_bytes, linked_entity_type=CdnMediaLinkedEntityType.VIBES_POST)
-    _audit_if_supported_image(db, asset, content_type=result.content_type, actor_user_id=current_user.id)
     return _with_asset(result, asset)
 
 
@@ -186,5 +178,4 @@ def upload_vibe_media(request: Request, file: UploadFile = File(...), current_us
 def upload_story_media(request: Request, file: UploadFile = File(...), current_user: User = Depends(get_current_user), db: Session = Depends(get_db)):
     result, object_key = _save_upload(file, folder=f"stories/user_{current_user.id}", max_size=MAX_VIBE_MEDIA_BYTES, allowed_types=ALLOWED_IMAGE_TYPES | ALLOWED_VIDEO_TYPES, request=request)
     asset = cdn_media_service.register_uploaded_media(db, owner=current_user, media_type=CdnMediaType.STORY_MEDIA, public_url=result.url, object_key=object_key, mime_type=result.content_type, size_bytes=result.size_bytes, linked_entity_type=CdnMediaLinkedEntityType.STORY)
-    _audit_if_supported_image(db, asset, content_type=result.content_type, actor_user_id=current_user.id)
     return _with_asset(result, asset)

@@ -7,12 +7,10 @@ import 'package:flutter/foundation.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 import '../../media/data/media_upload_service.dart';
-import 'live_room_audio_service.dart';
+import 'live_room_media_signaling_service.dart';
 
 class RoomMusicController {
-  RoomMusicController._();
-
-  static final RoomMusicController instance = RoomMusicController._();
+  RoomMusicController();
 
   static const String _playlistKey = 'vibematch_room_music_playlist_v1';
 
@@ -124,7 +122,7 @@ class RoomMusicController {
 
     try {
       final uploadedUrl = await _ensureUploaded(track);
-      final success = await LiveRoomAudioService.instance.startRoomMusic(
+      final success = await LiveRoomMediaSignalingService.instance.mediaEngine.startRoomMusic(
         url: uploadedUrl,
         title: track.title,
         seekMs: safeSeekMs,
@@ -132,7 +130,7 @@ class RoomMusicController {
 
       if (!success) {
         final sfuError =
-            LiveRoomAudioService.instance.lastError.value ??
+            LiveRoomMediaSignalingService.instance.mediaEngine.lastError.value ??
             'Could not start room music on SFU.';
         state.value = state.value.copyWith(
           isUploading: false,
@@ -199,7 +197,7 @@ class RoomMusicController {
     if (!state.value.isPlaying) return;
     _syncProgressPosition();
     _stopProgressTimer();
-    await LiveRoomAudioService.instance.stopRoomMusic();
+    await LiveRoomMediaSignalingService.instance.mediaEngine.stopRoomMusic();
     state.value = state.value.copyWith(
       isPlaying: false,
       isPaused: true,
@@ -231,7 +229,7 @@ class RoomMusicController {
 
   Future<void> stop() async {
     _stopProgressTimer();
-    await LiveRoomAudioService.instance.stopRoomMusic();
+    await LiveRoomMediaSignalingService.instance.mediaEngine.stopRoomMusic();
     state.value = state.value.copyWith(
       isPlaying: false,
       isPaused: false,
@@ -250,6 +248,12 @@ class RoomMusicController {
     } finally {
       _stoppingBecauseRoomExit = false;
     }
+  }
+
+  Future<void> dispose() async {
+    await stopBecauseControllerExitedRoom();
+    _stopProgressTimer();
+    state.dispose();
   }
 
   void showOverlay() {
@@ -280,9 +284,8 @@ class RoomMusicController {
   Future<String> _ensureUploaded(RoomMusicTrack track) async {
     if (track.uploadedUrl.trim().isNotEmpty) return track.uploadedUrl;
 
-    final bytes = await XFile(track.path).readAsBytes();
-    final result = await _uploadService.uploadRoomMusicBytes(
-      bytes: bytes,
+    final result = await _uploadService.uploadRoomMusicXFile(
+      XFile(track.path),
       filename: _uploadFilenameFor(track),
     );
 

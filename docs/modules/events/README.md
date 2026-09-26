@@ -22,19 +22,19 @@ PostgreSQL remains the durable source of truth for application state.
 
 ## Important files
 
-`backend/app/realtime/events.py`, `backend/app/realtime/event_bus.py`, `backend/app/services/event_outbox_service.py`, `backend/app/services/outbox_relay_service.py`, `apps/worker/events.py`, and `contracts/events/`.
+`backend/app/realtime/events.py`, `backend/app/realtime/event_bus.py`, `backend/app/services/event_outbox_service.py`, `backend/app/services/outbox_relay_service.py`, `apps/worker/events.py`, `apps/kafka-event-bridge/`, and `contracts/events/`.
 
 ## Public API/contracts
 
-Existing room event names; NATS JetStream envelope is the selected target. Keep existing Flutter-compatible paths and payloads until a versioned migration is ready.
+Operational event contracts target NATS JetStream. Kafka analytics contracts are a retained derivative behind the single bridge. Keep existing Flutter-compatible paths and payloads until a versioned migration is ready.
 
 ## Events published
 
-NATS JetStream is the selected broker. Contracts must carry event_id, event_type, event_version, occurred_at, request_id, trace_id, actor_user_id, and payload. The broker is at-least-once; consumers deduplicate.
+NATS JetStream is the operational broker. Contracts carry event_id, event_type, event_version, occurred_at, request_id, trace_id, actor_user_id and payload. Chunk 37 mirrors approved event families into Kafka for retained analytics/replay. Both paths are at-least-once; consumers deduplicate on event_id.
 
 ## Events consumed
 
-Implemented durable contracts use the worker's JetStream pull consumer with explicit ack, bounded retry, idempotent handlers and dead-letter publication. Realtime Redis Pub/Sub remains intentionally ephemeral and separate.
+Operational consumers use JetStream pull consumers with explicit ACK, bounded retry, idempotent handlers and dead-letter publication. The Kafka bridge ACKs its JetStream copy only after Kafka ACK. Kafka projection consumers use manual offsets and event_id idempotency. Realtime Redis Pub/Sub remains intentionally ephemeral and separate.
 
 ## Database tables/state owned
 
@@ -90,4 +90,4 @@ Review security boundaries, schema changes, resource limits, autoscaling signals
 
 ## Known migration status
 
-Redis realtime fanout and the PostgreSQL transactional-outbox → NATS JetStream durable-worker path are implemented as separate transports. Production NATS provisioning/credentials and additional domain-event migrations remain environment/domain-by-domain work rather than a platform gap.
+Redis realtime fanout, PostgreSQL transactional-outbox → NATS JetStream operational delivery, and the Chunk 37 NATS → Kafka analytics bridge are separate transports. Production NATS/Kafka provider credentials and additional domain-event adoption remain environment/domain-by-domain work.

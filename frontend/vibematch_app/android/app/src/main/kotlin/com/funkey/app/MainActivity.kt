@@ -3,8 +3,10 @@ package com.funkey.app
 import android.Manifest
 import android.content.Intent
 import android.content.pm.PackageManager
+import android.os.BatteryManager
 import android.os.Build
 import android.os.Bundle
+import android.os.PowerManager
 import android.view.WindowManager
 import androidx.core.app.ActivityCompat
 import androidx.core.content.ContextCompat
@@ -34,6 +36,24 @@ class MainActivity : FlutterActivity() {
                 "stopLiveRoomService" -> {
                     stopLiveRoomService()
                     result.success(true)
+                }
+                else -> result.notImplemented()
+            }
+        }
+
+        MethodChannel(flutterEngine.dartExecutor.binaryMessenger, POWER_STATE_CHANNEL).setMethodCallHandler { call, result ->
+            when (call.method) {
+                "getPowerState" -> {
+                    val batteryManager = getSystemService(BATTERY_SERVICE) as BatteryManager
+                    val rawLevel = batteryManager.getIntProperty(BatteryManager.BATTERY_PROPERTY_CAPACITY)
+                    val level = rawLevel.takeIf { it in 0..100 }
+                    val powerManager = getSystemService(POWER_SERVICE) as PowerManager
+                    result.success(
+                        mapOf(
+                            "batteryLevel" to level,
+                            "lowPowerMode" to powerManager.isPowerSaveMode,
+                        )
+                    )
                 }
                 else -> result.notImplemented()
             }
@@ -97,5 +117,6 @@ class MainActivity : FlutterActivity() {
     companion object {
         private const val LIVE_ROOM_SERVICE_CHANNEL = "vibematch/live_room_service"
         private const val SCREENSHOT_GUARD_CHANNEL = "vibematch/screenshot_guard"
+        private const val POWER_STATE_CHANNEL = "funkey/power_state"
     }
 }

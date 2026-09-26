@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 
+import '../../../../core/assets/funkey_cdn_assets.dart';
+
 class MiniProfileFamilyBadge extends StatelessWidget {
   const MiniProfileFamilyBadge({
     super.key,
@@ -35,8 +37,8 @@ class MiniProfileFamilyBadge extends StatelessWidget {
   _FamilyBadgeStyle get _style {
     switch (_level) {
       case 'platinum':
-        return const _FamilyBadgeStyle(
-          assetPath: 'assets/images/family_badges/platinum.png',
+        return _FamilyBadgeStyle(
+          assetUrl: FunKeyCdnAssets.familyBadge('platinum'),
           top: Color(0xFF7B8594),
           bottom: Color(0xFF4A5463),
           border: Color(0xFFEAF0F8),
@@ -48,8 +50,8 @@ class MiniProfileFamilyBadge extends StatelessWidget {
           durationMs: 1050,
         );
       case 'gold':
-        return const _FamilyBadgeStyle(
-          assetPath: 'assets/images/family_badges/gold.png',
+        return _FamilyBadgeStyle(
+          assetUrl: FunKeyCdnAssets.familyBadge('gold'),
           top: Color(0xFFE0B12F),
           bottom: Color(0xFF8D6508),
           border: Color(0xFFFFE28A),
@@ -61,8 +63,8 @@ class MiniProfileFamilyBadge extends StatelessWidget {
           durationMs: 1380,
         );
       case 'silver':
-        return const _FamilyBadgeStyle(
-          assetPath: 'assets/images/family_badges/silver.png',
+        return _FamilyBadgeStyle(
+          assetUrl: FunKeyCdnAssets.familyBadge('silver'),
           top: Color(0xFFD5DAE1),
           bottom: Color(0xFF87919C),
           border: Color(0xFFF0F4F8),
@@ -74,8 +76,8 @@ class MiniProfileFamilyBadge extends StatelessWidget {
           durationMs: 1720,
         );
       default:
-        return const _FamilyBadgeStyle(
-          assetPath: 'assets/images/family_badges/bronze.png',
+        return _FamilyBadgeStyle(
+          assetUrl: FunKeyCdnAssets.familyBadge('bronze'),
           top: Color(0xFFC08A5A),
           bottom: Color(0xFF7A4E2D),
           border: Color(0xFFDCA477),
@@ -174,8 +176,8 @@ class MiniProfileFamilyBadge extends StatelessWidget {
                 Positioned(
                   left: 0,
                   top: -3.5,
-                  child: Image.asset(
-                    style.assetPath,
+                  child: Image.network(
+                    style.assetUrl,
                     width: badgeSize,
                     height: badgeSize,
                     fit: BoxFit.contain,
@@ -212,7 +214,7 @@ class MiniProfileFamilyBadge extends StatelessWidget {
 
 class _FamilyBadgeStyle {
   const _FamilyBadgeStyle({
-    required this.assetPath,
+    required this.assetUrl,
     required this.top,
     required this.bottom,
     required this.border,
@@ -224,7 +226,7 @@ class _FamilyBadgeStyle {
     required this.durationMs,
   });
 
-  final String assetPath;
+  final String assetUrl;
   final Color top;
   final Color bottom;
   final Color border;

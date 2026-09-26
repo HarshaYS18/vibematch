@@ -1,7 +1,7 @@
 import 'dart:convert';
 
 import 'package:flutter/material.dart';
-import 'package:http/http.dart' as http;
+import 'package:vibematch_app/foundation/networking/feature_http_compat.dart' as http;
 
 import '../../../core/network/vm_api_config.dart';
 import '../presentation/live_room_models.dart';
@@ -89,8 +89,6 @@ GiftItem _giftFromJson(Map<String, dynamic> json) {
     coins: _int(json['coin_value']),
     icon: _iconFor(json['icon_key']?.toString(), categoryKey),
     chatSymbol: (json['chat_symbol'] ?? '*').toString(),
-    assetPath: _text(json['asset_path']),
-    videoAssetPath: _text(json['video_asset_path']),
     assetUrl: _text(json['asset_url']),
     videoUrl: _text(json['video_url']),
     colors: _colorsFor(categoryKey, isPremium: premium, isLucky: lucky),

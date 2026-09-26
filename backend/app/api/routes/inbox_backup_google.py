@@ -31,7 +31,7 @@ def google_drive_backup_callback(
               <head>
                 <meta charset="utf-8" />
                 <meta name="viewport" content="width=device-width, initial-scale=1" />
-                <title>Vibe Match Inbox Backup</title>
+                <title>FunKey Inbox Backup</title>
                 <style>
                   body {{ font-family: Arial, sans-serif; background: #faf7f1; color: #251538; padding: 28px; }}
                   .card {{ max-width: 680px; margin: auto; background: white; border-radius: 24px; padding: 24px; box-shadow: 0 14px 36px rgba(37, 21, 56, 0.12); }}
@@ -43,7 +43,7 @@ def google_drive_backup_callback(
                 <div class="card">
                   <h1>Google Drive backup authorization failed</h1>
                   <p class="error">{safe_error}</p>
-                  <p>Return to Vibe Match and try connecting Google Drive again.</p>
+                  <p>Return to FunKey and try connecting Google Drive again.</p>
                 </div>
               </body>
             </html>
@@ -58,7 +58,7 @@ def google_drive_backup_callback(
               <head>
                 <meta charset="utf-8" />
                 <meta name="viewport" content="width=device-width, initial-scale=1" />
-                <title>Vibe Match Inbox Backup</title>
+                <title>FunKey Inbox Backup</title>
                 <style>
                   body { font-family: Arial, sans-serif; background: #faf7f1; color: #251538; padding: 28px; }
                   .card { max-width: 680px; margin: auto; background: white; border-radius: 24px; padding: 24px; box-shadow: 0 14px 36px rgba(37, 21, 56, 0.12); }
@@ -68,7 +68,7 @@ def google_drive_backup_callback(
               <body>
                 <div class="card">
                   <h1>No authorization code received</h1>
-                  <p>Return to Vibe Match and start Google Drive backup authorization again.</p>
+                  <p>Return to FunKey and start Google Drive backup authorization again.</p>
                 </div>
               </body>
             </html>
@@ -84,7 +84,7 @@ def google_drive_backup_callback(
           <head>
             <meta charset="utf-8" />
             <meta name="viewport" content="width=device-width, initial-scale=1" />
-            <title>Vibe Match Inbox Backup</title>
+            <title>FunKey Inbox Backup</title>
             <style>
               body {{ font-family: Arial, sans-serif; background: #faf7f1; color: #251538; padding: 28px; }}
               .card {{ max-width: 760px; margin: auto; background: white; border-radius: 24px; padding: 24px; box-shadow: 0 14px 36px rgba(37, 21, 56, 0.12); }}
@@ -99,7 +99,7 @@ def google_drive_backup_callback(
             <div class="card">
               <span class="ok">Authorization code received</span>
               <h1>Connect Google Drive backup</h1>
-              <p>Copy this authorization code into the Vibe Match Inbox backup setup screen, or send it from backend testing to <strong>POST /inbox/backup/google/connect</strong> while logged in.</p>
+              <p>Copy this authorization code into the FunKey Inbox backup setup screen, or send it from backend testing to <strong>POST /inbox/backup/google/connect</strong> while logged in.</p>
               <div class="code">{safe_code}</div>
               <p class="state">State: {safe_state}</p>
               <p>After connecting, Inbox backup can upload encrypted chat backup files to the user's Google Drive app folder.</p>

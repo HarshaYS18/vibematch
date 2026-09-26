@@ -8,7 +8,7 @@ from starlette.concurrency import run_in_threadpool
 
 from app.api.routes.room_realtime_commands import client_room_snapshot
 from app.api.routes.users import get_current_user
-from app.database import SessionLocal, get_db
+from app.database import get_db
 from app.models.room import Room
 from app.models.room_participant import RoomParticipant
 from app.models.user import User
@@ -25,7 +25,6 @@ from app.schemas.room_theme import (
     CustomRoomBackgroundSubmitRequest,
     RoomCoverPhotoUpdateRequest,
     RoomThemeApplyRequest,
-    RoomThemePurchaseRequest,
     RoomThemeResponse,
     RoomThemeReviewDecisionRequest,
     RoomThemeReviewResponse,
@@ -35,6 +34,7 @@ from app.schemas.rooms.room import (
     RoomDetailResponse,
     RoomJoinRequest,
     RoomJoinResponse,
+    RoomHeartbeatResponse,
     RoomLeaveResponse,
     RoomMemberActionRequest,
     RoomModeUpdateRequest,
@@ -44,9 +44,10 @@ from app.schemas.rooms.room import (
 )
 from app.schemas.rooms.room_background import RoomBackgroundConfigResponse
 from app.schemas.rooms.room_kickout import RoomKickoutCreateRequest, RoomKickoutResponse
+from app.services.permissions import room_permission_service
 from app.services.rooms import room_action_service, room_state_service
+from app.services.rooms.room_db_context import room_session
 from app.services.rooms.room_background_service import list_room_backgrounds
-from app.services.rooms.room_contribution_service import room_contribution_rankings
 from app.services.rooms.room_kickout_service import (
     create_room_kickout,
     list_active_room_kickouts,
@@ -58,12 +59,12 @@ from app.services.rooms.room_service import (
     create_room,
     get_my_created_room,
     get_room_by_public_id,
-    heartbeat_room,
     join_room,
     leave_room,
     list_following_rooms,
     list_room_participants,
     list_trending_rooms,
+    quick_match_room,
     room_to_detail_response,
     set_room_admin,
     set_room_member,
@@ -74,7 +75,6 @@ from app.services.rooms.room_theme_service import (
     decide_custom_background_review,
     list_pending_custom_background_reviews,
     list_store_room_themes,
-    purchase_room_theme,
     submit_custom_room_background,
 )
 from app.services.role_service import get_user_roles
@@ -316,7 +316,7 @@ async def _record_and_broadcast(
 
 
 def _read_room_snapshot_for_broadcast(room_public_id: str) -> dict | None:
-    with SessionLocal() as snapshot_db:
+    with room_session() as snapshot_db:
         room = (
             snapshot_db.query(Room)
             .filter(
@@ -414,6 +414,21 @@ def get_trending_rooms(
     )
 
 
+@router.get("/quick-match", response_model=RoomTrendingResponse | None)
+def get_quick_match_room(
+    language: str | None = Query(default=None),
+    category: str | None = Query(default=None),
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    return quick_match_room(
+        db=db,
+        current_user=current_user,
+        language=language,
+        category=category,
+    )
+
+
 @router.get("/following", response_model=list[RoomTrendingResponse])
 def get_following_rooms(
     language: str | None = Query(default=None),
@@ -442,15 +457,6 @@ def get_room_theme_store(
     current_user: User = Depends(get_current_user),
 ):
     return list_store_room_themes(db, current_user)
-
-
-@router.post("/themes/purchase", response_model=RoomThemeResponse)
-def purchase_room_background_theme(
-    payload: RoomThemePurchaseRequest,
-    db: Session = Depends(get_db),
-    current_user: User = Depends(get_current_user),
-):
-    return purchase_room_theme(db, current_user, payload.theme_id)
 
 
 @router.post(
@@ -527,11 +533,18 @@ async def update_room_settings(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ) -> RoomSettingsResponse:
+    """Persist room access/participation settings and publish one room delta."""
     room = _get_room_for_update(db, room_public_id, current_user)
     if payload.language is not None:
         room.language = payload.language.strip()
     if payload.allow_screenshots is not None:
         room.allow_screenshots = payload.allow_screenshots
+    if payload.room_images_enabled is not None:
+        room.room_images_enabled = payload.room_images_enabled
+    if payload.guest_messages_enabled is not None:
+        room.guest_messages_enabled = payload.guest_messages_enabled
+    if payload.apply_only_mode_enabled is not None:
+        room.apply_only_mode_enabled = payload.apply_only_mode_enabled
     if payload.mode is not None:
         apply_room_mode(
             room,
@@ -696,29 +709,6 @@ async def apply_room_background_theme(
     return _room_settings_response(room)
 
 
-@router.get("/{room_public_id}/contributions")
-def get_room_contribution_rankings(
-    room_public_id: str,
-    period: str = Query(default="daily"),
-    category: str = Query(default="sent"),
-    limit: int = Query(default=100, ge=1, le=100),
-    db: Session = Depends(get_db),
-):
-    payload = room_contribution_rankings(
-        db=db,
-        room_public_id=room_public_id,
-        category=category,
-        period=period,
-        limit=limit,
-    )
-    if payload is None:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail="Room not found",
-        )
-    return payload
-
-
 @router.get("/{room_public_id}", response_model=RoomDetailResponse)
 def get_room_detail(room_public_id: str, db: Session = Depends(get_db)):
     room = get_room_by_public_id(db=db, room_public_id=room_public_id)
@@ -834,23 +824,13 @@ def _prepare_join(
     return joined, was_active
 
 
-@router.post("/{room_public_id}/heartbeat", response_model=RoomJoinResponse)
-def heartbeat_live_room(
-    room_public_id: str,
-    db: Session = Depends(get_db),
-    current_user: User = Depends(get_current_user),
-):
-    joined = heartbeat_room(
-        db=db,
-        room_public_id=room_public_id,
-        current_user=current_user,
+@router.post("/{room_public_id}/heartbeat", deprecated=True)
+def heartbeat_live_room(room_public_id: str):
+    """Retired compatibility endpoint; socket leases own room liveness."""
+    raise HTTPException(
+        status_code=status.HTTP_410_GONE,
+        detail="Room REST heartbeat retired; realtime socket lease owns liveness",
     )
-    if joined is None:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail="Room not found or not accessible",
-        )
-    return joined
 
 
 @router.post("/{room_public_id}/leave", response_model=RoomLeaveResponse)

@@ -32,7 +32,12 @@ def purchase_store_item(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
-    return store_service.purchase(db, current_user, payload.item_id)
+    return store_service.purchase(
+        db,
+        current_user,
+        payload.item_id,
+        purchase_id=payload.purchase_id,
+    )
 
 
 @router.get("/inventory", response_model=InventoryResponse)

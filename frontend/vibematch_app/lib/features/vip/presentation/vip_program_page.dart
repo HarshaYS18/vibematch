@@ -26,8 +26,6 @@ class _VipProgramPageState extends State<VipProgramPage> {
   static const Color _bg = Color(0xFF080713);
   static const Color _panel = Color(0xFF141121);
   static const Color _gold = Color(0xFFFFD36E);
-  static const Color _aqua = Color(0xFF19E6D2);
-  static const Color _pink = Color(0xFFFF5D9E);
   static const Color _text = Color(0xFFF9F2FF);
   static const Color _muted = Color(0xFFB9ADC8);
 

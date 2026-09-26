@@ -1,0 +1,41 @@
+{
+  "schema_version": 1,
+  "principals": [
+    {
+      "role": "bridge_producer",
+      "operations": ["WRITE", "DESCRIBE"],
+      "topics": [
+        "funkey.user.activity.v1",
+        "funkey.room.events.v1",
+        "funkey.vibes.engagement.v1",
+        "funkey.economy.analytics.v1",
+        "funkey.game.events.v1",
+        "funkey.media.events.v1",
+        "funkey.recommendation.events.v1"
+      ]
+    },
+    {
+      "role": "projection_consumer",
+      "operations": ["READ", "DESCRIBE"],
+      "topic_pattern": "funkey.*.v1",
+      "group_pattern": "funkey-projection-*"
+    },
+    {
+      "role": "replay_operator",
+      "operations": ["READ", "DESCRIBE"],
+      "topic_pattern": "funkey.*.v1",
+      "write_topic_pattern": "funkey.replay.*"
+    },
+    {
+      "role": "topic_provisioner",
+      "operations": ["CREATE", "ALTER", "DESCRIBE_CONFIGS"],
+      "environment": "staging-or-approved-production-provisioning-only"
+    }
+  ],
+  "forbidden": [
+    "domain-service Kafka credentials",
+    "anonymous production access",
+    "wildcard WRITE for projection consumers",
+    "replay WRITE into canonical source topics"
+  ]
+}

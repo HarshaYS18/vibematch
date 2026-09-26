@@ -91,6 +91,8 @@ class VibePostResponse(BaseModel):
 
 class VibeFeedResponse(BaseModel):
     posts: list[VibePostResponse]
+    next_cursor: str | None = None
+    has_more: bool = False
 
 
 class VibeLikeResponse(BaseModel):

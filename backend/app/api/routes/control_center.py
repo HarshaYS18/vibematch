@@ -3,15 +3,13 @@ from sqlalchemy.orm import Session
 
 from app.api.routes.users import get_current_user
 from app.database import get_db
-from app.models.special_permission import SpecialPermission, SpecialPermissionName
 from app.models.user import User
 from app.schemas.control_center import EconomyRuleSetUpdateRequest, ManifestImportRequest, StoreCategoryUpsertRequest, StoreItemUpsertRequest
 from app.schemas.profile_display import StealthGrantRequest, StealthStateResponse, StealthToggleRequest
-from app.services import economy_rules_service, profile_display_service, store_control_center_service
+from app.services import economy_rules_service, identity_service_client, profile_social_service_client, store_control_center_service
 from app.services.audit_log_service import create_admin_log
 from app.services.permissions import room_permission_service
 from app.services.role_service import get_primary_role
-from app.services.special_permission_service import grant_special_permission
 from app.models.role import RoleName
 
 router = APIRouter(tags=["Control Center"])
@@ -97,10 +95,19 @@ def import_store_manifest(
 
 @router.get("/users/me/stealth", response_model=StealthStateResponse)
 def get_my_stealth_state(db: Session = Depends(get_db), current_user: User = Depends(get_current_user)):
-    state = profile_display_service.get_or_create_stealth_state(db, current_user.id)
+    try:
+        state = profile_social_service_client.get_stealth(user_id=current_user.id)
+    except profile_social_service_client.ProfileSocialServiceUnavailable as exc:
+        raise HTTPException(status_code=503, detail=str(exc)) from exc
+    except profile_social_service_client.ProfileSocialServiceError as exc:
+        raise HTTPException(status_code=exc.status_code, detail=exc.detail) from exc
     can_use = room_permission_service.can_use_hidden_presence(db, current_user)
-    db.commit()
-    return StealthStateResponse(user_id=current_user.id, is_enabled=bool(state.is_enabled), can_use_stealth=can_use, updated_at=state.updated_at)
+    return StealthStateResponse(
+        user_id=current_user.id,
+        is_enabled=bool(state.get("enabled")),
+        can_use_stealth=can_use,
+        updated_at=state.get("updated_at"),
+    )
 
 
 @router.post("/users/me/stealth", response_model=StealthStateResponse)
@@ -111,12 +118,33 @@ def toggle_my_stealth(
 ):
     if not room_permission_service.can_use_hidden_presence(db, current_user):
         raise HTTPException(status_code=403, detail="Stealth mode is not enabled for this account")
-    state = profile_display_service.get_or_create_stealth_state(db, current_user.id)
-    state.is_enabled = payload.enabled
-    state.toggle_reason = payload.reason
-    db.commit()
-    create_admin_log(db=db, action="STEALTH_TOGGLED", actor_user_id=current_user.id, target_user_id=current_user.id, resource_type="stealth_state", resource_id=str(state.id), reason=payload.reason, metadata_json={"enabled": payload.enabled})
-    return StealthStateResponse(user_id=current_user.id, is_enabled=bool(state.is_enabled), can_use_stealth=True, updated_at=state.updated_at)
+    try:
+        state = profile_social_service_client.set_stealth(
+            user_id=current_user.id,
+            enabled=payload.enabled,
+            actor_user_id=current_user.id,
+            reason=payload.reason,
+        )
+    except profile_social_service_client.ProfileSocialServiceUnavailable as exc:
+        raise HTTPException(status_code=503, detail=str(exc)) from exc
+    except profile_social_service_client.ProfileSocialServiceError as exc:
+        raise HTTPException(status_code=exc.status_code, detail=exc.detail) from exc
+    create_admin_log(
+        db=db,
+        action="STEALTH_TOGGLED",
+        actor_user_id=current_user.id,
+        target_user_id=current_user.id,
+        resource_type="stealth_state",
+        resource_id=str(state.get("state_id") or current_user.id),
+        reason=payload.reason,
+        metadata_json={"enabled": payload.enabled},
+    )
+    return StealthStateResponse(
+        user_id=current_user.id,
+        is_enabled=bool(state.get("enabled")),
+        can_use_stealth=True,
+        updated_at=state.get("updated_at"),
+    )
 
 
 @router.post("/admin/users/stealth/grants", response_model=StealthStateResponse)
@@ -130,31 +158,43 @@ def grant_stealth(
     target = db.query(User).filter(User.id == payload.target_user_id).first()
     if target is None:
         raise HTTPException(status_code=404, detail="Target user not found")
-    if get_primary_role(target) == RoleName.FOUNDER_OWNER and get_primary_role(current_user) != RoleName.FOUNDER_OWNER:
-        raise HTTPException(status_code=403, detail="Founder Owner cannot be modified")
-    if payload.enabled:
-        grant_special_permission(
-            db=db,
-            target_user=target,
-            permission=SpecialPermissionName.USE_STEALTH,
-            granted_by=current_user,
+    try:
+        identity_service_client.set_special_permission(
+            target_user_id=target.id,
+            actor_user_id=current_user.id,
+            permission="USE_STEALTH",
+            enabled=payload.enabled,
             reason=payload.reason,
         )
-    else:
-        rows = db.query(SpecialPermission).filter(
-            SpecialPermission.user_id == target.id,
-            SpecialPermission.permission == SpecialPermissionName.USE_STEALTH,
-            SpecialPermission.is_active.is_(True),
-        ).all()
-        for row in rows:
-            row.is_active = False
-            row.revoked_by_user_id = current_user.id
-            row.revoked_reason = payload.reason
-    state = profile_display_service.get_or_create_stealth_state(db, target.id)
-    state.granted_by_user_id = current_user.id
-    state.grant_reason = payload.reason
-    if not payload.enabled:
-        state.is_enabled = False
-    db.commit()
-    create_admin_log(db=db, action="STEALTH_GRANT_UPDATED", actor_user_id=current_user.id, target_user_id=target.id, resource_type="stealth_state", resource_id=str(state.id), reason=payload.reason, metadata_json={"enabled": payload.enabled})
-    return StealthStateResponse(user_id=target.id, is_enabled=bool(state.is_enabled), can_use_stealth=room_permission_service.can_use_hidden_presence(db, target), updated_at=state.updated_at)
+    except identity_service_client.IdentityServiceUnavailable as exc:
+        raise HTTPException(status_code=503, detail=str(exc)) from exc
+    except identity_service_client.IdentityServiceAuthError as exc:
+        raise HTTPException(status_code=exc.status_code, detail=exc.detail) from exc
+    try:
+        state = profile_social_service_client.set_stealth_grant_state(
+            user_id=target.id,
+            enabled=payload.enabled,
+            actor_user_id=current_user.id,
+            reason=payload.reason,
+        )
+    except profile_social_service_client.ProfileSocialServiceUnavailable as exc:
+        raise HTTPException(status_code=503, detail=str(exc)) from exc
+    except profile_social_service_client.ProfileSocialServiceError as exc:
+        raise HTTPException(status_code=exc.status_code, detail=exc.detail) from exc
+    create_admin_log(
+        db=db,
+        action="STEALTH_GRANT_UPDATED",
+        actor_user_id=current_user.id,
+        target_user_id=target.id,
+        resource_type="stealth_state",
+        resource_id=str(state.get("state_id") or target.id),
+        reason=payload.reason,
+        metadata_json={"enabled": payload.enabled},
+    )
+    return StealthStateResponse(
+        user_id=target.id,
+        is_enabled=bool(state.get("enabled")),
+        can_use_stealth=room_permission_service.can_use_hidden_presence(db, target),
+        updated_at=state.get("updated_at"),
+    )
+

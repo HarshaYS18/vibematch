@@ -1,5 +1,5 @@
 name: vibematch_app
-description: "A new Flutter project."
+description: "FunKey production Flutter client."
 publish_to: 'none'
 
 version: 1.0.0+1
@@ -11,13 +11,14 @@ dependencies:
   flutter:
     sdk: flutter
 
-  cupertino_icons: ^1.0.8
-  http: ^1.6.0
+  dio: ^5.9.0
+  crypto: ^3.0.7
+  flutter_riverpod: ^2.6.1
   shared_preferences: ^2.5.5
-  device_info_plus: ^12.4.0
   uuid: ^4.5.3
   video_player: ^2.10.1
-  flutter_svg: ^2.0.10
+  youtube_player_iframe: ^6.0.2
+  flutter_inappwebview: ^6.1.5
   web_socket_channel: ^3.0.3
   file_picker: ^10.3.3
   image_picker: ^1.2.1
@@ -28,17 +29,15 @@ dependencies:
   flutter_webrtc: 1.5.2
   mediasfu_mediasoup_client: 0.1.4
   google_sign_in: ^6.2.2
-  audioplayers: ^6.6.0
   on_audio_query: ^2.9.0
   permission_handler: ^12.0.1
   cross_file: ^0.3.4+2
   url_launcher: ^6.3.1
-  record: ^6.1.2
-  path_provider: ^2.1.5
   local_auth: ^2.3.0
   firebase_core: ^4.9.0
   firebase_messaging: ^16.2.2
   flutter_local_notifications: ^21.0.0
+  sentry_flutter: ^9.30.0
 
 dependency_overrides:
   sdp_transform:
@@ -56,62 +55,4 @@ flutter:
   uses-material-design: true
 
   assets:
-    - assets/branding/
-    - assets/icons/
-    - assets/images/branding/
-    - assets/images/vip_badges/
-    - assets/images/vip_tags/
-    - assets/images/svip_tags/
-    - assets/images/store/avatar_frames/
-    - assets/images/store/chat_bubbles/
-    - assets/images/store/entrance_effects/
-    - assets/images/store/profile_themes/
-    - assets/images/store/badges/
-    - assets/images/gifts/
-    - assets/gifts/normal/
-    - assets/gifts/lucky/
-    - assets/gifts/broadcast/
-    - assets/gifts/love_rocket/icon/
-    - assets/gifts/love_rocket/effect/
-    - assets/images/events/
-    - assets/videos/gifts/
-    - assets/images/rooms/backgrounds/
-    - assets/images/room_backgrounds/chat_room/default/
-    - assets/images/room_backgrounds/chat_room/premium_dark/
-    - assets/images/room_backgrounds/chat_room/pearl/
-    - assets/images/room_backgrounds/chat_room/locked_room/
-    - assets/images/room_backgrounds/chat_room/secret_vibe/
-    - assets/images/room_backgrounds/cricket/default/
-    - assets/images/room_backgrounds/vibe_sync/default/
-    - assets/images/room_backgrounds/vibe_sync/premium/
-    - assets/images/room_backgrounds/vibe_sync/event/
-    - assets/images/room_backgrounds/vip/vip_1/
-    - assets/images/room_backgrounds/vip/vip_5/
-    - assets/images/room_backgrounds/vip/vip_10/
-    - assets/images/room_backgrounds/vip/vip_15/
-    - assets/images/room_backgrounds/vip/vip_20/
-    - assets/images/room_backgrounds/vip/vip_25/
-    - assets/images/room_backgrounds/vip/vip_30/
-    - assets/images/room_backgrounds/vip/vip_40/
-    - assets/images/room_backgrounds/vip/vip_50/
-    - assets/images/room_backgrounds/svip/svip_1/
-    - assets/images/room_backgrounds/svip/svip_2/
-    - assets/images/room_backgrounds/svip/svip_3/
-    - assets/images/room_backgrounds/svip/monthly_exclusive/
-    - assets/images/room_backgrounds/store/free/
-    - assets/images/room_backgrounds/store/paid/
-    - assets/images/room_backgrounds/store/vip/
-    - assets/images/room_backgrounds/store/svip/
-    - assets/images/room_backgrounds/store/limited/
-    - assets/images/room_backgrounds/events/active/
-    - assets/images/room_backgrounds/events/expired_preview/
-    - assets/images/room_backgrounds/events/seasonal/
-    - assets/images/room_backgrounds/custom_uploads_placeholder/
-    - assets/images/family_badges/
-    - assets/images/mini_profile_decorations/
-    - assets/games/jungle_hunt/backgrounds/
-    - assets/games/jungle_hunt/animals/
-    - assets/games/jungle_hunt/chips/
-    - assets/games/jungle_hunt/buttons/
-    - assets/games/jungle_hunt/frames/
-    - assets/games/jungle_hunt/effects/
+    - assets/branding/funkey_logo.png

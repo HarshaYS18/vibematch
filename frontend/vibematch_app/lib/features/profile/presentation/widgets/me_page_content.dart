@@ -1,6 +1,7 @@
 import 'dart:async';
 
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../auth/data/auth_api_service.dart';
 import '../../../auth/models/current_user.dart';
@@ -601,16 +602,20 @@ class _RealDataErrorBanner extends StatelessWidget {
   );
 }
 
-class _MeLoveBondBackendSyncGate extends StatefulWidget {
+/// Invisible lifecycle gate that synchronizes the signed-in user's Love Bonds.
+///
+/// Backend data is written into [loveBondRealtimeProvider]; the gate owns only
+/// the once-per-user sync trigger and no relationship state of its own.
+class _MeLoveBondBackendSyncGate extends ConsumerStatefulWidget {
   const _MeLoveBondBackendSyncGate({required this.user});
   final CurrentUser user;
   @override
-  State<_MeLoveBondBackendSyncGate> createState() =>
+  ConsumerState<_MeLoveBondBackendSyncGate> createState() =>
       _MeLoveBondBackendSyncGateState();
 }
 
 class _MeLoveBondBackendSyncGateState
-    extends State<_MeLoveBondBackendSyncGate> {
+    extends ConsumerState<_MeLoveBondBackendSyncGate> {
   bool _started = false;
   @override
   void initState() {
@@ -631,7 +636,9 @@ class _MeLoveBondBackendSyncGateState
     if (_started) return;
     _started = true;
     try {
-      await LoveBondRealtimeService.syncMyBondsFromBackend(
+      await ref
+          .read(loveBondRealtimeProvider.notifier)
+          .syncMyBondsFromBackend(
         currentUserId: widget.user.id,
         currentPublicUserId: widget.user.publicUserId,
         currentDisplayName:

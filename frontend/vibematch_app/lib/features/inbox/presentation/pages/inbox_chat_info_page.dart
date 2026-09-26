@@ -1,10 +1,11 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../controllers/inbox_call_controller.dart';
 import '../../models/inbox_models.dart';
 import '../widgets/inbox_call_action_sheet.dart';
 
-class InboxChatInfoPage extends StatefulWidget {
+class InboxChatInfoPage extends ConsumerStatefulWidget {
   const InboxChatInfoPage({
     super.key,
     required this.conversation,
@@ -19,21 +20,16 @@ class InboxChatInfoPage extends StatefulWidget {
   final VoidCallback onThemeTap;
 
   @override
-  State<InboxChatInfoPage> createState() => _InboxChatInfoPageState();
+  ConsumerState<InboxChatInfoPage> createState() => _InboxChatInfoPageState();
 }
 
-class _InboxChatInfoPageState extends State<InboxChatInfoPage> {
-  final InboxCallController _callController = InboxCallController();
+class _InboxChatInfoPageState extends ConsumerState<InboxChatInfoPage> {
+  InboxCallController get _callController =>
+      ref.read(inboxCallControllerProvider.notifier);
   String _selected = 'Media';
 
   List<InboxMessage> get _media => widget.conversation.messages.where((message) => message.type == InboxMessageType.image || message.type == InboxMessageType.voice || message.type == InboxMessageType.document).toList().reversed.toList();
   List<InboxMessage> get _starred => widget.conversation.messages.where((message) => message.isStarred).toList().reversed.toList();
-
-  @override
-  void dispose() {
-    _callController.dispose();
-    super.dispose();
-  }
 
   void _openCallSheet() {
     if (widget.conversation.isOfficial) {

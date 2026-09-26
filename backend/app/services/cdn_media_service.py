@@ -12,9 +12,8 @@ from app.models.cdn_media import (
     CdnMediaUploadStatus,
     MediaSafetySetting,
 )
-from app.models.inbox import InboxMessage
 from app.models.user import User
-from app.services import media_storage_service
+from app.services import event_outbox_service, inbox_service_client, media_storage_service
 from app.services.audit_log_service import create_admin_log
 
 
@@ -66,6 +65,14 @@ def create_media_asset(
         is_active_reference=True,
     )
     db.add(asset)
+    db.flush()
+    if moderation_required and mime_type.startswith("image/"):
+        event_outbox_service.enqueue_event(
+            db,
+            event_type="media.moderation.requested",
+            actor_user_id=owner.id if owner else None,
+            payload={"media_id": asset.public_id},
+        )
     db.commit()
     db.refresh(asset)
     return asset
@@ -109,23 +116,83 @@ def register_uploaded_media(
     )
 
 
-def mark_profile_picture_replaced(db: Session, *, user: User, new_asset: CdnMediaAsset, actor_user_id: int | None = None) -> None:
+def _defer_profile_reference_until_moderated(
+    db: Session,
+    *,
+    new_asset: CdnMediaAsset,
+    reference_kind: str,
+) -> bool:
+    if new_asset.moderation_status != CdnMediaModerationStatus.PENDING.value:
+        return False
+    metadata = dict(new_asset.metadata_json or {})
+    metadata["pending_profile_reference"] = reference_kind
+    new_asset.metadata_json = metadata
+    new_asset.is_active_reference = False
+    db.add(new_asset)
+    db.commit()
+    return True
+
+
+def mark_profile_picture_replaced(
+    db: Session,
+    *,
+    user: User,
+    new_asset: CdnMediaAsset,
+    actor_user_id: int | None = None,
+) -> None:
+    if _defer_profile_reference_until_moderated(
+        db,
+        new_asset=new_asset,
+        reference_kind="profile_picture",
+    ):
+        return
+    if new_asset.moderation_status not in {
+        CdnMediaModerationStatus.AI_APPROVED.value,
+        CdnMediaModerationStatus.HUMAN_APPROVED.value,
+        CdnMediaModerationStatus.NOT_REQUIRED.value,
+    }:
+        return
     old_url = user.avatar_url
     if old_url:
         old_asset = find_active_asset_by_url(db, old_url)
         if old_asset and old_asset.id != new_asset.id:
             old_asset.replaced_by_media_id = new_asset.id
-            mark_media_deleted(db, asset=old_asset, actor_user_id=actor_user_id, reason="profile_picture_replaced")
+            mark_media_deleted(
+                db,
+                asset=old_asset,
+                actor_user_id=actor_user_id,
+                reason="profile_picture_replaced",
+            )
     user.avatar_url = new_asset.public_url
     new_asset.upload_status = CdnMediaUploadStatus.APPROVED.value
-    new_asset.moderation_status = CdnMediaModerationStatus.AI_APPROVED.value if new_asset.moderation_status == CdnMediaModerationStatus.PENDING.value else new_asset.moderation_status
     new_asset.is_active_reference = True
+    metadata = dict(new_asset.metadata_json or {})
+    metadata.pop("pending_profile_reference", None)
+    new_asset.metadata_json = metadata
     db.add(user)
     db.add(new_asset)
     db.commit()
 
 
-def add_cover_photo_reference(db: Session, *, user: User, new_asset: CdnMediaAsset, actor_user_id: int | None = None) -> None:
+def add_cover_photo_reference(
+    db: Session,
+    *,
+    user: User,
+    new_asset: CdnMediaAsset,
+    actor_user_id: int | None = None,
+) -> None:
+    if _defer_profile_reference_until_moderated(
+        db,
+        new_asset=new_asset,
+        reference_kind="cover_photo",
+    ):
+        return
+    if new_asset.moderation_status not in {
+        CdnMediaModerationStatus.AI_APPROVED.value,
+        CdnMediaModerationStatus.HUMAN_APPROVED.value,
+        CdnMediaModerationStatus.NOT_REQUIRED.value,
+    }:
+        return
     old_urls = list(user.cover_photo_urls or [])
     if new_asset.public_url not in old_urls:
         next_urls = [new_asset.public_url, *old_urls]
@@ -133,11 +200,48 @@ def add_cover_photo_reference(db: Session, *, user: User, new_asset: CdnMediaAss
         next_urls = old_urls
     user.cover_photo_urls = next_urls[:6]
     new_asset.upload_status = CdnMediaUploadStatus.APPROVED.value
-    new_asset.moderation_status = CdnMediaModerationStatus.AI_APPROVED.value if new_asset.moderation_status == CdnMediaModerationStatus.PENDING.value else new_asset.moderation_status
     new_asset.is_active_reference = True
+    metadata = dict(new_asset.metadata_json or {})
+    metadata.pop("pending_profile_reference", None)
+    new_asset.metadata_json = metadata
     db.add(user)
     db.add(new_asset)
     db.commit()
+
+
+def activate_approved_profile_media(
+    db: Session,
+    *,
+    asset: CdnMediaAsset,
+    actor_user_id: int | None = None,
+) -> None:
+    reference_kind = dict(asset.metadata_json or {}).get("pending_profile_reference")
+    if reference_kind not in {"profile_picture", "cover_photo"}:
+        return
+    if asset.moderation_status not in {
+        CdnMediaModerationStatus.AI_APPROVED.value,
+        CdnMediaModerationStatus.HUMAN_APPROVED.value,
+    }:
+        return
+    if asset.owner_user_id is None:
+        return
+    user = db.query(User).filter(User.id == asset.owner_user_id).first()
+    if user is None:
+        return
+    if reference_kind == "profile_picture":
+        mark_profile_picture_replaced(
+            db,
+            user=user,
+            new_asset=asset,
+            actor_user_id=actor_user_id,
+        )
+    else:
+        add_cover_photo_reference(
+            db,
+            user=user,
+            new_asset=asset,
+            actor_user_id=actor_user_id,
+        )
 
 
 def find_active_asset_by_url(db: Session, public_url: str) -> CdnMediaAsset | None:
@@ -175,16 +279,80 @@ def link_media_to_entity(db: Session, *, public_url: str | None, linked_entity_t
     return asset
 
 
-def mark_media_deleted(db: Session, *, asset: CdnMediaAsset, actor_user_id: int | None = None, reason: str = "media_deleted") -> CdnMediaAsset:
+def mark_media_deleted(
+    db: Session,
+    *,
+    asset: CdnMediaAsset,
+    actor_user_id: int | None = None,
+    reason: str = "media_deleted",
+) -> CdnMediaAsset:
+    if asset.deletion_status in {
+        CdnMediaDeletionStatus.PENDING_DELETE.value,
+        CdnMediaDeletionStatus.DELETED.value,
+    }:
+        return asset
     asset.upload_status = CdnMediaUploadStatus.DELETED.value
-    asset.deletion_status = CdnMediaDeletionStatus.DELETED.value
+    asset.deletion_status = CdnMediaDeletionStatus.PENDING_DELETE.value
     asset.is_active_reference = False
     asset.deleted_at = datetime.utcnow()
+    asset.deletion_error = None
+    db.add(asset)
+    event_outbox_service.enqueue_event(
+        db,
+        event_type="media.delete.requested",
+        actor_user_id=actor_user_id,
+        payload={
+            "media_id": asset.public_id,
+            "reason": reason,
+        },
+    )
+    db.commit()
+    db.refresh(asset)
+    create_admin_log(
+        db=db,
+        actor_user_id=actor_user_id,
+        target_user_id=asset.owner_user_id,
+        action="CDN_MEDIA_DELETE_REQUESTED",
+        resource_type="cdn_media",
+        resource_id=asset.public_id,
+        reason=reason,
+        metadata_json={
+            "media_type": asset.media_type,
+            "object_key": asset.object_key,
+            "deletion_status": asset.deletion_status,
+        },
+    )
+    return asset
+
+
+def execute_media_delete(
+    db: Session,
+    *,
+    media_id: str,
+    actor_user_id: int | None = None,
+    reason: str = "media_deleted",
+) -> tuple[CdnMediaAsset, bool]:
+    asset = (
+        db.query(CdnMediaAsset)
+        .filter(CdnMediaAsset.public_id == media_id)
+        .first()
+    )
+    if asset is None:
+        raise ValueError("Media asset not found")
+    if asset.deletion_status == CdnMediaDeletionStatus.DELETED.value:
+        return asset, True
     try:
         media_storage_service.delete_media_object(asset.object_key)
     except Exception as exc:
-        asset.deletion_status = CdnMediaDeletionStatus.FAILED.value
-        asset.deletion_error = str(exc)
+        asset.deletion_status = CdnMediaDeletionStatus.RETRY_SCHEDULED.value
+        asset.deletion_error = type(exc).__name__
+        db.add(asset)
+        db.commit()
+        raise RuntimeError("Media object deletion failed") from exc
+
+    asset.deletion_status = CdnMediaDeletionStatus.DELETED.value
+    asset.deletion_error = None
+    asset.deleted_at = asset.deleted_at or datetime.utcnow()
     db.add(asset)
     db.commit()
     db.refresh(asset)
@@ -196,28 +364,67 @@ def mark_media_deleted(db: Session, *, asset: CdnMediaAsset, actor_user_id: int 
         resource_type="cdn_media",
         resource_id=asset.public_id,
         reason=reason,
-        metadata_json={"media_type": asset.media_type, "object_key": asset.object_key, "deletion_status": asset.deletion_status},
+        metadata_json={
+            "media_type": asset.media_type,
+            "object_key": asset.object_key,
+            "deletion_status": asset.deletion_status,
+        },
     )
-    return asset
+    return asset, False
 
 
-def _expire_inbox_message_references(db: Session, asset: CdnMediaAsset, now: datetime) -> int:
-    messages = db.query(InboxMessage).filter(InboxMessage.attachment_url == asset.public_url).all()
-    updated = 0
-    for message in messages:
-        metadata = dict(message.metadata_json or {})
-        metadata["media_expired"] = True
-        metadata["expired_media_url"] = asset.public_url
-        metadata["expired_media_id"] = asset.public_id
-        metadata["media_expired_at"] = now.isoformat()
-        metadata["local_first_allowed"] = True
-        message.metadata_json = metadata
-        db.add(message)
-        updated += 1
-    return updated
+def _expire_inbox_message_references(
+    db: Session,
+    asset: CdnMediaAsset,
+    now: datetime,
+) -> int:
+    del db
+    try:
+        return inbox_service_client.mark_media_expired(
+            attachment_url=asset.public_url,
+            media_id=asset.public_id,
+            expired_at=now.isoformat(),
+            local_first_allowed=True,
+        )
+    except inbox_service_client.InboxServiceUnavailable:
+        # Media cleanup remains retryable and must not reacquire write access
+        # to Inbox tables merely because the Inbox service is unavailable.
+        return 0
 
 
-def expire_due_inbox_media(db: Session, *, limit: int = 100, actor_user_id: int | None = None) -> dict:
+def request_expired_inbox_media_cleanup(
+    db: Session,
+    *,
+    limit: int = 100,
+    actor_user_id: int | None = None,
+) -> dict:
+    now = datetime.utcnow()
+    bounded = max(1, min(int(limit), 500))
+    due = (
+        db.query(CdnMediaAsset.id)
+        .filter(CdnMediaAsset.media_type == CdnMediaType.INBOX_MEDIA.value)
+        .filter(CdnMediaAsset.expires_at.isnot(None))
+        .filter(CdnMediaAsset.expires_at <= now)
+        .filter(CdnMediaAsset.deletion_status == CdnMediaDeletionStatus.ACTIVE.value)
+        .limit(bounded)
+        .count()
+    )
+    event_outbox_service.enqueue_event(
+        db,
+        event_type="media.cleanup.requested",
+        actor_user_id=actor_user_id,
+        payload={"limit": bounded, "actor_user_id": actor_user_id},
+    )
+    db.commit()
+    return {"checked": int(due), "deleted": 0, "failed": 0}
+
+
+def expire_due_inbox_media(
+    db: Session,
+    *,
+    limit: int = 100,
+    actor_user_id: int | None = None,
+) -> dict:
     now = datetime.utcnow()
     assets = (
         db.query(CdnMediaAsset)
@@ -226,30 +433,50 @@ def expire_due_inbox_media(db: Session, *, limit: int = 100, actor_user_id: int 
         .filter(CdnMediaAsset.expires_at <= now)
         .filter(CdnMediaAsset.deletion_status == CdnMediaDeletionStatus.ACTIVE.value)
         .order_by(CdnMediaAsset.expires_at.asc())
-        .limit(limit)
+        .limit(max(1, min(int(limit), 500)))
         .all()
     )
-    deleted = 0
+    queued = 0
     failed = 0
     placeholders = 0
     for asset in assets:
         try:
             asset.upload_status = CdnMediaUploadStatus.EXPIRED.value
-            asset.deletion_status = CdnMediaDeletionStatus.DELETED.value
+            asset.deletion_status = CdnMediaDeletionStatus.PENDING_DELETE.value
             asset.is_active_reference = False
             asset.deleted_at = now
             placeholders += _expire_inbox_message_references(db, asset, now)
-            media_storage_service.delete_media_object(asset.object_key)
             db.add(asset)
-            deleted += 1
+            event_outbox_service.enqueue_event(
+                db,
+                event_type="media.delete.requested",
+                actor_user_id=actor_user_id,
+                payload={
+                    "media_id": asset.public_id,
+                    "reason": "inbox_media_expired",
+                },
+            )
+            queued += 1
         except Exception as exc:
-            asset.deletion_status = CdnMediaDeletionStatus.FAILED.value
-            asset.deletion_error = str(exc)
+            asset.deletion_status = CdnMediaDeletionStatus.RETRY_SCHEDULED.value
+            asset.deletion_error = type(exc).__name__
             db.add(asset)
             failed += 1
     db.commit()
-    create_admin_log(db=db, actor_user_id=actor_user_id, action="INBOX_MEDIA_EXPIRY_CLEANUP_RUN", resource_type="cdn_media_cleanup", reason="manual_or_scheduled_cleanup", metadata_json={"checked": len(assets), "deleted": deleted, "failed": failed, "placeholders": placeholders})
-    return {"checked": len(assets), "deleted": deleted, "failed": failed}
+    create_admin_log(
+        db=db,
+        actor_user_id=actor_user_id,
+        action="INBOX_MEDIA_EXPIRY_CLEANUP_QUEUED",
+        resource_type="cdn_media_cleanup",
+        reason="worker_cleanup",
+        metadata_json={
+            "checked": len(assets),
+            "queued": queued,
+            "failed": failed,
+            "placeholders": placeholders,
+        },
+    )
+    return {"checked": len(assets), "deleted": queued, "failed": failed}
 
 
 def get_inbox_retention_days(db: Session) -> int:

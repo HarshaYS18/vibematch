@@ -250,6 +250,7 @@ class _FriendsInviteSheetState extends State<FriendsInviteSheet> {
                         borderRadius: BorderRadius.circular(15),
                         child: Image.network(
                           user.avatarUrl!,
+                          cacheWidth: (38 * MediaQuery.devicePixelRatioOf(context)).round(),
                           width: 38,
                           height: 38,
                           fit: BoxFit.cover,

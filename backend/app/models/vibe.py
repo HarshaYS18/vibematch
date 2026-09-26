@@ -21,6 +21,11 @@ class VibePost(Base):
     is_deleted: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False, index=True)
     created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow, nullable=False, index=True)
     updated_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow, nullable=False)
+    likes_count: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
+    comments_count: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
+    shares_count: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
+    saves_count: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
+    reports_count: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
 
     author = relationship("User")
     comments = relationship("VibeComment", back_populates="post", cascade="all, delete-orphan")

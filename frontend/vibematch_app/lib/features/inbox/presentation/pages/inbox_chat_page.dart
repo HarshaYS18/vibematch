@@ -1,6 +1,7 @@
 import 'dart:async';
 
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../../app/app_routes.dart';
 import '../../controllers/inbox_controller.dart';
@@ -9,7 +10,7 @@ import '../widgets/inbox_call_action_sheet.dart';
 import '../widgets/inbox_call_realtime_presenter.dart';
 import '../widgets/swipe_reply_message.dart';
 
-class InboxChatPage extends StatefulWidget {
+class InboxChatPage extends ConsumerStatefulWidget {
   const InboxChatPage({
     super.key,
     required this.conversation,
@@ -24,12 +25,13 @@ class InboxChatPage extends StatefulWidget {
   final VoidCallback? onBackTap;
 
   @override
-  State<InboxChatPage> createState() => _InboxChatPageState();
+  ConsumerState<InboxChatPage> createState() => _InboxChatPageState();
 }
 
-class _InboxChatPageState extends State<InboxChatPage> {
+class _InboxChatPageState extends ConsumerState<InboxChatPage> {
   final TextEditingController _textController = TextEditingController();
   final ScrollController _scrollController = ScrollController();
+  bool _loadingOlderMessages = false;
   String? _replyToText;
   String? _lastActivity;
 
@@ -50,8 +52,8 @@ class _InboxChatPageState extends State<InboxChatPage> {
   void initState() {
     super.initState();
     widget.controller.markConversationRead(widget.conversation.id);
-    widget.controller.addListener(_handleChanged);
     _textController.addListener(_handleInputChanged);
+    _scrollController.addListener(_handleMessageScroll);
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (mounted)
         unawaited(
@@ -66,26 +68,48 @@ class _InboxChatPageState extends State<InboxChatPage> {
       widget.controller.closeSecretDriftSession(conversation: _conversation),
     );
     widget.controller.clearActiveConversation(widget.conversation.id);
-    widget.controller.removeListener(_handleChanged);
     _textController.removeListener(_handleInputChanged);
+    _scrollController.removeListener(_handleMessageScroll);
     _textController.dispose();
     _scrollController.dispose();
     super.dispose();
   }
 
-  void _handleChanged() {
-    if (!mounted) return;
-    setState(() {});
-    WidgetsBinding.instance.addPostFrameCallback((_) => _jumpToBottom());
+  void _handleMessageScroll() {
+    if (_loadingOlderMessages || !_scrollController.hasClients) return;
+    if (_scrollController.position.pixels > 96) return;
+    final conversation = _conversation;
+    if (!conversation.hasOlderMessages ||
+        conversation.messagesNextCursor == null) {
+      return;
+    }
+    unawaited(_loadOlderMessagesPreservingPosition());
   }
 
-  void _jumpToBottom() {
-    if (!_scrollController.hasClients) return;
-    _scrollController.animateTo(
-      _scrollController.position.maxScrollExtent,
-      duration: const Duration(milliseconds: 220),
-      curve: Curves.easeOutCubic,
-    );
+  Future<void> _loadOlderMessagesPreservingPosition() async {
+    if (_loadingOlderMessages || !_scrollController.hasClients) return;
+    _loadingOlderMessages = true;
+    final oldMaxExtent = _scrollController.position.maxScrollExtent;
+    final oldOffset = _scrollController.position.pixels;
+    final added = await widget.controller.loadOlderMessages(_conversation.id);
+    if (!mounted) return;
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted || !_scrollController.hasClients) {
+        _loadingOlderMessages = false;
+        return;
+      }
+      if (added > 0) {
+        final delta =
+            _scrollController.position.maxScrollExtent - oldMaxExtent;
+        _scrollController.jumpTo(
+          (oldOffset + delta).clamp(
+            _scrollController.position.minScrollExtent,
+            _scrollController.position.maxScrollExtent,
+          ),
+        );
+      }
+      _loadingOlderMessages = false;
+    });
   }
 
   void _sendActivity(String activity) {
@@ -167,6 +191,8 @@ class _InboxChatPageState extends State<InboxChatPage> {
 
   @override
   Widget build(BuildContext context) {
+    ref.watch(inboxControllerProvider);
+
     final conversation = _conversation;
     final messages = conversation.messages;
     return InboxCallRealtimePresenter(

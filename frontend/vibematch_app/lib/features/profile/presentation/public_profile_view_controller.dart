@@ -25,9 +25,11 @@ extension _PublicProfileViewController on _PublicProfileViewPageState {
     if (publicUserId <= 0) return;
 
     try {
-      await LoveBondRealtimeService.syncPublicBondsFromBackend(
-        profilePublicUserId: publicUserId,
-      );
+      await ref
+          .read(loveBondRealtimeProvider.notifier)
+          .syncPublicBondsFromBackend(
+            profilePublicUserId: publicUserId,
+          );
     } catch (_) {}
   }
 

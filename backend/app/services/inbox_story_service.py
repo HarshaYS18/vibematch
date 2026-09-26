@@ -7,7 +7,7 @@ from app.models.cdn_media import CdnMediaLinkedEntityType, CdnMediaType
 from app.models.follow import UserFollow
 from app.models.inbox_story import InboxStory, InboxStoryView
 from app.models.user import User
-from app.services import cdn_media_service, inbox_preference_service
+from app.services import cdn_media_service
 
 VALID_VISIBILITY = {"everyone", "friends", "nobody"}
 VALID_MEDIA_TYPES = {"image", "video"}
@@ -39,8 +39,7 @@ def _can_view_story(db: Session, viewer: User, story: InboxStory) -> bool:
     owner = story.owner
     if owner is None:
         return False
-    preference = inbox_preference_service.get_or_create_preferences(db, owner)
-    visibility = story.visibility or preference.story_visibility
+    visibility = story.visibility or "friends"
     if visibility == "nobody":
         return False
     if visibility == "friends":
@@ -74,7 +73,7 @@ def list_visible_stories(db: Session, viewer: User) -> list[InboxStory]:
 
 def create_story(db: Session, owner: User, media_url: str, media_type: str, caption: str | None, visibility: str | None) -> InboxStory:
     clean_type = (media_type or "image").strip().lower()
-    clean_visibility = (visibility or inbox_preference_service.get_or_create_preferences(db, owner).story_visibility).strip().lower()
+    clean_visibility = (visibility or "friends").strip().lower()
     clean_url = media_url.strip()
     if clean_type not in VALID_MEDIA_TYPES:
         raise ValueError("Story media type must be image or video")

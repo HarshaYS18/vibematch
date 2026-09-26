@@ -1,0 +1,44 @@
+name: Frontend architecture guard
+
+on:
+  pull_request:
+    paths:
+      - 'frontend/vibematch_app/**'
+      - 'scripts/check_frontend_architecture.py'
+      - 'scripts/check_frontend_baseline.py'
+      - 'scripts/audit_flutter_hygiene.py'
+      - 'scripts/check_graphql_bff_architecture.py'
+      - 'scripts/check_search_platform.py'
+      - 'scripts/check_mobile_runtime.py'
+      - 'contracts/graphql/**'
+      - '.github/workflows/frontend-architecture.yml'
+  push:
+    branches:
+      - main
+      - 'chatgpt/**'
+    paths:
+      - 'frontend/vibematch_app/**'
+      - 'scripts/check_frontend_architecture.py'
+      - 'scripts/check_frontend_baseline.py'
+      - 'scripts/audit_flutter_hygiene.py'
+      - 'scripts/check_graphql_bff_architecture.py'
+      - 'scripts/check_search_platform.py'
+      - 'contracts/graphql/**'
+
+jobs:
+  architecture:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Enforce canonical frontend boundaries
+        run: python scripts/check_frontend_architecture.py
+      - name: Verify frontend baseline manifest integrity
+        run: python scripts/check_frontend_baseline.py
+      - name: Enforce zero unnecessary Flutter artifacts
+        run: python scripts/audit_flutter_hygiene.py --check
+      - name: Verify persisted GraphQL read boundary
+        run: python scripts/check_graphql_bff_architecture.py
+      - name: Verify Search projection boundary
+        run: python scripts/check_search_platform.py
+      - name: Verify mobile runtime/offline boundary
+        run: python scripts/check_mobile_runtime.py

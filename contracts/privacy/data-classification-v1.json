@@ -1,0 +1,15 @@
+{
+  "schema_version": 1,
+  "classes": {
+    "public": {"examples": ["public_user_id", "display_name", "public_room_name"]},
+    "internal": {"examples": ["request_id", "service_metrics", "feature_flags"]},
+    "restricted": {"examples": ["email", "date_of_birth", "device_id", "private_messages", "moderation_evidence"]},
+    "highly_restricted": {"examples": ["access_tokens", "password_hashes", "payment_secrets", "private_keys"]}
+  },
+  "rules": {
+    "logs": "no highly_restricted data; restricted values must be minimized/redacted",
+    "analytics": "no credentials; restricted data requires explicit approved field-level purpose",
+    "search": "public fields only",
+    "recommendation": "stable IDs and behavior features only; no credentials/private message bodies"
+  }
+}

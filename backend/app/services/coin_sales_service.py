@@ -5,7 +5,7 @@ from sqlalchemy.orm import Session
 from app.models.economy import CoinSaleOrder, CoinSaleStatus, CoinSupplyPool, CoinSupplyPoolType, EconomyCurrency, EconomyDirection, WalletLedger
 from app.models.role import RoleName
 from app.models.user import User
-from app.services import economy_service, role_service
+from app.services import economy_service, economy_transaction_service, role_service
 
 SELLER_ROLES = {
     RoleName.FOUNDER_OWNER,
@@ -106,7 +106,7 @@ def get_seller_pools(db: Session, actor: User) -> list[CoinSupplyPool]:
     return query.filter(CoinSupplyPool.owner_user_id == actor.id, CoinSupplyPool.pool_type.in_(allowed)).order_by(CoinSupplyPool.id.asc()).all()
 
 
-def grant_supply_to_seller(db: Session, actor: User, target_identifier: int | str, pool_type: str, amount: int, reason: str) -> CoinSupplyPool:
+def grant_supply_to_seller(db: Session, actor: User, target_identifier: int | str, pool_type: str, amount: int, reason: str, *, commit: bool = True) -> CoinSupplyPool:
     if not role_service.is_owner_or_above(actor):
         raise HTTPException(status_code=403, detail="Only Owner or Super Owner can grant seller supply.")
     target = _resolve_user_identifier(db, target_identifier)
@@ -127,8 +127,11 @@ def grant_supply_to_seller(db: Session, actor: User, target_identifier: int | st
         created_by_user_id=actor.id,
         reason=reason,
     ))
-    db.commit()
-    db.refresh(pool)
+    if commit:
+        db.commit()
+        db.refresh(pool)
+    else:
+        db.flush()
     return pool
 
 
@@ -146,7 +149,7 @@ def _find_pool_for_sale(db: Session, actor: User, source_pool_id: int | None) ->
     return pool
 
 
-def sell_to_user(db: Session, seller: User, target_identifier: int | str, coin_amount: int, payment_amount: int, payment_currency: str, proof_url: str | None, source_pool_id: int | None, reason: str) -> dict:
+def sell_to_user(db: Session, seller: User, target_identifier: int | str, coin_amount: int, payment_amount: int, payment_currency: str, proof_url: str | None, source_pool_id: int | None, reason: str, *, tx=None, commit: bool = True) -> dict:
     buyer = _resolve_user_identifier(db, target_identifier)
     source = _find_pool_for_sale(db, seller, source_pool_id)
     assert_can_use_pool(seller, source)
@@ -183,30 +186,46 @@ def sell_to_user(db: Session, seller: User, target_identifier: int | str, coin_a
         reason=reason,
     ))
 
-    wallet = economy_service.get_or_create_wallet(db, buyer.id)
-    before_wallet = wallet.coin_balance
-    wallet.coin_balance += coin_amount
-    db.add(WalletLedger(
-        user_id=buyer.id,
-        currency_type=EconomyCurrency.COIN.value,
-        direction=EconomyDirection.CREDIT.value,
-        amount=coin_amount,
-        before_balance=before_wallet,
-        after_balance=wallet.coin_balance,
-        source_type="ROLE_COIN_SALE",
-        source_id=str(order.id),
-        created_by_user_id=seller.id,
-        reason=reason,
-    ))
+    if tx is None:
+        wallet = economy_service.get_or_create_wallet(db, buyer.id)
+        before_wallet = wallet.coin_balance
+        wallet.coin_balance += coin_amount
+        db.add(WalletLedger(
+            user_id=buyer.id,
+            currency_type=EconomyCurrency.COIN.value,
+            direction=EconomyDirection.CREDIT.value,
+            amount=coin_amount,
+            before_balance=before_wallet,
+            after_balance=wallet.coin_balance,
+            source_type="ROLE_COIN_SALE",
+            source_id=str(order.id),
+            created_by_user_id=seller.id,
+            reason=reason,
+        ))
+    else:
+        wallet = economy_transaction_service.credit(
+            db,
+            user_id=buyer.id,
+            amount=coin_amount,
+            currency=EconomyCurrency.COIN.value,
+            source_type="ROLE_COIN_SALE",
+            source_id=str(order.id),
+            reason=reason,
+            tx=tx,
+            actor_user_id=seller.id,
+        )
     db.flush()
     from app.services import economy_level_service
 
     levels = economy_level_service.wallet_level_payload(db, wallet)
     economy_level_service.sync_vip_status(db, buyer.id, levels)
-    db.commit()
-    db.refresh(order)
-    db.refresh(source)
-    db.refresh(wallet)
+    if commit:
+        db.commit()
+        db.refresh(order)
+        db.refresh(source)
+        db.refresh(wallet)
+    else:
+        db.flush()
     return {
         "order_id": order.id,
         "seller_user_id": seller.id,

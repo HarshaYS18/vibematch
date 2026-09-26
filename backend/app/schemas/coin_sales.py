@@ -2,6 +2,7 @@ from pydantic import BaseModel, Field, model_validator
 
 
 class CoinSellerSupplyGrantRequest(BaseModel):
+    request_id: str | None = Field(default=None, min_length=8, max_length=80)
     target_public_user_id: int | None = None
     target_user_identifier: str | None = Field(default=None, min_length=1, max_length=80)
     pool_type: str = Field(..., min_length=3, max_length=80)
@@ -16,6 +17,7 @@ class CoinSellerSupplyGrantRequest(BaseModel):
 
 
 class CoinSellerSellToUserRequest(BaseModel):
+    request_id: str | None = Field(default=None, min_length=8, max_length=80)
     target_public_user_id: int | None = None
     target_user_identifier: str | None = Field(default=None, min_length=1, max_length=80)
     coin_amount: int = Field(..., gt=0, le=100_000_000)

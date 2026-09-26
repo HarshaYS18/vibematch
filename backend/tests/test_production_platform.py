@@ -33,21 +33,97 @@ class ProductionConfigTests(TestCase):
             Settings(APP_ENV="production", _env_file=None).validate_production()
         safe = dict(
             APP_ENV="production", JWT_SECRET_KEY="j" * 40,
-            MEDIA_INTERNAL_TOKEN="m" * 40, INBOX_BACKUP_ENCRYPTION_KEY="b" * 40,
+            MEDIA_INTERNAL_TOKEN="m" * 40, INBOX_INTERNAL_TOKEN="i" * 40,
+            VIBES_INTERNAL_TOKEN="v" * 40, ROOM_CONTROL_INTERNAL_TOKEN="r" * 40,
+            IDENTITY_INTERNAL_TOKEN="d" * 40, PROFILE_SOCIAL_INTERNAL_TOKEN="p" * 40,
+            ECONOMY_INTERNAL_TOKEN="e" * 40,
+            INBOX_BACKUP_ENCRYPTION_KEY="b" * 40,
             GOOGLE_AUTH_CLIENT_IDS="client.apps.googleusercontent.com",
+            REALTIME_CAPABILITY_PRIVATE_KEY_B64="AAECAwQFBgcICQoLDA0ODxAREhMUFRYXGBkaGxwdHh8",
             CORS_ALLOWED_ORIGINS="https://funkey.example",
             MEDIA_STORAGE_DRIVER="s3", MEDIA_S3_BUCKET="bucket",
             MEDIA_CDN_BASE_URL="https://cdn.funkey.example", RATE_LIMIT_ENABLED=True,
             database_url="postgresql://funkey:strong-secret@postgres.internal:5432/funkey",
             redis_url="rediss://cache.internal:6379/0",
+            CACHE_REDIS_URL="rediss://cache.internal:6379/0",
+            REALTIME_REDIS_URL="rediss://realtime.internal:6379/0",
+            MEDIA_REGISTRY_REDIS_URL="rediss://media-redis.internal:6379/0",
         )
         Settings(**safe, _env_file=None).validate_production()
         with self.assertRaisesRegex(RuntimeError, "database_url\\(default\\)"):
             Settings(**{**safe, "database_url": "postgresql://postgres:postgres@localhost:5432/vibematch"}, _env_file=None).validate_production()
-        with self.assertRaisesRegex(RuntimeError, "redis_url\\(default\\)"):
-            Settings(**{**safe, "redis_url": "redis://localhost:6379/0"}, _env_file=None).validate_production()
+        with self.assertRaisesRegex(RuntimeError, "CACHE_REDIS_URL"):
+            Settings(**{**safe, "CACHE_REDIS_URL": ""}, _env_file=None).validate_production()
+        with self.assertRaisesRegex(RuntimeError, "Redis role endpoint separation"):
+            Settings(
+                **{**safe, "REALTIME_REDIS_URL": safe["CACHE_REDIS_URL"]},
+                _env_file=None,
+            ).validate_production()
         with self.assertRaisesRegex(RuntimeError, "DB_API_CONNECTION_BUDGET"):
             Settings(**safe, DB_POOL_SIZE=10, DB_API_CONNECTION_BUDGET=100, _env_file=None).validate_production()
+        with self.assertRaisesRegex(RuntimeError, "READ_REPLICA_DATABASE_URL"):
+            Settings(
+                **safe,
+                DB_READ_REPLICA_ENABLED=True,
+                READ_REPLICA_DATABASE_URL="",
+                _env_file=None,
+            ).validate_production()
+        with self.assertRaisesRegex(RuntimeError, "READ_REPLICA_DATABASE_URL"):
+            Settings(
+                **safe,
+                DB_READ_REPLICA_ENABLED=True,
+                READ_REPLICA_DATABASE_URL=safe["database_url"],
+                _env_file=None,
+            ).validate_production()
+
+    def test_transaction_pooling_requires_direct_migration_url_and_bounded_topology(self):
+        safe = dict(
+            APP_ENV="production", JWT_SECRET_KEY="j" * 40,
+            MEDIA_INTERNAL_TOKEN="m" * 40, INBOX_INTERNAL_TOKEN="i" * 40,
+            VIBES_INTERNAL_TOKEN="v" * 40, ROOM_CONTROL_INTERNAL_TOKEN="r" * 40,
+            IDENTITY_INTERNAL_TOKEN="d" * 40, PROFILE_SOCIAL_INTERNAL_TOKEN="p" * 40,
+            ECONOMY_INTERNAL_TOKEN="e" * 40,
+            INBOX_BACKUP_ENCRYPTION_KEY="b" * 40,
+            GOOGLE_AUTH_CLIENT_IDS="client.apps.googleusercontent.com",
+            REALTIME_CAPABILITY_PRIVATE_KEY_B64="AAECAwQFBgcICQoLDA0ODxAREhMUFRYXGBkaGxwdHh8",
+            CORS_ALLOWED_ORIGINS="https://funkey.example",
+            MEDIA_STORAGE_DRIVER="s3", MEDIA_S3_BUCKET="bucket",
+            MEDIA_CDN_BASE_URL="https://cdn.funkey.example", RATE_LIMIT_ENABLED=True,
+            database_url="postgresql://funkey:strong-secret@pgbouncer.internal:6432/funkey",
+            MIGRATION_DATABASE_URL="postgresql://funkey_migrate:strong-secret@postgres.internal:5432/funkey",
+            DB_POOLER_MODE="transaction",
+            redis_url="rediss://cache.internal:6379/0",
+            CACHE_REDIS_URL="rediss://cache.internal:6379/0",
+            REALTIME_REDIS_URL="rediss://realtime.internal:6379/0",
+            MEDIA_REGISTRY_REDIS_URL="rediss://media-redis.internal:6379/0",
+        )
+        settings_obj = Settings(**safe, _env_file=None)
+        settings_obj.validate_production()
+        self.assertEqual(
+            "postgresql://funkey_migrate:strong-secret@postgres.internal:5432/funkey",
+            settings_obj.migration_database_url,
+        )
+        self.assertEqual(848, settings_obj.expected_pooler_client_connections)
+
+        with self.assertRaisesRegex(RuntimeError, "MIGRATION_DATABASE_URL"):
+            Settings(
+                **{**safe, "MIGRATION_DATABASE_URL": safe["database_url"]},
+                _env_file=None,
+            ).validate_production()
+        with self.assertRaisesRegex(RuntimeError, "DB_POOLER_MAX_CLIENT_CONNECTIONS"):
+            Settings(
+                **safe,
+                DB_POOLER_MAX_CLIENT_CONNECTIONS=100,
+                _env_file=None,
+            ).validate_production()
+        with self.assertRaisesRegex(RuntimeError, "DB_SERVER_CONNECTION_LIMIT"):
+            Settings(
+                **safe,
+                DB_POOLER_MAX_SERVER_CONNECTIONS=140,
+                DB_DIRECT_CONNECTION_RESERVE=40,
+                DB_SERVER_CONNECTION_LIMIT=160,
+                _env_file=None,
+            ).validate_production()
 
 
 class IdentityAllocationTests(TestCase):
@@ -111,7 +187,11 @@ class GatewayAuthTests(TestCase):
         user = SimpleNamespace(id=7)
         with patch.object(realtime_gateway_auth, "decode_access_token", return_value={"device_id": "device"}), \
              patch.object(realtime_gateway_auth, "is_device_banned", return_value=False), \
-             patch.object(realtime_gateway_auth, "evaluate_media_room_permission", return_value=SimpleNamespace(allowed=False, reason="kicked")):
+             patch.object(
+                 realtime_gateway_auth.room_control_service_client,
+                 "authorize_room_action",
+                 return_value={"allowed": False, "reason": "kicked", "permissions": []},
+             ):
             with self.assertRaises(HTTPException) as raised:
                 realtime_gateway_auth.verify_realtime_gateway(
                     realtime_gateway_auth.RealtimeVerifyRequest(requested_action="subscribe", room_public_id="VM123"),
@@ -125,7 +205,7 @@ class GatewayAuthTests(TestCase):
         heartbeat_node(redis, node_id="node-1", public_url="https://media.example",
                        room_count=0, peer_count=0, max_rooms=10, max_peers=100, room_ids=[])
         request = Request({"type": "http", "headers": [(b"x-media-internal-token", settings.MEDIA_INTERNAL_TOKEN.encode())]})
-        with patch.object(media_control, "get_redis", return_value=redis):
+        with patch.object(media_control, "get_media_registry_redis", return_value=redis):
             drained = media_control.media_node_internal_drain("node-1", request)
         self.assertTrue(drained.draining)
 
@@ -215,20 +295,20 @@ class OutboxLeaseTests(TestCase):
 
 
 class WorkerIdempotencyTests(TestCase):
-    def test_notification_is_inserted_once_for_duplicate_delivery(self):
-        db_engine = create_engine("sqlite://", connect_args={"check_same_thread": False}, poolclass=StaticPool)
-        Base.metadata.create_all(db_engine, tables=[User.__table__, UserNotification.__table__, WorkerProcessedEvent.__table__])
-        factory = sessionmaker(bind=db_engine)
-        with factory.begin() as db:
-            db.add(User(id=7, public_user_id=6418000007, username="recipient"))
+    def test_notification_worker_delegates_idempotency_to_notification_service(self):
         event = EventEnvelope(
             event_id=uuid4(), event_type="notification.requested", event_version=1,
             occurred_at=datetime.now(timezone.utc),
             payload={"recipient_user_id": 7, "notification_type": "test", "title": "Hello", "body": "Body"},
         )
-        with patch.object(handlers, "SessionLocal", factory):
+        with patch.object(
+            handlers.notification_service_client,
+            "create_intent",
+            side_effect=[{"duplicate": False}, {"duplicate": True}],
+        ) as create_intent:
             self.assertEqual(handlers.handle_notification_requested(event), "processed")
             self.assertEqual(handlers.handle_notification_requested(event), "duplicate")
-        with factory() as db:
-            self.assertEqual(db.query(UserNotification).count(), 1)
-        db_engine.dispose()
+        self.assertEqual(create_intent.call_count, 2)
+        for call in create_intent.call_args_list:
+            self.assertEqual(call.kwargs["source_event_id"], str(event.event_id))
+            self.assertEqual(call.kwargs["recipient_user_id"], 7)

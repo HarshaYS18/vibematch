@@ -1,0 +1,2 @@
+graphql-core==3.2.6
+httpx==0.28.1

@@ -3,7 +3,6 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 
 import '../../../data/live_room_media_signaling_service.dart';
-import '../../../data/live_room_member_request_service.dart';
 import '../../controllers/live_room_sheet_controller.dart';
 import '../../live_room_models.dart';
 import '../../widgets/live_room_invite_sheet.dart';
@@ -197,7 +196,7 @@ class LiveRoomSeatsModule {
       return;
     }
 
-    LiveRoomMemberRequestService.instance.requestMembership();
+    bundle.requestRoomMembership();
     RoomToast.show(bundle.context, 'Room member request sent to channel host');
   }
 

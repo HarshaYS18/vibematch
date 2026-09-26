@@ -1,5 +1,6 @@
-import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
+
+import '../../../../core/assets/funkey_cdn_assets.dart';
 
 class PremiumGiftBroadcastEvent {
   const PremiumGiftBroadcastEvent({
@@ -23,35 +24,38 @@ class PremiumGiftBroadcastEvent {
   final String? giftAssetUrl;
 }
 
+/// Room-scoped queue for premium gift broadcast presentation.
+///
+/// Ownership: [LiveRoomGiftController]. This queue is ephemeral UI state only;
+/// authoritative gift send/results come from backend room events. The queue is
+/// disposed with the room controller so broadcasts cannot leak across rooms.
 class PremiumGiftBroadcastBus {
-  const PremiumGiftBroadcastBus._();
+  PremiumGiftBroadcastBus();
 
-  static final ValueNotifier<int> queueVersion = ValueNotifier<int>(0);
-  static final List<PremiumGiftBroadcastEvent> _queue = <PremiumGiftBroadcastEvent>[];
-  static PremiumGiftBroadcastEvent? _active;
+  final ValueNotifier<int> queueVersion = ValueNotifier<int>(0);
+  final List<PremiumGiftBroadcastEvent> _queue =
+      <PremiumGiftBroadcastEvent>[];
+  PremiumGiftBroadcastEvent? _active;
 
-  static PremiumGiftBroadcastEvent? get active => _active;
+  PremiumGiftBroadcastEvent? get active => _active;
 
-  static bool _isBackend(PremiumGiftBroadcastEvent event) =>
+  bool _isBackend(PremiumGiftBroadcastEvent event) =>
       event.id.startsWith('premium-gift_');
 
-  static String _key(PremiumGiftBroadcastEvent event) =>
+  String _key(PremiumGiftBroadcastEvent event) =>
       '${event.senderName.trim().toLowerCase()}|'
       '${event.targetName.trim().toLowerCase()}|'
       '${event.giftName.trim().toLowerCase()}|${event.combo}';
 
-  static bool _same(
+  bool _same(
     PremiumGiftBroadcastEvent left,
     PremiumGiftBroadcastEvent right,
   ) => _key(left) == _key(right);
 
-  static void publish(PremiumGiftBroadcastEvent event) {
+  void publish(PremiumGiftBroadcastEvent event) {
     final active = _active;
     final incomingIsBackend = _isBackend(event);
 
-    // Every successful room send produces a backend event. The sender also
-    // creates a legacy local presentation after the HTTP response, so prefer
-    // the authoritative backend event and suppress only that local duplicate.
     if (!incomingIsBackend) {
       if (active != null && _isBackend(active) && _same(active, event)) return;
       if (_queue.any((item) => _isBackend(item) && _same(item, event))) return;
@@ -73,31 +77,39 @@ class PremiumGiftBroadcastBus {
     queueVersion.value++;
   }
 
-  static void completeActive() {
-    if (_queue.isEmpty) {
-      _active = null;
-    } else {
-      _active = _queue.removeAt(0);
-    }
+  void completeActive() {
+    _active = _queue.isEmpty ? null : _queue.removeAt(0);
     queueVersion.value++;
   }
 
-  static void clearAll() {
+  void clearAll() {
     _active = null;
     _queue.clear();
     queueVersion.value++;
   }
+
+  void dispose() {
+    _active = null;
+    _queue.clear();
+    queueVersion.dispose();
+  }
 }
 
+/// Renders the currently active premium broadcast from a room-scoped queue.
 class PremiumGiftBroadcastOverlay extends StatelessWidget {
-  const PremiumGiftBroadcastOverlay({super.key});
+  const PremiumGiftBroadcastOverlay({
+    super.key,
+    required this.bus,
+  });
+
+  final PremiumGiftBroadcastBus bus;
 
   @override
   Widget build(BuildContext context) {
     return ValueListenableBuilder<int>(
-      valueListenable: PremiumGiftBroadcastBus.queueVersion,
+      valueListenable: bus.queueVersion,
       builder: (context, _, child) {
-        final event = PremiumGiftBroadcastBus.active;
+        final event = bus.active;
         if (event == null) return const SizedBox.shrink();
         return Positioned(
           top: MediaQuery.paddingOf(context).top + 8,
@@ -107,7 +119,7 @@ class PremiumGiftBroadcastOverlay extends StatelessWidget {
             child: _PremiumGiftBroadcastCard(
               key: ValueKey(event.id),
               event: event,
-              onCompleted: PremiumGiftBroadcastBus.completeActive,
+              onCompleted: bus.completeActive,
             ),
           ),
         );
@@ -248,8 +260,8 @@ class _PremiumGiftBroadcastCardState extends State<_PremiumGiftBroadcastCard>
                     ),
                   ),
                   Positioned.fill(
-                    child: Image.asset(
-                      'assets/gifts/broadcast/premium_gift_broadcast_frame.png',
+                    child: Image.network(
+                      FunKeyCdnAssets.premiumGiftBroadcastFrame,
                       fit: BoxFit.fill,
                       errorBuilder: (context, error, stackTrace) =>
                           const _FallbackPremiumFrame(),
@@ -310,12 +322,10 @@ class _PremiumGiftBroadcastCardState extends State<_PremiumGiftBroadcastCard>
                               ],
                             ),
                           ),
-                          if ((widget.event.giftAssetUrl?.trim().isNotEmpty ?? false) ||
-                              (widget.event.giftAssetPath?.trim().isNotEmpty ?? false)) ...[
+                          if (widget.event.giftAssetUrl?.trim().isNotEmpty ?? false) ...[
                             const SizedBox(width: 7),
                             _BroadcastGiftImage(
                               assetUrl: widget.event.giftAssetUrl,
-                              assetPath: widget.event.giftAssetPath,
                             ),
                           ],
                         ],
@@ -401,15 +411,13 @@ class _BroadcastAvatar extends StatelessWidget {
 }
 
 class _BroadcastGiftImage extends StatelessWidget {
-  const _BroadcastGiftImage({this.assetUrl, this.assetPath});
+  const _BroadcastGiftImage({this.assetUrl});
 
   final String? assetUrl;
-  final String? assetPath;
 
   @override
   Widget build(BuildContext context) {
     final url = assetUrl?.trim();
-    final path = assetPath?.trim();
     Widget fallback() => const Icon(
       Icons.card_giftcard_rounded,
       color: Color(0xFFFFE7A1),
@@ -421,12 +429,6 @@ class _BroadcastGiftImage extends StatelessWidget {
       child: url != null && url.isNotEmpty
           ? Image.network(
               url,
-              fit: BoxFit.contain,
-              errorBuilder: (context, error, stackTrace) => fallback(),
-            )
-          : path != null && path.isNotEmpty
-          ? Image.asset(
-              path,
               fit: BoxFit.contain,
               errorBuilder: (context, error, stackTrace) => fallback(),
             )

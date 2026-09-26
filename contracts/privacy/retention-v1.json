@@ -1,0 +1,13 @@
+{
+  "schema_version": 1,
+  "policies": {
+    "security_audit": {"retention_days": 365, "deletion": "scheduled"},
+    "application_logs": {"retention_days": 30, "deletion": "scheduled"},
+    "analytics_raw": {"retention_days": 90, "deletion": "scheduled_or_aggregated"},
+    "analytics_aggregates": {"retention_days": 365, "deletion": "scheduled"},
+    "search_projection": {"retention_days": 0, "deletion": "delete_on_domain_tombstone_or_rebuild"},
+    "recommendation_projection": {"retention_days": 1, "deletion": "ttl"},
+    "privacy_request_audit": {"retention_days": 2555, "deletion": "pseudonymize_after_legal_window"}
+  },
+  "dsar_due_days": 30
+}

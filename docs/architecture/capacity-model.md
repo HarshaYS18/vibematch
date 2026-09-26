@@ -13,6 +13,11 @@ The design target is a path toward approximately one million concurrent users, n
 | PostgreSQL | Transactions/sec, connections, slow queries, WAL | Pool waits, replication lag, lock waits, disk and IOPS |
 | Redis/Valkey | Ops/sec and script latency | Memory, evictions, failover, registry heartbeat age |
 | NATS | Events/sec, pending and oldest age | Stream storage, consumer ack/redelivery, broker CPU/disk |
+| Kafka | Records/sec, producer latency, consumer lag | ISR health, broker storage, bridge source lag, replay throughput |
+| Search / OpenSearch | Queries/sec, indexing/sec, p95/p99 | Shard pressure, JVM/CPU/memory, queue/rejection rate, projection lag |
+| Recommendation | Feed reads/sec, projection updates/sec, p95/p99 | Kafka lag, Redis memory/latency, candidate volume, scoring CPU |
+| Analytics | Events/sec materialized, ClickHouse inserts/sec, lake bytes/sec | Kafka lag, ClickHouse merge/storage pressure, object-store errors |
+| GraphQL Read BFF | Composite reads/sec, owner fanout, p95/p99 | Upstream owner latency, timeout/partial-error rate, request complexity |
 
 ## Planning equations
 
@@ -36,6 +41,6 @@ Separate system, API/worker, realtime, and media node pools. The provider node a
 
 ## Test ladder
 
-Run local correctness, then 1k, 10k, 50k, 100k, 250k, 500k, and 1M concurrent stages only when the previous stage meets latency, error, recovery, and cost targets. At each stage include auth, snapshots, room join, WebSocket fanout, reconnect storm, node drain, media discovery, and real WebRTC/RTP capacity tests. HTTP discovery tests cannot stand in for SFU packet or TURN bandwidth tests. Exercise deployment and one-node failure during sustained load.
+Run local correctness, then 1k, 10k, 50k, 100k, 250k, 500k, and 1M concurrent stages only when the previous stage meets latency, error, recovery, and cost targets. At each stage include auth, snapshots, GraphQL composite reads, room join, WebSocket fanout, reconnect storm, node drain, Kafka bridge lag/recovery, Search indexing/query load, Recommendation feed rebuild/read load, Analytics Sink/ClickHouse/lake throughput, media discovery, and real WebRTC/RTP capacity tests. HTTP discovery tests cannot stand in for SFU packet or TURN bandwidth tests. Exercise deployment and one-node failure during sustained load.
 
 Record results in a separate dated report with exact scripts and topology. A failed stage is useful evidence; retain the bottleneck and remediation plan. Never copy projected values into a measured-capacity column.

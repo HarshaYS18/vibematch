@@ -1,6 +1,8 @@
 # FunKey Master Source of Truth Architecture
 
-Branch: `backend-realtime-core-v1`
+This document defines source-of-truth principles. The enforceable inventory is the
+[Architecture Authority Registry](architecture/authority-registry.md) with machine contract
+`contracts/architecture/authorities.yaml`.
 
 ## Core rule
 
@@ -50,7 +52,7 @@ High-change user state belongs in child/domain tables:
 - sent/received gift totals in contribution/experience tables
 - daily/weekly/monthly/yearly aggregates in user stat aggregate tables
 - sent level and received level in `user_experience_status`
-- current room presence in `room_participants` / room presence tables
+- durable room membership in `room_participants`; connected presence is an ephemeral Redis/Valkey realtime lease
 - room ownership and room level in room tables / room experience tables
 - store inventory in `user_store_inventory`
 - relationship/family/CP status in relationship tables
@@ -155,7 +157,8 @@ gift_transactions             -> every gift send/receive event
 user_contribution_aggregates  -> daily/weekly/monthly/yearly sent/received totals
 user_experience_status        -> sent/received levels and EXP
 user_vip_status               -> VIP/SVIP state
-room_participants             -> current room presence
+room_participants             -> durable room membership
+realtime Redis/Valkey leases  -> connected presence (ephemeral)
 room_experience_status        -> room level/EXP
 user_master_state_snapshots   -> optional cached read model assembled from child tables
 ```
@@ -241,42 +244,19 @@ The only local-only state allowed in room UI is temporary private interface stat
 
 If another user in the same eligible room should see or be affected by the action, it is not local state. It must be backend-saved or backend-validated, then broadcast.
 
-## Source-of-truth registry
+## Canonical authority registry
 
-| Element | Master source of truth | Write service | Read/snapshot service | Realtime event source | Client allowed state |
-|---|---|---|---|---|---|
-| User identity | `users`, `auth_identities` | `identity_service`, `auth` routes | `users/me`, profile services | `user.updated` later | cached current user only |
-| User master state | child tables + `user_master_state_snapshots` or service read model | domain services | `user_master_state_service` | `user.master_state.updated` | displayed snapshot cache only |
-| Roles/permissions | `user_roles`, `special_permissions` | `role_service`, `special_permission_service` | admin/user role endpoints | `role.updated` later | display-only role labels |
-| User bans/device bans | `user_bans`, `device_bans` | `ban_service` | moderation/admin endpoints | `moderation.updated` later | none |
-| Login history | `login_history` | `login_history_service` | admin login history endpoints | none initially | none |
-| Room identity | `rooms` | `room_service` | room snapshot/trending endpoints | `room.updated` | cached room card only |
-| Room presence | `room_participants`, `user_room_presence` | room presence/action services | room snapshot/presence endpoints | `room.joined`, `room.left`, `presence.updated` | visible list cache only |
-| Room seats | `room_seat_states` | `room_action_service` | `room_state_service` | `seat.updated` | visual seat layout cache only |
-| Room mic state | `room_seat_states` | `room_action_service` | `room_state_service` | `mic.self_muted`, `mic.admin_muted`, `seat.updated` | button highlight only |
-| Room seat locks | `room_seat_states` | `room_action_service` | `room_state_service` | `seat.locked`, `seat.unlocked` | icon display only |
-| Room settings | `rooms` plus room settings tables later | room settings service | room snapshot | `room.settings.updated` | settings panel form draft only |
-| Room background/theme | `rooms.background_theme_id`, `room_themes`, review tables | room theme service | room snapshot/theme endpoints | `room.theme.updated` | image cache only |
-| Room chat messages | `room_chat_messages` | room chat service/action service | room snapshot/chat history endpoint | `room.chat.message_created` | scroll position/input draft only |
-| Ribbon/floating messages | future `room_ribbon_messages`, wallet ledger | ribbon service | room snapshot/replay endpoint | `room.ribbon.created` | animation queue only |
-| Gifts | `gift_transactions`, `gift_catalog` | gift service | gift/history/catalog endpoints | `gift.sent`, `gift.combo.updated` | animation queue only |
-| Wallet/coins | `user_wallets`, `wallet_ledger` | wallet/transaction service | wallet endpoints | `wallet.balance.updated` | displayed balance cache only |
-| Sender/receiver levels | `user_experience_status` | experience service | level endpoints | `level.sender.updated`, `level.receiver.updated` | displayed badge cache only |
-| Contribution totals | `user_contribution_aggregates`, gift/recharge ledgers | contribution service | user master state/ranking endpoints | `contribution.updated` | displayed aggregate cache only |
-| Room level | `room_experience_status` | room experience service | room level endpoint/snapshot | `room.level.updated` | displayed badge cache only |
-| Inbox conversations | `inbox_conversations`, `inbox_participants` | inbox service | inbox endpoints | `inbox.updated` | conversation list cache only |
-| Inbox messages | `inbox_messages` | inbox service | inbox endpoints | `inbox.message_created` | input draft only |
-| Notifications | `user_notifications` | notification service | notification endpoints | `notification.created` | unread badge cache only |
-| Vibes posts | `vibe_posts` | vibes service | vibes endpoints | `vibe.created`, `vibe.updated` later | feed cache only |
-| Vibes comments/reactions | `vibe_comments`, `vibe_reactions` | vibes service | vibes endpoints | `vibe.reaction.updated` later | button animation only |
-| Profile/public profile | `users`, profile tables | profile service | profile endpoints | `profile.updated` later | edit form draft only |
-| VIP/SVIP status | `user_vip_status`, wallet/recharge ledger | VIP service | VIP/profile endpoints | `vip.updated`, `svip.updated` later | badge display cache only |
-| Store inventory | `store_items`, `user_store_inventory` | store service | store endpoints | `inventory.updated` later | store card cache only |
-| Cricket mode | cricket tables + room mode state | cricket service | cricket snapshot endpoint | `cricket_score.updated` | scoreboard display cache only |
-| Watch Party | future watch-party tables/state | watch party service | watch-party snapshot endpoint | `watch_party.updated` | video player UI state only |
-| Games | game tables, pool/ledger tables | game services | game endpoints | `game.round.updated` | animation/display cache only |
-| Lucky gifts/games RNG | server DB + secure RNG ledger | lucky services | settlement/history endpoints | settlement events only | none |
-| Banners/events | `home_banners`, event tables later | admin banner/event services | home endpoints | `home.updated` later | carousel cache only |
+The historical inline table was retired in Chunk 15 because it duplicated module documentation and had become stale for implemented features such as Watch Party.
+
+Use, in order:
+
+1. `contracts/architecture/authorities.yaml` — machine-readable ownership/classification contract enforced by CI.
+2. `docs/architecture/authority-registry.md` — human ownership summary.
+3. `docs/architecture/state-classification.md` — state semantics.
+4. `docs/architecture/service-boundaries.md` — logical owner versus current deployable.
+5. `/api/v1/app/source-of-truth/master` — client screen delivery registry, not a competing architecture authority.
+
+A module README that conflicts with the machine registry is architecture drift and must be corrected before merge.
 
 ## Client state categories
 
@@ -370,27 +350,22 @@ Therefore room seats, room settings, mic state, locks, chat history, gifts, room
 
 ## Current implementation status on this branch
 
-Implemented foundation:
+The original foundation checklist in this document has been completed or superseded by the Chunks 15–56 architecture program and the final audit repair wave. Current enforceable repository reality is:
 
-- persistent room seats: `room_seat_states`
-- persistent room events: `room_realtime_events`
-- persistent room chat messages: `room_chat_messages`
-- canonical room participant identity snapshot fields in backend room snapshots
-- room state snapshot service
-- room action service
-- room permission service foundation
-- websocket route backed by DB/service snapshots
-- REST command router for room realtime actions
-- raw socket disconnect does not mutate saved room state
+- PostgreSQL remains durable business truth, with extracted domain mutation authority isolated by service/database role.
+- Room Control owns durable room definition, membership, permissions, seats, Watch Party/activity state, and Room Cricket tournament/match/ball state.
+- Go realtime is the single application WebSocket transport and owns only ephemeral routing/presence/replay. Connected liveness is represented by bounded Redis/Valkey leases and is intersected with durable Room Control membership before room metadata is disclosed.
+- Flutter `RoomSessionRepository` is the canonical client room-state authority; feature networking converges on `AppNetworkClient -> CanonicalNetworkTransport -> Dio`.
+- Inbox, Vibes, Identity, Profile/Social, Economy, Game Platform and Notification execute mutations inside their owning deployables. Core is a compatibility/composite-read facade at extracted boundaries.
+- Economy is the exclusive value writer and owns effective VIP/SVIP projection plus audited manual VIP overrides.
+- Room Cricket mutations are permission-gated, serialized and retry-idempotent through normalized ball events and per-delivery event IDs.
+- NATS JetStream async work uses retry/DLQ/idempotent effect patterns; processed markers are written only after required side effects succeed.
+- Media v2 uses direct object-store upload plus authoritative PostgreSQL control state; multipart completion recovers safely from ambiguous successful object-store completion.
+- GraphQL Read BFF provides persisted, bounded, read-only composite queries and never becomes a mutation or database authority.
+- Kafka is a retained analytics/replay/ML copy fed only through the NATS-to-Kafka bridge; NATS JetStream remains operational async messaging.
+- Search/OpenSearch, Recommendation Redis projections, ClickHouse and Parquet/data-lake materializations are rebuildable projections, not durable truth.
+- Multi-region/DR, supply-chain security, privacy/trust controls, realtime/media QoS, mobile/offline budgets, cache/edge policy, release safety, SRE/FinOps and production-certification contracts are repository-enforced.
+- Architecture, migration, ownership, security, backend, Flutter, Go, media, infrastructure, contracts, documentation and container gates are enforced in CI.
 
-Still needed:
+For machine-enforceable current ownership, use `contracts/architecture/authorities.yaml`. For current deployable boundaries, use `docs/architecture/service-boundaries.md`. Historical implementation notes elsewhere in this document should not override those contracts.
 
-- token-auth command endpoints instead of temporary `user_id` in body
-- Redis pub/sub implementation behind `RealtimeEventBus`
-- full audit logging for every room action
-- frontend repository wiring to always load snapshots first
-- event replay/offline delivery
-- implement `user_master_state_service` and master-state endpoints
-- create aggregate/read models for contribution totals, VIP/SVIP, levels, room state, wallet summary
-- same source-of-truth registry applied to wallet, gifts, inbox, Vibes, profile, store, games, cricket, watch party
-- convert remaining local-only room UI actions into backend command + broadcast + snapshot-confirmed actions

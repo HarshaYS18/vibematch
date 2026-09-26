@@ -1,0 +1,29 @@
+{
+  "schema_version": 1,
+  "required_scenarios": [
+    "synthetic_core_flows",
+    "six_hour_soak",
+    "twenty_four_hour_soak",
+    "room_reconnect_load",
+    "media_join_load",
+    "database_failover",
+    "redis_role_failure",
+    "nats_failover",
+    "kafka_failover",
+    "regional_failover",
+    "rollback_drill"
+  ],
+  "evidence_required": [
+    "git_sha",
+    "environment",
+    "started_at",
+    "finished_at",
+    "scenario_results",
+    "observed_p95_p99",
+    "error_rates",
+    "resource_saturation",
+    "operator",
+    "artifacts"
+  ],
+  "claim_policy": "Do not publish capacity or SLO compliance without measured evidence from a production-like environment."
+}

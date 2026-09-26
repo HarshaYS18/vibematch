@@ -29,10 +29,27 @@ class GameDefinition(Base):
     updated_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
 
 
+class GameSession(Base):
+    __tablename__ = "game_sessions"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, index=True)
+    session_id: Mapped[str] = mapped_column(String(36), unique=True, index=True, nullable=False)
+    request_id: Mapped[str] = mapped_column(String(160), unique=True, index=True, nullable=False)
+    user_id: Mapped[int] = mapped_column(ForeignKey("users.id"), index=True, nullable=False)
+    game_key: Mapped[str] = mapped_column(String(80), index=True, nullable=False)
+    room_id: Mapped[int | None] = mapped_column(ForeignKey("rooms.id"), index=True, nullable=True)
+    bridge_version: Mapped[int] = mapped_column(Integer, default=1, nullable=False)
+    status: Mapped[str] = mapped_column(String(30), default="ACTIVE", index=True, nullable=False)
+    metadata_json: Mapped[str | None] = mapped_column(Text, nullable=True)
+    opened_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow, index=True)
+    closed_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
+
+
 class GameBet(Base):
     __tablename__ = "game_bets"
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True, index=True)
+    request_id: Mapped[str | None] = mapped_column(String(160), unique=True, index=True, nullable=True)
     round_id: Mapped[int] = mapped_column(ForeignKey("game_rounds.id"), index=True, nullable=False)
     user_id: Mapped[int] = mapped_column(ForeignKey("users.id"), index=True, nullable=False)
     target_id: Mapped[int] = mapped_column(Integer, index=True, nullable=False)

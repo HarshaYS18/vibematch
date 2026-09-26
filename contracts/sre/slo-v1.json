@@ -1,0 +1,20 @@
+{
+  "schema_version": 1,
+  "window_days": 28,
+  "slos": {
+    "api_reads": {"availability_percent": 99.9, "p95_ms": 300, "p99_ms": 800},
+    "graphql_simple": {"availability_percent": 99.9, "p95_ms": 150, "p99_ms": 500},
+    "graphql_composite": {"availability_percent": 99.9, "p95_ms": 250, "p99_ms": 800},
+    "room_join": {"success_percent": 99.5, "p95_ms": 750, "p99_ms": 1500},
+    "realtime_event_propagation": {"success_percent": 99.9, "p95_ms": 200, "p99_ms": 500},
+    "inbox_send": {"success_percent": 99.9, "p95_ms": 300, "p99_ms": 800},
+    "wallet_mutation": {"success_percent": 99.99, "p95_ms": 500, "p99_ms": 1000, "durable_loss": 0, "duplicate_settlement": 0},
+    "media_join": {"success_percent": 99.5, "p95_ms": 750, "p99_ms": 1500},
+    "mobile_crash_free_sessions_percent": 99.9
+  },
+  "error_budget_policy": {
+    "burn_rate_fast_window_minutes": 60,
+    "burn_rate_slow_window_hours": 6,
+    "freeze_nonessential_rollouts_when_exhausted": true
+  }
+}

@@ -1,0 +1,22 @@
+{
+  "schema_version": 1,
+  "targets": {
+    "realtime_event_propagation_p95_ms": 200,
+    "room_join_p95_ms": 750,
+    "reconnect_recovery_p95_ms": 1000,
+    "media_join_p95_ms": 750
+  },
+  "realtime": {
+    "local_route_shards": 32,
+    "hot_room_subscribers_per_gateway": 500,
+    "priorities": ["critical", "normal", "best_effort"],
+    "best_effort_drop_allowed_under_pressure": true,
+    "critical_drop_allowed": false
+  },
+  "media": {
+    "hot_room_peers_per_media_node": 250,
+    "initial_available_outgoing_bitrate_bps": 800000,
+    "prefer_udp": true,
+    "turn_fallback_required": true
+  }
+}

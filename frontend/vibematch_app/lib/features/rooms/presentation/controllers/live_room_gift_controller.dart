@@ -1,15 +1,12 @@
 import 'dart:async';
 import 'dart:math';
 
-import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart' show Alignment, Color;
 
 import '../../../auth/data/auth_api_service.dart';
 import '../../../auth/models/current_user.dart';
-import '../../../gifts/data/lucky_gifts_api_service.dart';
 import '../../../relationships/data/relationship_exp_api_service.dart';
 import '../../../wallet/data/wallet_api_service.dart';
-import '../../data/active_room_context.dart';
 import '../../data/gift_api_service.dart';
 import '../../data/live_room_media_signaling_service.dart';
 import '../../data/mini_profile_economy_service.dart';
@@ -67,56 +64,33 @@ class LuckyPacketRoomEvent {
   }
 }
 
-class LuckyPacketRoomBus {
-  const LuckyPacketRoomBus._();
-
-  static final ValueNotifier<LuckyPacketRoomEvent?> packet =
-      ValueNotifier<LuckyPacketRoomEvent?>(null);
-  static LiveRoomGiftController? _controller;
-  static List<SeatUser> _roomUsers = const <SeatUser>[];
-
-  static void bind({
-    required LiveRoomGiftController controller,
-    required List<SeatUser> roomUsers,
-  }) {
-    _controller = controller;
-    _roomUsers = roomUsers;
-    packet.value = controller.activeLuckyPacket;
-  }
-
-  static void publish(LuckyPacketRoomEvent? event) {
-    packet.value = event;
-  }
-
-  static void claim() {
-    _controller?.claimLuckyPacket(_roomUsers);
-  }
-
-  static void dismissResults() {
-    _controller?.dismissLuckyPacketResults();
-  }
-
-  static void clearController(LiveRoomGiftController controller) {
-    if (_controller != controller) return;
-    _controller = null;
-    _roomUsers = const <SeatUser>[];
-    packet.value = null;
-  }
-}
-
+/// Room-scoped owner for gift interaction and gift presentation state.
+///
+/// Backend services remain authoritative for wallet/gift outcomes. The
+/// controller owns only one mounted room's transient slides, combo state,
+/// flying-gift queue and premium-broadcast queue; all are disposed on room exit.
 class LiveRoomGiftController {
+  /// Optional only for isolated controller tests. Production room bundles pass
+  /// their canonical room id explicitly; no process-global room cache is read.
+
   LiveRoomGiftController({
     required SeatUser currentUser,
+    this.roomPublicId,
     required this.onChanged,
     required this.onFinalGiftMessage,
     required this.onToast,
+    bool refreshCoinBalanceOnCreate = true,
   }) : currentUser = LiveRoomMediaSignalingService.instance
            .effectiveCurrentUser(currentUser) {
     _userRealtimeSub = AuthUserRealtimeService.instance.users.listen(
       _handleRealtimeUser,
     );
-    unawaited(refreshCoinBalance());
+    if (refreshCoinBalanceOnCreate) {
+      unawaited(refreshCoinBalance());
+    }
   }
+
+  final String? roomPublicId;
 
   static const int smallGiftFlightThreshold = 200000;
   static const int comboTriggerSeconds = 15;
@@ -127,9 +101,16 @@ class LiveRoomGiftController {
   final ValueChangedLike<String> onToast;
   final WalletApiService _walletApi = const WalletApiService();
   final GiftApiService _giftApi = const GiftApiService();
-  final LuckyGiftsApiService _luckyGiftsApi = const LuckyGiftsApiService();
   final RelationshipExpApiService _relationshipExpApi =
       const RelationshipExpApiService();
+
+  /// Ephemeral flight animations scoped to this room controller.
+  final GiftFlightBus giftFlightBus = GiftFlightBus();
+
+  /// Ephemeral premium broadcasts scoped to this room controller.
+  final PremiumGiftBroadcastBus premiumGiftBroadcastBus =
+      PremiumGiftBroadcastBus();
+
   StreamSubscription<CurrentUser>? _userRealtimeSub;
 
   GiftCategory selectedCategory = GiftCategory.premium;
@@ -334,7 +315,7 @@ class LiveRoomGiftController {
           giftId: gift.id,
           coinValue: gift.coins,
           quantity: effectiveCombo,
-          roomPublicId: ActiveRoomContext.roomPublicId,
+          roomPublicId: roomPublicId,
         );
         coinBalance = result.senderCoinBalance;
         unawaited(
@@ -405,7 +386,7 @@ class LiveRoomGiftController {
 
     final shouldFly = (gift.coins * combo) < smallGiftFlightThreshold;
     if (shouldFly) {
-      GiftFlightBus.publish(
+      giftFlightBus.publish(
         GiftFlightEvent(
           id: 'flight-${slide.id}',
           gift: gift,
@@ -444,7 +425,7 @@ class LiveRoomGiftController {
           giftId: gift.id,
           coinValue: gift.coins,
           quantity: effectiveCombo,
-          roomPublicId: ActiveRoomContext.roomPublicId,
+          roomPublicId: roomPublicId,
         );
 
         final multiplier =
@@ -454,15 +435,6 @@ class LiveRoomGiftController {
             result.luckyResult?.rewardCoinAmount ??
             0;
         coinBalance = result.senderCoinBalance;
-        unawaited(
-          _recordLuckyGiftResultSilently(
-            gift: gift,
-            quantity: effectiveCombo,
-            receiverPublicUserId: receiverPublicUserId,
-            multiplier: multiplier,
-            rewardCoinAmount: rewardCoinAmount,
-          ),
-        );
         unawaited(
           _recordRelationshipGiftExpSilently(
             gift: gift,
@@ -512,7 +484,6 @@ class LiveRoomGiftController {
     required String message,
     required List<SeatUser> roomUsers,
   }) {
-    LuckyPacketRoomBus.bind(controller: this, roomUsers: roomUsers);
     if (coinBalance < coinAmount) {
       onToast('Not enough coins');
       unawaited(refreshCoinBalance());
@@ -634,7 +605,7 @@ class LiveRoomGiftController {
         giftId: context.gift.id,
         coinValue: context.gift.coins,
         quantity: context.baseCombo,
-        roomPublicId: ActiveRoomContext.roomPublicId,
+        roomPublicId: roomPublicId,
       );
       final multiplier =
           result.luckyMultiplier ?? result.luckyResult?.multiplier ?? 1;
@@ -643,15 +614,6 @@ class LiveRoomGiftController {
           result.luckyResult?.rewardCoinAmount ??
           0;
       coinBalance = result.senderCoinBalance;
-      unawaited(
-        _recordLuckyGiftResultSilently(
-          gift: context.gift,
-          quantity: context.baseCombo,
-          receiverPublicUserId: context.receiverPublicUserId,
-          multiplier: multiplier,
-          rewardCoinAmount: rewardCoinAmount,
-        ),
-      );
       unawaited(
         _recordRelationshipGiftExpSilently(
           gift: context.gift,
@@ -706,7 +668,13 @@ class LiveRoomGiftController {
 
   void _setLuckyPacket(LuckyPacketRoomEvent? packet) {
     activeLuckyPacket = packet;
-    LuckyPacketRoomBus.publish(packet);
+  }
+
+  void applyAuthoritativeLuckyPacket(LuckyPacketRoomEvent? packet) {
+    _luckyPacketTimer?.cancel();
+    _luckyPacketTimer = null;
+    _setLuckyPacket(packet);
+    onChanged();
   }
 
   void _tickLuckyPacket(List<SeatUser> roomUsers) {
@@ -714,7 +682,6 @@ class LiveRoomGiftController {
     if (packet == null) {
       _luckyPacketTimer?.cancel();
       _luckyPacketTimer = null;
-      LuckyPacketRoomBus.publish(null);
       return;
     }
     if (packet.remainingSeconds > 0) {
@@ -791,30 +758,6 @@ class LiveRoomGiftController {
     return result;
   }
 
-  Future<void> _recordLuckyGiftResultSilently({
-    required GiftItem gift,
-    required int quantity,
-    required int receiverPublicUserId,
-    required int multiplier,
-    required int rewardCoinAmount,
-  }) async {
-    try {
-      final spentCoins = gift.coins * quantity;
-      await _luckyGiftsApi.recordResult(
-        giftId: gift.id,
-        quantity: quantity,
-        receiverPublicUserId: receiverPublicUserId,
-        roomPublicId: ActiveRoomContext.roomPublicId,
-        spentCoins: spentCoins,
-        multiplier: multiplier,
-        rewardCoins: rewardCoinAmount,
-        netWinCoins: rewardCoinAmount - spentCoins,
-      );
-    } catch (_) {
-      // Lucky gift stats should never block the live room send flow.
-    }
-  }
-
   Future<void> _recordRelationshipGiftExpSilently({
     required GiftItem gift,
     required int quantity,
@@ -826,7 +769,7 @@ class LiveRoomGiftController {
         eventType: eventType,
         otherPublicUserId: receiverPublicUserId,
         coinValue: gift.coins * quantity,
-        roomPublicId: ActiveRoomContext.roomPublicId,
+        roomPublicId: roomPublicId,
       );
     } catch (_) {
       // Relationship EXP sync should never block the gift send flow.
@@ -936,7 +879,7 @@ class LiveRoomGiftController {
     required int rewardCoinAmount,
     required Alignment endAlignment,
   }) {
-    GiftFlightBus.publish(
+    giftFlightBus.publish(
       GiftFlightEvent(
         id: 'flight-${slide.id}',
         gift: gift,
@@ -957,7 +900,7 @@ class LiveRoomGiftController {
     required bool shouldPublish,
   }) {
     if (!shouldPublish) return;
-    PremiumGiftBroadcastBus.publish(
+    premiumGiftBroadcastBus.publish(
       PremiumGiftBroadcastEvent(
         id: 'premium-${gift.id}-${DateTime.now().microsecondsSinceEpoch}',
         senderName: currentUser.name,
@@ -1020,7 +963,8 @@ class LiveRoomGiftController {
     _lastComboTapBySlideId.clear();
     _luckyPacketTimer?.cancel();
     _luckyPacketTimer = null;
-    LuckyPacketRoomBus.clearController(this);
+    giftFlightBus.dispose();
+    premiumGiftBroadcastBus.dispose();
   }
 }
 

@@ -1,0 +1,70 @@
+{
+  "schema_version": 1,
+  "authority": "analytics_only",
+  "topics": [
+    {
+      "family": "user.activity",
+      "name": "funkey.user.activity.v1",
+      "partitions": 24,
+      "retention_ms": 2592000000,
+      "cleanup_policy": "delete",
+      "data_classification": "restricted_analytics"
+    },
+    {
+      "family": "room.events",
+      "name": "funkey.room.events.v1",
+      "partitions": 48,
+      "retention_ms": 2592000000,
+      "cleanup_policy": "delete",
+      "data_classification": "restricted_analytics"
+    },
+    {
+      "family": "vibes.engagement",
+      "name": "funkey.vibes.engagement.v1",
+      "partitions": 24,
+      "retention_ms": 7776000000,
+      "cleanup_policy": "delete",
+      "data_classification": "restricted_analytics"
+    },
+    {
+      "family": "economy.analytics",
+      "name": "funkey.economy.analytics.v1",
+      "partitions": 24,
+      "retention_ms": 31536000000,
+      "cleanup_policy": "delete",
+      "data_classification": "restricted_analytics"
+    },
+    {
+      "family": "game.events",
+      "name": "funkey.game.events.v1",
+      "partitions": 48,
+      "retention_ms": 7776000000,
+      "cleanup_policy": "delete",
+      "data_classification": "internal_analytics"
+    },
+    {
+      "family": "media.events",
+      "name": "funkey.media.events.v1",
+      "partitions": 24,
+      "retention_ms": 2592000000,
+      "cleanup_policy": "delete",
+      "data_classification": "restricted_analytics"
+    },
+    {
+      "family": "recommendation.events",
+      "name": "funkey.recommendation.events.v1",
+      "partitions": 24,
+      "retention_ms": 2592000000,
+      "cleanup_policy": "delete",
+      "data_classification": "restricted_analytics"
+    },
+    {
+      "family": "analytics.dlq",
+      "name": "funkey.analytics.dlq.v1",
+      "partitions": 12,
+      "retention_ms": 2592000000,
+      "cleanup_policy": "delete",
+      "data_classification": "restricted_analytics"
+    }
+  ]
+}

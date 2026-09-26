@@ -1,0 +1,73 @@
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: funkey-search
+automountServiceAccountToken: false
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: funkey-search
+  labels: {app: funkey-search}
+spec:
+  selector: {app: funkey-search}
+  ports:
+    - {name: http, port: 8093, targetPort: http}
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: funkey-search
+  labels: {app: funkey-search}
+spec:
+  replicas: 2
+  revisionHistoryLimit: 5
+  strategy: {type: RollingUpdate, rollingUpdate: {maxSurge: 1, maxUnavailable: 0}}
+  selector: {matchLabels: {app: funkey-search}}
+  template:
+    metadata:
+      labels: {app: funkey-search}
+    spec:
+      serviceAccountName: funkey-search
+      automountServiceAccountToken: false
+      terminationGracePeriodSeconds: 60
+      nodeSelector: {funkey.io/workload: application}
+      securityContext: {runAsNonRoot: true, seccompProfile: {type: RuntimeDefault}}
+      containers:
+        - name: search
+          image: funkey-search:dev
+          ports: [{name: http, containerPort: 8093}]
+          envFrom:
+            - {configMapRef: {name: funkey-config}}
+          resources:
+            requests: {cpu: 150m, memory: 192Mi}
+            limits: {cpu: "1", memory: 768Mi}
+          startupProbe: {httpGet: {path: /live, port: http}, failureThreshold: 30, periodSeconds: 2}
+          livenessProbe: {httpGet: {path: /live, port: http}, periodSeconds: 20}
+          readinessProbe: {httpGet: {path: /ready, port: http}, periodSeconds: 5}
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            capabilities: {drop: [ALL]}
+---
+apiVersion: policy/v1
+kind: PodDisruptionBudget
+metadata: {name: funkey-search}
+spec:
+  minAvailable: 1
+  selector: {matchLabels: {app: funkey-search}}
+---
+apiVersion: autoscaling/v2
+kind: HorizontalPodAutoscaler
+metadata: {name: funkey-search}
+spec:
+  scaleTargetRef: {apiVersion: apps/v1, kind: Deployment, name: funkey-search}
+  minReplicas: 2
+  maxReplicas: 20
+  behavior:
+    scaleDown: {stabilizationWindowSeconds: 300}
+  metrics:
+    - type: Resource
+      resource:
+        name: cpu
+        target: {type: Utilization, averageUtilization: 65}

@@ -69,10 +69,30 @@ def _user_payload(db: Session, user: User, score: int, rank: int, category: str)
     }
 
 
-def room_contribution_rankings(db: Session, *, room_public_id: str, category: str = "sent", period: str = "daily", limit: int = 100) -> dict | None:
-    room = db.query(Room).filter(Room.room_public_id == room_public_id, Room.is_active.is_(True)).first()
-    if room is None:
-        return None
+def room_contribution_rankings(
+    db: Session,
+    *,
+    room_public_id: str,
+    category: str = "sent",
+    period: str = "daily",
+    limit: int = 100,
+    resolved_room_id: int | None = None,
+    resolved_room_name: str | None = None,
+) -> dict | None:
+    room = None
+    if resolved_room_id is None:
+        room = (
+            db.query(Room)
+            .filter(Room.room_public_id == room_public_id, Room.is_active.is_(True))
+            .first()
+        )
+        if room is None:
+            return None
+        room_id = int(room.id)
+        room_name = room.name
+    else:
+        room_id = int(resolved_room_id)
+        room_name = resolved_room_name or room_public_id
 
     safe_category = (category or "sent").strip().lower()
     if safe_category not in {"sent", "received"}:
@@ -82,7 +102,7 @@ def room_contribution_rankings(db: Session, *, room_public_id: str, category: st
 
     rows = (
         db.query(group_column.label("user_id"), func.coalesce(func.sum(GiftTransaction.total_coin_value), 0).label("score"))
-        .filter(GiftTransaction.room_id == room.id, GiftTransaction.created_at >= start_at)
+        .filter(GiftTransaction.room_id == room_id, GiftTransaction.created_at >= start_at)
         .group_by(group_column)
         .order_by(func.coalesce(func.sum(GiftTransaction.total_coin_value), 0).desc())
         .limit(max(1, min(limit, 100)))
@@ -99,8 +119,8 @@ def room_contribution_rankings(db: Session, *, room_public_id: str, category: st
         entries.append(_user_payload(db, user, int(row.score or 0), index, safe_category))
 
     return {
-        "room_public_id": room.room_public_id,
-        "room_name": room.name,
+        "room_public_id": room_public_id,
+        "room_name": room_name,
         "category": safe_category,
         "period": period,
         "period_start_at": start_at.isoformat(),

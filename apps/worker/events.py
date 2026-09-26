@@ -14,6 +14,7 @@ class EventEnvelope(BaseModel):
     occurred_at: datetime
     request_id: str | None = Field(default=None, max_length=64)
     trace_id: str | None = Field(default=None, max_length=64)
+    traceparent: str | None = Field(default=None, max_length=255)
     actor_user_id: int | None = None
     payload: dict[str, Any]
 

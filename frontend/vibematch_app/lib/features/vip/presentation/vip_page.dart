@@ -1,42 +1,32 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../controllers/vip_center_controller.dart';
 import '../models/vip_models.dart';
 
-class VipPage extends StatefulWidget {
+class VipPage extends ConsumerStatefulWidget {
   const VipPage({super.key});
 
   @override
-  State<VipPage> createState() => _VipPageState();
+  ConsumerState<VipPage> createState() => _VipPageState();
 }
 
-class _VipPageState extends State<VipPage> {
-  late final VipCenterController _controller;
+class _VipPageState extends ConsumerState<VipPage> {
   int _selectedTab = 0;
 
   @override
   void initState() {
     super.initState();
-    _controller = VipCenterController()..addListener(_onChanged);
-    _controller.load();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted) ref.read(vipCenterControllerProvider.notifier).load();
+    });
   }
-
-  @override
-  void dispose() {
-    _controller.removeListener(_onChanged);
-    _controller.dispose();
-    super.dispose();
-  }
-
-  void _onChanged() {
-    if (mounted) setState(() {});
-  }
-
-  VipProgress get _selectedProgress => _selectedTab == 0 ? _controller.payload.vip : _controller.payload.svip;
 
   @override
   Widget build(BuildContext context) {
-    final progress = _selectedProgress;
+    final vip = ref.watch(vipCenterControllerProvider);
+    final controller = ref.read(vipCenterControllerProvider.notifier);
+    final progress = _selectedTab == 0 ? vip.payload.vip : vip.payload.svip;
     return Scaffold(
       backgroundColor: const Color(0xFFFAF7F1),
       appBar: AppBar(
@@ -45,13 +35,13 @@ class _VipPageState extends State<VipPage> {
         foregroundColor: const Color(0xFF251538),
         title: const Text('VIP & SVIP', style: TextStyle(fontWeight: FontWeight.w900)),
         actions: [
-          IconButton(onPressed: _controller.load, icon: const Icon(Icons.refresh_rounded)),
+          IconButton(onPressed: controller.load, icon: const Icon(Icons.refresh_rounded)),
         ],
       ),
-      body: _controller.isLoading
+      body: vip.isLoading
           ? const Center(child: CircularProgressIndicator(color: Color(0xFF12C7B7)))
-          : _controller.errorMessage != null
-              ? _VipErrorState(message: _controller.errorMessage!, onRetry: _controller.load)
+          : vip.errorMessage != null
+              ? _VipErrorState(message: vip.errorMessage!, onRetry: controller.load)
               : ListView(
                   padding: const EdgeInsets.fromLTRB(16, 8, 16, 28),
                   children: [
@@ -65,7 +55,7 @@ class _VipPageState extends State<VipPage> {
                     _VipMetricCard(
                       progress: progress,
                       totalRechargeLabel: _selectedTab == 0 ? 'Lifetime recharge' : 'Monthly recharge',
-                      totalRechargeValue: _selectedTab == 0 ? _controller.payload.lifetimeRechargeCoinExp : _controller.payload.monthlyRechargeCoinExp,
+                      totalRechargeValue: _selectedTab == 0 ? vip.payload.lifetimeRechargeCoinExp : vip.payload.monthlyRechargeCoinExp,
                     ),
                     const SizedBox(height: 14),
                     _ThresholdTable(progress: progress),

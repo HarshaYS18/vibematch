@@ -2,10 +2,16 @@ import 'dart:async';
 
 import 'package:flutter/material.dart';
 
+import '../../../../foundation/realtime/realtime_event_envelope.dart';
+import '../../../../realtime/app_realtime_hub.dart';
+import '../../../../room_session/data/room_session_repository.dart';
+import '../../../../room_session/domain/room_session_state.dart';
+import '../../data/room_session_legacy_adapter.dart';
 import '../../data/chat_moderation_api_service.dart';
 import '../../data/live_room_media_signaling_service.dart';
-import '../../data/live_room_member_request_service.dart';
-import '../../data/live_room_membership_service.dart';
+import '../../data/lucky_packet_realtime_service.dart';
+import '../../data/room_music_controller.dart';
+import '../../data/live_room_presence_repository.dart';
 import '../controllers/live_room_gift_controller.dart';
 import '../controllers/live_room_message_controller.dart';
 import '../controllers/live_room_mention_text_controller.dart';
@@ -21,6 +27,8 @@ import '../live_room_models.dart';
 import '../live_room_restore_state.dart';
 import '../widgets/room_theme.dart';
 import '../widgets/vibesync_room_module.dart';
+import 'cricket_room_mode_module.dart';
+import 'cricket_room_mode_signal.dart';
 
 typedef LiveRoomContextGetter = BuildContext Function();
 typedef LiveRoomMountedGetter = bool Function();
@@ -75,18 +83,29 @@ const SeatUser roomIdentityFallback = SeatUser(
   isCurrentUser: true,
 );
 
+/// Lifetime container for controllers belonging to one mounted live room.
+///
+/// RoomSessionRepository is the canonical room-state authority. Controllers
+/// held here own room-scoped presentation/command resources and are created
+/// and disposed with the route so none becomes process-global state.
 class LiveRoomControllerBundle {
   LiveRoomControllerBundle({
     required this.config,
+    required this.roomSessionRepository,
     required LiveRoomContextGetter contextGetter,
     required LiveRoomMountedGetter mountedGetter,
+    AppRealtimeHub? realtimeHub,
   }) : _contextGetter = contextGetter,
        _mountedGetter = mountedGetter,
+       _realtimeHub = realtimeHub ?? AppRealtimeHub.shared,
        _backendOnlineCount = config.onlineCount;
 
   final LiveRoomControllerConfig config;
+  final RoomSessionRepository roomSessionRepository;
   final LiveRoomContextGetter _contextGetter;
   final LiveRoomMountedGetter _mountedGetter;
+  final AppRealtimeHub _realtimeHub;
+  StreamSubscription<RealtimeEventEnvelope>? _cricketEventSubscription;
   int _backendOnlineCount;
 
   late final LiveRoomMentionTextController messageController;
@@ -97,6 +116,9 @@ class LiveRoomControllerBundle {
   late final LiveRoomMessageController roomMessageController;
   late final LiveRoomModerationController moderationController;
   late final LiveRoomPresenceController presenceController;
+  late final RoomMusicController roomMusicController;
+  late final CricketRoomModeController cricketModeController;
+  late final LuckyPacketRealtimeService luckyPacketRealtimeService;
 
   final LiveRoomUsersController usersController =
       const LiveRoomUsersController();
@@ -120,10 +142,7 @@ class LiveRoomControllerBundle {
   Timer? hostSeatOneTimer;
   Timer? hostSeatOneRetryTimer;
   VoidCallback? seatInviteListener;
-  VoidCallback? roomMembershipListener;
-  VoidCallback? roomMemberRequestListener;
   VoidCallback? roomStateChangedListener;
-  VoidCallback? syncLuckyPacketBeforeRoomRevision;
 
   bool disposed = false;
 
@@ -152,27 +171,95 @@ class LiveRoomControllerBundle {
   List<SeatUser> get roomUsers => seatController.roomUsers;
 
   List<SeatUser> get pendingRoomMemberRequests {
-    return LiveRoomMemberRequestService.instance.pendingRequests.value;
+    final raw = roomSessionRepository
+        .currentState.activities['pending_room_member_requests'];
+    if (raw is! List) return const <SeatUser>[];
+    return raw
+        .whereType<Map>()
+        .map((item) => item.cast<String, dynamic>())
+        .map(LiveRoomPresenceSnapshot.participantToSeatUser)
+        .toList(growable: false);
   }
 
   bool get currentUserIsMember {
     if (viewerCanManageRoom) return true;
-    return LiveRoomMembershipService.isRoomMember(
-      roomId: roomId,
-      userId: currentUser.id,
-    );
+    final aliases = _identityAliases(currentUser.id);
+    final state = roomSessionRepository.currentState;
+    for (final entry in state.membershipRoster.values) {
+      if (_matchesIdentity(
+            aliases,
+            backendUserId: entry.backendUserId,
+            publicUserId: entry.publicUserId,
+          ) &&
+          (entry.isMember || entry.isAdmin || entry.isHost)) {
+        return true;
+      }
+    }
+    for (final participant in state.presence.values) {
+      if (_matchesIdentity(
+            aliases,
+            backendUserId: participant.backendUserId,
+            publicUserId: participant.publicUserId,
+          ) &&
+          (participant.isMember ||
+              participant.isAdmin ||
+              participant.isHost)) {
+        return true;
+      }
+    }
+    return false;
   }
 
   bool get joinRequestPending {
-    return LiveRoomMembershipService.isPending(
-      roomId: roomId,
-      userId: currentUser.id,
-    );
+    final raw = roomSessionRepository
+        .currentState.activities['pending_room_member_requests'];
+    if (raw is! List) return false;
+    final aliases = _identityAliases(currentUser.id);
+    for (final item in raw.whereType<Map>()) {
+      final map = item.cast<String, dynamic>();
+      final backendId = int.tryParse(
+        (map['backend_user_id'] ?? map['user_id'])?.toString() ?? '',
+      );
+      final publicId =
+          int.tryParse(map['public_user_id']?.toString() ?? '');
+      if (_matchesIdentity(
+        aliases,
+        backendUserId: backendId,
+        publicUserId: publicId,
+      )) {
+        return true;
+      }
+    }
+    return false;
+  }
+
+  void requestRoomMembership() {
+    LiveRoomMediaSignalingService.instance.requestRoomMembership();
+  }
+
+  void resolveRoomMembership(
+    SeatUser user, {
+    required bool approved,
+  }) {
+    if (approved) {
+      LiveRoomMediaSignalingService.instance
+          .approveRoomMembership(user.id);
+    } else {
+      LiveRoomMediaSignalingService.instance
+          .rejectRoomMembership(user.id);
+    }
+  }
+
+  void removeRoomMembership(SeatUser user) {
+    LiveRoomMediaSignalingService.instance.removeRoomMembership(user.id);
   }
 
   List<SeatUser> get allRoomUsers {
     return usersController.buildAllRoomUsers(
       seatedUsers: roomUsers,
+      canonicalUsers: RoomSessionLegacyAdapter.presenceUsers(
+        roomSessionRepository.currentState,
+      ),
       fallbackRoomUsers: mockRoomUsers,
       inviteUsers: mockInviteUsers,
       isUserRemoved: moderationController.isLocallyKickedOut,
@@ -207,8 +294,6 @@ class LiveRoomControllerBundle {
   void initialize({
     required VoidCallback onRoomStateChanged,
     required VoidCallback onSeatInviteUpdate,
-    required VoidCallback onMembershipChanged,
-    required VoidCallback onMemberRequestChanged,
   }) {
     final restoreState = config.restoreState;
     final initialStateSnapshot = restoreState?.roomState;
@@ -216,6 +301,16 @@ class LiveRoomControllerBundle {
         initialStateSnapshot?.seatLayoutId ??
         restoreState?.seatState.layoutId ??
         '5x2';
+
+    roomMusicController = RoomMusicController();
+    unawaited(roomMusicController.attachRoom(config.roomId));
+    cricketModeController = CricketRoomModeController(
+      roomId: config.roomId,
+      roomName: config.roomName,
+    );
+    _cricketEventSubscription =
+        _realtimeHub.events.listen(_handleCricketRealtimeEvent);
+    unawaited(_realtimeHub.start());
 
     messageController = LiveRoomMentionTextController();
     if (restoreState != null && restoreState.messageDraft.trim().isNotEmpty) {
@@ -226,6 +321,8 @@ class LiveRoomControllerBundle {
 
     roomStateChangedListener = onRoomStateChanged;
     roomStateController = LiveRoomStateController(
+      roomSessionRepository: roomSessionRepository,
+      onChanged: onRoomStateChanged,
       initialRoomName: config.roomName,
       initialRoomId: config.roomId,
       initialModeTitle: config.modeTitle,
@@ -234,20 +331,41 @@ class LiveRoomControllerBundle {
       preserveInitialBackgroundOnFirstLoad:
           config.initialBackgroundTheme != null,
       initialInboxUnreadCount: 0,
-    )..addListener(roomStateChangedListener!);
+    );
 
     moderationController = LiveRoomModerationController(
       currentUser: currentUser,
     );
 
     roomMessageController = LiveRoomMessageController(
+      roomId: roomId,
+      roomSessionRepository: roomSessionRepository,
       currentUser: currentUser,
       restoreState: restoreState?.messageState,
       onChanged: () => notifyRoomChanged(),
     );
 
+    giftControllerInstance = LiveRoomGiftController(
+      currentUser: currentUser,
+      refreshCoinBalanceOnCreate: false,
+      onChanged: notifyGiftChanged,
+      onFinalGiftMessage: (entry) {
+        if (!mounted) return;
+        roomMessageController.insertEntry(entry);
+      },
+      onToast: (message) {
+        if (!mounted) return;
+        RoomToast.show(context, message);
+      },
+    );
+    luckyPacketRealtimeService = LuckyPacketRealtimeService(
+      roomId: roomId,
+      giftController: giftControllerInstance!,
+    )..attach();
+
     seatController = LiveRoomSeatController(
       currentUser: currentUser,
+      roomSessionRepository: roomSessionRepository,
       onChanged: () => notifyRoomChanged(),
       onToast: (message) {
         if (!mounted) return;
@@ -260,19 +378,6 @@ class LiveRoomControllerBundle {
     seatInviteListener = onSeatInviteUpdate;
     LiveRoomMediaSignalingService.instance.seatInvite.addListener(
       seatInviteListener!,
-    );
-
-    roomMembershipListener = onMembershipChanged;
-    LiveRoomMembershipService.snapshots.addListener(roomMembershipListener!);
-
-    roomMemberRequestListener = onMemberRequestChanged;
-    LiveRoomMemberRequestService.instance.pendingRequests.addListener(
-      roomMemberRequestListener!,
-    );
-
-    LiveRoomMemberRequestService.instance.startRoom(
-      roomId: roomId,
-      currentUser: currentUser,
     );
 
     unawaited(roomStateController.loadPersistedRoomSettings());
@@ -291,33 +396,129 @@ class LiveRoomControllerBundle {
       );
     }
 
-    final membershipListener = roomMembershipListener;
-    if (membershipListener != null) {
-      LiveRoomMembershipService.snapshots.removeListener(membershipListener);
-    }
-
-    final memberRequestListener = roomMemberRequestListener;
-    if (memberRequestListener != null) {
-      LiveRoomMemberRequestService.instance.pendingRequests.removeListener(
-        memberRequestListener,
-      );
-    }
-
-    final stateListener = roomStateChangedListener;
-    if (stateListener != null)
-      roomStateController.removeListener(stateListener);
-
+    unawaited(_cricketEventSubscription?.cancel());
+    _cricketEventSubscription = null;
+    luckyPacketRealtimeService.dispose();
     giftControllerInstance?.dispose();
     messageController.dispose();
     announcementController.dispose();
     messageFocusNode.dispose();
     seatController.dispose();
     moderationController.dispose();
+    roomMessageController.dispose();
     presenceController.leave();
     presenceController.dispose();
+    unawaited(roomMusicController.dispose());
+    cricketModeController.dispose();
     roomStateController.dispose();
     roomRevision.dispose();
     giftRevision.dispose();
+  }
+
+  void _handleCricketRealtimeEvent(RealtimeEventEnvelope envelope) {
+    if (disposed) return;
+    final decoded = envelope.toLegacyEvent();
+    if (decoded['type']?.toString() != 'room_cricket/state') return;
+
+    final rawPayload = decoded['payload'];
+    final payload = rawPayload is Map
+        ? rawPayload.cast<String, dynamic>()
+        : <String, dynamic>{};
+    final eventRoomId =
+        payload['room_id']?.toString().trim() ??
+        decoded['room_id']?.toString().trim() ??
+        '';
+    if (eventRoomId.isNotEmpty &&
+        roomId.trim().isNotEmpty &&
+        eventRoomId != roomId.trim()) {
+      return;
+    }
+
+    final rawCricketState = payload['cricket_state'];
+    final cricketState = rawCricketState is Map
+        ? rawCricketState.cast<String, dynamic>()
+        : const <String, dynamic>{};
+    final active = payload['active'] == true || cricketState['active'] == true;
+    final rawSetup = payload['setup'] ?? cricketState['setup'];
+
+    if (active && rawSetup is Map) {
+      final setup = CricketQuickMatchSetup.fromJson(
+        rawSetup.cast<String, dynamic>(),
+      );
+      if (!cricketModeController.active) {
+        preCricketLayoutId ??= seatController.layoutId;
+        preCricketBackgroundTheme ??= selectedBackgroundTheme;
+      }
+      cricketModeController.startRoomMode(
+        currentLayoutId: preCricketLayoutId ?? seatController.layoutId,
+        currentBackground:
+            preCricketBackgroundTheme ?? selectedBackgroundTheme,
+        setup: setup,
+      );
+      return;
+    }
+
+    if (!active && cricketModeController.active) {
+      cricketModeController.endRoomMode();
+    }
+  }
+
+  Set<String> _identityAliases(String rawId) {
+    final value = rawId.trim().toLowerCase();
+    if (value.isEmpty) return const <String>{};
+    final aliases = <String>{value};
+    final match = RegExp(r'(?:^|_)user_(\d+)$').firstMatch(value);
+    if (match != null) {
+      aliases.add(match.group(1)!);
+      aliases.add('user_${match.group(1)!}');
+    }
+    final direct = int.tryParse(value);
+    if (direct != null) {
+      aliases.add(direct.toString());
+      aliases.add('user_$direct');
+    }
+    return aliases;
+  }
+
+  bool _matchesIdentity(
+    Set<String> aliases, {
+    int? backendUserId,
+    int? publicUserId,
+  }) {
+    if (backendUserId != null && backendUserId > 0) {
+      if (aliases.contains(backendUserId.toString()) ||
+          aliases.contains('user_$backendUserId')) {
+        return true;
+      }
+    }
+    if (publicUserId != null && publicUserId > 0) {
+      if (aliases.contains(publicUserId.toString()) ||
+          aliases.contains('user_$publicUserId')) {
+        return true;
+      }
+    }
+    return false;
+  }
+
+  RoomSessionState? _lastAppliedCanonicalState;
+
+  /// Applies one immutable canonical room snapshot to scoped presentation.
+  ///
+  /// Seat/settings projection can consume every repository state, but chat is
+  /// replaced only after the repository has an authoritative server snapshot.
+  /// This preserves route-restored messages across the initial idle/joining
+  /// lifecycle and then lets canonical recent_messages take full ownership.
+  void applyCanonicalRoomState(RoomSessionState state) {
+    if (disposed || identical(_lastAppliedCanonicalState, state)) return;
+    _lastAppliedCanonicalState = state;
+    seatController.applyCanonicalRoomState();
+    roomStateController.applyCanonicalRoomState();
+    if (RoomSessionLegacyAdapter.canProjectCanonicalChat(state)) {
+      roomMessageController.applyCanonicalMessages(
+        RoomSessionLegacyAdapter.toChatEntries(state),
+      );
+    }
+    notifyRoomChanged();
   }
 
   void setRoomState(VoidCallback callback) {
@@ -326,9 +527,8 @@ class LiveRoomControllerBundle {
     notifyRoomChanged();
   }
 
-  void notifyRoomChanged({bool syncLuckyPacket = true}) {
+  void notifyRoomChanged() {
     if (!mounted || disposed) return;
-    if (syncLuckyPacket) syncLuckyPacketBeforeRoomRevision?.call();
     roomRevision.value++;
   }
 

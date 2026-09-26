@@ -17,8 +17,20 @@ on:
       - 'tests/load/**'
       - 'tests/chaos/**'
       - '.github/workflows/production-platform.yml'
+      - '.github/workflows/contracts.yml'
       - 'frontend/vibematch_app/**'
       - 'scripts/check_backend_architecture.py'
+      - 'scripts/check_contracts.py'
+      - 'scripts/check_realtime_media_qos.py'
+      - 'scripts/check_mobile_runtime.py'
+      - 'scripts/check_cache_edge_architecture.py'
+      - 'contracts/**'
+      - 'docs/architecture/**'
+      - 'docs/modules/**'
+      - 'docs/master-source-of-truth-architecture.md'
+      - 'docs/MODULE_INDEX.md'
+      - 'docs/adr/**'
+      - 'docs/runbooks/**'
       - 'PRODUCTION_RUNBOOK.md'
       - '.github/workflows/room-production-hardening.yml'
 
@@ -34,7 +46,12 @@ jobs:
         with:
           python-version: '3.13'
       - name: Verify canonical backend/media architecture
-        run: python scripts/check_backend_architecture.py
+        run: |
+          python scripts/check_backend_architecture.py
+          python scripts/check_contracts.py
+          python scripts/check_realtime_media_qos.py
+          python scripts/check_mobile_runtime.py
+          python scripts/check_cache_edge_architecture.py
 
   backend-tests:
     runs-on: ubuntu-latest
@@ -71,6 +88,14 @@ jobs:
         env:
           MIGRATION_TEST_DATABASE_URL: postgresql://postgres:postgres@localhost:5432/vibematch_test
         run: python check_migrations.py
+      - name: Validate PostgreSQL hot-query plans
+        env:
+          database_url: postgresql://postgres:postgres@localhost:5432/vibematch_test
+          MIGRATION_DATABASE_URL: postgresql://postgres:postgres@localhost:5432/vibematch_test
+          MIGRATION_TEST_DATABASE_URL: postgresql://postgres:postgres@localhost:5432/vibematch_test
+        run: |
+          alembic upgrade head
+          python -m unittest tests.test_postgres_query_plans -v
       - name: Run backend regression tests
         run: python -m unittest discover -s tests -p 'test_*.py' -v
 
@@ -108,6 +133,8 @@ jobs:
           cache: true
       - name: Resolve Flutter dependencies
         run: flutter pub get
+      - name: Verify Flutter dependency lockfile
+        run: git diff --exit-code -- pubspec.lock
       - name: Run Flutter tests
         run: flutter test
       - name: Analyze Flutter

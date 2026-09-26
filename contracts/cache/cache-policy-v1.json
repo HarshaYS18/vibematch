@@ -1,0 +1,33 @@
+{
+  "schema_version": 1,
+  "hierarchy": [
+    "client_memory",
+    "client_offline_projection",
+    "cdn_edge",
+    "service_memory",
+    "cache_redis",
+    "rebuildable_projection",
+    "authoritative_domain"
+  ],
+  "namespaces": {
+    "public_profile": {"ttl_seconds": 60, "stale_seconds": 300, "sensitivity": "public"},
+    "home_banners": {"ttl_seconds": 30, "stale_seconds": 120, "sensitivity": "public"},
+    "room_preview": {"ttl_seconds": 15, "stale_seconds": 30, "sensitivity": "public"},
+    "catalog": {"ttl_seconds": 300, "stale_seconds": 900, "sensitivity": "public"}
+  },
+  "forbidden": [
+    "wallet balances",
+    "ledger journals",
+    "authorization decisions",
+    "session truth",
+    "ban truth",
+    "private message bodies",
+    "settlement outcomes"
+  ],
+  "stampede": {
+    "distributed_single_flight": true,
+    "lock_seconds": 5,
+    "wait_budget_ms": 500,
+    "ttl_jitter_percent": 10
+  }
+}

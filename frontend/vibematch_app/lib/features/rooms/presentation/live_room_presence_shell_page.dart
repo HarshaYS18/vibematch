@@ -1,18 +1,22 @@
 import 'dart:async';
 
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../core/ui/vm_motion.dart';
+import '../../../foundation/runtime/media_resource_lifecycle.dart';
+import '../../../room_session/data/room_session_repository.dart';
 import '../../auth/models/current_user.dart';
 import '../data/live_room_media_signaling_service.dart';
 import '../data/live_room_presence_repository.dart';
+import '../data/room_session_legacy_adapter.dart';
 import 'live_room_models.dart';
 import 'live_room_page.dart';
 import 'live_room_restore_state.dart';
 import 'widgets/live_room_minimized_overlay_service.dart';
 import 'widgets/room_theme.dart';
 
-class LiveRoomPresenceShellPage extends StatefulWidget {
+class LiveRoomPresenceShellPage extends ConsumerStatefulWidget {
   const LiveRoomPresenceShellPage({
     super.key,
     required this.roomName,
@@ -37,19 +41,19 @@ class LiveRoomPresenceShellPage extends StatefulWidget {
   final LiveRoomRestoreState? restoreState;
 
   @override
-  State<LiveRoomPresenceShellPage> createState() =>
+  ConsumerState<LiveRoomPresenceShellPage> createState() =>
       _LiveRoomPresenceShellPageState();
 }
 
-class _LiveRoomPresenceShellPageState extends State<LiveRoomPresenceShellPage> {
-  final LiveRoomPresenceRepository _presenceRepository =
-      LiveRoomPresenceRepository();
+class _LiveRoomPresenceShellPageState
+    extends ConsumerState<LiveRoomPresenceShellPage> {
+  late final RoomSessionRepository _roomSessionRepository;
+  late final RoomSessionLegacyRealtimeBridge _roomSessionRealtimeBridge;
   final ValueNotifier<SeatUser?> _enteredUser = ValueNotifier<SeatUser?>(null);
   final ValueNotifier<String?> _livePresenceWarning = ValueNotifier<String?>(
     null,
   );
 
-  Timer? _heartbeatTimer;
   Timer? _enteredMessageTimer;
   LiveRoomPresenceSnapshot? _snapshot;
   bool _joining = true;
@@ -63,10 +67,23 @@ class _LiveRoomPresenceShellPageState extends State<LiveRoomPresenceShellPage> {
   @override
   void initState() {
     super.initState();
+    // Room media survives route disposal while minimized, so the signaling
+    // owner receives the session registry and keeps registration until actual
+    // room leave rather than tying it to this widget's dispose().
     LiveRoomMediaSignalingService.instance.configureRoom(
       roomId: widget.roomId,
       roomName: widget.roomName,
+      resourceRegistry: ref.read(mediaResourceRegistryProvider),
     );
+    _roomSessionRepository = ref.read(
+      roomSessionRepositoryProvider(widget.roomId).notifier,
+    );
+    _roomSessionRealtimeBridge = RoomSessionLegacyRealtimeBridge(
+      roomId: widget.roomId,
+      repository: _roomSessionRepository,
+      mediaSignalingService: LiveRoomMediaSignalingService.instance,
+    )..start();
+
     final currentUser = widget.currentUser;
     if (currentUser != null) {
       LiveRoomMediaSignalingService.instance.setActiveLoggedInUser(currentUser);
@@ -81,32 +98,50 @@ class _LiveRoomPresenceShellPageState extends State<LiveRoomPresenceShellPage> {
 
   @override
   void dispose() {
-    _heartbeatTimer?.cancel();
     _enteredMessageTimer?.cancel();
     if (!LiveRoomMinimizedOverlayService.instance.isShowing) {
-      unawaited(
-        _presenceRepository.leaveRoom(widget.roomId).catchError((_) => 0),
-      );
+      _roomSessionRealtimeBridge.deactivate();
+      unawaited(_leaveRoomBestEffort());
     }
+    _roomSessionRealtimeBridge.dispose();
     _enteredUser.dispose();
     _livePresenceWarning.dispose();
-    _presenceRepository.close();
     super.dispose();
+  }
+
+  Future<void> _leaveRoomBestEffort() async {
+    try {
+      await LiveRoomMediaSignalingService.instance.leaveRoom();
+    } catch (_) {
+      // Media teardown is best effort; durable room state still needs leave.
+    }
+    try {
+      await _roomSessionRepository.leave();
+    } catch (_) {
+      // Route teardown must not be blocked by a failed leave request.
+    }
   }
 
   void _restorePresenceWithoutFreshJoin() {
     _seedIdentityFromRestoreState();
-    final cachedParticipants =
-        LiveRoomPresenceRepository.currentParticipantsForRoom(widget.roomId);
+    final restoredParticipants = <SeatUser>[
+      for (final seat in widget.restoreState?.seatState.seats ??
+          const <RoomSeat>[])
+        if (seat.user != null) seat.user!,
+    ];
     _snapshot = LiveRoomPresenceSnapshot(
       roomId: widget.roomId,
       onlineCount: widget.initialOnlineCount,
-      participants: cachedParticipants,
+      participants: List<SeatUser>.unmodifiable(restoredParticipants),
     );
     _joining = false;
     _presenceEstablished = true;
     _presenceError = null;
-    _startHeartbeat();
+    unawaited(_roomSessionRealtimeBridge.activate());
+    // A minimized-room restore may render cached visual state immediately.
+    // Reconcile once after reconnect; steady-state liveness comes from the
+    // authenticated realtime socket lease and room-state deltas.
+    unawaited(_refreshAfterRestore());
     _restoreSavedSeatIfNeeded();
   }
 
@@ -194,9 +229,12 @@ class _LiveRoomPresenceShellPageState extends State<LiveRoomPresenceShellPage> {
     }
 
     try {
-      final snapshot = await _presenceRepository.joinRoom(
-        widget.roomId,
+      final roomState = await _roomSessionRepository.join(
         lockPassword: widget.lockPassword,
+      );
+      final snapshot = RoomSessionLegacyAdapter.toPresenceSnapshot(
+        roomState,
+        currentPublicUserId: widget.currentUser?.publicUserId,
       );
       if (!mounted) return;
 
@@ -212,7 +250,7 @@ class _LiveRoomPresenceShellPageState extends State<LiveRoomPresenceShellPage> {
 
       _showEnteredMessageIfNeeded(snapshot);
       _autoSeatIfAllowed(snapshot);
-      _startHeartbeat();
+      await _roomSessionRealtimeBridge.activate();
     } catch (error) {
       if (!mounted) return;
 
@@ -220,12 +258,10 @@ class _LiveRoomPresenceShellPageState extends State<LiveRoomPresenceShellPage> {
       if (_presenceEstablished) {
         _joining = false;
         _livePresenceWarning.value = message;
-        _startHeartbeat();
-        return;
+          return;
       }
 
-      _heartbeatTimer?.cancel();
-      setState(() {
+        setState(() {
         _joining = false;
         _presenceError = message;
       });
@@ -297,33 +333,20 @@ class _LiveRoomPresenceShellPageState extends State<LiveRoomPresenceShellPage> {
     );
   }
 
-  void _startHeartbeat() {
-    _heartbeatTimer?.cancel();
-    _heartbeatTimer = Timer.periodic(
-      const Duration(seconds: 12),
-      (_) => unawaited(_heartbeat()),
-    );
-  }
-
-  Future<void> _heartbeat() async {
+  Future<void> _refreshAfterRestore() async {
     try {
-      final snapshot = await _presenceRepository.heartbeat(widget.roomId);
+      final roomState = await _roomSessionRepository.refreshAfterReconnect();
+      final snapshot = RoomSessionLegacyAdapter.toPresenceSnapshot(
+        roomState,
+        currentPublicUserId: widget.currentUser?.publicUserId,
+      );
       if (!mounted) return;
-
       _seedIdentityFromPresence(snapshot);
       _livePresenceWarning.value = null;
-
-      final onlineCountChanged = _onlineCount != snapshot.onlineCount;
-      if (onlineCountChanged) {
-        setState(() {
-          _snapshot = snapshot;
-          _presenceError = null;
-        });
-      } else {
+      setState(() {
         _snapshot = snapshot;
         _presenceError = null;
-      }
-
+      });
       _autoSeatIfAllowed(snapshot);
     } catch (error) {
       if (!mounted) return;
@@ -332,7 +355,6 @@ class _LiveRoomPresenceShellPageState extends State<LiveRoomPresenceShellPage> {
   }
 
   Future<void> _retryPresence() async {
-    _heartbeatTimer?.cancel();
     await _joinPresence();
   }
 
@@ -342,6 +364,13 @@ class _LiveRoomPresenceShellPageState extends State<LiveRoomPresenceShellPage> {
 
   @override
   Widget build(BuildContext context) {
+    final canonicalRoom = ref.watch(
+      roomSessionRepositoryProvider(widget.roomId),
+    );
+    final canonicalOnlineCount = canonicalRoom.isJoined
+        ? canonicalRoom.onlineCount
+        : _onlineCount;
+
     if (_shouldBlockRoomWithRetry) {
       return _RoomNetworkRetryState(
         message: _presenceError!,
@@ -361,7 +390,7 @@ class _LiveRoomPresenceShellPageState extends State<LiveRoomPresenceShellPage> {
           roomId: widget.roomId,
           language: widget.language,
           modeTitle: widget.modeTitle,
-          onlineCount: _onlineCount,
+          onlineCount: canonicalOnlineCount,
           initialBackgroundTheme: widget.initialBackgroundTheme,
           restoreState: widget.restoreState,
         ),

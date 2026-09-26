@@ -292,16 +292,30 @@ def get_or_create_definition(db: Session, actor: User | None = None) -> GameDefi
 
 
 def load_rules(db: Session) -> dict[str, Any]:
-    definition = get_or_create_definition(db)
-    rules = _merged(DEFAULT_RULES, definition.rules_json)
+    definition = (
+        db.query(GameDefinition)
+        .filter(GameDefinition.game_key == LUCKY_GIFT_KEY)
+        .first()
+    )
+    rules = _merged(
+        DEFAULT_RULES,
+        definition.rules_json if definition is not None else None,
+    )
     rules["multipliers"] = _normalized_multiplier_rows(rules.get("multipliers"))
     rules["special_scroll_multipliers"] = [100, 500, 1000]
     return rules
 
 
 def load_risk(db: Session) -> dict[str, Any]:
-    definition = get_or_create_definition(db)
-    return _merged(DEFAULT_RISK, definition.risk_config_json)
+    definition = (
+        db.query(GameDefinition)
+        .filter(GameDefinition.game_key == LUCKY_GIFT_KEY)
+        .first()
+    )
+    return _merged(
+        DEFAULT_RISK,
+        definition.risk_config_json if definition is not None else None,
+    )
 
 
 def get_props(db: Session) -> dict[str, Any]:
@@ -332,7 +346,13 @@ def get_props(db: Session) -> dict[str, Any]:
     }
 
 
-def update_props(db: Session, actor: User, payload: dict[str, Any]) -> dict[str, Any]:
+def update_props(
+    db: Session,
+    actor: User,
+    payload: dict[str, Any],
+    *,
+    commit: bool = True,
+) -> dict[str, Any]:
     definition = get_or_create_definition(db, actor)
     current = get_props(db)
     rules = _merged(DEFAULT_RULES, definition.rules_json)
@@ -356,8 +376,11 @@ def update_props(db: Session, actor: User, payload: dict[str, Any]) -> dict[str,
     definition.rules_json = _dumps(rules)
     definition.risk_config_json = _dumps(risk)
     definition.updated_by_user_id = actor.id
-    db.commit()
-    db.refresh(definition)
+    if commit:
+        db.commit()
+        db.refresh(definition)
+    else:
+        db.flush()
     return get_props(db)
 
 
