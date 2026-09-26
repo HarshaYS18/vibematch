@@ -57,17 +57,11 @@ flutter:
   assets:
     - assets/branding/
     - assets/images/branding/
-    - assets/images/vip_badges/
     - assets/images/vip_tags/
     - assets/images/svip_tags/
-    - assets/images/store/avatar_frames/
     - assets/gifts/lucky/
     - assets/gifts/broadcast/
     - assets/gifts/love_rocket/icon/
-    - assets/gifts/love_rocket/effect/
-    - assets/videos/gifts/
-    - assets/images/rooms/backgrounds/
-    - assets/images/room_backgrounds/chat_room/default/
     - assets/images/room_backgrounds/cricket/default/
     - assets/images/family_badges/
     - assets/images/mini_profile_decorations/
