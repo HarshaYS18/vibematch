@@ -1,8 +1,10 @@
 #!/usr/bin/env python3
-"""Report Flutter dead-code/dependency/asset candidates without changing behavior.
+"""Enforce Flutter dead-code, dependency, asset and platform hygiene.
 
-The cleanup pass uses this report as evidence. Once the candidate set is
-reviewed and repaired, this script becomes the permanent regression guard.
+The cleanup pass established an evidence-backed zero baseline. This guard keeps
+new pure orphans, unused dependencies, dead bundled assets and unsupported
+desktop runners from returning while preserving deliberate compatibility/test
+artifacts.
 """
 
 from __future__ import annotations
@@ -17,6 +19,17 @@ ROOT = Path(__file__).resolve().parents[1]
 APP = ROOT / "frontend" / "vibematch_app"
 LIB = APP / "lib"
 PUBSPEC = APP / "pubspec.yaml"
+
+SUPPORTED_PLATFORM_DIRS = {"android", "ios", "web"}
+UNSUPPORTED_PLATFORM_DIRS = {"linux", "macos", "windows"}
+APPROVED_UNREACHABLE_LIB_DART = {
+    "lib/core/network/api_client.dart": (
+        "deprecated source-compatibility alias retained by the decommission registry"
+    ),
+    "lib/foundation/offline/offline_projection_store.dart": (
+        "Chunk 46 offline projection policy component retained by focused tests/guard"
+    ),
+}
 
 DIRECTIVE_RE = re.compile(r"(?ms)^\s*(import|export|part)\s+([^;]+);")
 URI_RE = re.compile(r"['\"]([^'\"]+)['\"]")
@@ -289,6 +302,20 @@ def main() -> None:
         and not any(asset.startswith(prefix) for prefix in dynamic_asset_prefixes)
     )
 
+    unexpected_unreachable = sorted(
+        path for path in unreachable
+        if path not in APPROVED_UNREACHABLE_LIB_DART
+    )
+    dead_bundled_assets = sorted(
+        asset for asset in literal_unreferenced_assets
+        if asset not in external_asset_references
+    )
+    present_unsupported_platforms = sorted(
+        platform
+        for platform in UNSUPPORTED_PLATFORM_DIRS
+        if (APP / platform).exists()
+    )
+
     report = {
         "lib_dart_files": len(lib_files),
         "reachable_lib_dart_files": len(reachable),
@@ -310,6 +337,12 @@ def main() -> None:
             )
         },
         "pure_orphan_lib_dart": pure_orphans,
+        "approved_unreachable_lib_dart": {
+            path: APPROVED_UNREACHABLE_LIB_DART[path]
+            for path in sorted(APPROVED_UNREACHABLE_LIB_DART)
+            if path in unreachable
+        },
+        "unexpected_unreachable_lib_dart": unexpected_unreachable,
         "unexpected_unreachable_lib_dart": unexpected_unreachable,
         "direct_dependencies": sorted(dependencies),
         "imported_direct_dependencies": sorted(dependencies & set(imported_packages)),
