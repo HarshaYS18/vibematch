@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 
+import '../../../../core/assets/funkey_cdn_assets.dart';
+
 class FamilyClanBadgeIcon extends StatelessWidget {
   const FamilyClanBadgeIcon({
     super.key,
@@ -29,8 +31,8 @@ class FamilyClanBadgeIcon extends StatelessWidget {
   _BadgeIconStyle get _style {
     switch (_level) {
       case 'platinum':
-        return const _BadgeIconStyle(
-          assetPath: 'assets/images/family_badges/platinum.png',
+        return _BadgeIconStyle(
+          assetUrl: FunKeyCdnAssets.familyBadge('platinum'),
           fallbackTop: Color(0xFFEAF0F8),
           fallbackBottom: Color(0xFF7B8594),
           glow: Color(0xFFEAF0F8),
@@ -38,8 +40,8 @@ class FamilyClanBadgeIcon extends StatelessWidget {
           sparkle: Color(0xFFFFFFFF),
         );
       case 'gold':
-        return const _BadgeIconStyle(
-          assetPath: 'assets/images/family_badges/gold.png',
+        return _BadgeIconStyle(
+          assetUrl: FunKeyCdnAssets.familyBadge('gold'),
           fallbackTop: Color(0xFFFFE28A),
           fallbackBottom: Color(0xFFE0B12F),
           glow: Color(0xFFFFD96A),
@@ -47,8 +49,8 @@ class FamilyClanBadgeIcon extends StatelessWidget {
           sparkle: Color(0xFFFFF2B0),
         );
       case 'silver':
-        return const _BadgeIconStyle(
-          assetPath: 'assets/images/family_badges/silver.png',
+        return _BadgeIconStyle(
+          assetUrl: FunKeyCdnAssets.familyBadge('silver'),
           fallbackTop: Color(0xFFF0F4F8),
           fallbackBottom: Color(0xFF9AA5B1),
           glow: Color(0xFFD6DDE5),
@@ -56,8 +58,8 @@ class FamilyClanBadgeIcon extends StatelessWidget {
           sparkle: Color(0xFFFFFFFF),
         );
       default:
-        return const _BadgeIconStyle(
-          assetPath: 'assets/images/family_badges/bronze.png',
+        return _BadgeIconStyle(
+          assetUrl: FunKeyCdnAssets.familyBadge('bronze'),
           fallbackTop: Color(0xFFDCA477),
           fallbackBottom: Color(0xFFC08A5A),
           glow: Color(0xFFC68E61),
@@ -93,8 +95,8 @@ class FamilyClanBadgeIcon extends StatelessWidget {
               boxShadow: [BoxShadow(color: style.glow.withValues(alpha: 0.36), blurRadius: 24, spreadRadius: 1)],
             ),
           ),
-          Image.asset(
-            style.assetPath,
+          Image.network(
+            style.assetUrl,
             width: size,
             height: size,
             fit: BoxFit.contain,
@@ -127,7 +129,7 @@ class FamilyClanBadgeIcon extends StatelessWidget {
 
 class _BadgeIconStyle {
   const _BadgeIconStyle({
-    required this.assetPath,
+    required this.assetUrl,
     required this.fallbackTop,
     required this.fallbackBottom,
     required this.glow,
@@ -135,7 +137,7 @@ class _BadgeIconStyle {
     required this.sparkle,
   });
 
-  final String assetPath;
+  final String assetUrl;
   final Color fallbackTop;
   final Color fallbackBottom;
   final Color glow;
