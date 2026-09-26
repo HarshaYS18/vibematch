@@ -1,5 +1,12 @@
+from app.core.config import settings
 from app.schemas.rooms.room_background import RoomBackgroundConfigResponse
 
+
+def _media_cdn_url(object_key: str) -> str | None:
+    base = settings.MEDIA_CDN_BASE_URL.strip().rstrip("/")
+    if not base:
+        return None
+    return f"{base}/{object_key.lstrip('/')}"
 
 _CRICKET_BACKGROUNDS = [
     RoomBackgroundConfigResponse(
@@ -9,9 +16,9 @@ _CRICKET_BACKGROUNDS = [
         source_type="cricket",
         unlock_type="free",
         ownership_type="free",
-        asset_path="assets/images/room_backgrounds/cricket/default/floodlight_arena.webp",
-        image_url=None,
-        thumbnail_url=None,
+        asset_path=None,
+        image_url=_media_cdn_url("ui/rooms/cricket/backgrounds/v1/floodlight_arena.webp"),
+        thumbnail_url=_media_cdn_url("ui/rooms/cricket/backgrounds/v1/floodlight_arena.webp"),
         accent="#65FF8F",
         overlay_opacity=0.48,
         fallback_colors=["#04130A", "#0B3E1F"],
@@ -25,9 +32,9 @@ _CRICKET_BACKGROUNDS = [
         source_type="cricket",
         unlock_type="free",
         ownership_type="free",
-        asset_path="assets/images/room_backgrounds/cricket/default/stadium_night.webp",
-        image_url=None,
-        thumbnail_url=None,
+        asset_path=None,
+        image_url=_media_cdn_url("ui/rooms/cricket/backgrounds/v1/stadium_night.webp"),
+        thumbnail_url=_media_cdn_url("ui/rooms/cricket/backgrounds/v1/stadium_night.webp"),
         accent="#FFD36A",
         overlay_opacity=0.50,
         fallback_colors=["#07160D", "#254B1D"],
@@ -40,9 +47,9 @@ _CRICKET_BACKGROUNDS = [
         source_type="cricket",
         unlock_type="free",
         ownership_type="free",
-        asset_path="assets/images/room_backgrounds/cricket/default/royal_pitch.webp",
-        image_url=None,
-        thumbnail_url=None,
+        asset_path=None,
+        image_url=_media_cdn_url("ui/rooms/cricket/backgrounds/v1/royal_pitch.webp"),
+        thumbnail_url=_media_cdn_url("ui/rooms/cricket/backgrounds/v1/royal_pitch.webp"),
         accent="#12C7B7",
         overlay_opacity=0.46,
         fallback_colors=["#051B13", "#0C6040"],
