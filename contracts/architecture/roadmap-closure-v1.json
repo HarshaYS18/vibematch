@@ -267,7 +267,7 @@
       "title": "API Gateway",
       "status": "complete",
       "docs": [
-        "docs/platform/chunk35-api-gateway.md",
+        "docs/frontend/chunk35-api-gateway.md",
         "docs/architecture/api-gateway.md"
       ],
       "evidence": [
@@ -280,7 +280,7 @@
       "title": "GraphQL Read BFF",
       "status": "complete",
       "docs": [
-        "docs/platform/chunk36-graphql-read-bff.md",
+        "docs/frontend/chunk36-graphql-read-bff.md",
         "docs/architecture/graphql-read-bff.md"
       ],
       "evidence": [
@@ -478,7 +478,8 @@
       "status": "complete",
       "docs": [
         "docs/platform/chunk52-ownership-governance.md",
-        "docs/governance/README.md"
+        "docs/governance/architecture-review.md",
+        "docs/governance/rfc-process.md"
       ],
       "evidence": [
         "scripts/check_ownership_governance.py",
@@ -491,7 +492,7 @@
       "status": "complete",
       "docs": [
         "docs/platform/chunk53-developer-experience.md",
-        "docs/developer-portal/golden-paths.md"
+        "docs/developer-experience/golden-path.md"
       ],
       "evidence": [
         "scripts/check_developer_experience.py"
@@ -516,7 +517,7 @@
       "status": "complete",
       "docs": [
         "docs/platform/chunk55-release-management.md",
-        "docs/governance/release-management.md"
+        "docs/release/compatibility-matrix.md"
       ],
       "evidence": [
         "scripts/check_release_management.py",
