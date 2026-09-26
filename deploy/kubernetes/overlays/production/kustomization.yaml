@@ -51,6 +51,9 @@ images:
   - name: funkey-recommendation
     newName: ghcr.io/harshays18/vibematch/funkey-recommendation
     digest: sha256:0000000000000000000000000000000000000000000000000000000000000000
+  - name: funkey-analytics-sink
+    newName: ghcr.io/harshays18/vibematch/funkey-analytics-sink
+    digest: sha256:0000000000000000000000000000000000000000000000000000000000000000
   - name: funkey-realtime
     newName: ghcr.io/harshays18/vibematch/funkey-realtime
     digest: sha256:0000000000000000000000000000000000000000000000000000000000000000

@@ -7,7 +7,7 @@ modules own resource behavior; this module owns hierarchy and registration.
 from fastapi import APIRouter
 
 from app.api.routes import (
-    admin_support, ai_moderation, app_source_registry, calls,
+    admin_support, ai_moderation, app_source_registry, calls, compatibility,
     control_center, economy, economy_admin, economy_master, economy_proxy,
     experience, families_economy, game_platform_proxy, game_props_admin,
     game_settlements, health, home_banners,
@@ -25,7 +25,7 @@ api_router = APIRouter(prefix="/api/v1")
 
 # System and identity.
 for router in (
-    health.router, identity_proxy.router, app_source_registry.router, users.router, support.router,
+    health.router, identity_proxy.router, app_source_registry.router, compatibility.router, users.router, support.router,
     settings.router, role_badges.router,
 ):
     api_router.include_router(router)

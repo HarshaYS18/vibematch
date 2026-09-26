@@ -50,6 +50,9 @@ on:
       recommendation_image:
         description: Immutable Recommendation service image (name@sha256:digest)
         required: true
+      analytics_sink_image:
+        description: Immutable Analytics Sink image (name@sha256:digest)
+        required: true
       realtime_image:
         description: Immutable realtime image (name@sha256:digest)
         required: true
@@ -87,6 +90,7 @@ jobs:
             --kafka-event-bridge "${{ inputs.kafka_event_bridge_image }}" \
             --search "${{ inputs.search_image }}" \
             --recommendation "${{ inputs.recommendation_image }}" \
+            --analytics-sink "${{ inputs.analytics_sink_image }}" \
             --realtime "${{ inputs.realtime_image }}" \
             --media "${{ inputs.media_image }}"
       - uses: azure/setup-kubectl@v4

@@ -64,6 +64,9 @@ jobs:
           - name: recommendation
             dockerfile: apps/recommendation-service/Dockerfile
             context: .
+          - name: analytics-sink
+            dockerfile: apps/analytics-sink/Dockerfile
+            context: .
           - name: realtime
             dockerfile: apps/realtime-gateway/Dockerfile
             context: .

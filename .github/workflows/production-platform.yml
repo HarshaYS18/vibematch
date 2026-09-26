@@ -28,6 +28,9 @@ on:
       - 'scripts/check_cache_edge_architecture.py'
       - 'scripts/check_mobile_runtime.py'
       - 'scripts/check_realtime_media_qos.py'
+      - 'scripts/check_analytics_platform.py'
+      - 'scripts/check_release_safety.py'
+      - 'scripts/check_sre_finops.py'
       - 'scripts/prepare_gitops_promotion.py'
       - 'docs/platform/chunk37-kafka-data-platform.md'
       - 'docs/architecture/kafka-data-platform.md'
@@ -102,6 +105,9 @@ jobs:
           scripts/check_realtime_media_qos.py
           scripts/check_mobile_runtime.py
           scripts/check_cache_edge_architecture.py
+          scripts/check_analytics_platform.py
+          scripts/check_release_safety.py
+          scripts/check_sre_finops.py
       - run: python scripts/check_gateway_architecture.py
       - run: python scripts/check_graphql_bff_architecture.py
       - run: python scripts/check_kafka_data_platform.py
@@ -115,6 +121,9 @@ jobs:
       - run: python scripts/check_realtime_media_qos.py
       - run: python scripts/check_mobile_runtime.py
       - run: python scripts/check_cache_edge_architecture.py
+      - run: python scripts/check_analytics_platform.py
+      - run: python scripts/check_release_safety.py
+      - run: python scripts/check_sre_finops.py
       - uses: azure/setup-kubectl@v4
         with:
           version: v1.36.4
@@ -147,11 +156,11 @@ jobs:
           python - <<'PY'
           from pathlib import Path
           manifest = Path("/tmp/funkey-production.yaml").read_text()
-          for image in ("funkey-api", "funkey-inbox", "funkey-vibes", "funkey-room-control", "funkey-identity", "funkey-profile-social", "funkey-economy", "funkey-game-platform", "funkey-notification", "funkey-graphql-bff", "funkey-worker", "funkey-kafka-event-bridge", "funkey-search", "funkey-recommendation", "funkey-realtime", "funkey-media"):
+          for image in ("funkey-api", "funkey-inbox", "funkey-vibes", "funkey-room-control", "funkey-identity", "funkey-profile-social", "funkey-economy", "funkey-game-platform", "funkey-notification", "funkey-graphql-bff", "funkey-worker", "funkey-kafka-event-bridge", "funkey-search", "funkey-recommendation", "funkey-analytics-sink", "funkey-realtime", "funkey-media"):
               if f"{image}:dev" in manifest:
                   raise SystemExit(f"production render still contains mutable dev image: {image}")
-          if manifest.count("@sha256:") < 16:
-              raise SystemExit("production render must pin all 16 backend workloads by digest")
+          if manifest.count("@sha256:") < 17:
+              raise SystemExit("production render must pin all 17 backend workloads by digest")
           PY
       - name: Parse load and chaos harnesses
         shell: bash
@@ -169,6 +178,7 @@ jobs:
       - run: docker build -f apps/kafka-event-bridge/Dockerfile -t funkey-kafka-event-bridge:ci .
       - run: docker build -f apps/search-service/Dockerfile -t funkey-search:ci .
       - run: docker build -f apps/recommendation-service/Dockerfile -t funkey-recommendation:ci .
+      - run: docker build -f apps/analytics-sink/Dockerfile -t funkey-analytics-sink:ci .
       - run: docker build -f apps/inbox-service/Dockerfile -t funkey-inbox:ci .
       - run: docker build -f apps/vibes-service/Dockerfile -t funkey-vibes:ci .
       - run: docker build -f apps/room-control-service/Dockerfile -t funkey-room-control:ci .
@@ -360,6 +370,27 @@ jobs:
         run: python scripts/check_recommendation_platform.py
       - name: Build Recommendation image
         run: docker build -f apps/recommendation-service/Dockerfile -t funkey-recommendation:ci .
+
+  analytics-platform:
+    name: Analytics / ClickHouse / data lake
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.13'
+      - name: Install analytics runtime
+        run: pip install -r apps/analytics-sink/requirements.txt
+      - name: Compile analytics sink
+        run: python -m compileall -q apps/analytics-sink scripts/check_analytics_platform.py
+      - name: Run analytics unit tests
+        working-directory: apps/analytics-sink
+        run: python -m unittest discover -s tests -p 'test_*.py' -v
+      - name: Enforce analytics authority boundary
+        run: python scripts/check_analytics_platform.py
+      - name: Build analytics image
+        run: docker build -f apps/analytics-sink/Dockerfile -t funkey-analytics-sink:ci .
 
   security-source:
     runs-on: ubuntu-latest

@@ -1,0 +1,24 @@
+{
+  "git_sha": "REPLACE",
+  "environment": "production-like",
+  "started_at": "REPLACE",
+  "finished_at": "REPLACE",
+  "operator": "REPLACE",
+  "scenario_results": {
+    "synthetic_core_flows": {"status": "not_run"},
+    "six_hour_soak": {"status": "not_run"},
+    "twenty_four_hour_soak": {"status": "not_run"},
+    "room_reconnect_load": {"status": "not_run"},
+    "media_join_load": {"status": "not_run"},
+    "database_failover": {"status": "not_run"},
+    "redis_role_failure": {"status": "not_run"},
+    "nats_failover": {"status": "not_run"},
+    "kafka_failover": {"status": "not_run"},
+    "regional_failover": {"status": "not_run"},
+    "rollback_drill": {"status": "not_run"}
+  },
+  "observed_p95_p99": {},
+  "error_rates": {},
+  "resource_saturation": {},
+  "artifacts": []
+}

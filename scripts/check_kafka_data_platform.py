@@ -13,6 +13,7 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parents[1]
 BRIDGE = ROOT / "apps" / "kafka-event-bridge"
 RECOMMENDATION = ROOT / "apps" / "recommendation-service"
+ANALYTICS_SINK = ROOT / "apps" / "analytics-sink"
 
 EXPECTED_TOPICS = {
     "funkey.user.activity.v1",
@@ -145,7 +146,7 @@ def check_no_domain_kafka_clients() -> None:
     offenders: list[str] = []
     for base in roots:
         for path in base.rglob("*.py"):
-            if BRIDGE in path.parents or RECOMMENDATION in path.parents:
+            if BRIDGE in path.parents or RECOMMENDATION in path.parents or ANALYTICS_SINK in path.parents:
                 continue
             if pattern.search(path.read_text(encoding="utf-8", errors="replace")):
                 offenders.append(str(path.relative_to(ROOT)))

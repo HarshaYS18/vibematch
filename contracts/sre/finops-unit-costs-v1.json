@@ -1,0 +1,21 @@
+{
+  "schema_version": 1,
+  "currency": "USD",
+  "unit_metrics": [
+    "cost_per_1000_api_requests",
+    "cost_per_1000_realtime_events",
+    "cost_per_1000_kafka_events",
+    "cost_per_room_hour",
+    "cost_per_media_participant_minute",
+    "cost_per_gb_egress",
+    "cost_per_clickhouse_gb_month",
+    "cost_per_object_storage_gb_month",
+    "cost_per_1000_push_notifications"
+  ],
+  "allocation_dimensions": ["environment", "region", "service", "workload_tier"],
+  "rules": [
+    "cost metrics are decision support, never billing authority",
+    "capacity claims require measured load evidence",
+    "production certification evidence must record git sha and environment"
+  ]
+}

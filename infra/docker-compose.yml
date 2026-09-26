@@ -211,6 +211,37 @@ services:
       kafka: {condition: service_healthy}
       cache-redis: {condition: service_healthy}
 
+  clickhouse:
+    profiles: ["analytics"]
+    image: clickhouse/clickhouse-server:25.8
+    ports:
+      - "127.0.0.1:18123:8123"
+    volumes: ["clickhouse_data:/var/lib/clickhouse"]
+    healthcheck:
+      test: ["CMD-SHELL", "wget -q -O - http://127.0.0.1:8123/ping | grep -q Ok"]
+      interval: 10s
+      timeout: 5s
+      retries: 30
+
+  analytics-sink:
+    profiles: ["analytics"]
+    build: {context: .., dockerfile: apps/analytics-sink/Dockerfile}
+    environment:
+      APP_ENV: development
+      KAFKA_BOOTSTRAP_SERVERS: kafka:9092
+      KAFKA_SECURITY_PROTOCOL: PLAINTEXT
+      ANALYTICS_KAFKA_GROUP: funkey-analytics-sink-v1
+      CLICKHOUSE_URL: http://clickhouse:8123
+      CLICKHOUSE_DATABASE: funkey_analytics
+      ANALYTICS_OBJECT_STORE_MODE: file
+      ANALYTICS_LOCAL_LAKE_PATH: /lake
+      ANALYTICS_PORT: "8095"
+    volumes: ["analytics_lake_data:/lake"]
+    ports: ["127.0.0.1:8095:8095"]
+    depends_on:
+      kafka: {condition: service_healthy}
+      clickhouse: {condition: service_healthy}
+
   kafka-event-bridge:
     profiles: ["data"]
     build: {context: .., dockerfile: apps/kafka-event-bridge/Dockerfile}
@@ -554,3 +585,5 @@ volumes:
   nats_data:
   kafka_data:
   opensearch_data:
+  clickhouse_data:
+  analytics_lake_data:

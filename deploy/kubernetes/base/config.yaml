@@ -95,6 +95,14 @@ data:
   RECOMMENDATION_REDIS_URL: redis://cache-redis:6379/0
   RECOMMENDATION_FEED_TTL_SECONDS: "21600"
   RECOMMENDATION_KAFKA_GROUP: funkey-recommendation-v1
+  ANALYTICS_KAFKA_GROUP: funkey-analytics-sink-v1
+  ANALYTICS_PORT: "8095"
+  CLICKHOUSE_URL: https://clickhouse.example.invalid
+  CLICKHOUSE_DATABASE: funkey_analytics
+  ANALYTICS_OBJECT_STORE_MODE: s3
+  ANALYTICS_OBJECT_STORE_BUCKET: funkey-analytics-placeholder
+  ANALYTICS_OBJECT_STORE_PREFIX: funkey/events/v1
+  ANALYTICS_OBJECT_STORE_REGION: ap-south-1
   REALTIME_NATS_URL: nats://nats.example.invalid:4222
   REALTIME_NATS_INBOX_SUBJECT: funkey.events.inbox.realtime
   REALTIME_INBOX_COMMAND_URL: http://funkey-inbox:8083/api/v1/realtime/command

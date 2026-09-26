@@ -132,3 +132,12 @@ apiVersion: autoscaling/v2
 kind: HorizontalPodAutoscaler
 metadata: {name: funkey-recommendation}
 $patch: delete
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata: {name: funkey-analytics-sink}
+spec:
+  replicas: 0
+  template:
+    spec:
+      nodeSelector: null

@@ -1,7 +1,7 @@
 # FunKey module index
 
 Use this index to find the current owner, contracts, runbooks and architecture
-for the repository through Chunk 47. A service name here means the deployable
+for the repository through Chunk 50. A service name here means the deployable
 exists. GraphQL read composition and the Kafka analytics bridge are now deployed
 platform boundaries; Search and Recommendation are deployed projection boundaries.
 
@@ -14,6 +14,7 @@ platform boundaries; Search and Recommendation are deployed projection boundarie
 - [Kafka Event Bridge](modules/kafka-event-bridge/README.md)
 - [Search Service](modules/search/README.md)
 - [Recommendation Service](modules/recommendation/README.md)
+- [Analytics Sink](../apps/analytics-sink/README.md)
 - [Inbox Service](architecture/inbox-service.md)
 - [Vibes Service](architecture/vibes-service.md)
 - [Room Control Service](architecture/room-control-service.md)
@@ -77,6 +78,9 @@ platform boundaries; Search and Recommendation are deployed projection boundarie
 - [Realtime / media QoS](architecture/realtime-media-qos.md)
 - [Mobile runtime / offline](architecture/mobile-runtime-offline.md)
 - [Cache / edge](architecture/cache-edge.md)
+- [Analytics platform](architecture/analytics-platform.md)
+- [Release safety](architecture/release-safety.md)
+- [SRE / FinOps](architecture/sre-finops.md)
 - [Room State Engine v2](architecture/room-state-engine-v2.md)
 - [Go realtime v2](architecture/go-realtime-platform-v2.md)
 - [Media v2](architecture/media-v2-upload.md)

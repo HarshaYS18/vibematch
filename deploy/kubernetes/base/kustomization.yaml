@@ -17,6 +17,7 @@ resources:
   - kafka-event-bridge.yaml
   - search.yaml
   - recommendation.yaml
+  - analytics-sink.yaml
   - realtime.yaml
   - worker.yaml
   - autoscaling.yaml
