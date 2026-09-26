@@ -52,7 +52,7 @@ High-change user state belongs in child/domain tables:
 - sent/received gift totals in contribution/experience tables
 - daily/weekly/monthly/yearly aggregates in user stat aggregate tables
 - sent level and received level in `user_experience_status`
-- current room presence in `room_participants` / room presence tables
+- durable room membership in `room_participants`; connected presence is an ephemeral Redis/Valkey realtime lease
 - room ownership and room level in room tables / room experience tables
 - store inventory in `user_store_inventory`
 - relationship/family/CP status in relationship tables
@@ -157,7 +157,8 @@ gift_transactions             -> every gift send/receive event
 user_contribution_aggregates  -> daily/weekly/monthly/yearly sent/received totals
 user_experience_status        -> sent/received levels and EXP
 user_vip_status               -> VIP/SVIP state
-room_participants             -> current room presence
+room_participants             -> durable room membership
+realtime Redis/Valkey leases  -> connected presence (ephemeral)
 room_experience_status        -> room level/EXP
 user_master_state_snapshots   -> optional cached read model assembled from child tables
 ```
@@ -349,7 +350,7 @@ Therefore room seats, room settings, mic state, locks, chat history, gifts, room
 
 ## Current implementation status on this branch
 
-The original foundation checklist in this document has been completed or superseded by the Chunk 20–32 architecture work and the post-audit repair wave. Current enforceable reality is:
+The original foundation checklist in this document has been completed or superseded by the Chunks 15–56 architecture program and the final audit repair wave. Current enforceable repository reality is:
 
 - PostgreSQL remains durable business truth, with extracted domain mutation authority isolated by service/database role.
 - Room Control owns durable room definition, membership, permissions, seats, Watch Party/activity state, and Room Cricket tournament/match/ball state.
@@ -360,7 +361,11 @@ The original foundation checklist in this document has been completed or superse
 - Room Cricket mutations are permission-gated, serialized and retry-idempotent through normalized ball events and per-delivery event IDs.
 - NATS JetStream async work uses retry/DLQ/idempotent effect patterns; processed markers are written only after required side effects succeed.
 - Media v2 uses direct object-store upload plus authoritative PostgreSQL control state; multipart completion recovers safely from ambiguous successful object-store completion.
-- Architecture, migration, ownership, security, backend, Flutter, Go, media, infrastructure and container gates are enforced in CI.
+- GraphQL Read BFF provides persisted, bounded, read-only composite queries and never becomes a mutation or database authority.
+- Kafka is a retained analytics/replay/ML copy fed only through the NATS-to-Kafka bridge; NATS JetStream remains operational async messaging.
+- Search/OpenSearch, Recommendation Redis projections, ClickHouse and Parquet/data-lake materializations are rebuildable projections, not durable truth.
+- Multi-region/DR, supply-chain security, privacy/trust controls, realtime/media QoS, mobile/offline budgets, cache/edge policy, release safety, SRE/FinOps and production-certification contracts are repository-enforced.
+- Architecture, migration, ownership, security, backend, Flutter, Go, media, infrastructure, contracts, documentation and container gates are enforced in CI.
 
 For machine-enforceable current ownership, use `contracts/architecture/authorities.yaml`. For current deployable boundaries, use `docs/architecture/service-boundaries.md`. Historical implementation notes elsewhere in this document should not override those contracts.
 
