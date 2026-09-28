@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 
+import '../../../core/presentation/vm_async_state.dart';
+
 import '../data/experience_api_service.dart';
 
 enum ExperienceDetailKind { sent, received, room }
@@ -139,9 +141,9 @@ class _ExperienceDetailPageState extends State<ExperienceDetailPage> {
         actions: [IconButton(onPressed: _load, icon: const Icon(Icons.refresh_rounded))],
       ),
       body: _loading
-          ? const Center(child: CircularProgressIndicator(color: Color(0xFF12C7B7)))
+          ? const VmLoadingState(message: 'Loading experience…')
           : _error != null
-              ? _ErrorState(error: _error.toString(), onRetry: _load)
+              ? VmFailureState(error: _error, contentLabel: 'experience', onRetry: _load)
               : ListView(
                   padding: const EdgeInsets.fromLTRB(16, 8, 16, 28),
                   children: [
@@ -296,29 +298,6 @@ class _InfoNote extends StatelessWidget {
       padding: const EdgeInsets.all(14),
       decoration: BoxDecoration(color: const Color(0xFF251538).withValues(alpha: 0.06), borderRadius: BorderRadius.circular(20)),
       child: Text(text, style: const TextStyle(color: Color(0xFF4A2A63), fontSize: 12, height: 1.35, fontWeight: FontWeight.w800)),
-    );
-  }
-}
-
-class _ErrorState extends StatelessWidget {
-  const _ErrorState({required this.error, required this.onRetry});
-
-  final String error;
-  final VoidCallback onRetry;
-
-  @override
-  Widget build(BuildContext context) {
-    return Center(
-      child: Padding(
-        padding: const EdgeInsets.all(24),
-        child: Column(mainAxisSize: MainAxisSize.min, children: [
-          const Icon(Icons.error_outline_rounded, color: Color(0xFFE84C72), size: 38),
-          const SizedBox(height: 10),
-          Text(error, textAlign: TextAlign.center, style: const TextStyle(color: Color(0xFF7B6A86), fontWeight: FontWeight.w700)),
-          const SizedBox(height: 14),
-          FilledButton(onPressed: onRetry, child: const Text('Retry')),
-        ]),
-      ),
     );
   }
 }
