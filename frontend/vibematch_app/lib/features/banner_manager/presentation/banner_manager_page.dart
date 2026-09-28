@@ -1,6 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../../core/network/vm_failure.dart';
+import '../../../core/presentation/vm_async_state.dart';
+
 import '../../media/data/media_upload_service.dart';
 import '../controllers/banner_manager_controller.dart';
 import '../models/banner_manager_models.dart';
@@ -70,7 +73,7 @@ class _BannerManagerPageState extends ConsumerState<BannerManagerPage> {
     } on MediaUploadCancelledException {
       return;
     } catch (error) {
-      _toast(error.toString().replaceFirst('Exception: ', ''));
+      _toast(VmFailurePresentation.messageFor(error, contentLabel: 'banner'));
     } finally {
       controller.setUploadingImage(false);
     }
@@ -82,7 +85,7 @@ class _BannerManagerPageState extends ConsumerState<BannerManagerPage> {
       _titleController.clear();
       _toast('Banner saved to backend');
     } catch (error) {
-      _toast(error.toString().replaceFirst('Exception: ', ''));
+      _toast(VmFailurePresentation.messageFor(error, contentLabel: 'banner'));
     }
   }
 
@@ -119,7 +122,7 @@ class _BannerManagerPageState extends ConsumerState<BannerManagerPage> {
               SliverToBoxAdapter(child: _Header(onBackTap: () => Navigator.pop(context))),
               SliverToBoxAdapter(child: _SectionSwitcher(selectedSection: banner.selectedSection, onChanged: controller.selectSection)),
               if (banner.errorMessage != null)
-                SliverToBoxAdapter(child: _ErrorCard(message: banner.errorMessage!, onRetry: controller.loadBanners)),
+                SliverToBoxAdapter(child: VmInlineFailure(message: banner.errorMessage!, onRetry: controller.loadBanners)),
               SliverToBoxAdapter(
                 child: _BannerFormCard(
                   controller: controller,
@@ -420,28 +423,6 @@ class _FieldLabel extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) => Text(text, style: const TextStyle(color: Color(0xFF251538), fontSize: 12.5, fontWeight: FontWeight.w900));
-}
-
-class _ErrorCard extends StatelessWidget {
-  const _ErrorCard({required this.message, required this.onRetry});
-
-  final String message;
-  final VoidCallback onRetry;
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      margin: const EdgeInsets.fromLTRB(14, 8, 14, 8),
-      padding: const EdgeInsets.all(14),
-      decoration: BoxDecoration(color: const Color(0xFFFFF7E8), borderRadius: BorderRadius.circular(22), border: Border.all(color: const Color(0xFFE8C77C))),
-      child: Row(children: [
-        const Icon(Icons.wifi_off_rounded, color: Color(0xFFC99A3B), size: 20),
-        const SizedBox(width: 10),
-        Expanded(child: Text(message, style: const TextStyle(color: Color(0xFF4A2A63), fontSize: 12, fontWeight: FontWeight.w800))),
-        TextButton(onPressed: onRetry, child: const Text('Retry', style: TextStyle(fontWeight: FontWeight.w900))),
-      ]),
-    );
-  }
 }
 
 class _SavedBannerList extends StatelessWidget {
