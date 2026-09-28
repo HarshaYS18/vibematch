@@ -87,6 +87,16 @@ Riverpod is the app-wide composition mechanism. Prefer selective provider
 watching and immutable state. Persistent tab branches remain mounted to preserve
 scroll/navigation state; inactive branches disable tickers and interaction.
 
+## Navigation motion and backend states
+
+All ordinary Material routes inherit the canonical FunKey transition system from
+`core/ui/vm_motion.dart`. Backend-backed screens should use the shared
+`VmLoadingState`, `VmFailureState`, `VmInlineFailure` and
+`VmFailurePresentation` primitives instead of exposing raw transport errors.
+The full production contract, including reduced-motion behavior and retry/empty
+state rules, is documented in
+`../../docs/frontend/ui-motion-and-load-states.md`.
+
 ## Performance rules
 
 - one active Vibes decoder
