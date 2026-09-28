@@ -2,6 +2,9 @@ import 'dart:async';
 
 import 'package:flutter/material.dart';
 
+import '../../../../core/network/vm_failure.dart';
+import '../../../../core/presentation/vm_async_state.dart';
+
 import '../../data/vibes_api_service.dart';
 
 class VibeReportReviewPage extends StatefulWidget {
@@ -40,7 +43,7 @@ class _VibeReportReviewPageState extends State<VibeReportReviewPage> {
       });
     } catch (error) {
       if (!mounted) return;
-      setState(() => _error = error.toString().replaceFirst('Exception: ', ''));
+      setState(() => _error = VmFailurePresentation.messageFor(error, contentLabel: 'Vibe reports'));
     } finally {
       if (mounted) setState(() => _loading = false);
     }
@@ -63,7 +66,7 @@ class _VibeReportReviewPageState extends State<VibeReportReviewPage> {
       setState(() => _reports.removeWhere((item) => item.id == report.id));
       _toast(deletePost ? 'Report action taken. Vibe removed.' : 'Report rejected and closed.');
     } catch (error) {
-      if (mounted) _toast(error.toString().replaceFirst('Exception: ', ''));
+      if (mounted) _toast(VmFailurePresentation.messageFor(error, contentLabel: 'Vibe reports'));
     }
   }
 
@@ -103,8 +106,8 @@ class _VibeReportReviewPageState extends State<VibeReportReviewPage> {
             padding: const EdgeInsets.fromLTRB(14, 8, 14, 26),
             children: [
               const _OfficialReviewNotice(),
-              if (_loading) const _LoadingCard(),
-              if (_error != null) _ErrorCard(message: _error!, onRetry: _loadReports),
+              if (_loading) const VmLoadingState(compact: true),
+              if (_error != null) VmInlineFailure(message: _error!, onRetry: _loadReports),
               if (!_loading && _error == null && _reports.isEmpty) const _EmptyReportsCard(),
               ..._reports.map((report) => _ReportCard(
                     report: report,
