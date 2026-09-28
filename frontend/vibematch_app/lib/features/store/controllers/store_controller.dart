@@ -1,5 +1,7 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../../core/network/vm_failure.dart';
+
 import '../data/store_api_service.dart';
 import '../models/store_models.dart';
 
@@ -74,7 +76,7 @@ class StoreController extends AutoDisposeNotifier<StoreState> {
       state = state.copyWith(
         catalog: StoreCatalog.empty,
         selectedCategory: null,
-        errorMessage: error.toString().replaceFirst('Exception: ', ''),
+        errorMessage: VmFailurePresentation.messageFor(error, contentLabel: 'store'),
       );
     } finally {
       state = state.copyWith(isLoading: false);
