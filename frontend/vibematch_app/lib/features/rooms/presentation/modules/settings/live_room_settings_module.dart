@@ -3,6 +3,8 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
 
+import '../../../../../core/network/vm_failure.dart';
+
 import '../../../data/live_room_media_signaling_service.dart';
 import '../../../data/room_api_service.dart';
 import '../../controllers/live_room_sheet_controller.dart';
@@ -77,7 +79,7 @@ class LiveRoomSettingsModule {
             if (!bundle.mounted) return;
             RoomToast.show(
               bundle.context,
-              error.toString().replaceFirst('Exception: ', ''),
+              VmFailurePresentation.messageFor(error, contentLabel: 'room settings'),
             );
           }
         },
@@ -146,7 +148,7 @@ class LiveRoomSettingsModule {
       if (!bundle.mounted) return;
       RoomToast.show(
         bundle.context,
-        error.toString().replaceFirst('Exception: ', ''),
+        VmFailurePresentation.messageFor(error, contentLabel: 'room settings'),
       );
     }
   }
@@ -189,7 +191,7 @@ class LiveRoomSettingsModule {
       if (!bundle.mounted) return;
       RoomToast.show(
         bundle.context,
-        error.toString().replaceFirst('Exception: ', ''),
+        VmFailurePresentation.messageFor(error, contentLabel: 'room settings'),
       );
     }
   }
@@ -307,7 +309,7 @@ class LiveRoomSettingsModule {
               if (!bundle.mounted) return;
               RoomToast.show(
                 context,
-                error.toString().replaceFirst('Exception: ', ''),
+                VmFailurePresentation.messageFor(error, contentLabel: 'room settings'),
               );
             }
           },
@@ -317,7 +319,7 @@ class LiveRoomSettingsModule {
       if (!bundle.mounted) return;
       RoomToast.show(
         bundle.context,
-        error.toString().replaceFirst('Exception: ', ''),
+        VmFailurePresentation.messageFor(error, contentLabel: 'room settings'),
       );
     }
   }
@@ -550,7 +552,7 @@ class LiveRoomSettingsModule {
       if (!bundle.mounted) return;
       RoomToast.show(
         bundle.context,
-        error.toString().replaceFirst('Exception: ', ''),
+        VmFailurePresentation.messageFor(error, contentLabel: 'room settings'),
       );
     }
   }
