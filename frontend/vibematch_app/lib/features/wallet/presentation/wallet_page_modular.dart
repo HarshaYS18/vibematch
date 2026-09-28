@@ -2,6 +2,9 @@ import 'dart:async';
 
 import 'package:flutter/material.dart';
 
+import '../../../core/network/vm_failure.dart';
+import '../../../core/presentation/vm_async_state.dart';
+
 import '../../auth/data/auth_api_service.dart';
 import '../../auth/models/current_user.dart';
 import '../../economy/data/economy_master_api_service.dart';
