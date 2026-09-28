@@ -2,6 +2,8 @@ import 'dart:async';
 
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../../../core/network/vm_failure.dart';
+
 import '../../data/family_api_service.dart';
 import '../../models/family_level_models.dart';
 import '../../models/family_ui_models.dart';
@@ -209,7 +211,7 @@ class FamilyController
     } catch (error) {
       state = state.copyWith(
         loadingBackend: false,
-        backendError: error.toString().replaceFirst('Exception: ', ''),
+        backendError: VmFailurePresentation.messageFor(error, contentLabel: 'family'),
       );
       unawaited(refreshRankings());
     }
@@ -241,7 +243,7 @@ class FamilyController
     } catch (error) {
       state = state.copyWith(
         loadingRankings: false,
-        backendError: error.toString().replaceFirst('Exception: ', ''),
+        backendError: VmFailurePresentation.messageFor(error, contentLabel: 'family'),
       );
     }
   }
@@ -325,7 +327,7 @@ class FamilyController
     } catch (error) {
       state = state.copyWith(
         loadingBackend: false,
-        backendError: error.toString().replaceFirst('Exception: ', ''),
+        backendError: VmFailurePresentation.messageFor(error, contentLabel: 'family'),
       );
     }
   }
@@ -349,7 +351,7 @@ class FamilyController
     } catch (error) {
       state = state.copyWith(
         joinRequestPending: false,
-        backendError: error.toString().replaceFirst('Exception: ', ''),
+        backendError: VmFailurePresentation.messageFor(error, contentLabel: 'family'),
       );
     }
   }
@@ -377,7 +379,7 @@ class FamilyController
     } catch (error) {
       state = state.copyWith(
         loadingBackend: false,
-        backendError: error.toString().replaceFirst('Exception: ', ''),
+        backendError: VmFailurePresentation.messageFor(error, contentLabel: 'family'),
       );
     }
   }
@@ -421,7 +423,7 @@ class FamilyController
       state = state.copyWith(backendError: null);
     } catch (error) {
       state = state.copyWith(
-        backendError: error.toString().replaceFirst('Exception: ', ''),
+        backendError: VmFailurePresentation.messageFor(error, contentLabel: 'family'),
       );
     }
   }
@@ -446,7 +448,7 @@ class FamilyController
     } catch (error) {
       state = state.copyWith(
         loadingBackend: false,
-        backendError: error.toString().replaceFirst('Exception: ', ''),
+        backendError: VmFailurePresentation.messageFor(error, contentLabel: 'family'),
       );
     }
   }
@@ -471,7 +473,7 @@ class FamilyController
     } catch (error) {
       state = state.copyWith(
         loadingBackend: false,
-        backendError: error.toString().replaceFirst('Exception: ', ''),
+        backendError: VmFailurePresentation.messageFor(error, contentLabel: 'family'),
       );
     }
   }
@@ -487,7 +489,7 @@ class FamilyController
       );
     } catch (error) {
       state = state.copyWith(
-        backendError: error.toString().replaceFirst('Exception: ', ''),
+        backendError: VmFailurePresentation.messageFor(error, contentLabel: 'family'),
       );
     }
   }
@@ -511,7 +513,7 @@ class FamilyController
       return true;
     } catch (error) {
       state = state.copyWith(
-        backendError: error.toString().replaceFirst('Exception: ', ''),
+        backendError: VmFailurePresentation.messageFor(error, contentLabel: 'family'),
       );
       return false;
     }
