@@ -270,7 +270,7 @@ class _EconomyStoreControlCenterPageState
     if (!mounted) return;
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
-        content: Text(message.replaceFirst('Exception: ', '')),
+        content: Text(message),
         backgroundColor: danger
             ? const Color(0xFFE84C72)
             : const Color(0xFF12C7B7),
