@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_webrtc/flutter_webrtc.dart';
 
+import '../../../../core/network/vm_failure.dart';
 import '../../../../foundation/runtime/media_resource_lifecycle.dart';
 import '../../controllers/inbox_call_controller.dart';
 import '../../data/inbox_call_media_bridge.dart';
@@ -84,7 +85,7 @@ class _InboxActiveCallPageState extends ConsumerState<InboxActiveCallPage> {
       setState(() {
         _mediaReady = false;
         _mediaJoining = false;
-        _mediaError = error.toString().replaceFirst('Exception: ', '');
+        _mediaError = VmFailurePresentation.messageFor(error, contentLabel: 'call media');
       });
     }
   }
