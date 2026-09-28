@@ -345,7 +345,7 @@ class LiveRoomGiftController {
       MiniProfileEconomyService.instance.clearCache();
       unawaited(refreshCoinBalance());
     } catch (error) {
-      onToast(error.toString().replaceFirst('Exception: ', ''));
+      onToast(VmFailurePresentation.messageFor(error, contentLabel: 'gift action'));
       unawaited(refreshCoinBalance());
     } finally {
       giftSendInProgress = false;
@@ -470,7 +470,7 @@ class LiveRoomGiftController {
       MiniProfileEconomyService.instance.clearCache();
       unawaited(refreshCoinBalance());
     } catch (error) {
-      onToast(error.toString().replaceFirst('Exception: ', ''));
+      onToast(VmFailurePresentation.messageFor(error, contentLabel: 'gift action'));
       unawaited(refreshCoinBalance());
     } finally {
       luckyGiftSendInProgress = false;
@@ -646,7 +646,7 @@ class LiveRoomGiftController {
       MiniProfileEconomyService.instance.clearCache();
       unawaited(refreshCoinBalance());
     } catch (error) {
-      onToast(error.toString().replaceFirst('Exception: ', ''));
+      onToast(VmFailurePresentation.messageFor(error, contentLabel: 'gift action'));
       unawaited(refreshCoinBalance());
     } finally {
       _luckyComboProcessingSlideIds.remove(slide.id);
