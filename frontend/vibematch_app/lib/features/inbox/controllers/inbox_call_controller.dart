@@ -2,6 +2,8 @@ import 'dart:async';
 
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../../core/network/vm_failure.dart';
+
 import '../data/inbox_call_api_service.dart';
 import '../models/inbox_call_models.dart';
 import '../models/inbox_models.dart';
@@ -90,7 +92,7 @@ class InboxCallController extends AutoDisposeNotifier<InboxCallState> {
       _cancelMissedCallTimer();
       return session;
     } catch (error) {
-      state = state.copyWith(errorMessage: error.toString());
+      state = state.copyWith(errorMessage: VmFailurePresentation.messageFor(error, contentLabel: 'call'));
       return null;
     } finally {
       _setBusy(false);
@@ -109,7 +111,7 @@ class InboxCallController extends AutoDisposeNotifier<InboxCallState> {
       );
       _cancelMissedCallTimer();
     } catch (error) {
-      state = state.copyWith(errorMessage: error.toString());
+      state = state.copyWith(errorMessage: VmFailurePresentation.messageFor(error, contentLabel: 'call'));
     } finally {
       _setBusy(false);
     }
@@ -131,7 +133,7 @@ class InboxCallController extends AutoDisposeNotifier<InboxCallState> {
       );
       _cancelMissedCallTimer();
     } catch (error) {
-      state = state.copyWith(errorMessage: error.toString());
+      state = state.copyWith(errorMessage: VmFailurePresentation.messageFor(error, contentLabel: 'call'));
     } finally {
       _setBusy(false);
     }
@@ -153,7 +155,7 @@ class InboxCallController extends AutoDisposeNotifier<InboxCallState> {
       );
       _cancelMissedCallTimer();
     } catch (error) {
-      state = state.copyWith(errorMessage: error.toString());
+      state = state.copyWith(errorMessage: VmFailurePresentation.messageFor(error, contentLabel: 'call'));
     } finally {
       _setBusy(false);
     }
@@ -281,7 +283,7 @@ class InboxCallController extends AutoDisposeNotifier<InboxCallState> {
         );
       } catch (error) {
         state = state.copyWith(
-          errorMessage: error.toString(),
+          errorMessage: VmFailurePresentation.messageFor(error, contentLabel: 'call'),
           lastSummary: summaryFromActiveCall(
             status: InboxCallStatus.missed,
           ),
