@@ -16,6 +16,8 @@ import '../../../vip/presentation/vip_program_page.dart';
 import '../../../wallet/data/wallet_api_service.dart';
 import '../../../wallet/presentation/wallet_page_modular.dart';
 import '../../../../core/navigation/vm_navigator.dart';
+import '../../../../core/network/vm_failure.dart';
+import '../../../../core/presentation/vm_async_state.dart';
 import '../../data/love_bond_realtime_service.dart';
 import '../../data/profile_api_service.dart';
 import '../control_center/coin_supply_grant_page.dart';
@@ -202,7 +204,7 @@ class _MePageContentState extends State<MePageContent> {
     } catch (error) {
       if (!mounted) return;
       setState(() {
-        _loadError = error.toString().replaceFirst('Exception: ', '');
+        _loadError = VmFailurePresentation.messageFor(error, contentLabel: 'profile');
         _loadingRealData = false;
       });
     }
@@ -465,7 +467,7 @@ class _MePageContentState extends State<MePageContent> {
               backgroundColor: Color(0xFFECE2D8),
             ),
           if (_loadError != null)
-            _RealDataErrorBanner(message: _loadError!, onRetry: _loadRealData),
+            VmInlineFailure(message: _loadError!, onRetry: _loadRealData),
           MePremiumProfileHero(
             displayName: _displayName,
             publicId: user.visibleId,
@@ -565,41 +567,6 @@ class _MePageContentState extends State<MePageContent> {
       ),
     );
   }
-}
-
-class _RealDataErrorBanner extends StatelessWidget {
-  const _RealDataErrorBanner({required this.message, required this.onRetry});
-  final String message;
-  final VoidCallback onRetry;
-  @override
-  Widget build(BuildContext context) => Container(
-    margin: const EdgeInsets.only(bottom: 10),
-    padding: const EdgeInsets.all(11),
-    decoration: BoxDecoration(
-      color: Colors.white,
-      borderRadius: BorderRadius.circular(18),
-      border: Border.all(color: const Color(0xFFE8C77C)),
-    ),
-    child: Row(
-      children: [
-        const Icon(Icons.wifi_off_rounded, color: Color(0xFFC99A3B), size: 18),
-        const SizedBox(width: 8),
-        Expanded(
-          child: Text(
-            message,
-            maxLines: 2,
-            overflow: TextOverflow.ellipsis,
-            style: const TextStyle(
-              color: Color(0xFF7B6A86),
-              fontSize: 11.5,
-              fontWeight: FontWeight.w800,
-            ),
-          ),
-        ),
-        TextButton(onPressed: onRetry, child: const Text('Retry')),
-      ],
-    ),
-  );
 }
 
 /// Invisible lifecycle gate that synchronizes the signed-in user's Love Bonds.
