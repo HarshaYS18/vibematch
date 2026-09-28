@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../../../../core/network/vm_failure.dart';
+import '../../../../core/ui/vm_motion.dart';
 
 import '../../data/inbox_preferences_api_service.dart';
 import '../../models/inbox_models.dart';
@@ -154,6 +155,7 @@ class _InboxSettingsPageState extends State<InboxSettingsPage> {
   void _openLockSetup() {
     showModalBottomSheet<void>(
       context: context,
+      sheetAnimationStyle: VmMotion.sheetAnimationStyle,
       backgroundColor: Colors.transparent,
       isScrollControlled: true,
       builder: (_) => InboxLockSetupSheet(
@@ -166,6 +168,7 @@ class _InboxSettingsPageState extends State<InboxSettingsPage> {
   void _openChangeLock() {
     showModalBottomSheet<void>(
       context: context,
+      sheetAnimationStyle: VmMotion.sheetAnimationStyle,
       backgroundColor: Colors.transparent,
       isScrollControlled: true,
       builder: (_) => InboxLockChangeSheet(onChangeLock: widget.onChangeLock),
@@ -175,6 +178,7 @@ class _InboxSettingsPageState extends State<InboxSettingsPage> {
   void _openRecovery() {
     showModalBottomSheet<void>(
       context: context,
+      sheetAnimationStyle: VmMotion.sheetAnimationStyle,
       backgroundColor: Colors.transparent,
       isScrollControlled: true,
       builder: (_) => InboxLockRecoverySheet(
@@ -189,6 +193,7 @@ class _InboxSettingsPageState extends State<InboxSettingsPage> {
   void _openGoogleDriveSetup() {
     showModalBottomSheet<void>(
       context: context,
+      sheetAnimationStyle: VmMotion.sheetAnimationStyle,
       backgroundColor: Colors.transparent,
       isScrollControlled: true,
       builder: (_) => _GoogleDriveSetupSheet(
