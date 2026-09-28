@@ -1,6 +1,8 @@
 import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
 
+import '../../../core/network/vm_failure.dart';
+
 import '../../auth/models/current_user.dart';
 import '../../media/data/media_upload_service.dart';
 import '../data/profile_api_service.dart';
@@ -86,7 +88,7 @@ class _EditProfilePageState extends State<EditProfilePage> {
       return;
     } catch (error) {
       if (!mounted) return;
-      _toast(error.toString().replaceFirst('Exception: ', ''));
+      _toast(VmFailurePresentation.messageFor(error, contentLabel: 'profile update'));
     } finally {
       if (mounted) setState(() => _uploadingAvatar = false);
     }
@@ -121,7 +123,7 @@ class _EditProfilePageState extends State<EditProfilePage> {
       if (closeAfterSave) Navigator.pop(context, true);
     } catch (error) {
       if (!mounted) return;
-      _toast(error.toString().replaceFirst('Exception: ', ''));
+      _toast(VmFailurePresentation.messageFor(error, contentLabel: 'profile update'));
     } finally {
       if (mounted) setState(() => _saving = false);
     }
