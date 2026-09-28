@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../../../../core/network/vm_failure.dart';
+import '../../../../core/ui/vm_motion.dart';
 
 import '../../data/support_api_service.dart';
 import 'help_center_models.dart';
@@ -80,6 +81,7 @@ class _HelpCenterPageState extends State<HelpCenterPage> {
   Future<void> _openTicketSheet({String? category, String? subject}) async {
     final created = await showModalBottomSheet<bool>(
       context: context,
+      sheetAnimationStyle: VmMotion.sheetAnimationStyle,
       isScrollControlled: true,
       backgroundColor: Colors.transparent,
       builder: (_) => _CreateTicketSheet(
@@ -110,6 +112,7 @@ class _HelpCenterPageState extends State<HelpCenterPage> {
   Future<void> _openAssistantSheet() async {
     await showModalBottomSheet<void>(
       context: context,
+      sheetAnimationStyle: VmMotion.sheetAnimationStyle,
       isScrollControlled: true,
       backgroundColor: Colors.transparent,
       builder: (_) => _AssistantSheet(
