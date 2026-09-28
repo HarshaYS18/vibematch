@@ -25,7 +25,7 @@ void main() {
 
       expect(failure.kind, VmFailureKind.timeout);
       expect(failure.retryable, isTrue);
-      expect(failure.message, contains('Taking longer'));
+      expect(failure.message.toLowerCase(), contains('taking longer'));
       expect(failure.message.toLowerCase(), isNot(contains('receivetimeout')));
     });
 
