@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 
+import '../../../../core/network/vm_failure.dart';
+
 import '../../data/love_bond_api_service.dart';
 import '../../../store/presentation/store_page.dart';
 import 'love_bond_detail_page.dart';
@@ -50,7 +52,7 @@ class _LoveBondsPageState extends State<LoveBondsPage> {
     } catch (error) {
       if (!mounted) return;
       setState(() => _loadingBonds = false);
-      _showAction(context, error.toString().replaceFirst('Exception: ', ''));
+      _showAction(context, VmFailurePresentation.messageFor(error, contentLabel: 'Love Bonds'));
     }
   }
 
