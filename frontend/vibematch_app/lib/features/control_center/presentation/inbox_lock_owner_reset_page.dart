@@ -3,6 +3,7 @@ import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:vibematch_app/foundation/networking/feature_http_compat.dart' as http;
 
+import '../../../core/network/vm_failure.dart';
 import '../../../core/network/vm_api_config.dart';
 import '../../auth/data/auth_api_service.dart';
 
@@ -48,7 +49,7 @@ class _InboxLockOwnerResetPageState extends State<InboxLockOwnerResetPage> {
       _identifierController.clear();
       _toast('Inbox Lock reset to 1234. User can unlock with 1234 and change it in Inbox Settings.');
     } catch (error) {
-      _toast(error.toString().replaceFirst('Exception: ', ''));
+      _toast(VmFailurePresentation.messageFor(error, contentLabel: 'inbox lock reset'));
     } finally {
       if (mounted) setState(() => _busy = false);
     }
