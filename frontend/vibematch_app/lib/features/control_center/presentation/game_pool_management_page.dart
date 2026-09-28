@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 
 import '../../../core/network/vm_failure.dart';
 import '../../../core/presentation/vm_async_state.dart';
+import '../../../core/ui/vm_motion.dart';
 
 import 'package:vibematch_app/foundation/networking/app_network_client.dart';
 import '../../auth/data/auth_api_service.dart';
@@ -407,6 +408,7 @@ class _GamePoolManagementPageState extends State<GamePoolManagementPage> {
   }) async {
     await showModalBottomSheet<void>(
       context: context,
+      sheetAnimationStyle: VmMotion.sheetAnimationStyle,
       isScrollControlled: true,
       backgroundColor: Colors.transparent,
       builder: (context) => Padding(
