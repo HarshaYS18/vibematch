@@ -1,5 +1,8 @@
 import 'package:flutter/material.dart';
 
+import '../../../core/network/vm_failure.dart';
+import '../../../core/presentation/vm_async_state.dart';
+
 import '../../auth/data/auth_api_service.dart';
 import '../../profile/data/coin_sales_api_service.dart';
 
@@ -101,7 +104,7 @@ class _MerchantSellerPanelPageState extends State<MerchantSellerPanelPage> {
       });
     } catch (error) {
       if (!mounted) return;
-      _toast(error.toString().replaceFirst('Exception: ', ''));
+      _toast(VmFailurePresentation.messageFor(error, contentLabel: 'merchant panel action'));
     } finally {
       if (mounted) setState(() => _selling = false);
     }
@@ -121,10 +124,10 @@ class _MerchantSellerPanelPageState extends State<MerchantSellerPanelPage> {
       body: FutureBuilder<_MerchantSellerDashboard>(
         future: _dashboardFuture,
         builder: (context, snapshot) {
-          if (snapshot.connectionState == ConnectionState.waiting) return const Center(child: CircularProgressIndicator(color: Color(0xFF251538)));
-          if (snapshot.hasError) return _ErrorState(message: snapshot.error.toString(), onRetry: _reload);
+          if (snapshot.connectionState == ConnectionState.waiting) return const VmLoadingState(message: 'Loading merchant panel…');
+          if (snapshot.hasError) return VmFailureState(error: snapshot.error, contentLabel: 'merchant panel', onRetry: _reload);
           final dashboard = snapshot.data;
-          if (dashboard == null) return _ErrorState(message: 'Panel data is empty.', onRetry: _reload);
+          if (dashboard == null) return VmFailureState(message: 'We could not load merchant panel data right now. Please try again.', contentLabel: 'merchant panel', onRetry: _reload);
 
           return RefreshIndicator(
             onRefresh: () async => _reload(),
@@ -344,35 +347,6 @@ class _RuleCard extends StatelessWidget {
       padding: const EdgeInsets.all(15),
       decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(26), border: Border.all(color: const Color(0xFFECE2D8))),
       child: Column(children: [for (final rule in rules) Padding(padding: const EdgeInsets.only(bottom: 9), child: Row(crossAxisAlignment: CrossAxisAlignment.start, children: [const Icon(Icons.check_circle_rounded, color: Color(0xFF12C7B7), size: 18), const SizedBox(width: 8), Expanded(child: Text(rule, style: const TextStyle(color: Color(0xFF251538), fontSize: 12.5, fontWeight: FontWeight.w800, height: 1.25)))]))]),
-    );
-  }
-}
-
-class _ErrorState extends StatelessWidget {
-  const _ErrorState({required this.message, required this.onRetry});
-
-  final String message;
-  final VoidCallback onRetry;
-
-  @override
-  Widget build(BuildContext context) {
-    return Center(
-      child: Padding(
-        padding: const EdgeInsets.all(22),
-        child: Container(
-          padding: const EdgeInsets.all(18),
-          decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(26), border: Border.all(color: const Color(0xFFECE2D8))),
-          child: Column(mainAxisSize: MainAxisSize.min, children: [
-            const Icon(Icons.error_outline_rounded, color: Color(0xFFE84C72), size: 38),
-            const SizedBox(height: 10),
-            const Text('Could not load panel', style: TextStyle(color: Color(0xFF251538), fontSize: 18, fontWeight: FontWeight.w900)),
-            const SizedBox(height: 8),
-            Text(message, textAlign: TextAlign.center, style: const TextStyle(color: Color(0xFF8C7B8F), fontSize: 12, fontWeight: FontWeight.w700)),
-            const SizedBox(height: 14),
-            ElevatedButton.icon(onPressed: onRetry, icon: const Icon(Icons.refresh_rounded), label: const Text('Retry'), style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFF251538), foregroundColor: Colors.white)),
-          ]),
-        ),
-      ),
     );
   }
 }
