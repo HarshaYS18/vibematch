@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 
 import '../../../core/network/vm_failure.dart';
 import '../../../core/presentation/vm_async_state.dart';
+import '../../../core/ui/vm_motion.dart';
 
 import '../../inbox/presentation/inbox_page.dart';
 import '../../profile/presentation/help_center/help_center_page.dart';
@@ -123,6 +124,7 @@ class _SettingsPageState extends State<SettingsPage> {
   }) {
     return showModalBottomSheet<String>(
       context: context,
+      sheetAnimationStyle: VmMotion.sheetAnimationStyle,
       backgroundColor: Colors.transparent,
       builder: (_) =>
           _ChoiceSheet(title: title, selected: selected, choices: choices),
@@ -132,6 +134,7 @@ class _SettingsPageState extends State<SettingsPage> {
   void _openBlockedUsers() {
     showModalBottomSheet<void>(
       context: context,
+      sheetAnimationStyle: VmMotion.sheetAnimationStyle,
       backgroundColor: Colors.transparent,
       isScrollControlled: true,
       builder: (_) => _BlockedUsersSheet(onToast: _toast),
