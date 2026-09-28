@@ -1,5 +1,7 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../../core/network/vm_failure.dart';
+
 import '../data/banner_manager_repository.dart';
 import '../models/banner_manager_models.dart';
 
@@ -117,7 +119,7 @@ class BannerManagerController
     } catch (error) {
       state = state.copyWith(
         savedBanners: const <ManagedBanner>[],
-        errorMessage: error.toString().replaceFirst('Exception: ', ''),
+        errorMessage: VmFailurePresentation.messageFor(error, contentLabel: 'banners'),
       );
     } finally {
       state = state.copyWith(isLoading: false);
@@ -202,7 +204,7 @@ class BannerManagerController
       await loadBanners();
     } catch (error) {
       state = state.copyWith(
-        errorMessage: error.toString().replaceFirst('Exception: ', ''),
+        errorMessage: VmFailurePresentation.messageFor(error, contentLabel: 'banners'),
       );
       rethrow;
     } finally {
@@ -219,7 +221,7 @@ class BannerManagerController
       await loadBanners();
     } catch (error) {
       state = state.copyWith(
-        errorMessage: error.toString().replaceFirst('Exception: ', ''),
+        errorMessage: VmFailurePresentation.messageFor(error, contentLabel: 'banners'),
       );
     }
   }
