@@ -361,7 +361,7 @@ final RoomBackgroundTheme cosmicHorizonVeilRoomBackgroundTheme = RoomBackgroundT
 final RoomBackgroundTheme defaultRoomBackgroundTheme =
     celestialFallsRoomBackgroundTheme;
 
-final List<RoomBackgroundTheme> ownedRoomBackgroundThemes = [
+final List<RoomBackgroundTheme> roomBackgroundThemes = [
   celestialFallsRoomBackgroundTheme,
   moonlitBiolumeShoreRoomBackgroundTheme,
   auroraFrostLakeRoomBackgroundTheme,
@@ -371,8 +371,6 @@ final List<RoomBackgroundTheme> ownedRoomBackgroundThemes = [
   moonlitWhisperGroveRoomBackgroundTheme,
   cosmicHorizonVeilRoomBackgroundTheme,
 ];
-
-final List<RoomBackgroundTheme> mockRoomBackgroundThemes = ownedRoomBackgroundThemes;
 
 /// Renders the room background selected by the owning room state.
 ///
@@ -511,7 +509,7 @@ class RoomBackgroundPickerSheet extends StatelessWidget {
                     ),
                     SizedBox(height: 4),
                     Text(
-                      'Default themes now, backend/CDN themes later',
+                      'CDN-backed room themes with account-aware access',
                       style: TextStyle(
                         color: Color(0xFF82758E),
                         fontSize: 11.5,
@@ -538,7 +536,7 @@ class RoomBackgroundPickerSheet extends StatelessWidget {
             child: GridView.builder(
               padding: EdgeInsets.zero,
               physics: const BouncingScrollPhysics(),
-              itemCount: ownedRoomBackgroundThemes.length,
+              itemCount: roomBackgroundThemes.length,
               gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
                 crossAxisCount: 2,
                 mainAxisSpacing: 10,
@@ -546,7 +544,7 @@ class RoomBackgroundPickerSheet extends StatelessWidget {
                 childAspectRatio: 1.18,
               ),
               itemBuilder: (context, index) {
-                final theme = ownedRoomBackgroundThemes[index];
+                final theme = roomBackgroundThemes[index];
                 final selected = theme.id == currentTheme.id;
                 final access = theme.accessFor(viewerState);
                 return _BackgroundThemeTile(
