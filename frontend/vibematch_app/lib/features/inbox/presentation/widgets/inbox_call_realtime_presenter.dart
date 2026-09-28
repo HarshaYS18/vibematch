@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../../../core/ui/vm_motion.dart';
+
 import '../../controllers/inbox_call_controller.dart';
 import '../../models/inbox_call_models.dart';
 import '../pages/inbox_active_call_page.dart';
@@ -57,6 +59,7 @@ class _InboxCallRealtimePresenterState
     _incomingSheetOpen = true;
     await showModalBottomSheet<void>(
       context: context,
+      sheetAnimationStyle: VmMotion.sheetAnimationStyle,
       backgroundColor: Colors.transparent,
       isScrollControlled: true,
       enableDrag: false,
