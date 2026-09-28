@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../../core/network/vm_failure.dart';
+import '../../../../core/ui/vm_motion.dart';
 
 import '../../controllers/vibe_detail_controller.dart';
 import '../../models/vibe_models.dart';
@@ -104,6 +105,7 @@ class _VibeDetailBackendPageState
     if (!detail.isSelfVibe || detail.deleting) return;
     final shouldDelete = await showModalBottomSheet<bool>(
       context: context,
+      sheetAnimationStyle: VmMotion.sheetAnimationStyle,
       backgroundColor: Colors.transparent,
       builder: (_) => const VibeConfirmDeleteSheet(),
     );
@@ -114,6 +116,7 @@ class _VibeDetailBackendPageState
   Future<void> _confirmAndDeleteComment(VibeComment comment) async {
     final shouldDelete = await showModalBottomSheet<bool>(
       context: context,
+      sheetAnimationStyle: VmMotion.sheetAnimationStyle,
       backgroundColor: Colors.transparent,
       builder: (_) => const VibeConfirmDeleteCommentSheet(),
     );
@@ -125,6 +128,7 @@ class _VibeDetailBackendPageState
     if (!comment.canPin && !comment.canDelete) return;
     final action = await showModalBottomSheet<VibeDetailCommentAction>(
       context: context,
+      sheetAnimationStyle: VmMotion.sheetAnimationStyle,
       backgroundColor: Colors.transparent,
       builder: (_) => VibeCommentActionsSheet(comment: comment),
     );
@@ -140,6 +144,7 @@ class _VibeDetailBackendPageState
   Future<void> _openCommentsOverlay() async {
     await showModalBottomSheet<void>(
       context: context,
+      sheetAnimationStyle: VmMotion.sheetAnimationStyle,
       isScrollControlled: true,
       useSafeArea: true,
       backgroundColor: Colors.transparent,
