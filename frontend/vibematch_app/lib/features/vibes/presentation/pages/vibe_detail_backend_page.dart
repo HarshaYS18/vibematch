@@ -3,6 +3,8 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../../../core/network/vm_failure.dart';
+
 import '../../controllers/vibe_detail_controller.dart';
 import '../../models/vibe_models.dart';
 import '../widgets/vibe_detail_widgets.dart';
@@ -64,7 +66,7 @@ class _VibeDetailBackendPageState
       if (popOnSuccess) Navigator.pop(context);
     } catch (error) {
       if (mounted) {
-        _toast(error.toString().replaceFirst('Exception: ', ''));
+        _toast(VmFailurePresentation.messageFor(error, contentLabel: 'Vibe action'));
       }
     }
   }
