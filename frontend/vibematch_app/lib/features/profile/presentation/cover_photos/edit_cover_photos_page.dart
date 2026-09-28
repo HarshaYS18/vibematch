@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 
+import '../../../../core/network/vm_failure.dart';
+
 import '../../../media/data/media_upload_service.dart';
 import '../../data/profile_api_service.dart';
 
@@ -64,7 +66,7 @@ class _EditCoverPhotosPageState extends State<EditCoverPhotosPage> {
       return;
     } catch (error) {
       if (!mounted) return;
-      _toast(error.toString().replaceFirst('Exception: ', ''));
+      _toast(VmFailurePresentation.messageFor(error, contentLabel: 'cover photos'));
     } finally {
       if (mounted) setState(() => _isUploading = false);
     }
@@ -105,7 +107,7 @@ class _EditCoverPhotosPageState extends State<EditCoverPhotosPage> {
       return true;
     } catch (error) {
       if (!mounted) return false;
-      _toast(error.toString().replaceFirst('Exception: ', ''));
+      _toast(VmFailurePresentation.messageFor(error, contentLabel: 'cover photos'));
       return false;
     } finally {
       if (mounted) setState(() => _isSaving = false);
