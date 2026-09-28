@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../core/navigation/vm_navigator.dart';
+import '../../../core/presentation/vm_async_state.dart';
 import '../application/search_controller.dart';
 import '../models/search_result_item.dart';
 import '../models/search_result_type.dart';
@@ -164,29 +165,15 @@ class _ProductionSearchResults extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     if (state.isLoading) {
-      return const Center(child: CircularProgressIndicator(color: Color(0xFF251538)));
+      return const VmLoadingState(message: 'Searching…');
     }
 
     final error = state.errorMessage;
     if (error != null) {
-      return Center(
-        child: Container(
-          margin: const EdgeInsets.all(20),
-          padding: const EdgeInsets.all(18),
-          decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(24), border: Border.all(color: const Color(0xFFE8C77C))),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              const Icon(Icons.wifi_off_rounded, color: Color(0xFFC99A3B), size: 34),
-              const SizedBox(height: 10),
-              const Text('Search failed', style: TextStyle(color: Color(0xFF251538), fontSize: 18, fontWeight: FontWeight.w900)),
-              const SizedBox(height: 6),
-              Text(error, textAlign: TextAlign.center, style: const TextStyle(color: Color(0xFF7B6A86), fontWeight: FontWeight.w700)),
-              const SizedBox(height: 14),
-              FilledButton(onPressed: () => controller.retry(), child: const Text('Retry')),
-            ],
-          ),
-        ),
+      return VmFailureState(
+        message: error,
+        contentLabel: 'search results',
+        onRetry: () => controller.retry(),
       );
     }
 
