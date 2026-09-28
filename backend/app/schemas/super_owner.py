@@ -13,11 +13,13 @@ class SuperOwnerMintCoinsRequest(SuperOwnerReasonRequest):
     target_pool_type: str = Field(..., min_length=3, max_length=80)
     amount: int = Field(..., gt=0)
     target_user_id: int | None = None
+    request_id: str | None = Field(default=None, min_length=8, max_length=36)
 
 
 class SuperOwnerSendCoinsAllRequest(SuperOwnerReasonRequest):
     coin_amount: int = Field(..., gt=0, le=10_000_000)
     active_only: bool = True
+    request_id: str | None = Field(default=None, min_length=8, max_length=36)
 
 
 class SuperOwnerCustomIdRequest(SuperOwnerReasonRequest):
@@ -37,6 +39,7 @@ class SuperOwnerSpecialPermissionGrantRequest(SuperOwnerReasonRequest):
 
 
 class SuperOwnerVipAdjustmentRequest(SuperOwnerReasonRequest):
+    request_id: str = Field(..., min_length=8, max_length=80)
     target_user_id: int
     vip_level: int = Field(default=0, ge=0, le=100)
     svip_level: int = Field(default=0, ge=0, le=100)
@@ -46,6 +49,7 @@ class SuperOwnerVipAdjustmentRequest(SuperOwnerReasonRequest):
 
 
 class SuperOwnerLevelAdjustmentRequest(SuperOwnerReasonRequest):
+    request_id: str | None = Field(default=None, min_length=8, max_length=80)
     target_user_id: int
     send_exp_total: int | None = Field(default=None, ge=0)
     receive_exp_total: int | None = Field(default=None, ge=0)

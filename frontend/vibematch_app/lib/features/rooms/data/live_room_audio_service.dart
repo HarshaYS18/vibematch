@@ -1,10 +1,12 @@
 import 'dart:async';
 import 'dart:convert';
 
-import 'package:http/http.dart' as http;
 
 import 'package:flutter/foundation.dart';
-import 'package:flutter_webrtc/flutter_webrtc.dart';
+import 'package:vibematch_app/foundation/networking/feature_http_compat.dart' as http;
+
+import '../../../foundation/runtime/media_resource_lifecycle.dart';
+import 'runtime/audio_input_resource_participant.dart';
 import 'package:mediasfu_mediasoup_client/mediasfu_mediasoup_client.dart';
 import 'package:socket_io_client/socket_io_client.dart' as io;
 
@@ -19,11 +21,25 @@ class LiveRoomAudioService {
 
   static final LiveRoomAudioService instance = LiveRoomAudioService._();
 
+  /// Injects the authenticated session resource registry through the
+  /// RoomMediaEngine/delegate boundary. Room UI never reaches this service
+  /// directly.
+  void bindMediaResourceRegistry(MediaResourceRegistry? registry) {
+    if (identical(_mediaResourceRegistry, registry)) return;
+    _detachAudioInputResource();
+    _mediaResourceRegistry = registry;
+    if (registry != null && _localAudioStream != null) {
+      unawaited(_attachAudioInputResource());
+    }
+  }
+
   io.Socket? _socket;
   String? _roomId;
   String? _peerId;
-  SeatUser? _currentUser;
+  String? _currentUserId;
   MediaStream? _localAudioStream;
+  MediaResourceRegistry? _mediaResourceRegistry;
+  AudioInputResourceParticipant? _audioInputResourceParticipant;
   Device? _device;
   dynamic _sendTransport;
   dynamic _recvTransport;
@@ -86,10 +102,21 @@ class LiveRoomAudioService {
   Future<void> joinRoom({
     required String roomId,
     required SeatUser currentUser,
+  }) {
+    return joinRoomForUser(
+      roomId: roomId,
+      userId: currentUser.id,
+    );
+  }
+
+  Future<void> joinRoomForUser({
+    required String roomId,
+    required String userId,
   }) async {
     final safeRoomId = roomId.trim().isEmpty ? 'VM257808' : roomId.trim();
-    final safePeerId = '${safeRoomId}_${currentUser.id}'.replaceAll(
-      RegExp(r'[^a-zA-Z0-9_\\-]'),
+    final safeUserId = userId.trim().isEmpty ? 'user' : userId.trim();
+    final safePeerId = '${safeRoomId}_$safeUserId'.replaceAll(
+      RegExp(r'[^a-zA-Z0-9_\-]'),
       '_',
     );
 
@@ -97,7 +124,7 @@ class LiveRoomAudioService {
     _joinPresenceRetryCount = 0;
     _roomId = safeRoomId;
     _peerId = safePeerId;
-    _currentUser = currentUser;
+    _currentUserId = safeUserId;
 
     if (_joined && _socket?.connected == true) {
       _debug('join skipped already joined room=$safeRoomId peer=$safePeerId');
@@ -255,7 +282,7 @@ class LiveRoomAudioService {
     remoteAudioRenderers.value = <RTCVideoRenderer>[];
     _roomId = null;
     _peerId = null;
-    _currentUser = null;
+    _currentUserId = null;
     _routerRtpCapabilities = null;
     _device = null;
     _pendingProducerIds.clear();
@@ -318,7 +345,7 @@ class LiveRoomAudioService {
       if (!isCurrentSocket()) return;
       connected.value = true;
       _debug('audio socket connected $audioUrl');
-      if (_shouldStayConnected && _roomId != null && _currentUser != null) {
+      if (_shouldStayConnected && _roomId != null && _currentUserId != null) {
         _sendJoinRoom();
       }
     });
@@ -408,7 +435,9 @@ class LiveRoomAudioService {
 
     final endpoint =
         Uri.parse(
-          VmApiConfig.endpoint('/rooms/${Uri.encodeComponent(roomId)}/media'),
+          VmApiConfig.mediaControlEndpoint(
+            '/rooms/${Uri.encodeComponent(roomId)}/assignment',
+          ),
         ).replace(
           queryParameters: <String, String>{
             if (deviceId != null && deviceId.trim().isNotEmpty)
@@ -525,7 +554,7 @@ class LiveRoomAudioService {
     if (_rediscovering ||
         !_shouldStayConnected ||
         _roomId == null ||
-        _currentUser == null)
+        _currentUserId == null)
       return;
     _rediscovering = true;
     try {
@@ -567,7 +596,7 @@ class LiveRoomAudioService {
     String reason, {
     Duration delay = const Duration(milliseconds: 900),
   }) {
-    if (!_shouldStayConnected || _roomId == null || _currentUser == null)
+    if (!_shouldStayConnected || _roomId == null || _currentUserId == null)
       return;
     if (_recoveryTimer?.isActive ?? false) return;
     _debug(
@@ -582,7 +611,7 @@ class LiveRoomAudioService {
   Future<void> _recoverSession(String reason) async {
     if (!_shouldStayConnected ||
         _roomId == null ||
-        _currentUser == null ||
+        _currentUserId == null ||
         _recovering)
       return;
     _recovering = true;
@@ -642,6 +671,7 @@ class LiveRoomAudioService {
       }
       _localAudioStream = stream;
       localMicCapturing.value = true;
+      await _attachAudioInputResource();
       _debug(
         'local mic capture started tracks=${stream.getAudioTracks().length}',
       );
@@ -1045,6 +1075,36 @@ class LiveRoomAudioService {
     _rebuildSendPipelineOnRetry = false;
   }
 
+  Future<void> consumeRemoteProducer({
+    required String producerId,
+    required String peerId,
+    String kind = 'audio',
+    String? publicUserId,
+    int? seatNo,
+  }) async {
+    final safeProducerId = producerId.trim();
+    final safePeerId = peerId.trim();
+    if (safeProducerId.isEmpty || safePeerId.isEmpty) return;
+
+    final info = RemoteProducerInfo(
+      producerId: safeProducerId,
+      peerId: safePeerId,
+      kind: kind,
+      publicUserId: publicUserId,
+      seatNo: seatNo,
+    );
+
+    if (_isSelfProducer(info) || info.kind != 'audio') return;
+    if (_remoteConsumersByProducerId.containsKey(safeProducerId) ||
+        _consumingProducerIds.contains(safeProducerId)) {
+      return;
+    }
+
+    _producerInfoById[safeProducerId] = info;
+    _pendingProducerIds.add(safeProducerId);
+    await _consumePendingProducers();
+  }
+
   void _rememberProducers(dynamic rawProducers) {
     if (rawProducers is! List) return;
     for (final item in rawProducers) {
@@ -1058,7 +1118,7 @@ class LiveRoomAudioService {
   bool _isSelfProducer(RemoteProducerInfo info) {
     if (info.peerId == _peerId) return true;
 
-    final roomUserId = _currentUser?.id.trim() ?? '';
+    final roomUserId = _currentUserId?.trim() ?? '';
     final publicUserId = roomUserId.startsWith('user_')
         ? roomUserId.substring('user_'.length)
         : '';
@@ -1302,6 +1362,7 @@ class LiveRoomAudioService {
   }
 
   Future<void> _stopLocalMicCapture() async {
+    _detachAudioInputResource();
     final stream = _localAudioStream;
     if (stream == null) return;
     _localAudioStream = null;
@@ -1316,6 +1377,46 @@ class LiveRoomAudioService {
     } catch (_) {}
     localMicCapturing.value = false;
     _debug('local mic capture stopped');
+  }
+
+  Future<void> _attachAudioInputResource() async {
+    if (_audioInputResourceParticipant != null) return;
+    final registry = _mediaResourceRegistry;
+    final stream = _localAudioStream;
+    if (registry == null || stream == null) return;
+
+    final participant = AudioInputResourceParticipant(
+      resourceId:
+          'audio-input:${_roomId ?? 'room'}:${_currentUserId ?? 'user'}',
+      releaseInput: _releaseAudioInputForSession,
+    );
+    try {
+      if (!registry.register(participant)) return;
+      _audioInputResourceParticipant = participant;
+      await participant.onForegroundChanged(registry.isForeground);
+    } catch (_) {
+      registry.unregister(
+        participant.resourceId,
+        expectedParticipant: participant,
+      );
+    }
+  }
+
+  void _detachAudioInputResource() {
+    final registry = _mediaResourceRegistry;
+    final participant = _audioInputResourceParticipant;
+    _audioInputResourceParticipant = null;
+    if (registry == null || participant == null) return;
+    registry.unregister(
+      participant.resourceId,
+      expectedParticipant: participant,
+    );
+  }
+
+  Future<void> _releaseAudioInputForSession() async {
+    _invalidatePublishingIntent();
+    _silenceLocalMicImmediately();
+    await _stopLocalMicCapture();
   }
 
   void _closeSendTransport() {

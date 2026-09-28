@@ -2,6 +2,9 @@ import 'dart:async';
 
 import 'package:flutter/material.dart';
 
+import '../../../../core/assets/funkey_cdn_assets.dart';
+
+import '../../../../realtime/app_realtime_hub.dart';
 import '../../data/live_room_system_event_bus.dart';
 import '../../modules/gift_slide/presentation/gift_slide_overlay.dart';
 import '../../modules/ribbon_chat/models/ribbon_message.dart';
@@ -15,9 +18,15 @@ import 'gift_modules/lucky_packet_room_overlay.dart';
 import 'premium_gift_broadcast_overlay.dart';
 import 'room_gifts.dart';
 
+/// Composes local and backend gift presentation for one mounted room.
+///
+/// Flight and premium queues are injected from the room's
+/// [LiveRoomGiftController], preventing gift UI events from leaking between
+/// rooms while preserving backend/local deduplication behavior.
 class LiveRoomGiftOverlay extends StatefulWidget {
   const LiveRoomGiftOverlay({
     super.key,
+    required this.roomPublicId,
     required this.slides,
     required this.activeComboSlide,
     this.activeLuckyPacket,
@@ -25,11 +34,16 @@ class LiveRoomGiftOverlay extends StatefulWidget {
     required this.onComboTap,
     required this.onComboButtonTap,
     required this.onVideoGiftFinished,
+    required this.giftFlightBus,
+    required this.premiumGiftBroadcastBus,
     this.onLuckyPacketGetTap,
     this.onLuckyPacketResultsDismiss,
     this.currentUserId,
+    this.systemEvents,
   });
 
+  /// Canonical room scope supplied by LiveRoomControllerBundle.
+  final String roomPublicId;
   final List<GiftSlide> slides;
   final GiftSlide? activeComboSlide;
   final LuckyPacketRoomEvent? activeLuckyPacket;
@@ -37,9 +51,12 @@ class LiveRoomGiftOverlay extends StatefulWidget {
   final ValueChanged<GiftSlide> onComboTap;
   final VoidCallback onComboButtonTap;
   final ValueChanged<GiftSlide> onVideoGiftFinished;
+  final GiftFlightBus giftFlightBus;
+  final PremiumGiftBroadcastBus premiumGiftBroadcastBus;
   final VoidCallback? onLuckyPacketGetTap;
   final VoidCallback? onLuckyPacketResultsDismiss;
   final String? currentUserId;
+  final Stream<LiveRoomSystemEvent>? systemEvents;
 
   @override
   State<LiveRoomGiftOverlay> createState() => _LiveRoomGiftOverlayState();
@@ -56,23 +73,31 @@ class _LiveRoomGiftOverlayState extends State<LiveRoomGiftOverlay> {
   final Map<String, _SenderLuckyOutcome> _senderLuckyOutcomes =
       <String, _SenderLuckyOutcome>{};
   final Set<String> _handledBackendGiftIds = <String>{};
-  VoidCallback? _backendGiftListener;
+  StreamSubscription<dynamic>? _backendGiftSubscription;
 
   List<GiftItem> get _fullGiftCatalog => GiftPanel.withMockExtras(mockGiftItems);
 
   @override
   void initState() {
     super.initState();
-    _backendGiftListener = _handleBackendRoomEvent;
-    LiveRoomSystemEventBus.latestEvent.addListener(_backendGiftListener!);
+    final injectedEvents = widget.systemEvents;
+    if (injectedEvents != null) {
+      _backendGiftSubscription = injectedEvents.listen(_handleBackendRoomEvent);
+    } else {
+      _backendGiftSubscription = AppRealtimeHub.shared.events.listen((envelope) {
+        final event = decodeLiveRoomSystemEvent(
+          envelope,
+          roomId: widget.roomPublicId,
+        );
+        if (event != null) _handleBackendRoomEvent(event);
+      });
+      unawaited(AppRealtimeHub.shared.start());
+    }
   }
 
   @override
   void dispose() {
-    final listener = _backendGiftListener;
-    if (listener != null) {
-      LiveRoomSystemEventBus.latestEvent.removeListener(listener);
-    }
+    unawaited(_backendGiftSubscription?.cancel());
     for (final timer in _backendGiftTimers.values) {
       timer.cancel();
     }
@@ -82,21 +107,18 @@ class _LiveRoomGiftOverlayState extends State<LiveRoomGiftOverlay> {
     super.dispose();
   }
 
-  void _handleBackendRoomEvent() {
-    final event = LiveRoomSystemEventBus.latestEvent.value;
-    final isGlobalBroadcast = event?.type == 'global_gift_broadcast';
-    if (event == null || (!event.isRoomGiftSent && !isGlobalBroadcast)) return;
+  void _handleBackendRoomEvent(LiveRoomSystemEvent event) {
+    final isGlobalBroadcast = event.type == 'global_gift_broadcast';
+    if (!event.isRoomGiftSent && !isGlobalBroadcast) return;
     if (!_handledBackendGiftIds.add(event.id)) return;
 
     final gift = _giftItemForEvent(event);
-    final videoUrl = _clean(event.giftVideoUrl) ?? _clean(gift.videoUrl);
-    final videoPath =
-        _clean(event.giftVideoAssetPath) ??
-        _clean(gift.videoAssetPath) ??
-        _videoPathFromNormalizedId(_normalize(event.giftId)) ??
-        _videoPathFromNormalizedId(_normalize(event.giftName));
+    final videoUrl =
+        _clean(event.giftVideoUrl) ??
+        _clean(gift.videoUrl) ??
+        _videoUrlFromNormalizedId(_normalize(event.giftId)) ??
+        _videoUrlFromNormalizedId(_normalize(event.giftName));
     final assetUrl = _clean(event.giftAssetUrl) ?? _clean(gift.assetUrl);
-    final assetPath = _clean(event.giftAssetPath) ?? _clean(gift.assetPath);
 
     final slide = GiftSlide(
       id: event.id,
@@ -108,9 +130,7 @@ class _LiveRoomGiftOverlayState extends State<LiveRoomGiftOverlay> {
           : event.targetName.trim(),
       giftName: _giftDisplayName(event, gift),
       giftIcon: gift.icon,
-      giftAssetPath: assetPath,
       giftAssetUrl: assetUrl,
-      videoAssetPath: videoPath,
       videoUrl: videoUrl,
       colors: _colorsForBackendEvent(event, gift),
       combo: event.giftQuantity <= 0 ? 1 : event.giftQuantity,
@@ -254,12 +274,10 @@ class _LiveRoomGiftOverlayState extends State<LiveRoomGiftOverlay> {
           ? const <Color>[Color(0xFFFFD166), Color(0xFF8C5CF6)]
           : const <Color>[Color(0xFFFFC857), Color(0xFF12C7B7)],
       assetUrl: event.giftAssetUrl,
-      videoUrl: event.giftVideoUrl,
-      assetPath: event.giftAssetPath,
-      videoAssetPath:
-          event.giftVideoAssetPath ??
-          _videoPathFromNormalizedId(cleanGiftId) ??
-          _videoPathFromNormalizedId(cleanGiftName),
+      videoUrl:
+          event.giftVideoUrl ??
+          _videoUrlFromNormalizedId(cleanGiftId) ??
+          _videoUrlFromNormalizedId(cleanGiftName),
       giftType: event.giftType,
       animationType: event.animationType,
       categoryKey: event.giftCategory,
@@ -271,31 +289,23 @@ class _LiveRoomGiftOverlayState extends State<LiveRoomGiftOverlay> {
     );
   }
 
-  String? _videoPathFromNormalizedId(String normalized) {
-    switch (normalized) {
-      case 'love_rocket':
-        return 'assets/videos/gifts/love_rocket.mp4';
-      case 'proposal':
-      case 'propose':
-      case 'boy_proposing_girl':
-      case 'boy_proposing_girl_d_romantic':
-      case 'romantic_proposal':
-        return 'assets/videos/gifts/boy_proposing_girl_d_romantic.mp4';
-      case 'butterfly':
-      case 'pretty_girl_butterfly':
-      case 'pretty_girl_butterfly_animation':
-        return 'assets/videos/gifts/pretty_girl_butterfly_animation.mp4';
-      case 'magic_1':
-      case 'premium_magic_1':
-        return 'assets/videos/gifts/premium_magic_1.mp4';
-      case 'magic_2':
-      case 'premium_magic_2':
-        return 'assets/videos/gifts/premium_magic_2.mp4';
-      case 'magic_3':
-      case 'premium_magic_3':
-        return 'assets/videos/gifts/premium_magic_3.mp4';
-    }
-    return null;
+  String? _videoUrlFromNormalizedId(String normalized) {
+    final giftId = switch (normalized) {
+      'love_rocket' => 'love_rocket',
+      'proposal' ||
+      'propose' ||
+      'boy_proposing_girl' ||
+      'boy_proposing_girl_d_romantic' ||
+      'romantic_proposal' => 'proposal',
+      'butterfly' ||
+      'pretty_girl_butterfly' ||
+      'pretty_girl_butterfly_animation' => 'butterfly',
+      'magic_1' || 'premium_magic_1' => 'premium_magic_1',
+      'magic_2' || 'premium_magic_2' => 'premium_magic_2',
+      'magic_3' || 'premium_magic_3' => 'premium_magic_3',
+      _ => null,
+    };
+    return giftId == null ? null : FunKeyCdnAssets.giftVideo(giftId);
   }
 
   String? _clean(String? value) {
@@ -425,7 +435,7 @@ class _LiveRoomGiftOverlayState extends State<LiveRoomGiftOverlay> {
         event.ribbonTier == 'premium' ||
         event.broadcastScope == 'global';
     if (!shouldBroadcast) return;
-    PremiumGiftBroadcastBus.publish(
+    widget.premiumGiftBroadcastBus.publish(
       PremiumGiftBroadcastEvent(
         id: 'premium-${event.id}',
         senderName: slide.senderName,
@@ -449,7 +459,7 @@ class _LiveRoomGiftOverlayState extends State<LiveRoomGiftOverlay> {
         ? event.giftTotalCoinValue
         : gift.coins * slide.combo;
     if (totalCoins >= LiveRoomGiftController.smallGiftFlightThreshold) return;
-    GiftFlightBus.publish(
+    widget.giftFlightBus.publish(
       GiftFlightEvent(
         id: 'flight-${event.id}',
         gift: gift,
@@ -504,7 +514,7 @@ class _LiveRoomGiftOverlayState extends State<LiveRoomGiftOverlay> {
         fit: StackFit.expand,
         clipBehavior: Clip.none,
         children: [
-          const PremiumGiftBroadcastOverlay(),
+          PremiumGiftBroadcastOverlay(bus: widget.premiumGiftBroadcastBus),
           GiftSlideOverlay(
             slides: normalSlides,
             onComboTap: (slide) {
@@ -516,15 +526,16 @@ class _LiveRoomGiftOverlayState extends State<LiveRoomGiftOverlay> {
             },
           ),
           CleanVideoGiftOverlay(
+            roomPublicId: widget.roomPublicId,
             slides: videoSlides,
             onVideoFinished: _finishVideoGift,
           ),
           ValueListenableBuilder<GiftFlightEvent?>(
-            valueListenable: GiftFlightBus.latest,
+            valueListenable: widget.giftFlightBus.latest,
             builder: (context, event, _) {
               return GiftFlightOverlay(
                 event: event,
-                onCompleted: GiftFlightBus.clear,
+                onCompleted: widget.giftFlightBus.clear,
               );
             },
           ),

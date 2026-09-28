@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 
+import '../../../core/presentation/vm_async_state.dart';
+
 import '../data/rankings_api_service.dart';
 import '../models/ranking_models.dart';
 import 'widgets/rankings_luxury_widgets.dart';
@@ -58,14 +60,16 @@ class _RankingsPageState extends State<RankingsPage> {
                 future: _future,
                 builder: (context, snapshot) {
                   if (snapshot.connectionState != ConnectionState.done) {
-                    return const Center(child: CircularProgressIndicator(color: RankingLuxuryTheme.gold));
+                    return const VmLoadingState(message: 'Loading rankings…');
                   }
                   if (snapshot.hasError || !snapshot.hasData) {
-                    return Center(
-                      child: TextButton(
-                        onPressed: _reload,
-                        child: const Text('Retry backend rankings', style: TextStyle(color: RankingLuxuryTheme.gold, fontWeight: FontWeight.w900)),
-                      ),
+                    return VmFailureState(
+                      error: snapshot.error,
+                      message: snapshot.error == null
+                          ? 'We could not load rankings right now. Please try again.'
+                          : null,
+                      contentLabel: 'rankings',
+                      onRetry: _reload,
                     );
                   }
                   final entries = snapshot.data!.entries;

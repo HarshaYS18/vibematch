@@ -12,7 +12,7 @@ from app.models.follow import UserBlock, UserFollow
 from app.models.user import User
 from app.schemas.profile_visit import ProfileVisitListResponse, ProfileVisitRecordResponse
 from app.schemas.user import PublicUserProfileResponse, UserMeResponse, UserProfileUpdateRequest, UserRelationshipResponse, UserSearchResponse, UserSearchResultResponse
-from app.services import cdn_media_service, profile_service
+from app.services import cdn_media_service, profile_service, identity_service_client, profile_social_service_client
 from app.services.role_badge_service import get_primary_role_badge, get_role_badges
 from app.services.role_service import get_primary_role, get_user_roles
 from app.services.user_master_state_service import get_user_master_state
@@ -44,6 +44,19 @@ def get_current_user_from_token(db: Session, token: str) -> User:
     active_device_id = (user.last_device_id or "").strip()
     if active_device_id and token_device_id != active_device_id:
         raise HTTPException(status_code=401, detail="Session replaced by a newer login")
+    session_id = str(payload.get("sid") or "").strip()
+    if session_id:
+        try:
+            verified = identity_service_client.verify_access_token(token)
+        except identity_service_client.IdentityServiceUnavailable as exc:
+            raise HTTPException(status_code=503, detail=str(exc)) from exc
+        except identity_service_client.IdentityServiceAuthError as exc:
+            raise HTTPException(status_code=exc.status_code, detail=exc.detail) from exc
+        if int(verified.get("user_id") or 0) != user.id:
+            raise HTTPException(status_code=401, detail="Identity verification mismatch")
+    # Backward compatibility: pre-Chunk-27 tokens have no sid and remain valid
+    # until their original JWT expiry. New tokens are verified by Identity,
+    # never by directly reading Identity-owned session tables.
     return user
 
 
@@ -215,19 +228,22 @@ def _profile_visit_payload(db: Session, visit: ProfileVisit) -> ProfileVisitReco
     return ProfileVisitRecordResponse(id=f"visitor_{visit.profile_owner_user_id}_{visit.visitor_user_id}", visitor_user_id=visitor.id, visitor_public_user_id=visitor.public_user_id, visitor_visible_id=str(visible_id), visitor_display_name=_display_name(visitor), visitor_username=visitor.username, visitor_avatar_url=visitor.avatar_url, visitor_role_label=role_badge.display_title, visited_at=visit.last_visited_at, visit_count=visit.visit_count)
 
 
-def _record_profile_visit(db: Session, profile_owner: User, visitor: User, source: str = "public_profile") -> None:
+def _record_profile_visit(
+    db: Session,
+    profile_owner: User,
+    visitor: User,
+    source: str = "public_profile",
+) -> None:
     if profile_owner.id == visitor.id:
         return
-    visit = db.query(ProfileVisit).filter(ProfileVisit.profile_owner_user_id == profile_owner.id, ProfileVisit.visitor_user_id == visitor.id).first()
-    now = datetime.utcnow()
-    if visit is None:
-        visit = ProfileVisit(profile_owner_user_id=profile_owner.id, visitor_user_id=visitor.id, source=source, visit_count=1, first_visited_at=now, last_visited_at=now)
-        db.add(visit)
-    else:
-        visit.visit_count += 1
-        visit.source = source
-        visit.last_visited_at = now
-    db.commit()
+    try:
+        profile_social_service_client.record_profile_visit(
+            profile_owner_user_id=profile_owner.id,
+            visitor_user_id=visitor.id,
+            source=source,
+        )
+    except profile_social_service_client.ProfileSocialServiceUnavailable:
+        return
 
 
 @router.get("/me", response_model=UserMeResponse)
@@ -241,26 +257,24 @@ def get_my_master_state(db: Session = Depends(get_db), current_user: User = Depe
 
 
 @router.patch("/me/profile", response_model=UserMeResponse)
-def update_my_profile(payload: UserProfileUpdateRequest, db: Session = Depends(get_db), current_user: User = Depends(get_current_user)):
-    if payload.display_name is not None:
-        safe_name = payload.display_name.strip()
-        if len(safe_name) < 2:
-            raise HTTPException(status_code=400, detail="Display name must be at least 2 characters")
-        current_user.display_name = safe_name
-    if payload.bio is not None:
-        current_user.bio = _clean_optional(payload.bio)
-    if payload.avatar_url is not None:
-        current_user.avatar_url = _validate_profile_media_url(db, user=current_user, url=payload.avatar_url, media_type=CdnMediaType.PROFILE_PICTURE, label="avatar")
-    current_user.cover_photo_urls = _validate_cover_photo_urls(db, user=current_user, urls=payload.cover_photo_urls)
-    current_user.date_of_birth = payload.date_of_birth
-    current_user.gender = _clean_enum(payload.gender, _ALLOWED_GENDERS, "gender")
-    current_user.profession = _clean_optional(payload.profession)
-    current_user.marital_status = _clean_enum(payload.marital_status, _ALLOWED_MARITAL, "marital status")
-    current_user.friend_gender_preference = _clean_enum(payload.friend_gender_preference, _ALLOWED_GENDER_PREFS, "friend gender preference")
-    current_user.friend_marital_preference = _clean_enum(payload.friend_marital_preference, _ALLOWED_MARITAL_PREFS, "friend marital preference")
-    current_user.interests = _clean_interests(payload.interests)
-    db.add(current_user)
-    db.commit()
+def update_my_profile(
+    payload: UserProfileUpdateRequest,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    try:
+        profile_social_service_client.update_profile(
+            user_id=current_user.id,
+            profile=payload.model_dump(exclude_unset=True, mode="json"),
+        )
+    except profile_social_service_client.ProfileSocialServiceUnavailable as exc:
+        raise HTTPException(status_code=503, detail=str(exc)) from exc
+    except profile_social_service_client.ProfileSocialServiceError as exc:
+        raise HTTPException(status_code=exc.status_code, detail=exc.detail) from exc
+
+    # Profile/Social committed the authoritative mutation on a separate DB
+    # connection. Refresh the shared legacy row, then compose the unchanged
+    # mobile response from read-only projections.
     db.refresh(current_user)
     return _user_me_response(db, current_user)
 

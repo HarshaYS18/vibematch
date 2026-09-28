@@ -4,39 +4,72 @@ FunKey is a social live-room application with a Flutter client, a FastAPI applic
 
 ## Architecture
 
-```text
-Flutter clients
-  | HTTPS / WebSocket                    | WebRTC media
-  v                                      v
-Edge TLS and load balancer          TURN / SFU network path
-  |                                      |
-  +--> FastAPI core control plane        +--> backend_media (mediasoup)
-  |      |                                      ^
-  |      +--> PostgreSQL (durable truth)        | internal authorization
-  |      +--> Redis/Valkey (ephemeral state) ---+
-  |      +--> object storage / CDN
-  |
-  +--> Go realtime gateway (incremental migration target)
-         +--> distributed events / Redis coordination
+FunKey is a social/live-room platform built as an evolutionary service architecture.
+PostgreSQL remains durable truth, while each extracted domain has one mutation
+owner and isolated production credentials.
 
-Workers, Kubernetes autoscaling and infrastructure automation are introduced
-incrementally; see the completion report for the implemented state of this branch.
+```text
+Flutter apps
+  | REST/control plane                       | WebRTC
+  v                                          v
+Core compatibility API :8000            TURN / backend_media :4100
+  |
+  +--> Identity :8086
+  +--> Profile/Social :8087
+  +--> Inbox :8083
+  +--> Vibes :8084
+  +--> Room Control :8085
+  +--> Economy :8088  <---- Game Platform :8089
+  +--> Notification :8090 + provider worker
+  |
+  +--> Go realtime gateway :8081  (single application WebSocket)
+  +--> Worker pools :8082
+
+PostgreSQL/PgBouncer -> durable authority
+Redis/Valkey roles     -> cache / realtime presence+replay / media registry
+NATS JetStream         -> durable operational async work
+Kafka                   -> retained analytics / replay / ML data, never RPC authority
+Object storage/CDN     -> media/game bytes, never business authority
 ```
 
-The backend is authoritative for identity, bans, memberships, rooms, seats, roles, permissions, moderation, calls, and value movement. PostgreSQL holds durable truth. Redis coordinates transient presence, fanout, and media placement; it must not become the only record of a wallet balance or ban. `backend_media` owns only SFU transport state. Clients resolve a media node through the backend and never choose one directly. See [the media architecture](docs/production_realtime_media_architecture.md) and [source-of-truth rules](docs/master-source-of-truth-architecture.md).
+### Authority rules
+
+- Identity, Profile/Social, Inbox, Vibes, Room Control, Economy, Game Platform
+  and Notification are separately deployed mutation boundaries.
+- Economy is the exclusive financial writer. Game Platform owns gameplay
+  lifecycle but calls Economy for wager/settlement.
+- Go realtime owns transport/routing/presence/replay only.
+- `backend_media` owns mediasoup/WebRTC transport only.
+- Redis, NATS, Kafka, Flutter caches and search/analytics projections are never
+  durable business truth.
+- Media v2 uses direct object-store uploads while PostgreSQL owns control state.
+- Flutter REST traffic converges on `AppNetworkClient -> CanonicalNetworkTransport -> Dio`.
+
+Kafka is fed only through the transactional-outbox -> NATS -> Kafka Event Bridge path. See `docs/architecture/kafka-data-platform.md` and `docs/modules/kafka-event-bridge/README.md` for retention, replay and failure semantics.
+
+See `docs/architecture/authority-registry.md`,
+`contracts/architecture/authorities.yaml`, and
+`docs/architecture/service-boundaries.md` before moving any domain boundary.
+The final Chunks 15–56 architecture/decommission closure is documented in
+[`FUNKEY_PRODUCTION_ARCHITECTURE_COMPLETION_REPORT.md`](FUNKEY_PRODUCTION_ARCHITECTURE_COMPLETION_REPORT.md).
 
 ## Repository map
 
 | Path | Responsibility |
 | --- | --- |
-| `backend/` | Current Python/FastAPI API, domain services, models, tests, and canonical Alembic migration graph |
-| `backend_media/` | The sole Node.js/TypeScript mediasoup signaling and SFU implementation |
-| `frontend/vibematch_app/` | Flutter client; the directory name is retained for compatibility |
-| `infra/` | Local services, TURN, and infrastructure definitions |
-| `scripts/` | Local and validation workflows |
-| `docs/` | Architecture decisions, module ownership, operations, and deployment guides |
+| `backend/` | Shared Python domain code, core compatibility API, canonical models/migrations/tests |
+| `apps/` | Extracted domain services, Go realtime gateway and worker platform |
+| `backend_media/` | Sole Node/TypeScript mediasoup signaling/SFU implementation |
+| `frontend/vibematch_app/` | Flutter client (directory name retained for compatibility) |
+| `contracts/` | Authority, Redis and versioned service/event contracts |
+| `deploy/` | Kubernetes, PostgreSQL ownership, observability and GitOps desired state |
+| `infra/` | Local/runtime infrastructure definitions |
+| `scripts/` | Validation, developer and release workflows |
+| `docs/` | Architecture, ADRs, module ownership and operations |
 
-Go is the preferred language for new high-concurrency backend components. FastAPI remains operational during the strangler migration; Python remains appropriate for existing domain logic and selected jobs. Node.js/TypeScript remains the canonical mediasoup runtime. Do not move durable authority simply because a new process exists. [ADR-001](docs/adr/ADR-001-go-target-language.md) and [ADR-002](docs/adr/ADR-002-strangler-migration.md) explain the transition.
+Go remains preferred for high-concurrency transport components; Python remains
+appropriate for existing business/domain services and workers; Node/TypeScript
+remains canonical for mediasoup. Language choice never changes state authority.
 
 ## Local development
 
@@ -47,7 +80,7 @@ The supported Windows workflow uses PowerShell and Docker Desktop; Kubernetes is
 .\scripts\dev-status.ps1
 ```
 
-The startup script starts local PostgreSQL and Redis, applies Alembic migrations, and launches FastAPI plus `backend_media`. See [local development](docs/local-development.md) for ports, overrides, client setup, and safe shutdown. Where a new event broker or worker is enabled, follow its module guide and local Compose configuration.
+The startup script starts local PostgreSQL plus isolated cache, realtime, and media-registry Redis roles, applies Alembic migrations, and launches FastAPI plus `backend_media`. See [local development](docs/local-development.md) for ports, overrides, client setup, and safe shutdown. Where a new event broker or worker is enabled, follow its module guide and local Compose configuration.
 
 ## Validation and schema changes
 
@@ -71,11 +104,11 @@ See [CI](.github/workflows/room-production-hardening.yml) for the full gate, inc
 
 ## Realtime and media
 
-Room commands and snapshots are registered by `backend/app/api/router.py`; `backend/app/realtime/` holds event and connection abstractions. The Go realtime gateway is a bounded migration target and must defer durable decisions to domain authority. Clients reconnect by fetching an authoritative snapshot and then receiving incremental events. Media discovery is `GET /api/v1/rooms/{room_public_id}/media`; the backend authorizes, chooses a healthy non-draining media node, and maintains sticky room assignment in Redis. The SFU reauthorizes sensitive signaling actions with FastAPI. See the [realtime](docs/modules/realtime-gateway/README.md) and [media](docs/modules/media/README.md) guides.
+Room commands and snapshots are registered by `backend/app/api/router.py`; `backend/app/realtime/` holds event and connection abstractions. The Go realtime gateway is the canonical application realtime transport and must defer durable decisions to domain authority. Clients reconnect by fetching an authoritative snapshot and then receiving incremental events. Media discovery is `GET /api/v1/rooms/{room_public_id}/media`; the backend authorizes, chooses a healthy non-draining media node, and maintains sticky room assignment in Redis. The SFU reauthorizes sensitive signaling actions with FastAPI. See the [realtime](docs/modules/realtime-gateway/README.md) and [media](docs/modules/media/README.md) guides.
 
 ## Operations and deployment
 
-Deploy API, realtime, workers, and media as separately scalable workloads as their implementations become ready. Production needs private PostgreSQL and Redis, object storage and CDN, TURN, TLS ingress, secret management, monitoring, backups, and a tested migration job. A Kubernetes manifest or Terraform configuration alone does not prove capacity. Use [capacity planning](docs/architecture/capacity-model.md), [deployment sequence](docs/architecture/deployment.md), and the [runbooks](docs/runbooks/README.md). External account and credential requirements are listed in [external prerequisites](docs/EXTERNAL_PREREQUISITES.md).
+Deploy API, realtime, workers, and media as separately scalable workloads as their implementations become ready. Production needs private PostgreSQL/PgBouncer and three isolated HA Redis/Valkey roles, object storage and CDN, TURN, TLS ingress, secret management, monitoring, backups, and a tested migration job. A Kubernetes manifest or Terraform configuration alone does not prove capacity. Use [capacity planning](docs/architecture/capacity-model.md), [deployment sequence](docs/architecture/deployment.md), and the [runbooks](docs/runbooks/README.md). External account and credential requirements are listed in [external prerequisites](docs/EXTERNAL_PREREQUISITES.md).
 
 ## Contributing
 

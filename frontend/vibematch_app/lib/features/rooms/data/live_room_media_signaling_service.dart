@@ -1,38 +1,52 @@
-import 'live_room_system_event_bus.dart';
-import 'live_room_settings_event_bus.dart';
-import 'live_room_seat_application_event_bus.dart';
 import 'dart:async';
-import 'dart:convert';
 
 import 'package:flutter/material.dart';
-import 'package:web_socket_channel/web_socket_channel.dart';
 
-import '../../../core/network/vm_media_config.dart';
 import '../../../core/ui/vm_motion.dart';
+import '../../../foundation/realtime/realtime_event_envelope.dart';
+import '../../../foundation/runtime/media_resource_lifecycle.dart';
+import '../../../realtime/app_realtime_hub.dart';
 import '../../../main.dart';
-import '../../auth/data/auth_api_service.dart';
 import '../../auth/models/current_user.dart';
 import '../presentation/live_room_models.dart';
 import '../presentation/modules/cricket_room_mode_signal.dart';
 import '../presentation/widgets/cricket_room_backgrounds.dart';
 import '../presentation/widgets/room_theme.dart';
-import 'live_room_audio_service.dart';
+import '../../../room_media/domain/room_media_engine.dart';
+import '../../../room_media/runtime/room_media_resource_participant.dart';
+import '../../../room_media/runtime/room_media_resource_registry_binding.dart';
+import '../../../room_media/room_media_engine_factory.dart';
 import 'live_room_log.dart';
 import 'live_room_foreground_service.dart';
-import 'live_room_presence_repository.dart';
 import 'seat_authority_gate.dart';
 
+/// Compatibility facade for room media and transient realtime effects.
+///
+/// Durable room/chat/settings state is owned by RoomSessionRepository and
+/// backend REST commands. This singleton may coordinate the media engine,
+/// application-realtime subscription, seat/audio enforcement, invitations and
+/// transient system effects, but it must not originate durable chat/settings
+/// mutations or act as a second canonical room-state authority.
 class LiveRoomMediaSignalingService with WidgetsBindingObserver {
-  LiveRoomMediaSignalingService._() {
+  LiveRoomMediaSignalingService._({
+    RoomMediaEngine? mediaEngine,
+  }) : _mediaEngine = mediaEngine ?? createRoomMediaEngine() {
     WidgetsBinding.instance.addObserver(this);
   }
 
   static final LiveRoomMediaSignalingService instance =
       LiveRoomMediaSignalingService._();
 
-  WebSocketChannel? _channel;
-  StreamSubscription<dynamic>? _subscription;
-  Timer? _reconnectTimer;
+  final RoomMediaEngine _mediaEngine;
+  final AppRealtimeHub _appRealtimeHub = AppRealtimeHub.shared;
+
+  // Chunk 34-M9: lifecycle registration follows the actual room-media
+  // connection, not the room widget lifetime. This is required because a room
+  // may stay connected while minimized after its route widget is disposed.
+  MediaResourceRegistry? _mediaResourceRegistry;
+  RoomMediaResourceParticipant? _mediaResourceParticipant;
+
+  StreamSubscription<RealtimeEventEnvelope>? _realtimeSubscription;
 
   String? _roomId;
   String? _roomName;
@@ -60,11 +74,24 @@ class LiveRoomMediaSignalingService with WidgetsBindingObserver {
   final ValueNotifier<LiveMediaSeatInvite?> seatInvite =
       ValueNotifier<LiveMediaSeatInvite?>(null);
 
-  bool get isConnected => _channel != null;
+  final StreamController<Map<String, dynamic>> _canonicalRoomSnapshotController =
+      StreamController<Map<String, dynamic>>.broadcast();
+
+  /// Canonical room snapshots projected from RoomSessionRepository.
+  ///
+  /// The Go application socket is delta-first. RoomSessionRepository reconciles
+  /// those deltas, then this compatibility stream updates remaining legacy UI
+  /// consumers while the adapters are retired.
+  Stream<Map<String, dynamic>> get canonicalRoomSnapshotEvents =>
+      _canonicalRoomSnapshotController.stream;
+
+  bool get isConnected => _appRealtimeHub.isConnected;
   bool get isJoined => _joined;
   String? get roomId => _roomId;
+  String? get roomName => _roomName;
   String? get peerId => _peerId;
   SeatUser? get activeLoggedInSeatUser => _activeLoggedInSeatUser;
+  RoomMediaEngine get mediaEngine => _mediaEngine;
 
   SeatUser effectiveCurrentUser(SeatUser fallback) {
     return _activeLoggedInSeatUser ?? fallback;
@@ -77,20 +104,90 @@ class LiveRoomMediaSignalingService with WidgetsBindingObserver {
 
     if (_appInForeground) {
       _scheduleReconnect(reason: 'app resumed');
+      // Production AppShell lifecycle recovery flows through the registered
+      // resource participant. Keep a direct fallback only for isolated/test
+      // contexts where no resource registry is available.
+      if (_mediaResourceRegistry == null) {
+        _runMediaAction(
+          _mediaEngine.reconnect(),
+          label: 'resume room audio fallback',
+        );
+      }
     }
   }
 
-  void configureRoom({required String roomId, required String roomName}) {
+  void configureRoom({
+    required String roomId,
+    required String roomName,
+    MediaResourceRegistry? resourceRegistry,
+  }) {
     final nextRoomId = roomId.trim().isEmpty ? 'VM257808' : roomId.trim();
 
     _roomId = nextRoomId;
     _roomName = roomName.trim().isEmpty ? 'Live Room' : roomName.trim();
+    _configureMediaResourceLifecycle(nextRoomId, resourceRegistry);
 
     if (roomSnapshot.value?.roomId != nextRoomId) {
       roomSnapshot.value = null;
       roomBlock.value = null;
       seatInvite.value = null;
       _seatAuthorityGate.cancelPendingSeat();
+    }
+  }
+
+  void _configureMediaResourceLifecycle(
+    String roomId,
+    MediaResourceRegistry? resourceRegistry,
+  ) {
+    final nextResourceId = 'room-webrtc:$roomId';
+    final currentParticipant = _mediaResourceParticipant;
+    if (identical(_mediaResourceRegistry, resourceRegistry) &&
+        currentParticipant?.resourceId == nextResourceId) {
+      return;
+    }
+
+    _detachMediaResourceLifecycle();
+    _bindNestedMediaResources(resourceRegistry);
+    if (resourceRegistry == null) return;
+
+    final participant = RoomMediaResourceParticipant(
+      resourceId: nextResourceId,
+      engine: _mediaEngine,
+    );
+    try {
+      resourceRegistry.register(participant);
+      _mediaResourceRegistry = resourceRegistry;
+      _mediaResourceParticipant = participant;
+      unawaited(
+        participant
+            .onForegroundChanged(resourceRegistry.isForeground)
+            .catchError((Object error) {
+              _warn('room media lifecycle sync failed: $error');
+            }),
+      );
+    } catch (error) {
+      _warn('room media lifecycle registration failed: $error');
+    }
+  }
+
+  void _detachMediaResourceLifecycle() {
+    _bindNestedMediaResources(null);
+    final registry = _mediaResourceRegistry;
+    final participant = _mediaResourceParticipant;
+    _mediaResourceRegistry = null;
+    _mediaResourceParticipant = null;
+    if (registry == null || participant == null) return;
+    registry.unregister(
+      participant.resourceId,
+      expectedParticipant: participant,
+    );
+  }
+
+  void _bindNestedMediaResources(MediaResourceRegistry? registry) {
+    final engine = _mediaEngine;
+    if (engine is RoomMediaResourceRegistryBinding) {
+      (engine as RoomMediaResourceRegistryBinding)
+          .bindMediaResourceRegistry(registry);
     }
   }
 
@@ -149,15 +246,12 @@ class LiveRoomMediaSignalingService with WidgetsBindingObserver {
     final roomId = _roomId;
     final shouldSyncActiveRoom =
         roomId != null &&
-        (roomSnapshot.value?.roomId == roomId ||
-            LiveRoomPresenceRepository.currentRoomId == roomId ||
-            _joined);
+        (roomSnapshot.value?.roomId == roomId || _joined);
     if (shouldSyncActiveRoom) {
-      LiveRoomPresenceRepository.publishParticipant(_activeLoggedInSeatUser!);
       _overlayCurrentUserProfileInSnapshot(_activeLoggedInSeatUser!);
     }
 
-    if (_joined && _channel != null) {
+    if (_joined && _appRealtimeHub.isConnected) {
       _send('profile/update', _profileUpdatePayload(_activeLoggedInSeatUser!));
     }
 
@@ -287,7 +381,10 @@ class LiveRoomMediaSignalingService with WidgetsBindingObserver {
 
   void leaveSeat() {
     _seatAuthorityGate.cancelPendingSeat();
-    LiveRoomAudioService.instance.leaveSeat();
+    _runMediaAction(
+      _mediaEngine.stopPublishingMic(),
+      label: 'stop mic publishing',
+    );
 
     _send('seat/leave', <String, Object?>{});
   }
@@ -350,7 +447,10 @@ class LiveRoomMediaSignalingService with WidgetsBindingObserver {
   void setMicEnabled(bool enabled) {
     if (enabled && _currentUserIsAdminMuted()) {
       _debug('mic enable blocked because current user is admin-muted');
-      LiveRoomAudioService.instance.setSelfMuted(true);
+      _runMediaAction(
+        _mediaEngine.mute(),
+        label: 'mute microphone',
+      );
 
       _send('mic/set_enabled', <String, Object?>{'enabled': false});
       return;
@@ -359,7 +459,10 @@ class LiveRoomMediaSignalingService with WidgetsBindingObserver {
     // FastAPI's following room snapshot confirms both seat ownership and the
     // mic state.  Do not start a producer merely because this command was sent.
     _seatAuthorityGate.requestMicEnabled(enabled);
-    if (!enabled) LiveRoomAudioService.instance.setSelfMuted(true);
+    if (!enabled) _runMediaAction(
+        _mediaEngine.mute(),
+        label: 'mute microphone',
+      );
 
     _send('mic/set_enabled', <String, Object?>{'enabled': enabled});
   }
@@ -389,38 +492,31 @@ class LiveRoomMediaSignalingService with WidgetsBindingObserver {
     });
   }
 
-  void setRoomApplyOnlyMode(bool enabled) {
-    _send('room_settings/apply_mode', <String, Object?>{
-      'apply_only_mode_enabled': enabled,
+  void requestRoomMembership() {
+    _send('room_member/request', const <String, Object?>{});
+  }
+
+  void approveRoomMembership(String targetUserId) {
+    final target = targetUserId.trim();
+    if (target.isEmpty) return;
+    _send('room_member/approve', <String, Object?>{
+      'target_user_id': target,
     });
   }
 
-  void setRoomImagesEnabled(bool enabled) {
-    _send('room_settings/images', <String, Object?>{
-      'enabled': enabled,
-      'room_images_enabled': enabled,
+  void rejectRoomMembership(String targetUserId) {
+    final target = targetUserId.trim();
+    if (target.isEmpty) return;
+    _send('room_member/reject', <String, Object?>{
+      'target_user_id': target,
     });
   }
 
-  void setGuestMessagesEnabled(bool enabled) {
-    _send('room_settings/guest_messages', <String, Object?>{
-      'enabled': enabled,
-      'guest_messages_enabled': enabled,
-    });
-  }
-
-  void setRoomBackgroundTheme(String backgroundThemeId) {
-    final safeThemeId = backgroundThemeId.trim();
-    if (safeThemeId.isEmpty) return;
-
-    _send('room_settings/background_theme', <String, Object?>{
-      'background_theme_id': safeThemeId,
-    });
-  }
-
-  void setRoomAnnouncement(String announcementText) {
-    _send('room_settings/announcement', <String, Object?>{
-      'announcement_text': announcementText.trim(),
+  void removeRoomMembership(String targetUserId) {
+    final target = targetUserId.trim();
+    if (target.isEmpty) return;
+    _send('room_member/remove', <String, Object?>{
+      'target_user_id': target,
     });
   }
 
@@ -464,25 +560,15 @@ class LiveRoomMediaSignalingService with WidgetsBindingObserver {
     _send('room/system_message', <String, Object?>{'message': safeMessage});
   }
 
-  void broadcastChatCleared() {
-    _send('room/chat_clear', <String, Object?>{});
-  }
-
-  void sendRoomChat(String text) {
-    final safeText = text.trim();
-    if (safeText.isEmpty) return;
-
-    _send('room/chat', <String, Object?>{'text': safeText});
-  }
-
   Future<void> leaveRoom() async {
     _shouldStayConnected = false;
+    _detachMediaResourceLifecycle();
     _seatAuthorityGate.cancelPendingSeat();
-    _reconnectTimer?.cancel();
-    _reconnectTimer = null;
-
-    if (_channel != null && _joined) {
-      _send('room/leave', <String, Object?>{});
+    // RoomSessionRepository owns the durable room/leave mutation. This facade
+    // only tears down the shared room subscription and media plane.
+    final leavingRoomId = _roomId;
+    if (leavingRoomId != null && leavingRoomId.trim().isNotEmpty) {
+      _appRealtimeHub.unsubscribeRoom(leavingRoomId);
     }
 
     _joined = false;
@@ -491,12 +577,9 @@ class LiveRoomMediaSignalingService with WidgetsBindingObserver {
     roomBlock.value = null;
     seatInvite.value = null;
 
-    await LiveRoomAudioService.instance.leaveRoom();
-    await _subscription?.cancel();
-    _subscription = null;
-
-    await _channel?.sink.close();
-    _channel = null;
+    await _mediaEngine.leave();
+    await _realtimeSubscription?.cancel();
+    _realtimeSubscription = null;
     _connecting = false;
 
     await _stopForegroundServiceIfNeeded();
@@ -508,20 +591,20 @@ class LiveRoomMediaSignalingService with WidgetsBindingObserver {
     roomBlock.value = block;
     _shouldStayConnected = false;
     _seatAuthorityGate.cancelPendingSeat();
-    _reconnectTimer?.cancel();
-    _reconnectTimer = null;
+    final removedRoomId = _roomId;
+    if (removedRoomId != null && removedRoomId.trim().isNotEmpty) {
+      _appRealtimeHub.unsubscribeRoom(removedRoomId);
+    }
 
     _joined = false;
     _peerId = null;
     roomSnapshot.value = null;
     seatInvite.value = null;
+    _detachMediaResourceLifecycle();
 
-    await LiveRoomAudioService.instance.leaveRoom();
-    await _subscription?.cancel();
-    _subscription = null;
-
-    await _channel?.sink.close();
-    _channel = null;
+    await _mediaEngine.leave();
+    await _realtimeSubscription?.cancel();
+    _realtimeSubscription = null;
     _connecting = false;
 
     await _stopForegroundServiceIfNeeded();
@@ -608,57 +691,44 @@ class LiveRoomMediaSignalingService with WidgetsBindingObserver {
 
     if (effectiveUser == null) return;
 
-    if (_joined && _channel != null) {
+    if (_joined && _appRealtimeHub.isConnected) {
       _debug(
-        'media room already joined; preserving active session for $reason',
+        'application room transport already joined; preserving session for $reason',
       );
       return;
     }
 
-    _debug('joining media room: $reason');
-
+    _debug('joining application room transport: $reason');
     await _connect();
 
-    if (_channel == null) {
-      _scheduleReconnect(reason: 'join failed without channel');
+    if (!_appRealtimeHub.isConnected) {
+      _scheduleReconnect(reason: 'shared realtime hub unavailable');
       return;
     }
 
-    _send('room/join', _joinPayload(effectiveUser, safeRoomId));
+    // Authoritative room presence was already established by
+    // RoomSessionRepository before this facade is entered. The Go socket only
+    // subscribes to room events; it must not perform a duplicate room/join.
+    _appRealtimeHub.subscribeRoom(safeRoomId);
+    _peerId ??= '${safeRoomId}_${effectiveUser.id}'.replaceAll(
+      RegExp(r'[^a-zA-Z0-9_\-]'),
+      '_',
+    );
     _joined = true;
+    roomBlock.value = null;
+    _joinAudioAfterMediaJoin();
   }
 
   Future<void> _connect() async {
-    if (_channel != null || _connecting) return;
-
+    if (_connecting) return;
     _connecting = true;
-
     try {
-      final wsUrl = Uri.parse(VmMediaConfig.wsUrl);
-      final channel = WebSocketChannel.connect(wsUrl);
-
-      _channel = channel;
-
-      _subscription = channel.stream.listen(
-        _handleMessage,
-        onError: (Object error) {
-          _warn('websocket error: $error');
-          _resetConnectionState();
-          _scheduleReconnect(reason: 'socket error');
-        },
-        onDone: () {
-          _debug('media websocket closed');
-          _resetConnectionState();
-          _scheduleReconnect(reason: 'socket closed');
-        },
-        cancelOnError: true,
-      );
-
-      _debug('media websocket connecting: ${VmMediaConfig.wsUrl}');
+      _realtimeSubscription ??= _appRealtimeHub.events.listen(_handleMessage);
+      await _appRealtimeHub.start();
+      _debug('application realtime delegated to AppRealtimeHub');
     } catch (error) {
-      _warn('websocket connect failed: $error');
-      _resetConnectionState();
-      _scheduleReconnect(reason: 'connect exception');
+      _warn('shared application realtime start failed: $error');
+      _scheduleReconnect(reason: 'shared realtime start failed');
     } finally {
       _connecting = false;
     }
@@ -672,51 +742,12 @@ class LiveRoomMediaSignalingService with WidgetsBindingObserver {
       return;
     }
 
-    if (_channel != null || _connecting) return;
-
-    _reconnectTimer?.cancel();
-
-    _debug('media reconnect scheduled: $reason');
-
-    _reconnectTimer = Timer(const Duration(milliseconds: 2500), () {
-      _reconnectTimer = null;
-
-      if (!_shouldStayConnected || !_appInForeground) return;
-
-      unawaited(
-        _joinRoomInternal(reason: 'reconnect: $reason').catchError((
-          Object error,
-        ) {
-          _warn('reconnect failed: $error');
-        }),
-      );
-    });
-  }
-
-  Map<String, Object?> _joinPayload(SeatUser user, String safeRoomId) {
-    final stablePeerId = '${safeRoomId}_${user.id}'.replaceAll(
-      RegExp(r'[^a-zA-Z0-9_\-]'),
-      '_',
+    _debug('application realtime reconnect delegated to AppRealtimeHub: $reason');
+    unawaited(
+      _appRealtimeHub.start().catchError((Object error) {
+        _warn('shared application realtime reconnect failed: $error');
+      }),
     );
-
-    _peerId = stablePeerId;
-
-    return <String, Object?>{
-      'room_id': safeRoomId,
-      'access_token': const AuthApiService().cachedAccessToken,
-      'peer_id': stablePeerId,
-      'user_id': user.id,
-      'display_name': user.name,
-      'avatar_url': user.avatarUrl,
-      'vip_level': user.vipLevel,
-      'svip_level': user.svipLevel,
-      'sending_level': user.sendingLevel,
-      'receiving_level': user.receivingLevel,
-      'is_host': user.isHost,
-      'is_room_admin': user.isRoomAdmin || user.isHost,
-      'role_label': _roomRoleLabelFor(user),
-      'seat_index': null,
-    };
   }
 
   Map<String, Object?> _profileUpdatePayload(SeatUser user) {
@@ -743,10 +774,11 @@ class LiveRoomMediaSignalingService with WidgetsBindingObserver {
   }
 
   void _send(String type, Map<String, Object?> payload) {
-    final channel = _channel;
-
-    if (channel == null) {
-      _debug('media send skipped, socket not connected: $type');
+    final roomId = _roomId?.trim();
+    if (!_appRealtimeHub.isConnected ||
+        roomId == null ||
+        roomId.isEmpty) {
+      _debug('application realtime send skipped: $type');
       _scheduleReconnect(reason: 'send skipped for $type');
       return;
     }
@@ -754,31 +786,65 @@ class LiveRoomMediaSignalingService with WidgetsBindingObserver {
     try {
       final commandId =
           '${DateTime.now().microsecondsSinceEpoch}_${_commandSequence++}';
-      final message = jsonEncode(<String, Object?>{
+      _appRealtimeHub.sendRaw(<String, dynamic>{
         'type': type,
+        'room_public_id': roomId,
         'command_id': commandId,
-        'payload': payload,
+        'payload': Map<String, Object?>.from(payload),
       });
-
-      channel.sink.add(message);
-
-      _debug('media sent: $type command=$commandId');
+      _debug('application realtime sent: $type command=$commandId');
     } catch (error) {
-      _warn('send failed for $type: $error');
-      _resetConnectionState();
+      _warn('application realtime send failed for $type: $error');
       _scheduleReconnect(reason: 'send failed for $type');
     }
   }
 
-  void _handleMessage(dynamic raw) {
+  void _handleMessage(RealtimeEventEnvelope event) {
     try {
-      final decoded = jsonDecode(raw.toString()) as Map<String, dynamic>;
+      final decoded = event.toLegacyEvent();
       final type = decoded['type']?.toString() ?? 'unknown';
-      final payload = decoded['payload'];
+      final rawPayload = decoded['payload'];
+      final payload = rawPayload is Map
+          ? rawPayload.cast<String, dynamic>()
+          : Map<String, dynamic>.from(decoded);
 
-      _debug('media received: $type $payload');
+      final eventRoomId =
+          payload['room_id']?.toString() ??
+          payload['room_public_id']?.toString() ??
+          decoded['room_id']?.toString() ??
+          decoded['room_public_id']?.toString();
+      final activeRoomId = _roomId?.trim();
+      if (eventRoomId != null &&
+          eventRoomId.trim().isNotEmpty &&
+          activeRoomId != null &&
+          eventRoomId.trim() != activeRoomId) {
+        return;
+      }
+      if (type.startsWith('inbox.') ||
+          type.startsWith('inbox_') ||
+          type.startsWith('wallet.') ||
+          type.startsWith('notification.')) {
+        return;
+      }
 
-      if (payload is! Map<String, dynamic>) return;
+      _debug('application realtime received: $type $payload');
+
+      final rawCanonicalRoom = payload['room'];
+      if (rawCanonicalRoom is Map) {
+        final canonicalRoom = rawCanonicalRoom.cast<String, dynamic>();
+        final snapshotRoomId =
+            canonicalRoom['room_id']?.toString() ??
+            canonicalRoom['room_public_id']?.toString() ??
+            payload['room_id']?.toString();
+        if (_roomId == null ||
+            snapshotRoomId == null ||
+            snapshotRoomId.trim().isEmpty ||
+            snapshotRoomId.trim() == _roomId) {
+          _canonicalRoomSnapshotController.add(
+            Map<String, dynamic>.unmodifiable(canonicalRoom),
+          );
+        }
+      }
 
       if (type == 'command/ack') {
         return;
@@ -791,31 +857,18 @@ class LiveRoomMediaSignalingService with WidgetsBindingObserver {
         );
         if (payload['command_type']?.toString() == 'seat/take') {
           _seatAuthorityGate.rejectSeatRequest();
-          LiveRoomAudioService.instance.leaveSeat();
+          _runMediaAction(
+      _mediaEngine.stopPublishingMic(),
+      label: 'stop mic publishing',
+    );
         }
         return;
       }
 
       if (type == 'room/system_event') {
-        LiveRoomSystemEventBus.publish(LiveRoomSystemEvent.fromJson(payload));
-
         return;
       }
       if (type == 'room_admin/updated') {
-        final targetUserId = payload['target_user_id']?.toString() ?? '';
-        final targetName = payload['target_name']?.toString() ?? '';
-        final roomId = payload['room_id']?.toString() ?? _roomId ?? '';
-        final isRoomAdmin = payload['is_room_admin'] == true;
-
-        if (targetUserId.isNotEmpty) {
-          LiveRoomPresenceRepository.updateParticipantRoomAdmin(
-            roomId: roomId,
-            userId: targetUserId,
-            displayName: targetName,
-            isRoomAdmin: isRoomAdmin,
-          );
-        }
-
         final roomData = payload['room'];
         if (roomData is Map<String, dynamic>) {
           roomSnapshot.value = LiveMediaRoomSnapshot.fromJson(roomData);
@@ -825,17 +878,10 @@ class LiveRoomMediaSignalingService with WidgetsBindingObserver {
         return;
       }
       if (type == 'seat_application/received') {
-        LiveRoomSeatApplicationEventBus.publish(
-          LiveRoomSeatApplicationEvent.fromJson(payload),
-        );
         return;
       }
 
       if (type == 'room_settings/updated') {
-        LiveRoomSettingsEventBus.publish(
-          LiveRoomSettingsEvent.fromJson(payload),
-        );
-
         final roomData = payload['room'];
         if (roomData is Map<String, dynamic>) {
           roomSnapshot.value = LiveMediaRoomSnapshot.fromJson(roomData);
@@ -846,62 +892,10 @@ class LiveRoomMediaSignalingService with WidgetsBindingObserver {
       }
 
       if (type == 'room_cricket/state') {
-        final roomId = payload['room_id']?.toString() ?? _roomId ?? '';
-        final cricketState = payload['cricket_state'];
-        final active =
-            payload['active'] == true ||
-            (cricketState is Map<String, dynamic> &&
-                cricketState['active'] == true);
-
-        final rawSetup =
-            payload['setup'] ??
-            (cricketState is Map<String, dynamic>
-                ? cricketState['setup']
-                : null);
-
-        if (active && rawSetup is Map<String, dynamic>) {
-          final setup = CricketQuickMatchSetup.fromJson(rawSetup);
-          final safeRoomId = roomId.isEmpty ? setup.roomId : roomId;
-          CricketRoomModeSignal.activateWithSetup(
-            roomId: safeRoomId,
-            setup: setup,
-          );
-          activeRoomBackgroundTheme.value =
-              cricketFloodlightArenaBackgroundTheme;
-          LiveRoomSettingsEventBus.publish(
-            LiveRoomSettingsEvent(
-              id: DateTime.now().microsecondsSinceEpoch.toString(),
-              roomId: safeRoomId,
-              applyOnlyModeEnabled: false,
-              roomImagesEnabled: true,
-              guestMessagesEnabled: true,
-              actorUserId: payload['actor_user_id']?.toString() ?? '',
-              actorName: payload['actor_name']?.toString() ?? 'Cricket Mode',
-              backgroundThemeId:
-                  payload['background_theme_id']?.toString() ??
-                  cricketFloodlightArenaBackgroundTheme.id,
-            ),
-          );
-        } else {
-          final safeRoomId = roomId;
-          CricketRoomModeSignal.deactivate(safeRoomId);
-          activeRoomBackgroundTheme.value = defaultRoomBackgroundTheme;
-          LiveRoomSettingsEventBus.publish(
-            LiveRoomSettingsEvent(
-              id: DateTime.now().microsecondsSinceEpoch.toString(),
-              roomId: safeRoomId,
-              applyOnlyModeEnabled: false,
-              roomImagesEnabled: true,
-              guestMessagesEnabled: true,
-              actorUserId: payload['actor_user_id']?.toString() ?? '',
-              actorName: payload['actor_name']?.toString() ?? 'Cricket Mode',
-              backgroundThemeId:
-                  payload['background_theme_id']?.toString() ??
-                  defaultRoomBackgroundTheme.id,
-            ),
-          );
-        }
-
+        // Cricket presentation state is owned by the mounted
+        // LiveRoomControllerBundle. The shared media transport must not write
+        // process-global UI state; scoped realtime subscribers project this
+        // event into their own room controller.
         return;
       }
 
@@ -982,8 +976,14 @@ class LiveRoomMediaSignalingService with WidgetsBindingObserver {
 
     if (roomId == null || user == null) return;
 
-    unawaited(
-      LiveRoomAudioService.instance.joinRoom(roomId: roomId, currentUser: user),
+    _runMediaAction(
+      _mediaEngine.join(
+        RoomMediaJoinRequest(
+          roomId: roomId,
+          userId: user.id,
+        ),
+      ),
+      label: 'join room audio',
     );
   }
 
@@ -1048,64 +1048,60 @@ class LiveRoomMediaSignalingService with WidgetsBindingObserver {
     );
   }
 
-  void _publishProfileUpdateFromPayload(Map<String, dynamic> payload) {
+  void _publishProfileUpdateFromPayload(
+    Map<String, dynamic> payload,
+  ) {
     final userId = payload['user_id']?.toString() ?? '';
     if (userId.isEmpty) return;
+    final snapshot = roomSnapshot.value;
+    if (snapshot == null) return;
 
-    final existing = LiveRoomPresenceRepository.userByRoomUserId(userId);
-    final isHost = payload['is_host'] == true || payload['isHost'] == true;
+    final isHost =
+        payload['is_host'] == true || payload['isHost'] == true;
     final isRoomAdmin =
-        payload['is_room_admin'] == true || payload['isRoomAdmin'] == true;
-    final displayName = _text(
-      payload['display_name'] ?? payload['displayName'],
-    );
-    final roleLabel = _text(payload['role_label'] ?? payload['roleLabel']);
-    final avatarUrl = _text(payload['avatar_url'] ?? payload['avatarUrl']);
-    final nextUser =
-        (existing ??
-                SeatUser(
-                  id: userId,
-                  name: displayName ?? 'Vibe User',
-                  roleLabel: isHost
-                      ? 'Channel Host'
-                      : isRoomAdmin
-                      ? 'Admin'
-                      : roleLabel ?? 'Member',
-                  familyName: '',
-                  relationshipText: '',
-                  vipLevel: 0,
-                  sendingLevel: 0,
-                  receivingLevel: 0,
-                  sentExp: 0,
-                  receivedExp: 0,
-                  medals: const <String>[],
-                  avatarColors: const <Color>[
-                    Color(0xFF12C7B7),
-                    Color(0xFF6D5DF6),
-                  ],
-                ))
-            .copyWith(
-              name: displayName,
-              roleLabel: isHost
-                  ? 'Channel Host'
-                  : isRoomAdmin
-                  ? 'Admin'
-                  : roleLabel,
-              avatarUrl: avatarUrl,
-              clearAvatarUrl: avatarUrl == null,
-              vipLevel: _int(payload['vip_level'] ?? payload['vipLevel']),
-              svipLevel: _int(payload['svip_level'] ?? payload['svipLevel']),
-              sendingLevel: _int(
-                payload['sending_level'] ?? payload['sendingLevel'],
-              ),
-              receivingLevel: _int(
-                payload['receiving_level'] ?? payload['receivingLevel'],
-              ),
-              isHost: isHost,
-              isRoomAdmin: isRoomAdmin || isHost,
-            );
+        payload['is_room_admin'] == true ||
+        payload['isRoomAdmin'] == true;
+    final displayName =
+        _text(payload['display_name'] ?? payload['displayName']);
+    final roleLabel =
+        _text(payload['role_label'] ?? payload['roleLabel']);
+    final avatarUrl =
+        _text(payload['avatar_url'] ?? payload['avatarUrl']);
 
-    LiveRoomPresenceRepository.publishParticipant(nextUser);
+    roomSnapshot.value = LiveMediaRoomSnapshot(
+      roomId: snapshot.roomId,
+      stateVersion: snapshot.stateVersion,
+      peerCount: snapshot.peerCount,
+      lockedSeatIndexes: snapshot.lockedSeatIndexes,
+      peers: snapshot.peers.map((peer) {
+        if (peer.userId != userId) return peer;
+        return peer.copyWith(
+          displayName: displayName,
+          isHost: isHost,
+          isRoomAdmin: isRoomAdmin || isHost,
+          roleLabel: isHost
+              ? 'Channel Host'
+              : isRoomAdmin
+              ? 'Admin'
+              : roleLabel,
+          avatarUrl: avatarUrl,
+          clearAvatarUrl: avatarUrl == null,
+          vipLevel: _int(
+            payload['vip_level'] ?? payload['vipLevel'],
+          ),
+          svipLevel: _int(
+            payload['svip_level'] ?? payload['svipLevel'],
+          ),
+          sendingLevel: _int(
+            payload['sending_level'] ?? payload['sendingLevel'],
+          ),
+          receivingLevel: _int(
+            payload['receiving_level'] ??
+                payload['receivingLevel'],
+          ),
+        );
+      }).toList(growable: false),
+    );
   }
 
   LiveMediaRoomSnapshot? _overlayAdminMute(
@@ -1201,21 +1197,30 @@ class LiveRoomMediaSignalingService with WidgetsBindingObserver {
 
     if (decision.shouldLeaveSeat) {
       _debug('current user is no longer seated; forcing local audio leaveSeat');
-      LiveRoomAudioService.instance.leaveSeat();
+      _runMediaAction(
+      _mediaEngine.stopPublishingMic(),
+      label: 'stop mic publishing',
+    );
       return;
     }
 
     final confirmedSeatIndex = decision.confirmedSeatIndex;
     if (confirmedSeatIndex != null) {
-      LiveRoomAudioService.instance.takeSeat(
-        confirmedSeatIndex,
-        micEnabled: decision.micEnabled,
+      _runMediaAction(
+        _mediaEngine.publishMic(
+          seatIndex: confirmedSeatIndex,
+          muted: decision.micEnabled != true,
+        ),
+        label: 'apply authoritative microphone state',
       );
     }
 
     if (currentPeer?.adminMuted == true) {
       _debug('admin mute enforced from room snapshot for current user');
-      LiveRoomAudioService.instance.setSelfMuted(true);
+      _runMediaAction(
+        _mediaEngine.mute(),
+        label: 'mute microphone',
+      );
     }
   }
 
@@ -1290,15 +1295,49 @@ class LiveRoomMediaSignalingService with WidgetsBindingObserver {
     if (!matchesUser && !matchesPeer) return;
 
     _debug('admin mute enforced on current user audio producer');
-    LiveRoomAudioService.instance.setSelfMuted(true);
+    _runMediaAction(
+        _mediaEngine.mute(),
+        label: 'mute microphone',
+      );
   }
 
-  void _resetConnectionState() {
-    _channel = null;
-    _subscription = null;
-    _joined = false;
-    _connecting = false;
+  void applyCanonicalRoomState(Map<String, dynamic> room) {
+    final projectedRoomId =
+        room['room_id']?.toString() ??
+        room['room_public_id']?.toString() ??
+        _roomId;
+    if (projectedRoomId != null &&
+        _roomId != null &&
+        projectedRoomId.trim().isNotEmpty &&
+        projectedRoomId.trim() != _roomId!.trim()) {
+      return;
+    }
+
+    final canonical = Map<String, dynamic>.unmodifiable(
+      Map<String, dynamic>.from(room),
+    );
+    _canonicalRoomSnapshotController.add(canonical);
+
+    try {
+      final nextSnapshot = LiveMediaRoomSnapshot.fromJson(canonical);
+      roomSnapshot.value = nextSnapshot;
+      _enforceCurrentUserAudioStateFromSnapshot(nextSnapshot);
+    } catch (error) {
+      _warn('canonical room projection ignored: $error');
+    }
   }
+
+  void _runMediaAction(
+    Future<void> action, {
+    required String label,
+  }) {
+    unawaited(
+      action.catchError((Object error) {
+        _warn('$label failed: $error');
+      }),
+    );
+  }
+
 
   void _debug(String message) {
     LiveRoomLog.trace('Media', message);

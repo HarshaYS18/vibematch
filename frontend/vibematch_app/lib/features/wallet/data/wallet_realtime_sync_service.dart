@@ -1,9 +1,3 @@
-import 'dart:async';
-import 'dart:convert';
-
-import 'package:web_socket_channel/web_socket_channel.dart';
-
-import '../../../core/network/vm_api_config.dart';
 import '../../auth/data/auth_api_service.dart';
 import '../../profile/models/vip_wallet_models.dart';
 
@@ -13,69 +7,14 @@ class WalletRealtimeSyncService {
   static final WalletRealtimeSyncService instance =
       WalletRealtimeSyncService._();
 
-  WebSocketChannel? _channel;
-  StreamSubscription<dynamic>? _subscription;
-  Timer? _pingTimer;
-  bool _started = false;
+  /// Compatibility no-op. The authenticated app now owns one physical
+  /// realtime socket through AppRealtimeHub.
+  Future<void> start() async {}
 
-  Future<void> start() async {
-    if (_started) return;
-    _started = true;
+  Future<void> stop() async {}
 
-    final auth = const AuthApiService();
-    final token = auth.cachedAccessToken;
-    if (token == null || token.trim().isEmpty) {
-      _started = false;
-      return;
-    }
-
-    final wsUrl = _webSocketUrl(
-      '/ws/inbox?token=${Uri.encodeQueryComponent(token)}',
-    );
+  void applyRealtimeEvent(Map<String, dynamic> decoded) {
     try {
-      final channel = WebSocketChannel.connect(Uri.parse(wsUrl));
-      _channel = channel;
-      _subscription = channel.stream.listen(
-        _handleMessage,
-        onError: (_) => _stopInternal(),
-        onDone: _stopInternal,
-        cancelOnError: true,
-      );
-      _pingTimer = Timer.periodic(const Duration(seconds: 25), (_) {
-        try {
-          _channel?.sink.add(jsonEncode({'event': 'ping'}));
-        } catch (_) {
-          _stopInternal();
-        }
-      });
-    } catch (_) {
-      _stopInternal();
-    }
-  }
-
-  Future<void> stop() async {
-    _started = false;
-    await _subscription?.cancel();
-    _subscription = null;
-    _pingTimer?.cancel();
-    _pingTimer = null;
-    await _channel?.sink.close();
-    _channel = null;
-  }
-
-  void _stopInternal() {
-    _started = false;
-    _subscription?.cancel();
-    _subscription = null;
-    _pingTimer?.cancel();
-    _pingTimer = null;
-    _channel = null;
-  }
-
-  void _handleMessage(dynamic raw) {
-    try {
-      final decoded = raw is String ? jsonDecode(raw) : raw;
-      if (decoded is! Map<String, dynamic>) return;
       final event = decoded['event']?.toString();
       if (event == 'wallet_vip_svip_updated') {
         _handleWalletVipSvipUpdated(_map(decoded['payload']));
@@ -288,13 +227,6 @@ class WalletRealtimeSyncService {
     );
   }
 
-  String _webSocketUrl(String path) {
-    final base = VmApiConfig.baseUrl;
-    final scheme = base.startsWith('https://') ? 'wss://' : 'ws://';
-    final noScheme = base.replaceFirst(RegExp(r'^https?://'), '');
-    final normalizedPath = path.startsWith('/') ? path : '/$path';
-    return '$scheme$noScheme$normalizedPath';
-  }
 }
 
 Map<String, dynamic> _map(dynamic value) {

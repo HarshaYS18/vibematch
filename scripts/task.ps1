@@ -1,7 +1,8 @@
 param(
     [Parameter(Position = 0, Mandatory = $true)]
-    [ValidateSet('dev', 'test', 'lint', 'integration-test', 'load-test-smoke', 'down')]
-    [string]$Task
+    [ValidateSet('dev', 'test', 'lint', 'integration-test', 'load-test-smoke', 'down', 'bootstrap', 'seed', 'scaffold-service')]
+    [string]$Task,
+    [string]$Name = ''
 )
 
 $ErrorActionPreference = 'Stop'
@@ -15,6 +16,27 @@ function Invoke-Step([string]$label, [scriptblock]$action) {
 }
 
 switch ($Task) {
+    'bootstrap' {
+        & (Join-Path $PSScriptRoot 'bootstrap_dev.ps1')
+        if ($LASTEXITCODE -ne 0) { throw "Developer bootstrap failed with exit code $LASTEXITCODE" }
+    }
+    'seed' {
+        Invoke-Step 'Start local application dependencies' { docker compose -f $compose --profile app up --build -d postgres pgbouncer cache-redis realtime-redis media-redis nats migrate }
+        Push-Location (Join-Path $repo 'backend')
+        try {
+            $previous = $env:FUNKEY_DEV_SEED_CONFIRM
+            $env:FUNKEY_DEV_SEED_CONFIRM = 'YES'
+            try { Invoke-Step 'Apply deterministic development seed' { python ../scripts/seed_dev.py } }
+            finally {
+                if ($null -eq $previous) { Remove-Item Env:FUNKEY_DEV_SEED_CONFIRM -ErrorAction SilentlyContinue }
+                else { $env:FUNKEY_DEV_SEED_CONFIRM = $previous }
+            }
+        } finally { Pop-Location }
+    }
+    'scaffold-service' {
+        if ([string]::IsNullOrWhiteSpace($Name)) { throw 'scaffold-service requires -Name <service-name>' }
+        Invoke-Step 'Generate service golden path' { python (Join-Path $PSScriptRoot 'scaffold_service.py') $Name }
+    }
     'dev' {
         Invoke-Step 'Start local platform and services' { docker compose -f $compose --profile app up --build -d }
         Invoke-Step 'Show service status' { docker compose -f $compose --profile app ps }

@@ -2,15 +2,15 @@
 
 ## Purpose
 
-Owns room metadata, membership decisions, seats, chat state, and room snapshots.
+Owns room metadata, membership decisions, seats, chat state, current room request state, durable room versions/events, and authoritative room snapshots.
 
 ## Responsibilities
 
-The module owns rooms, room_participants, room_seat_states, room_realtime_events, room_chat_messages, room_kickouts. Routes should validate input and delegate business decisions to services.
+The module owns `rooms`, `room_participants`, `room_seat_states`, `room_member_requests`, `room_seat_applications`, `room_realtime_events`, `room_chat_messages`, `room_kickouts`, and Room Cricket state (`cricket_tournaments`, `cricket_matches`, `cricket_ball_events`). Routes validate input and delegate business decisions to services. Normal socket liveness is an expiring realtime Redis lease, not a PostgreSQL heartbeat.
 
 ## What this module owns
 
-rooms, room_participants, room_seat_states, room_realtime_events, room_chat_messages, room_kickouts.
+`rooms`, `room_participants`, `room_seat_states`, `room_member_requests`, `room_seat_applications`, `room_realtime_events`, `room_chat_messages`, `room_kickouts`, `cricket_tournaments`, `cricket_matches`, and `cricket_ball_events`.
 
 ## What this module does NOT own
 
@@ -18,11 +18,11 @@ This module does not own SFU transport state, edge routing, or client UI state.
 
 ## Source of truth
 
-PostgreSQL is the durable source of truth for rooms, room_participants, room_seat_states, room_realtime_events, room_chat_messages.
+PostgreSQL is durable authority. Redis room leases, transport sequences, and replay buffers are ephemeral/rebuildable and never override PostgreSQL state.
 
 ## Important files
 
-`backend/app/services/rooms/room_action_service.py`, `backend/app/services/rooms/room_state_service.py`, `backend/app/api/routes/room_realtime.py`.
+`apps/room-control-service/main.py`, `backend/app/services/rooms/room_action_service.py`, `backend/app/services/rooms/room_state_service.py`, `backend/app/services/rooms/room_db_context.py`, `backend/app/api/routes/room_realtime_commands.py`, and `docs/architecture/room-control-service.md`.
 
 ## Public API/contracts
 
@@ -38,11 +38,11 @@ No durable broker consumer is implied by this ownership guide. Add a consumer on
 
 ## Database tables/state owned
 
-Database tables and state: `rooms, room_participants, room_seat_states, room_realtime_events, room_chat_messages`.
+Database tables and state: `rooms, room_participants, room_seat_states, room_realtime_events, room_chat_messages, cricket_tournaments, cricket_matches, cricket_ball_events`.
 
 ## Redis keys/state owned
 
-Room fanout coordination and media assignment are transient Redis uses.
+`funkey:realtime:room:*`, `funkey:realtime:gateway:user-rooms:*`, and `funkey:realtime:gateway:room-users:*` leases plus stream epoch/sequence, replay, command-dedupe, and fanout keys are transient. Media assignment is a separate Redis role.
 
 ## Dependencies
 
@@ -54,7 +54,7 @@ Room privacy, kick, membership, seat, and mic policy are checked in FastAPI. Nev
 
 ## Failure modes
 
-Clients missing an event must refetch the versioned room snapshot.
+Clients first attempt bounded contiguous room replay. If the stream epoch changed, replay is trimmed/unavailable, or Redis sequencing fails, they refetch the versioned authoritative room snapshot.
 
 ## Retry/idempotency behavior
 
@@ -82,7 +82,7 @@ Add a regression test for authorization, transaction outcome, and duplicate/reco
 
 ## Deployment notes
 
-Apply Alembic first; roll out compatible API behavior; check readiness and error metrics.
+Room Control is independently deployable as `funkey-room-control` on port 8085. Apply Alembic first, apply the service-local PostgreSQL role boundary, then roll out the Room Control image before directing core compatibility-proxy traffic to it. Core retains only the public compatibility proxy and explicit cross-domain room commerce/contribution orchestration.
 
 ## Change checklist
 
@@ -90,4 +90,132 @@ Before changing this module: identify the owning table and contract, add an addi
 
 ## Known migration status
 
-Existing FastAPI authority; gateway transport migration is planned.
+Chunk 20 Room State Engine v2 is implemented and Chunk 21 completed the one-Go-socket application realtime cutover. Chunk 26 physically extracts durable Room Control authority from core into `room-control-service`, preserves the public `/api/v1/rooms/**` contract through a compatibility proxy, isolates room PostgreSQL credentials, and keeps Go realtime/Redis/media transport outside Room Control authority.
+
+
+## Flutter room presentation ownership
+
+Client gift animation queues are not room-domain authority. Flying-gift and
+premium-broadcast presentation state is scoped to the mounted
+`LiveRoomGiftController` and disposed when that room exits. Durable gift,
+wallet and room-event outcomes remain backend/canonical realtime authority.
+Do not introduce static Flutter event buses for room presentation.
+
+
+## Canonical room chat contract
+
+Room chat is durable room state. The canonical REST/realtime command accepts
+text messages with `text`, and image messages with `message_type="image"`,
+`media_url`, and optional `content_type`; image messages do not require fake
+placeholder text. The backend validates HTTP(S) image URLs and persists
+`media_url` in `room_chat_messages`, while `metadata_json` carries
+presentation metadata.
+
+All client success UI must wait for the canonical chat command to succeed.
+Room snapshots/realtime deltas publish `recent_messages`; Flutter must project
+that canonical list into presentation models rather than maintain a second
+durable chat authority.
+
+
+## Canonical chat clearing
+
+Clearing room chat is a durable administrative room mutation. The canonical
+client path is `POST /rooms/{room_public_id}/realtime/chat/clear`, which
+executes the existing `room/chat_clear` command under backend room-admin
+authorization. The backend marks active `room_chat_messages` deleted and
+returns a new authoritative snapshot whose `recent_messages` is empty.
+
+Flutter must call this through the room-scoped `RoomSessionRepository` and
+reconcile the returned snapshot. Media signaling, widget-local lists, and
+process-global notifier/event-bus state must not clear durable chat.
+
+
+## Canonical settings command ownership
+
+Room images, guest messaging, apply-only seat mode, background and announcement
+are durable room settings. Their writes use authenticated backend REST settings
+routes, which persist PostgreSQL state and publish the canonical room update.
+Flutter reconciles the returned DTO/snapshot into `RoomSessionRepository`.
+
+`LiveRoomMediaSignalingService` is transport/compatibility only and must not
+originate those durable settings or room chat mutations. The retired
+`ActiveRoomContext` and no-op `RoomSeatLayoutSyncService` compatibility
+files were removed during Chunk 33 closure.
+
+Text and image chat now use the same canonical
+`/rooms/{room}/realtime/chat/send` command. Chat clear uses
+`/rooms/{room}/realtime/chat/clear`.
+
+
+### Chunk 33 post-closure repair: room identity threading
+
+Room-facing UI modules must receive room identity from their scoped
+`LiveRoomControllerBundle`/route. The deleted `ActiveRoomContext` must not be
+reintroduced. Gift commands, privacy settings, rankings, and room event overlays
+now receive an explicit room id. Media `roomId` may be used only as a transient
+navigation/runtime fallback where no durable mutation or canonical projection is
+owned.
+
+
+### Scoped seat-action dismissal
+
+Seat action menus are widget-local. Features that need to dismiss them clear
+the owning room's selected seat via `LiveRoomSeatController.clearSelectedSeat`
+(or an injected callback to it). No process-global seat-menu dismissal function
+or notifier may be reintroduced.
+
+
+### Background mutation ownership
+
+Room background changes are durable settings. Call
+`LiveRoomStateController.setSelectedBackgroundTheme`; it persists via
+`RoomSettingsRepository.updateBackground` and reconciles canonical state.
+Do not send a second background mutation through
+`LiveRoomMediaSignalingService`.
+
+
+### Cricket background picker
+
+`CricketRoomBackgroundPickerSheet` is presentation-only. It returns the chosen
+theme through its injected callback and must not mutate global background state.
+
+
+### Retired Chunk 33 identifiers
+
+The architecture guard rejects `ActiveRoomContext`,
+`dismissRoomSeatActionPill`, and `activeRoomBackgroundTheme`. New code must
+use explicit room scope, `LiveRoomSeatController.clearSelectedSeat`, and
+room-scoped background callbacks/controllers instead.
+
+
+### Constructor scope propagation
+
+Room UI helpers and tests must supply explicit room scope after Chunk 33.
+Composer helpers receive a scoped seat-dismiss callback; gift/lucky overlays
+receive `roomPublicId`. Tests intentionally mirror these production contracts
+instead of relying on hidden defaults.
+
+
+### Gift-video resource lifecycle
+
+The production gift-video path is `CleanVideoGiftOverlay`. Active video
+decoders register through the foundation media-resource port using explicit room
+scope. The resource runtime may pause/resume presentation or drop an ephemeral
+gift decoder under memory pressure, but it never owns gift settlement, wallet or
+combo authority.
+
+
+### Microphone resource lifecycle
+
+Local microphone capture is registered only while the underlying
+`MediaStream` exists. Resource-registry injection travels through
+`RoomMediaEngine` and its delegate; room UI must not import or call
+`LiveRoomAudioService` directly. Lifecycle coordination never overrides
+backend seat/admin-mute/publish authorization.
+
+
+### Gift-video async initialization safety
+
+Chunk 34-M14 closes the lifecycle edge where a gift-video widget can unmount
+while its decoder is still initializing. Stale or failed controllers are
+disposed before the presentation path returns.

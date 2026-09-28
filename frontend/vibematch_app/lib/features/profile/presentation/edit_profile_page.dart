@@ -1,6 +1,9 @@
 import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
 
+import '../../../core/network/vm_failure.dart';
+import '../../../core/ui/vm_motion.dart';
+
 import '../../auth/models/current_user.dart';
 import '../../media/data/media_upload_service.dart';
 import '../data/profile_api_service.dart';
@@ -86,7 +89,7 @@ class _EditProfilePageState extends State<EditProfilePage> {
       return;
     } catch (error) {
       if (!mounted) return;
-      _toast(error.toString().replaceFirst('Exception: ', ''));
+      _toast(VmFailurePresentation.messageFor(error, contentLabel: 'profile update'));
     } finally {
       if (mounted) setState(() => _uploadingAvatar = false);
     }
@@ -121,7 +124,7 @@ class _EditProfilePageState extends State<EditProfilePage> {
       if (closeAfterSave) Navigator.pop(context, true);
     } catch (error) {
       if (!mounted) return;
-      _toast(error.toString().replaceFirst('Exception: ', ''));
+      _toast(VmFailurePresentation.messageFor(error, contentLabel: 'profile update'));
     } finally {
       if (mounted) setState(() => _saving = false);
     }
@@ -131,6 +134,7 @@ class _EditProfilePageState extends State<EditProfilePage> {
     var selected = _dob ?? DateTime(2000, 1, 1);
     await showModalBottomSheet<void>(
       context: context,
+      sheetAnimationStyle: VmMotion.sheetAnimationStyle,
       backgroundColor: Colors.transparent,
       builder: (_) => _SheetShell(
         child: SizedBox(
@@ -549,14 +553,12 @@ class _CompactTextField extends StatelessWidget {
     required this.controller,
     this.maxLines = 1,
     this.maxLength,
-    this.keyboardType,
     this.onChanged,
   });
   final String hint;
   final TextEditingController controller;
   final int maxLines;
   final int? maxLength;
-  final TextInputType? keyboardType;
   final ValueChanged<String>? onChanged;
   @override
   Widget build(BuildContext context) => Padding(
@@ -565,7 +567,6 @@ class _CompactTextField extends StatelessWidget {
       controller: controller,
       maxLines: maxLines,
       maxLength: maxLength,
-      keyboardType: keyboardType,
       onChanged: onChanged,
       style: const TextStyle(
         color: Color(0xFF251538),

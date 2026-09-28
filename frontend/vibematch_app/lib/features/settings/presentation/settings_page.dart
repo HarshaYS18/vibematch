@@ -1,5 +1,9 @@
 import 'package:flutter/material.dart';
 
+import '../../../core/network/vm_failure.dart';
+import '../../../core/presentation/vm_async_state.dart';
+import '../../../core/ui/vm_motion.dart';
+
 import '../../inbox/presentation/inbox_page.dart';
 import '../../profile/presentation/help_center/help_center_page.dart';
 import '../../profile/presentation/settings/account_settings_page.dart';
@@ -31,7 +35,7 @@ class _SettingsPageState extends State<SettingsPage> {
         _loadError = null;
       });
     } catch (error) {
-      if (mounted) setState(() => _loadError = error.toString());
+      if (mounted) setState(() => _loadError = VmFailurePresentation.messageFor(error, contentLabel: 'settings'));
     }
   }
 
@@ -44,7 +48,7 @@ class _SettingsPageState extends State<SettingsPage> {
     } catch (error) {
       if (!mounted) return;
       setState(() => _state = previous);
-      _toast(error.toString());
+      _toast(VmFailurePresentation.messageFor(error, contentLabel: 'settings'));
     }
   }
 
@@ -120,6 +124,7 @@ class _SettingsPageState extends State<SettingsPage> {
   }) {
     return showModalBottomSheet<String>(
       context: context,
+      sheetAnimationStyle: VmMotion.sheetAnimationStyle,
       backgroundColor: Colors.transparent,
       builder: (_) =>
           _ChoiceSheet(title: title, selected: selected, choices: choices),
@@ -129,6 +134,7 @@ class _SettingsPageState extends State<SettingsPage> {
   void _openBlockedUsers() {
     showModalBottomSheet<void>(
       context: context,
+      sheetAnimationStyle: VmMotion.sheetAnimationStyle,
       backgroundColor: Colors.transparent,
       isScrollControlled: true,
       builder: (_) => _BlockedUsersSheet(onToast: _toast),
@@ -153,14 +159,9 @@ class _SettingsPageState extends State<SettingsPage> {
       backgroundColor: const Color(0xFFFAFAFA),
       body: SafeArea(
         child: _loadError != null
-            ? _SettingsUnavailable(message: _loadError!, onRetry: _load)
+            ? VmFailureState(message: _loadError!, contentLabel: 'settings', onRetry: _load)
             : state == null
-            ? const Center(
-                child: CircularProgressIndicator(
-                  color: Color(0xFF3797F0),
-                  strokeWidth: 2.4,
-                ),
-              )
+            ? const VmLoadingState(message: 'Loading settings…')
             : ListView(
                 physics: const BouncingScrollPhysics(),
                 padding: const EdgeInsets.fromLTRB(16, 10, 16, 28),
@@ -270,54 +271,6 @@ class _SettingsPageState extends State<SettingsPage> {
                   ),
                 ],
               ),
-      ),
-    );
-  }
-}
-
-class _SettingsUnavailable extends StatelessWidget {
-  const _SettingsUnavailable({required this.message, required this.onRetry});
-
-  final String message;
-  final VoidCallback onRetry;
-
-  @override
-  Widget build(BuildContext context) {
-    return Center(
-      child: Padding(
-        padding: const EdgeInsets.all(24),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            const Icon(
-              Icons.cloud_off_rounded,
-              color: Color(0xFF71717A),
-              size: 38,
-            ),
-            const SizedBox(height: 10),
-            const Text(
-              'Settings unavailable',
-              style: TextStyle(
-                color: Color(0xFF111114),
-                fontSize: 18,
-                fontWeight: FontWeight.w900,
-              ),
-            ),
-            const SizedBox(height: 6),
-            Text(
-              message,
-              textAlign: TextAlign.center,
-              style: const TextStyle(
-                color: Color(0xFF71717A),
-                fontSize: 12.5,
-                height: 1.35,
-                fontWeight: FontWeight.w700,
-              ),
-            ),
-            const SizedBox(height: 14),
-            FilledButton(onPressed: onRetry, child: const Text('Retry')),
-          ],
-        ),
       ),
     );
   }
@@ -621,6 +574,10 @@ class _BlockedUsersSheetState extends State<_BlockedUsersSheet> {
   late Future<List<BlockedUserSetting>> _future =
       AccountSettingsStore.loadBlockedUsers();
 
+  void _retryLoad() {
+    setState(() => _future = AccountSettingsStore.loadBlockedUsers());
+  }
+
   Future<void> _unblock(BlockedUserSetting user) async {
     try {
       final users = await AccountSettingsStore.unblockUser(user.publicUserId);
@@ -628,7 +585,7 @@ class _BlockedUsersSheetState extends State<_BlockedUsersSheet> {
       setState(() => _future = Future<List<BlockedUserSetting>>.value(users));
       widget.onToast('${user.displayName} unblocked.');
     } catch (error) {
-      widget.onToast(error.toString());
+      widget.onToast(VmFailurePresentation.messageFor(error, contentLabel: 'blocked users'));
     }
   }
 
@@ -673,24 +630,16 @@ class _BlockedUsersSheetState extends State<_BlockedUsersSheet> {
                 if (snapshot.connectionState == ConnectionState.waiting)
                   const Padding(
                     padding: EdgeInsets.symmetric(vertical: 18),
-                    child: Center(
-                      child: CircularProgressIndicator(
-                        color: Color(0xFF3797F0),
-                        strokeWidth: 2.2,
-                      ),
-                    ),
+                    child: VmLoadingState(compact: true),
                   )
                 else if (snapshot.hasError)
                   Padding(
                     padding: const EdgeInsets.only(bottom: 8),
-                    child: Text(
-                      snapshot.error.toString(),
-                      style: const TextStyle(
-                        color: Color(0xFFEF4444),
-                        fontSize: 12.5,
-                        height: 1.35,
-                        fontWeight: FontWeight.w700,
-                      ),
+                    child: VmFailureState(
+                      error: snapshot.error,
+                      contentLabel: 'blocked users',
+                      compact: true,
+                      onRetry: _retryLoad,
                     ),
                   )
                 else if (users.isEmpty)

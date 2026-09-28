@@ -7,9 +7,10 @@ from sqlalchemy.orm import Session
 from app.models.economy import EconomyCurrency, EconomyDirection, GiftTransaction, UserWallet, WalletLedger
 from app.models.experience import UserExperienceStatus
 from app.models.user import User
-from app.models.vip_status import UserVipStatus
+from app.models.vip_status import UserVipOverride, UserVipStatus
 from app.services import economy_rules_service, economy_service
 from app.services import level_progression_service as progression
+from app.services.event_outbox_service import enqueue_event
 from app.services.get_or_create_service import get_or_create_unique
 
 OFFICIAL_RECHARGE_SOURCE_TYPES = {
@@ -75,25 +76,181 @@ def _next_month_start() -> datetime:
     return datetime(year, month, 1)
 
 
-def sync_vip_status(db: Session, user_id: int, levels: dict | None = None) -> UserVipStatus:
+def _effective_vip_values(
+    db: Session,
+    *,
+    user_id: int,
+    derived_vip_level: int,
+    derived_svip_level: int,
+) -> dict[str, object]:
+    override = (
+        db.query(UserVipOverride)
+        .filter(
+            UserVipOverride.user_id == user_id,
+            UserVipOverride.is_active.is_(True),
+        )
+        .first()
+    )
+    if override is None:
+        return {
+            "vip_level": derived_vip_level,
+            "svip_level": derived_svip_level,
+            "vip_is_active": derived_vip_level > 0,
+            "svip_is_active": derived_svip_level > 0,
+            "svip_expires_at": (
+                _next_month_start() if derived_svip_level > 0 else None
+            ),
+            "updated_by_user_id": None,
+            "update_reason": "Recharge ledger VIP/SVIP sync",
+            "override": None,
+        }
+
+    svip_active = bool(override.svip_is_active and override.svip_level > 0)
+    if (
+        svip_active
+        and override.svip_expires_at is not None
+        and override.svip_expires_at <= datetime.utcnow()
+    ):
+        svip_active = False
+    return {
+        "vip_level": int(override.vip_level or 0),
+        "svip_level": int(override.svip_level or 0),
+        "vip_is_active": bool(
+            override.vip_is_active and int(override.vip_level or 0) > 0
+        ),
+        "svip_is_active": svip_active,
+        "svip_expires_at": (
+            override.svip_expires_at if svip_active else None
+        ),
+        "updated_by_user_id": override.updated_by_user_id,
+        "update_reason": override.update_reason or "Economy VIP manual override",
+        "override": override,
+    }
+
+
+def sync_vip_status(
+    db: Session,
+    user_id: int,
+    levels: dict | None = None,
+    *,
+    actor_user_id: int | None = None,
+    request_id: str | None = None,
+) -> UserVipStatus:
     safe_levels = levels
     if safe_levels is None:
-        wallet = get_or_create_wallet(db, user_id)
-        safe_levels = wallet_level_payload(db, wallet)
+        safe_levels = user_level_payload(db, user_id)
 
-    vip_level = int((safe_levels.get("vip") or {}).get("level") or 0)
-    svip_level = int((safe_levels.get("svip") or {}).get("level") or 0)
+    derived_vip_level = int((safe_levels.get("vip") or {}).get("level") or 0)
+    derived_svip_level = int((safe_levels.get("svip") or {}).get("level") or 0)
+    effective = _effective_vip_values(
+        db,
+        user_id=user_id,
+        derived_vip_level=derived_vip_level,
+        derived_svip_level=derived_svip_level,
+    )
 
-    status = get_or_create_unique(db, UserVipStatus, UserVipStatus.user_id, user_id)
+    status = get_or_create_unique(
+        db,
+        UserVipStatus,
+        UserVipStatus.user_id,
+        user_id,
+    )
+    before = (
+        int(status.vip_level or 0),
+        int(status.svip_level or 0),
+        bool(status.vip_is_active),
+        bool(status.svip_is_active),
+        status.svip_expires_at,
+    )
 
-    status.vip_level = vip_level
-    status.svip_level = svip_level
-    status.vip_is_active = vip_level > 0
-    status.svip_is_active = svip_level > 0
-    status.svip_expires_at = _next_month_start() if svip_level > 0 else None
-    status.update_reason = "Recharge ledger VIP/SVIP sync"
+    status.vip_level = int(effective["vip_level"])
+    status.svip_level = int(effective["svip_level"])
+    status.vip_is_active = bool(effective["vip_is_active"])
+    status.svip_is_active = bool(effective["svip_is_active"])
+    status.svip_expires_at = effective["svip_expires_at"]
+    status.updated_by_user_id = effective["updated_by_user_id"] or actor_user_id
+    status.update_reason = str(effective["update_reason"])
     db.flush()
+
+    after = (
+        int(status.vip_level or 0),
+        int(status.svip_level or 0),
+        bool(status.vip_is_active),
+        bool(status.svip_is_active),
+        status.svip_expires_at,
+    )
+    if before != after:
+        enqueue_event(
+            db,
+            event_type="economy.vip_projection.updated.v1",
+            actor_user_id=actor_user_id,
+            request_id=request_id,
+            payload={
+                "user_id": user_id,
+                "vip_level": status.vip_level,
+                "svip_level": status.svip_level,
+                "vip_is_active": status.vip_is_active,
+                "svip_is_active": status.svip_is_active,
+                "svip_expires_at": (
+                    status.svip_expires_at.isoformat()
+                    if status.svip_expires_at is not None
+                    else None
+                ),
+                "source": (
+                    "manual_override"
+                    if effective["override"] is not None
+                    else "derived_recharge"
+                ),
+            },
+        )
     return status
+
+
+def set_vip_override(
+    db: Session,
+    *,
+    user_id: int,
+    actor_user_id: int,
+    vip_level: int,
+    svip_level: int,
+    vip_is_active: bool,
+    svip_is_active: bool,
+    svip_expires_at: datetime | None,
+    reason: str,
+    transaction_id: str | None,
+    request_id: str | None = None,
+) -> UserVipStatus:
+    override = (
+        db.query(UserVipOverride)
+        .filter(UserVipOverride.user_id == user_id)
+        .with_for_update()
+        .first()
+    )
+    if override is None:
+        override = UserVipOverride(user_id=user_id)
+        db.add(override)
+        db.flush()
+
+    override.vip_level = int(vip_level)
+    override.svip_level = int(svip_level)
+    override.vip_is_active = bool(vip_is_active)
+    override.svip_is_active = bool(svip_is_active)
+    override.svip_expires_at = svip_expires_at
+    override.is_active = True
+    override.updated_by_user_id = actor_user_id
+    override.update_reason = reason
+    override.last_transaction_id = transaction_id
+    db.flush()
+
+    return sync_vip_status(
+        db,
+        user_id,
+        user_level_payload(db, user_id),
+        actor_user_id=actor_user_id,
+        request_id=request_id,
+    )
+
+
 
 
 def wallet_level_payload(db: Session, wallet: UserWallet) -> dict:

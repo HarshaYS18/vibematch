@@ -60,6 +60,7 @@ class LuckyGiftModerationResponse(BaseModel):
 
 
 class LuckyGiftPoolAdjustRequest(BaseModel):
+    request_id: str | None = Field(default=None, min_length=8, max_length=160)
     game_key: str = Field(default="lucky_gifts", min_length=2, max_length=80)
     pool_type: str = Field(default="GAME_HOUSE_POOL", min_length=3, max_length=80)
     direction: str = Field(..., pattern="^(CREDIT|DEBIT)$")
@@ -68,11 +69,13 @@ class LuckyGiftPoolAdjustRequest(BaseModel):
 
 
 class LuckyGiftPoolTransferRequest(BaseModel):
+    request_id: str | None = Field(default=None, min_length=8, max_length=160)
     amount: int = Field(..., gt=0)
     reason: str = Field(..., min_length=3, max_length=255)
 
 
 class LuckyGiftPoolSettingsRequest(BaseModel):
+    request_id: str | None = Field(default=None, min_length=8, max_length=160)
     game_key: str = Field(default="lucky_gifts", min_length=2, max_length=80)
     pool_type: str = Field(default="GAME_HOUSE_POOL", min_length=3, max_length=80)
     status: str | None = Field(default=None, pattern="^(ACTIVE|FROZEN|CLOSED)$")

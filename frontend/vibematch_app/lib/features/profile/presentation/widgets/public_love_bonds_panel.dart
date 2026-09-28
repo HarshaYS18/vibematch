@@ -1,6 +1,9 @@
 import 'dart:async';
 
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+
+import '../../../../core/network/vm_failure.dart';
 
 import '../../../relationships/data/relationship_exp_api_service.dart';
 import '../../../relationships/presentation/relationship_exp_detail_sheet.dart';
@@ -10,7 +13,11 @@ import '../love_bonds/widgets/love_bond_card.dart';
 import '../love_bonds/widgets/love_bond_realtime_cards.dart';
 import 'public_profile_shared_widgets.dart';
 
-class PublicLoveBondsPanel extends StatefulWidget {
+/// Public-profile Love Bond panel.
+///
+/// Love Bond request state comes from [loveBondRealtimeProvider]; relationship
+/// EXP is loaded independently because it is a separate backend domain.
+class PublicLoveBondsPanel extends ConsumerStatefulWidget {
   const PublicLoveBondsPanel({
     super.key,
     required this.publicUserId,
@@ -21,10 +28,11 @@ class PublicLoveBondsPanel extends StatefulWidget {
   final VoidCallback onVisitorTap;
 
   @override
-  State<PublicLoveBondsPanel> createState() => _PublicLoveBondsPanelState();
+  ConsumerState<PublicLoveBondsPanel> createState() =>
+      _PublicLoveBondsPanelState();
 }
 
-class _PublicLoveBondsPanelState extends State<PublicLoveBondsPanel> {
+class _PublicLoveBondsPanelState extends ConsumerState<PublicLoveBondsPanel> {
   final RelationshipExpApiService _api = const RelationshipExpApiService();
   RelationshipExpSummary? _summary;
   bool _loading = false;
@@ -64,7 +72,7 @@ class _PublicLoveBondsPanelState extends State<PublicLoveBondsPanel> {
       if (!mounted) return;
       setState(() {
         _loading = false;
-        _error = error.toString().replaceFirst('Exception: ', '');
+        _error = VmFailurePresentation.messageFor(error, contentLabel: 'Love Bonds');
       });
     }
   }
@@ -83,18 +91,22 @@ class _PublicLoveBondsPanelState extends State<PublicLoveBondsPanel> {
 
   @override
   Widget build(BuildContext context) {
-    return ValueListenableBuilder<List<LoveBondRequest>>(
-      valueListenable: LoveBondRealtimeService.requests,
-      builder: (context, requests, child) {
-        final activeBonds = LoveBondRealtimeService.activeBondsFor(widget.publicUserId);
-        final summary = _summary;
-        if (activeBonds.isEmpty && summary == null && !_loading) {
-          return const SizedBox.shrink();
-        }
+    final realtime = ref.watch(loveBondRealtimeProvider);
+    final activeBonds = realtime.requests
+        .where((request) => request.status == LoveBondRequestStatus.accepted)
+        .where((request) => request.involvesPublicUserId(widget.publicUserId))
+        .toList(growable: false);
+    final summary = _summary;
+    if (activeBonds.isEmpty && summary == null && !_loading) {
+      return const SizedBox.shrink();
+    }
 
-        final cards = loveBondCardsForProfile(widget.publicUserId);
+    final cards = loveBondCardsForProfile(
+      widget.publicUserId,
+      realtime.requests,
+    );
 
-        return Container(
+    return Container(
           padding: const EdgeInsets.all(15),
           decoration: publicProfileWhitePanelDecoration(radius: 28),
           child: Column(
@@ -178,8 +190,6 @@ class _PublicLoveBondsPanelState extends State<PublicLoveBondsPanel> {
             ],
           ),
         );
-      },
-    );
   }
 }
 

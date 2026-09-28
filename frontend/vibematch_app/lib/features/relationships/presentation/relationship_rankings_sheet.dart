@@ -2,6 +2,9 @@ import 'dart:async';
 
 import 'package:flutter/material.dart';
 
+import '../../../core/network/vm_failure.dart';
+import '../../../core/ui/vm_motion.dart';
+
 import '../../auth/data/auth_api_service.dart';
 import '../../auth/models/current_user.dart';
 import '../data/relationship_exp_api_service.dart';
@@ -20,6 +23,7 @@ class RelationshipRankingsSheet extends StatefulWidget {
   }) {
     return showModalBottomSheet<void>(
       context: context,
+      sheetAnimationStyle: VmMotion.sheetAnimationStyle,
       isScrollControlled: true,
       backgroundColor: Colors.transparent,
       builder: (_) => RelationshipRankingsSheet(initialPeriod: initialPeriod),
@@ -76,7 +80,7 @@ class _RelationshipRankingsSheetState extends State<RelationshipRankingsSheet> {
       if (!mounted) return;
       setState(() {
         _loading = false;
-        _error = error.toString().replaceFirst('Exception: ', '');
+        _error = VmFailurePresentation.messageFor(error, contentLabel: 'relationship rankings');
       });
     }
   }

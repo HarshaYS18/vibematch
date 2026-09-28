@@ -1,300 +1,252 @@
 import 'dart:async';
 
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../core/icons/vm_icons.dart';
 import '../core/permissions/vm_android_permission_service.dart';
-import '../core/session/vm_session_cleanup_service.dart';
 import '../core/ui/vm_motion.dart';
 import '../core/ui/vm_toast.dart';
-import '../features/auth/data/auth_api_service.dart';
 import '../features/auth/models/current_user.dart';
 import '../features/home/presentation/home_page_modular.dart';
+import '../game_platform/data/game_manifest_repository.dart';
 import '../features/inbox/controllers/inbox_controller.dart';
-import '../features/inbox/models/inbox_models.dart';
 import '../features/inbox/presentation/inbox_page.dart';
 import '../features/inbox/presentation/widgets/inbox_foreground_notification_banner.dart';
 import '../features/profile/presentation/me_page.dart';
-import '../features/presence/data/presence_api_service.dart';
 import '../features/rooms/data/live_room_media_signaling_service.dart';
 import '../features/rooms/presentation/widgets/live_room_minimized_bubble.dart';
 import '../features/rooms/presentation/widgets/live_room_minimized_overlay_service.dart';
 import '../features/vibes/presentation/vibes_page_modular.dart';
 import '../features/vibes/presentation/widgets/vibe_media_playback_gate.dart';
-import '../features/wallet/data/wallet_realtime_sync_service.dart';
+import '../identity/data/identity_repository.dart';
+import '../session/data/session_repository.dart';
+import 'runtime/app_identity_runtime.dart';
+import 'runtime/app_inbox_runtime.dart';
+import '../realtime/app_realtime_hub.dart';
+import 'runtime/app_shell_navigation_controller.dart';
+import 'runtime/game_bundle_cache_resource_participant.dart';
+import 'runtime/flutter_image_cache_resource_participant.dart';
+import 'runtime/media_resource_coordinator.dart';
+import '../foundation/runtime/mobile_runtime_budget.dart';
+import 'runtime/vibes_media_resource_participant.dart';
+import 'runtime/app_wallet_runtime.dart';
 import 'app_routes.dart';
+import 'app_source_registry_repository.dart';
 
-class AppShell extends StatefulWidget {
+class AppShell extends ConsumerStatefulWidget {
   const AppShell({
     super.key,
     required this.currentUser,
     required this.onLogoutPressed,
-    required this.onRefreshPressed,
   });
 
   final CurrentUser currentUser;
   final Future<void> Function() onLogoutPressed;
-  final Future<void> Function() onRefreshPressed;
 
   @override
-  State<AppShell> createState() => _AppShellState();
+  ConsumerState<AppShell> createState() => _AppShellState();
 }
 
-class _AppShellState extends State<AppShell> {
-  VmMainTab _selectedTab = VmMainTab.home;
-  VmMainTab _previousTab = VmMainTab.home;
-  late CurrentUser _syncedUser;
-  StreamSubscription<CurrentUser>? _userSyncSubscription;
-  StreamSubscription<void>? _signedOutSubscription;
-  final PresenceApiService _presenceApi = const PresenceApiService();
+class _AppShellState extends ConsumerState<AppShell>
+    with WidgetsBindingObserver {
+  final AppSourceRegistryRepository _sourceRegistryRepository =
+      AppSourceRegistryRepository();
   final VmAndroidPermissionService _permissionService =
       const VmAndroidPermissionService();
-  Timer? _presenceHeartbeatTimer;
-  int _homeRefreshNonce = 0;
-  int _backPressCount = 0;
-  final InboxController _inboxController = InboxController();
-  bool _inboxRealtimeReady = false;
-  String? _lastGlobalInboxMessageKey;
-  InboxConversation? _globalForegroundConversation;
-  InboxMessage? _globalForegroundMessage;
-  Timer? _globalForegroundDismissTimer;
-  String? _pendingInboxOpenConversationId;
-  int _pendingInboxOpenRequestNonce = 0;
-  String? _activeInboxConversationId;
-  Timer? _backPressResetTimer;
-  bool _sessionLogoutInFlight = false;
 
-  CurrentUser get _activeUser => _syncedUser;
-  bool get _showOwnerControls => _activeUser.canSeeOwnerControls;
+  bool _sessionLogoutInFlight = false;
+  bool _canonicalRefreshInFlight = false;
+  late final VibeMediaPlaybackGate _vibePlaybackGate;
+  late final VibesMediaResourceParticipant _vibesMediaResourceParticipant;
+  late final GameBundleCacheResourceParticipant
+      _gameBundleCacheResourceParticipant;
+  late final FlutterImageCacheResourceParticipant
+      _flutterImageCacheResourceParticipant;
 
   @override
   void initState() {
     super.initState();
-    _syncedUser = widget.currentUser;
-    _syncVibesPlaybackWithActiveTab();
-    LiveRoomMediaSignalingService.instance.setActiveLoggedInUser(_syncedUser);
-    _userSyncSubscription = AuthUserRealtimeService.instance.users.listen(
-      _onUserSynced,
+    WidgetsBinding.instance.addObserver(this);
+    _vibePlaybackGate = VibeMediaPlaybackGate(initiallyPaused: true);
+    _vibesMediaResourceParticipant = VibesMediaResourceParticipant(
+      playbackGate: _vibePlaybackGate,
     );
-    _signedOutSubscription = AuthUserRealtimeService.instance.signedOut.listen(
-      (_) => _handleSignedOut(),
+    _gameBundleCacheResourceParticipant = GameBundleCacheResourceParticipant(
+      cache: ref.read(gameBundleCacheProvider),
     );
-    _startPresenceHeartbeat();
-    _inboxController.addListener(_handleGlobalInboxChanged);
-    unawaited(_startGlobalInboxRealtime());
-    unawaited(WalletRealtimeSyncService.instance.start());
-    WidgetsBinding.instance.addPostFrameCallback(
-      (_) => unawaited(_permissionService.requestAppLaunchPermissions()),
+    _flutterImageCacheResourceParticipant = FlutterImageCacheResourceParticipant(
+      clearLiveImages: PaintingBinding.instance.imageCache.clearLiveImages,
     );
+
+    ref.read(identityRepositoryProvider.notifier).accept(widget.currentUser);
+    LiveRoomMediaSignalingService.instance.setActiveLoggedInUser(
+      widget.currentUser,
+    );
+
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) return;
+      unawaited(_startShellRuntimes());
+      unawaited(_validateAppSourceRegistry());
+      unawaited(_permissionService.requestAppLaunchPermissions());
+      unawaited(ref.read(mobileRuntimeBudgetProvider).refresh());
+    });
   }
 
   @override
   void didUpdateWidget(covariant AppShell oldWidget) {
     super.didUpdateWidget(oldWidget);
-    if (oldWidget.currentUser != widget.currentUser)
-      _onUserSynced(widget.currentUser);
+    if (oldWidget.currentUser != widget.currentUser) {
+      ref.read(identityRepositoryProvider.notifier).accept(widget.currentUser);
+      LiveRoomMediaSignalingService.instance.setActiveLoggedInUser(
+        widget.currentUser,
+      );
+    }
   }
 
   @override
   void dispose() {
-    VibeMediaPlaybackGate.setTabPaused(true);
-    VibeMediaPlaybackGate.clearPauseLocks();
-    _userSyncSubscription?.cancel();
-    _signedOutSubscription?.cancel();
-    _presenceHeartbeatTimer?.cancel();
-    _backPressResetTimer?.cancel();
-    _globalForegroundDismissTimer?.cancel();
-    _inboxController.removeListener(_handleGlobalInboxChanged);
-    _inboxController.dispose();
-    unawaited(WalletRealtimeSyncService.instance.stop());
+    WidgetsBinding.instance.removeObserver(this);
+    _vibePlaybackGate.setTabPaused(true);
+    _vibePlaybackGate.clearPauseLocks();
+    _vibePlaybackGate.dispose();
+    _sourceRegistryRepository.close();
     super.dispose();
   }
 
-  Future<void> _startGlobalInboxRealtime() async {
-    await _inboxController.loadFromBackend();
-    if (!mounted) return;
-    _lastGlobalInboxMessageKey = _latestIncomingInboxKey();
-    _inboxRealtimeReady = true;
-    setState(() {});
+  @override
+  void didHaveMemoryPressure() {
+    // Chunk 34-M5: Vibes, game-bundle and Flutter image-cache cleanup now
+    // share the session-scoped resource runtime. AppShell no longer performs
+    // heavyweight resource cleanup directly.
+    unawaited(_notifyResourceMemoryPressure());
   }
 
-  String? _latestIncomingInboxKey() {
-    for (final conversation in _inboxController.conversations) {
-      if (conversation.messages.isEmpty) continue;
-      final message = conversation.messages.last;
-      if (message.isMine) continue;
-      return _globalInboxMessageKey(conversation, message);
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    // The coordinator receives lifecycle pressure only. It does not become
+    // authority for session, navigation, playback, room, or game state.
+    final isForeground = state == AppLifecycleState.resumed;
+    unawaited(_notifyResourceForegroundState(isForeground));
+    unawaited(ref.read(mobileRuntimeBudgetProvider).setForeground(isForeground));
+    if (state == AppLifecycleState.resumed) {
+      unawaited(_reconcileCanonicalShellState());
     }
-    return null;
   }
 
-  String _globalInboxMessageKey(
-    InboxConversation conversation,
-    InboxMessage message,
-  ) => '${conversation.id}:${message.id ?? message.text}:${message.time}';
-
-  void _handleGlobalInboxChanged() {
-    if (!_inboxRealtimeReady || !mounted) return;
-    var shouldRefreshShell = false;
-    for (final conversation in _inboxController.conversations) {
-      if (conversation.messages.isEmpty) continue;
-      if (conversation.isMuted || conversation.isLockedByBackend) continue;
-      if (conversation.id == _activeInboxConversationId) continue;
-      final message = conversation.messages.last;
-      if (message.isMine) continue;
-      final key = _globalInboxMessageKey(conversation, message);
-      if (key == _lastGlobalInboxMessageKey) {
-        shouldRefreshShell = true;
-        continue;
-      }
-      _lastGlobalInboxMessageKey = key;
-      _globalForegroundConversation = conversation;
-      _globalForegroundMessage = message;
-      _globalForegroundDismissTimer?.cancel();
-      _globalForegroundDismissTimer = Timer(const Duration(seconds: 4), () {
-        if (!mounted) return;
-        setState(() {
-          _globalForegroundConversation = null;
-          _globalForegroundMessage = null;
-        });
-      });
-      setState(() {});
-      return;
-    }
-    if (shouldRefreshShell) setState(() {});
-  }
-
-  void _dismissGlobalForegroundNotification() {
-    _globalForegroundDismissTimer?.cancel();
-    setState(() {
-      _globalForegroundConversation = null;
-      _globalForegroundMessage = null;
-    });
-  }
-
-  void _openGlobalForegroundNotification() {
-    final conversation = _globalForegroundConversation;
-    if (conversation == null) {
-      _selectTab(VmMainTab.inbox);
-      return;
-    }
-    _globalForegroundDismissTimer?.cancel();
-    setState(() {
-      _pendingInboxOpenConversationId = conversation.id;
-      _pendingInboxOpenRequestNonce += 1;
-      _globalForegroundConversation = null;
-      _globalForegroundMessage = null;
-      _previousTab = _selectedTab;
-      _selectedTab = VmMainTab.inbox;
-    });
-    _syncVibesPlaybackWithActiveTab();
-  }
-
-  void _syncVibesPlaybackWithActiveTab() {
-    final isVibesTabActive = _selectedTab == VmMainTab.vibes;
-    VibeMediaPlaybackGate.setTabPaused(!isVibesTabActive);
-    if (isVibesTabActive)
-      WidgetsBinding.instance.addPostFrameCallback(
-        (_) => VibeMediaPlaybackGate.notifyFeedScrolled(),
-      );
-  }
-
-  void _startPresenceHeartbeat() {
-    _presenceHeartbeatTimer?.cancel();
-    unawaited(_sendPresenceHeartbeat());
-    _presenceHeartbeatTimer = Timer.periodic(
-      const Duration(seconds: 30),
-      (_) => unawaited(_sendPresenceHeartbeat()),
-    );
-  }
-
-  Future<void> _sendPresenceHeartbeat() async {
+  Future<void> _notifyResourceMemoryPressure() async {
     try {
-      await _presenceApi.heartbeat();
+      await ref.read(mediaResourceCoordinatorProvider).handleMemoryPressure();
     } catch (error) {
-      final message = error.toString().toLowerCase();
-      final sessionInvalid =
-          message.contains('session replaced') ||
-          message.contains('invalid or expired token') ||
-          message.contains('please login again');
-      if (!sessionInvalid || _sessionLogoutInFlight) return;
-      _sessionLogoutInFlight = true;
-      await widget.onLogoutPressed();
+      debugPrint('[FK:W:ResourceRuntime:Memory] $error');
     }
   }
 
-  void _handleSignedOut() {
-    _presenceHeartbeatTimer?.cancel();
-    VmSessionCleanupService.clearUserScopedStateUnawaited(
-      reason: 'app shell signed out',
-    );
+  Future<void> _notifyResourceForegroundState(bool isForeground) async {
+    try {
+      await ref
+          .read(mediaResourceCoordinatorProvider)
+          .setForeground(isForeground);
+    } catch (error) {
+      debugPrint('[FK:W:ResourceRuntime:Lifecycle] $error');
+    }
   }
 
-  void _onUserSynced(CurrentUser user) {
-    LiveRoomMediaSignalingService.instance.setActiveLoggedInUser(user);
-    if (!mounted) return;
-    setState(() => _syncedUser = user);
+  Future<void> _syncNewResourceParticipant(
+    MediaResourceCoordinator coordinator,
+    MediaResourceParticipant participant,
+  ) async {
+    try {
+      await participant.onForegroundChanged(coordinator.isForeground);
+    } catch (error) {
+      debugPrint('[FK:W:ResourceRuntime:Register] $error');
+    }
   }
 
-  Future<void> _refreshAndSyncUser() async {
-    await widget.onRefreshPressed();
-    final cached = const AuthApiService().cachedUser;
-    if (cached != null) _onUserSynced(cached);
+  Future<void> _startShellRuntimes() async {
+    ref
+        .read(appIdentityRuntimeProvider)
+        .start(initialUser: widget.currentUser);
+
+    final realtime = ref.read(appRealtimeHubProvider);
+    await realtime.start();
+
+    await Future.wait<void>([
+      ref.read(appInboxRuntimeProvider.notifier).start(),
+      ref.read(appWalletRuntimeProvider).start(),
+    ]);
   }
 
-  Widget _pageFor(VmMainTab tab) {
-    final activeUser = _activeUser;
-    switch (tab) {
-      case VmMainTab.home:
-        return HomePage(
-          key: ValueKey('home_$_homeRefreshNonce'),
-          user: activeUser,
-          currentUser: activeUser,
-        );
-      case VmMainTab.vibes:
-        return const VibesPage();
-      case VmMainTab.inbox:
-        return InboxPage(
-          controller: _inboxController,
-          openConversationId: _pendingInboxOpenConversationId,
-          openConversationRequestNonce: _pendingInboxOpenRequestNonce,
-          onActiveConversationChanged: (conversationId) {
-            _activeInboxConversationId = conversationId;
-            if (mounted) setState(() {});
-          },
-        );
-      case VmMainTab.me:
-        return MePage(
-          user: activeUser,
-          onLogoutPressed: widget.onLogoutPressed,
-          onRefreshPressed: _refreshAndSyncUser,
-        );
+  Future<void> _handleAuthoritativeSessionInvalidation() async {
+    if (_sessionLogoutInFlight) return;
+    _sessionLogoutInFlight = true;
+    await widget.onLogoutPressed();
+  }
+
+  Future<void> _validateAppSourceRegistry() async {
+    try {
+      await _sourceRegistryRepository.fetchAndValidate();
+    } catch (error) {
+      debugPrint('[FK:W:SourceRegistry] $error');
+    }
+  }
+
+  Future<void> _reconcileCanonicalShellState() async {
+    if (_canonicalRefreshInFlight || _sessionLogoutInFlight) return;
+    _canonicalRefreshInFlight = true;
+    final sessions = ref.read(sessionRepositoryProvider.notifier);
+    try {
+      final user = await sessions.refresh();
+      ref.read(identityRepositoryProvider.notifier).accept(user);
+      LiveRoomMediaSignalingService.instance.setActiveLoggedInUser(user);
+
+      await ref.read(appRealtimeHubProvider).start();
+      await Future.wait<void>([
+        ref.read(appInboxRuntimeProvider.notifier).ensureRealtimeConnected(),
+        ref.read(appWalletRuntimeProvider).start(),
+      ]);
+    } catch (error) {
+      if (sessions.isAuthoritativeFailure(error)) {
+        await _handleAuthoritativeSessionInvalidation();
+      } else {
+        debugPrint('[FK:W:ShellReconcile] $error');
+      }
+    } finally {
+      _canonicalRefreshInFlight = false;
     }
   }
 
   void _selectTab(VmMainTab tab) {
-    if (_selectedTab == tab) return;
-    setState(() {
-      _previousTab = _selectedTab;
-      _selectedTab = tab;
-      if (tab == VmMainTab.home) _homeRefreshNonce += 1;
-    });
-    _syncVibesPlaybackWithActiveTab();
+    final navigation = ref.read(appShellNavigationProvider.notifier);
+    if (!navigation.select(tab)) return;
+    _syncVibesPlaybackWithActiveTab(tab);
+  }
+
+  void _syncVibesPlaybackWithActiveTab(VmMainTab selectedTab) {
+    final isVibesTabActive = selectedTab == VmMainTab.vibes;
+    _vibePlaybackGate.setTabPaused(!isVibesTabActive);
+    if (isVibesTabActive) {
+      WidgetsBinding.instance.addPostFrameCallback(
+        (_) => _vibePlaybackGate.notifyFeedScrolled(),
+      );
+    }
+  }
+
+  void _openGlobalForegroundNotification() {
+    ref.read(appInboxRuntimeProvider.notifier).openForegroundNotification();
+    _selectTab(VmMainTab.inbox);
   }
 
   void _handleAppBack(bool didPop, Object? result) {
     if (didPop) return;
-    if (_selectedTab != VmMainTab.home) {
+    final navigation = ref.read(appShellNavigationProvider.notifier);
+    final selected = ref.read(appShellNavigationProvider).selectedTab;
+    if (selected != VmMainTab.home) {
       _selectTab(VmMainTab.home);
       return;
     }
-    _backPressCount += 1;
-    _backPressResetTimer?.cancel();
-    _backPressResetTimer = Timer(
-      const Duration(seconds: 2),
-      () => _backPressCount = 0,
-    );
-    final remaining = (3 - _backPressCount).clamp(1, 3);
+
+    final remaining = navigation.registerBackPress();
     VmToast.show(
       context,
       'Press back $remaining more time${remaining == 1 ? '' : 's'} to exit',
@@ -305,68 +257,183 @@ class _AppShellState extends State<AppShell> {
 
   @override
   Widget build(BuildContext context) {
-    return PopScope<void>(
+    // Watching these providers keeps session-scoped runtimes alive only while
+    // the authenticated shell is mounted.
+    ref.watch(appIdentityRuntimeProvider);
+    ref.watch(appRealtimeHubProvider);
+    ref.watch(appWalletRuntimeProvider);
+    // Chunk 34: registry lifetime exactly matches the authenticated AppShell.
+    // Vibes decoder, verified game-bundle cache and Flutter image cache are
+    // migrated; registration remains idempotent across AppShell rebuilds.
+    final resourceCoordinator = ref.watch(mediaResourceCoordinatorProvider);
+    if (resourceCoordinator.register(_vibesMediaResourceParticipant)) {
+      unawaited(
+        _syncNewResourceParticipant(
+          resourceCoordinator,
+          _vibesMediaResourceParticipant,
+        ),
+      );
+    }
+    if (resourceCoordinator.register(_gameBundleCacheResourceParticipant)) {
+      unawaited(
+        _syncNewResourceParticipant(
+          resourceCoordinator,
+          _gameBundleCacheResourceParticipant,
+        ),
+      );
+    }
+    if (resourceCoordinator.register(_flutterImageCacheResourceParticipant)) {
+      unawaited(
+        _syncNewResourceParticipant(
+          resourceCoordinator,
+          _flutterImageCacheResourceParticipant,
+        ),
+      );
+    }
+
+    final navigation = ref.watch(appShellNavigationProvider);
+    final identity = ref.watch(identityRepositoryProvider);
+    final inboxRuntimeState = ref.watch(appInboxRuntimeProvider);
+    final inboxRuntime = ref.read(appInboxRuntimeProvider.notifier);
+    final inboxState = ref.watch(inboxControllerProvider);
+    final inboxController = ref.read(inboxControllerProvider.notifier);
+    final activeUser = identity.user ?? widget.currentUser;
+
+    ref.listen<CurrentUser?>(
+      identityRepositoryProvider.select((state) => state.user),
+      (previous, next) {
+        if (next != null && next != previous) {
+          LiveRoomMediaSignalingService.instance.setActiveLoggedInUser(next);
+        }
+      },
+    );
+
+    final pages = <Widget>[
+      HomePage(
+        key: const PageStorageKey<String>('main-home'),
+        user: activeUser,
+        currentUser: activeUser,
+      ),
+      VibesPage(
+        key: const PageStorageKey<String>('main-vibes'),
+        playbackGate: _vibePlaybackGate,
+      ),
+      InboxPage(
+        key: const PageStorageKey<String>('main-inbox'),
+        controller: inboxController,
+        openConversationId: inboxRuntimeState.pendingOpenConversationId,
+        openConversationRequestNonce: inboxRuntimeState.pendingOpenRequestNonce,
+        onActiveConversationChanged: inboxRuntime.setActiveConversation,
+      ),
+      MePage(
+        key: const PageStorageKey<String>('main-me'),
+        user: activeUser,
+        onLogoutPressed: widget.onLogoutPressed,
+        onRefreshPressed: _reconcileCanonicalShellState,
+      ),
+    ];
+
+    return ProviderScope(
+      overrides: [
+        mediaResourceRegistryProvider.overrideWithValue(resourceCoordinator),
+      ],
+      child: PopScope<void>(
       canPop: false,
       onPopInvokedWithResult: _handleAppBack,
       child: Scaffold(
         backgroundColor: const Color(0xFFFAF7F1),
         body: Stack(
           children: [
-            _AnimatedTabStage(
-              selectedTab: _selectedTab,
-              previousTab: _previousTab,
-              child: _pageFor(_selectedTab),
+            _PersistentTabStage(
+              selectedTab: navigation.selectedTab,
+              previousTab: navigation.previousTab,
+              pages: pages,
             ),
             const _LiveRoomMiniBubbleLayer(),
-            if (_globalForegroundConversation != null &&
-                _globalForegroundMessage != null)
+            if (inboxRuntimeState.foregroundConversation != null &&
+                inboxRuntimeState.foregroundMessage != null)
               Positioned(
                 left: 0,
                 right: 0,
                 top: 0,
                 child: InboxForegroundNotificationBanner(
-                  conversation: _globalForegroundConversation!,
-                  message: _globalForegroundMessage!,
+                  conversation: inboxRuntimeState.foregroundConversation!,
+                  message: inboxRuntimeState.foregroundMessage!,
                   onTap: _openGlobalForegroundNotification,
-                  onClose: _dismissGlobalForegroundNotification,
+                  onClose: inboxRuntime.dismissForegroundNotification,
                 ),
               ),
           ],
         ),
         bottomNavigationBar: _VibeBottomNav(
-          selectedTab: _selectedTab,
-          showOwnerControls: _showOwnerControls,
-          inboxUnreadCount: _inboxController.unreadCount,
+          selectedTab: navigation.selectedTab,
+          showOwnerControls: activeUser.canSeeOwnerControls,
+          inboxUnreadCount: inboxState.unreadCount,
           onTabSelected: _selectTab,
         ),
+      ),
       ),
     );
   }
 }
 
-class _AnimatedTabStage extends StatelessWidget {
-  const _AnimatedTabStage({
+class _PersistentTabStage extends StatelessWidget {
+  const _PersistentTabStage({
     required this.selectedTab,
     required this.previousTab,
-    required this.child,
+    required this.pages,
   });
+
   final VmMainTab selectedTab;
   final VmMainTab previousTab;
+  final List<Widget> pages;
+
+  @override
+  Widget build(BuildContext context) {
+    return Stack(
+      fit: StackFit.expand,
+      children: [
+        for (final tab in VmMainTab.values)
+          _PersistentTabBranch(
+            active: selectedTab == tab,
+            direction: selectedTab.tabIndex >= previousTab.tabIndex ? 1 : -1,
+            child: pages[tab.tabIndex],
+          ),
+      ],
+    );
+  }
+}
+
+class _PersistentTabBranch extends StatelessWidget {
+  const _PersistentTabBranch({
+    required this.active,
+    required this.direction,
+    required this.child,
+  });
+
+  final bool active;
+  final int direction;
   final Widget child;
 
   @override
   Widget build(BuildContext context) {
-    final direction = selectedTab.tabIndex >= previousTab.tabIndex ? 1.0 : -1.0;
-    return AnimatedSwitcher(
-      duration: VmMotion.tabDuration,
-      switchInCurve: VmMotion.enterCurve,
-      switchOutCurve: VmMotion.exitCurve,
-      transitionBuilder: (child, animation) => VmMotion.tabTransition(
-        child: child,
-        animation: animation,
-        direction: direction,
+    final hiddenOffset = Offset(0.025 * direction, 0);
+    return IgnorePointer(
+      ignoring: !active,
+      child: TickerMode(
+        enabled: active,
+        child: AnimatedOpacity(
+          opacity: active ? 1 : 0,
+          duration: VmMotion.tabDuration,
+          curve: active ? VmMotion.enterCurve : VmMotion.exitCurve,
+          child: AnimatedSlide(
+            offset: active ? Offset.zero : hiddenOffset,
+            duration: VmMotion.tabDuration,
+            curve: active ? VmMotion.enterCurve : VmMotion.exitCurve,
+            child: child,
+          ),
+        ),
       ),
-      child: KeyedSubtree(key: ValueKey(selectedTab), child: child),
     );
   }
 }

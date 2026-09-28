@@ -2,6 +2,9 @@ import 'dart:async';
 
 import 'package:flutter/material.dart';
 
+import '../../../../core/network/vm_failure.dart';
+import '../../../../core/ui/vm_motion.dart';
+
 import '../../../social/widgets/friends_invite_sheet.dart';
 import '../../data/vibes_api_service.dart';
 import '../../models/vibe_models.dart';
@@ -14,10 +17,12 @@ class MediaVibeDetailPager extends StatefulWidget {
     super.key,
     required this.vibes,
     required this.initialIndex,
+    required this.playbackGate,
   });
 
   final List<VibeItem> vibes;
   final int initialIndex;
+  final VibeMediaPlaybackGate playbackGate;
 
   @override
   State<MediaVibeDetailPager> createState() => _MediaVibeDetailPagerState();
@@ -26,6 +31,7 @@ class MediaVibeDetailPager extends StatefulWidget {
 class _MediaVibeDetailPagerState extends State<MediaVibeDetailPager> {
   final VibesApiService _api = const VibesApiService();
   late final PageController _pageController;
+  late final String _pauseLockKey;
   final Map<String, VibeItem> _stateById = <String, VibeItem>{};
 
   List<VibeItem> get _vibes => widget.vibes.where((item) => item.mediaType != VibeMediaType.text).toList(growable: false);
@@ -33,7 +39,8 @@ class _MediaVibeDetailPagerState extends State<MediaVibeDetailPager> {
   @override
   void initState() {
     super.initState();
-    VibeMediaPlaybackGate.feedPlaybackPaused.value = true;
+    _pauseLockKey = 'media-detail-${identityHashCode(this)}';
+    widget.playbackGate.acquirePauseLock(_pauseLockKey);
     final initialPage = widget.initialIndex.clamp(0, _vibes.isEmpty ? 0 : _vibes.length - 1);
     _pageController = PageController(initialPage: initialPage);
     for (final vibe in _vibes) {
@@ -43,7 +50,7 @@ class _MediaVibeDetailPagerState extends State<MediaVibeDetailPager> {
 
   @override
   void dispose() {
-    VibeMediaPlaybackGate.feedPlaybackPaused.value = false;
+    widget.playbackGate.releasePauseLock(_pauseLockKey);
     _pageController.dispose();
     super.dispose();
   }
@@ -61,7 +68,7 @@ class _MediaVibeDetailPagerState extends State<MediaVibeDetailPager> {
         _stateById[_key(vibe)] = current.copyWith(likedByMe: result.likedByMe, likes: result.likesCount);
       });
     } catch (error) {
-      _toast(error.toString().replaceFirst('Exception: ', ''));
+      _toast(VmFailurePresentation.messageFor(error, contentLabel: 'Vibe action'));
     }
   }
 
@@ -76,7 +83,7 @@ class _MediaVibeDetailPagerState extends State<MediaVibeDetailPager> {
       });
       _toast(result.savedByMe ? 'Saved Vibe.' : 'Removed from saved Vibes.');
     } catch (error) {
-      _toast(error.toString().replaceFirst('Exception: ', ''));
+      _toast(VmFailurePresentation.messageFor(error, contentLabel: 'Vibe action'));
     }
   }
 
@@ -84,6 +91,7 @@ class _MediaVibeDetailPagerState extends State<MediaVibeDetailPager> {
     if (vibe.id.trim().isEmpty) return;
     await showModalBottomSheet<void>(
       context: context,
+      sheetAnimationStyle: VmMotion.sheetAnimationStyle,
       isScrollControlled: true,
       useSafeArea: false,
       backgroundColor: Colors.transparent,
@@ -104,7 +112,7 @@ class _MediaVibeDetailPagerState extends State<MediaVibeDetailPager> {
             });
             _toast('Vibe sent to ${friend.displayName}');
           } catch (error) {
-            _toast(error.toString().replaceFirst('Exception: ', ''));
+            _toast(VmFailurePresentation.messageFor(error, contentLabel: 'Vibe action'));
           }
         },
       ),
@@ -114,6 +122,7 @@ class _MediaVibeDetailPagerState extends State<MediaVibeDetailPager> {
   Future<void> _openComments(VibeItem vibe) async {
     await showModalBottomSheet<void>(
       context: context,
+      sheetAnimationStyle: VmMotion.sheetAnimationStyle,
       isScrollControlled: true,
       useSafeArea: true,
       backgroundColor: Colors.transparent,

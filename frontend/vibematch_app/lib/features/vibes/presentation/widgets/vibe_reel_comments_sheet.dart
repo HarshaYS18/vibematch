@@ -2,6 +2,8 @@ import 'dart:async';
 
 import 'package:flutter/material.dart';
 
+import '../../../../core/network/vm_failure.dart';
+
 import '../../data/vibes_api_service.dart';
 import '../../models/vibe_models.dart';
 
@@ -58,7 +60,7 @@ class _VibeReelCommentsSheetState extends State<VibeReelCommentsSheet> {
           ..addAll(comments);
       });
     } catch (error) {
-      if (mounted) setState(() => _error = error.toString().replaceFirst('Exception: ', ''));
+      if (mounted) setState(() => _error = VmFailurePresentation.messageFor(error, contentLabel: 'comments'));
     } finally {
       if (mounted) setState(() => _loading = false);
     }
@@ -79,7 +81,7 @@ class _VibeReelCommentsSheetState extends State<VibeReelCommentsSheet> {
       });
       widget.onCommentAdded();
     } catch (error) {
-      if (mounted) setState(() => _error = error.toString().replaceFirst('Exception: ', ''));
+      if (mounted) setState(() => _error = VmFailurePresentation.messageFor(error, contentLabel: 'comments'));
     } finally {
       if (mounted) setState(() => _sending = false);
     }
@@ -97,7 +99,7 @@ class _VibeReelCommentsSheetState extends State<VibeReelCommentsSheet> {
         }
       });
     } catch (error) {
-      if (mounted) setState(() => _error = error.toString().replaceFirst('Exception: ', ''));
+      if (mounted) setState(() => _error = VmFailurePresentation.messageFor(error, contentLabel: 'comments'));
     }
   }
 

@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 
+import '../../../core/presentation/vm_async_state.dart';
+
 import '../../wallet/data/wallet_api_service.dart';
 
 class VipProgramPage extends StatefulWidget {
@@ -26,8 +28,6 @@ class _VipProgramPageState extends State<VipProgramPage> {
   static const Color _bg = Color(0xFF080713);
   static const Color _panel = Color(0xFF141121);
   static const Color _gold = Color(0xFFFFD36E);
-  static const Color _aqua = Color(0xFF19E6D2);
-  static const Color _pink = Color(0xFFFF5D9E);
   static const Color _text = Color(0xFFF9F2FF);
   static const Color _muted = Color(0xFFB9ADC8);
 
@@ -58,10 +58,10 @@ class _VipProgramPageState extends State<VipProgramPage> {
                 future: _future,
                 builder: (context, snapshot) {
                   if (snapshot.connectionState != ConnectionState.done) {
-                    return const Center(child: CircularProgressIndicator(color: _gold));
+                    return const VmLoadingState(message: 'Loading VIP program…');
                   }
                   if (snapshot.hasError || !snapshot.hasData) {
-                    return _ErrorState(onRetry: _reload);
+                    return VmFailureState(error: snapshot.error, contentLabel: 'VIP program', onRetry: _reload);
                   }
                   final wallet = snapshot.data!;
                   return RefreshIndicator(
@@ -352,18 +352,4 @@ class _SourceCard extends StatelessWidget {
       Expanded(child: Text(note, style: const TextStyle(color: _VipProgramPageState._muted, fontWeight: FontWeight.w800, height: 1.36))),
     ]),
   );
-}
-
-class _ErrorState extends StatelessWidget {
-  const _ErrorState({required this.onRetry});
-  final VoidCallback onRetry;
-  @override
-  Widget build(BuildContext context) => Center(child: TextButton(onPressed: onRetry, child: const Text('Retry backend economy source', style: TextStyle(color: _VipProgramPageState._gold, fontWeight: FontWeight.w900))));
-}
-
-String _compact(int value) {
-  if (value >= 1000000000) return '${(value / 1000000000).toStringAsFixed(1)}B';
-  if (value >= 1000000) return '${(value / 1000000).toStringAsFixed(1)}M';
-  if (value >= 1000) return '${(value / 1000).toStringAsFixed(1)}K';
-  return '$value';
 }

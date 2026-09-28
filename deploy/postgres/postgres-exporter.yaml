@@ -1,0 +1,66 @@
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: funkey-postgres-exporter
+automountServiceAccountToken: false
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: funkey-postgres-exporter
+  labels: {app: funkey-postgres-exporter}
+spec:
+  replicas: 1
+  selector:
+    matchLabels: {app: funkey-postgres-exporter}
+  template:
+    metadata:
+      labels: {app: funkey-postgres-exporter}
+      annotations:
+        prometheus.io/scrape: "true"
+        prometheus.io/path: /metrics
+        prometheus.io/port: "9187"
+    spec:
+      serviceAccountName: funkey-postgres-exporter
+      automountServiceAccountToken: false
+      nodeSelector: {funkey.io/workload: application}
+      securityContext: {runAsNonRoot: true, seccompProfile: {type: RuntimeDefault}}
+      containers:
+        - name: exporter
+          image: quay.io/prometheuscommunity/postgres-exporter:v0.20.1
+          imagePullPolicy: IfNotPresent
+          args:
+            - --collector.locks
+            - --collector.stat_activity
+            - --collector.settings
+            - --collector.stat_statements
+            - --collector.long_running_transactions
+            - --collector.long_running_transactions.threshold=5s
+          env:
+            - name: DATA_SOURCE_NAME
+              valueFrom:
+                secretKeyRef:
+                  name: funkey-postgres-monitoring
+                  key: database_url
+          ports: [{name: metrics, containerPort: 9187}]
+          resources:
+            requests: {cpu: 25m, memory: 64Mi}
+            limits: {cpu: 250m, memory: 256Mi}
+          livenessProbe:
+            httpGet: {path: /metrics, port: metrics}
+            periodSeconds: 30
+          readinessProbe:
+            httpGet: {path: /metrics, port: metrics}
+            periodSeconds: 10
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            capabilities: {drop: [ALL]}
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: funkey-postgres-exporter
+spec:
+  selector: {app: funkey-postgres-exporter}
+  ports: [{name: metrics, port: 9187, targetPort: metrics}]

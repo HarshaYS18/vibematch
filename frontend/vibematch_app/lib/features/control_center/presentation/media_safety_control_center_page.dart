@@ -2,6 +2,10 @@ import 'dart:async';
 
 import 'package:flutter/material.dart';
 
+import '../../../core/network/vm_failure.dart';
+import '../../../core/presentation/vm_async_state.dart';
+import '../../../core/ui/vm_motion.dart';
+
 import '../data/media_safety_api_service.dart';
 
 class MediaSafetyControlCenterPage extends StatefulWidget {
@@ -51,7 +55,7 @@ class _MediaSafetyControlCenterPageState extends State<MediaSafetyControlCenterP
       });
     } catch (error) {
       if (!mounted) return;
-      setState(() => _error = error.toString().replaceFirst('Exception: ', ''));
+      setState(() => _error = VmFailurePresentation.messageFor(error, contentLabel: 'media safety'));
     } finally {
       if (mounted) setState(() => _busy = false);
     }
@@ -99,7 +103,7 @@ class _MediaSafetyControlCenterPageState extends State<MediaSafetyControlCenterP
       await action();
       await _load();
     } catch (error) {
-      _toast(error.toString().replaceFirst('Exception: ', ''), danger: true);
+      _toast(VmFailurePresentation.messageFor(error, contentLabel: 'media safety'), danger: true);
     } finally {
       if (mounted) setState(() => _actionBusy = false);
     }
@@ -409,6 +413,7 @@ class _MediaSafetyControlCenterPageState extends State<MediaSafetyControlCenterP
   void _showAssetSheet(CdnMediaAsset asset) {
     showModalBottomSheet<void>(
       context: context,
+      sheetAnimationStyle: VmMotion.sheetAnimationStyle,
       showDragHandle: true,
       backgroundColor: const Color(0xFFFAF7F1),
       builder: (context) => SafeArea(
@@ -491,8 +496,8 @@ class _MediaSafetyControlCenterPageState extends State<MediaSafetyControlCenterP
           children: [
             _HeroCard(onRunCleanup: () => unawaited(_cleanupInboxMedia())),
             const SizedBox(height: 14),
-            if (_busy) const _LoadingCard(),
-            if (_error != null) _ErrorCard(message: _error!, onRetry: () => unawaited(_load())),
+            if (_busy) const VmLoadingState(message: 'Loading media safety…'),
+            if (_error != null) VmInlineFailure(message: _error!, onRetry: () => unawaited(_load())),
             if (!_busy && _error == null && dashboard != null) ...[
               GridView.count(
                 crossAxisCount: 2,
@@ -769,20 +774,6 @@ class _TinyChip extends StatelessWidget {
       child: Text(label.replaceAll('_', ' '), style: const TextStyle(color: Color(0xFF4A2A63), fontSize: 10.5, fontWeight: FontWeight.w900)),
     );
   }
-}
-
-class _LoadingCard extends StatelessWidget {
-  const _LoadingCard();
-  @override
-  Widget build(BuildContext context) => const Center(child: Padding(padding: EdgeInsets.all(30), child: CircularProgressIndicator()));
-}
-
-class _ErrorCard extends StatelessWidget {
-  const _ErrorCard({required this.message, required this.onRetry});
-  final String message;
-  final VoidCallback onRetry;
-  @override
-  Widget build(BuildContext context) => _EmptyCard(message: message, actionLabel: 'Retry', onAction: onRetry);
 }
 
 class _EmptyCard extends StatelessWidget {

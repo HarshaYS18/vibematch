@@ -1,9 +1,18 @@
+// Regression coverage for room-scoped premium gift presentation queues.
+// Each test owns and disposes its queue, matching LiveRoomGiftController
+// lifecycle and preventing cross-room/cross-test presentation leakage.
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:vibematch_app/features/rooms/data/live_room_system_event_bus.dart';
 import 'package:vibematch_app/features/rooms/presentation/widgets/premium_gift_broadcast_overlay.dart';
 
 void main() {
+  PremiumGiftBroadcastBus scopedBus() {
+    final bus = PremiumGiftBroadcastBus();
+    addTearDown(bus.dispose);
+    return bus;
+  }
+
   group('room gift realtime payload', () {
     test('parses authoritative send and receive broadcast fields', () {
       final event = LiveRoomSystemEvent.fromJson(<String, dynamic>{
@@ -83,10 +92,9 @@ void main() {
     });
   });
 
-  group('premium gift broadcast bus', () {
-    tearDown(PremiumGiftBroadcastBus.clearAll);
-
+  group('premium gift broadcast queue', () {
     test('authoritative backend event wins over sender local echo', () {
+      final bus = scopedBus();
       const backend = PremiumGiftBroadcastEvent(
         id: 'premium-gift_77_6418000022',
         senderName: 'Sender',
@@ -102,13 +110,14 @@ void main() {
         combo: 3,
       );
 
-      PremiumGiftBroadcastBus.publish(backend);
-      PremiumGiftBroadcastBus.publish(localEcho);
+      bus.publish(backend);
+      bus.publish(localEcho);
 
-      expect(PremiumGiftBroadcastBus.active?.id, backend.id);
+      expect(bus.active?.id, backend.id);
     });
 
     test('separate backend transactions are still queued', () {
+      final bus = scopedBus();
       const first = PremiumGiftBroadcastEvent(
         id: 'premium-gift_77_6418000022',
         senderName: 'Sender',
@@ -124,20 +133,20 @@ void main() {
         combo: 3,
       );
 
-      PremiumGiftBroadcastBus.publish(first);
-      PremiumGiftBroadcastBus.publish(second);
-      expect(PremiumGiftBroadcastBus.active?.id, first.id);
+      bus.publish(first);
+      bus.publish(second);
+      expect(bus.active?.id, first.id);
 
-      PremiumGiftBroadcastBus.completeActive();
-      expect(PremiumGiftBroadcastBus.active?.id, second.id);
+      bus.completeActive();
+      expect(bus.active?.id, second.id);
     });
   });
 
   testWidgets('premium overlay renders server sender and receiver names', (
     tester,
   ) async {
-    PremiumGiftBroadcastBus.clearAll();
-    PremiumGiftBroadcastBus.publish(
+    final bus = scopedBus();
+    bus.publish(
       const PremiumGiftBroadcastEvent(
         id: 'premium-gift_88_6418000022',
         senderName: 'Alice',
@@ -148,9 +157,11 @@ void main() {
     );
 
     await tester.pumpWidget(
-      const MaterialApp(
+      MaterialApp(
         home: Scaffold(
-          body: Stack(children: <Widget>[PremiumGiftBroadcastOverlay()]),
+          body: Stack(
+            children: <Widget>[PremiumGiftBroadcastOverlay(bus: bus)],
+          ),
         ),
       ),
     );
@@ -158,7 +169,5 @@ void main() {
 
     expect(find.text('Alice'), findsOneWidget);
     expect(find.text('sent Crown to Bob x2'), findsOneWidget);
-
-    PremiumGiftBroadcastBus.clearAll();
   });
 }

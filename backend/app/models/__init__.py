@@ -1,5 +1,6 @@
 from app.models.user import User
 from app.models.auth_identity import AuthIdentity
+from app.models.identity_session import IdentityDevice, IdentitySession
 from app.models.role import UserRole, RoleName
 from app.models.admin_log import AdminLog
 from app.models.special_permission import SpecialPermission, SpecialPermissionName
@@ -10,15 +11,20 @@ from app.models.room_participant import RoomParticipant
 from app.models.room_realtime_state import RoomChatMessage, RoomRealtimeEvent, RoomSeatState
 from app.models.room_kickout import RoomKickout, RoomKickoutDuration
 from app.models.room_theme import RoomTheme, RoomThemeOwnershipType, RoomThemeReview, RoomThemeReviewStatus, UserRoomThemeInventory
-from app.models.store import StoreAssetManifest, StoreCategory, StoreItem, StoreItemCategory, UserStoreInventory
+from app.models.store import StoreAssetManifest, StoreCategory, StoreItem, StoreItemCategory, StorePurchaseOperation, UserStoreInventory
 from app.models.home_banner import HomeBanner, HomeBannerPlacement, HomeBannerTarget
 from app.models.cdn_media import (
     CdnMediaAsset,
+    CdnMediaVariant,
     CdnMediaDeletionStatus,
     CdnMediaLinkedEntityType,
     CdnMediaModerationStatus,
     CdnMediaType,
     CdnMediaUploadStatus,
+    MediaProcessingStatus,
+    MediaUploadMode,
+    MediaUploadSession,
+    MediaUploadSessionStatus,
     MediaSafetySetting,
 )
 from app.models.cricket import (
@@ -33,7 +39,12 @@ from app.models.login_history import (
     LoginHistoryFailureReason,
 )
 from app.models.follow import UserBlock, UserFollow
-from app.models.notification import UserNotification
+from app.models.notification import (
+    NotificationDelivery,
+    NotificationPreference,
+    NotificationTemplate,
+    UserNotification,
+)
 from app.models.event_outbox import EventOutbox, WorkerProcessedEvent
 from app.models.inbox import (
     InboxConversation,
@@ -68,8 +79,11 @@ from app.models.call_session import (
     CallSessionStatus,
     CallSessionType,
 )
-from app.models.experience import RoomExperienceStatus, UserExperienceStatus
+from app.models.experience import ExperienceMutationReceipt, RoomExperienceStatus, UserExperienceStatus
 from app.models.mvp_feature import MvpFeatureState
+from app.models.economy_transaction import EconomyTransaction
+from app.models.economy_house_reservation import EconomyHouseReservation
+from app.models.economy_bulk_grant import EconomyBulkGrant, EconomyBulkGrantRecipient
 from app.models.economy import (
     CoinPoolLedger,
     CoinSaleOrder,
@@ -124,3 +138,5 @@ from app.models.user_violation_score import UserViolationScore
 from app.models.user_app_setting import UserAppSetting
 
 from app.models.lucky_packet import LuckyPacket, LuckyPacketClaim
+
+from app.models.privacy_request import PrivacyRequest

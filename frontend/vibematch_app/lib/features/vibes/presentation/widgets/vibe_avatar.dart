@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 
+import '../../../../foundation/images/app_image.dart';
+
 import '../../models/vibe_models.dart';
 
 class VibeAvatar extends StatelessWidget {
@@ -20,10 +22,12 @@ class VibeAvatar extends StatelessWidget {
         gradient: LinearGradient(colors: vibe.colors),
       ),
       child: avatarUrl != null && avatarUrl.isNotEmpty
-          ? Image.network(
+          ? AppImage.network(
               avatarUrl,
+              width: size,
+              height: size,
               fit: BoxFit.cover,
-              errorBuilder: (_, _, _) => _FallbackAvatar(vibe: vibe),
+              fallback: _FallbackAvatar(vibe: vibe),
             )
           : _FallbackAvatar(vibe: vibe),
     );

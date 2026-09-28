@@ -1,10 +1,13 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
+from datetime import datetime
 
+from fastapi import HTTPException
 from sqlalchemy.orm import Session
 
 from app.models.economy import GamePool, GamePoolLedger, GamePoolType, EconomyDirection
+from app.models.economy_house_reservation import EconomyHouseReservation
 
 
 @dataclass(frozen=True)
@@ -29,32 +32,165 @@ def reserve_house_liability(
     amount: int,
     reference_type: str,
     reference_id: str | None,
+    *,
+    reservation_key: str | None = None,
+    release_scope: str | None = None,
+    transaction_id: str | None = None,
+    user_id: int | None = None,
 ) -> dict:
     safe_amount = max(int(amount or 0), 0)
-    pool = get_house_pool(db, pool_type)
+    safe_pool_type = str(pool_type or GamePoolType.GAME_HOUSE_POOL.value)
+    pool = (
+        db.query(GamePool)
+        .filter(GamePool.pool_type == safe_pool_type)
+        .with_for_update()
+        .first()
+    )
     if pool is None or safe_amount <= 0:
         return {
             "reservation_id": None,
+            "reservation_key": reservation_key,
+            "release_scope": release_scope,
             "house_pool_balance": int(pool.balance) if pool else 0,
             "house_reserved_liability": int(pool.reserved_balance) if pool else 0,
             "reserved_amount": 0,
+            "duplicate": False,
             "safe_default": True,
         }
-    pool.reserved_balance += safe_amount
+
+    key = (reservation_key or f"{reference_type}:{reference_id or 'pending'}").strip()
+    scope = (release_scope or reference_id or key).strip()
+    if not key or not scope:
+        raise HTTPException(status_code=400, detail="House reservation identity is required")
+
+    existing = (
+        db.query(EconomyHouseReservation)
+        .filter(EconomyHouseReservation.reservation_key == key)
+        .with_for_update()
+        .first()
+    )
+    if existing is not None:
+        if (
+            int(existing.pool_id) != int(pool.id)
+            or int(existing.amount) != safe_amount
+            or existing.release_scope != scope
+            or existing.reference_type != reference_type
+        ):
+            raise HTTPException(
+                status_code=409,
+                detail="House reservation key reused with different request",
+            )
+        return {
+            "reservation_id": existing.id,
+            "reservation_key": existing.reservation_key,
+            "release_scope": existing.release_scope,
+            "house_pool_balance": int(pool.balance or 0),
+            "house_reserved_liability": int(pool.reserved_balance or 0),
+            "reserved_amount": int(existing.amount),
+            "duplicate": True,
+            "safe_default": False,
+        }
+
+    available = max(int(pool.balance or 0) - int(pool.reserved_balance or 0), 0)
+    if available < safe_amount:
+        raise HTTPException(
+            status_code=409,
+            detail="Insufficient house pool available balance for reservation",
+        )
+
+    reservation = EconomyHouseReservation(
+        reservation_key=key,
+        release_scope=scope,
+        pool_id=pool.id,
+        user_id=user_id,
+        amount=safe_amount,
+        status="ACTIVE",
+        reference_type=reference_type,
+        reference_id=reference_id,
+        transaction_id=transaction_id,
+    )
+    db.add(reservation)
+    pool.reserved_balance = int(pool.reserved_balance or 0) + safe_amount
     db.flush()
     return {
-        "reservation_id": f"{reference_type}:{reference_id or 'pending'}",
-        "house_pool_balance": int(pool.balance),
-        "house_reserved_liability": int(pool.reserved_balance),
+        "reservation_id": reservation.id,
+        "reservation_key": reservation.reservation_key,
+        "release_scope": reservation.release_scope,
+        "house_pool_balance": int(pool.balance or 0),
+        "house_reserved_liability": int(pool.reserved_balance or 0),
         "reserved_amount": safe_amount,
+        "duplicate": False,
         "safe_default": False,
     }
 
 
-def release_house_liability(db: Session, reservation_id: str | None) -> dict:
-    # Durable reservation rows are intentionally not introduced yet.
-    # This placeholder keeps the settlement flow stable until full house-pool tables are hardened.
-    return {"reservation_id": reservation_id, "released": True, "safe_default": True}
+def release_house_liability(
+    db: Session,
+    release_scope: str | None,
+) -> dict:
+    scope = str(release_scope or "").strip()
+    if not scope:
+        return {
+            "release_scope": scope,
+            "released": False,
+            "released_amount": 0,
+            "reservation_count": 0,
+            "safe_default": True,
+        }
+
+    reservations = (
+        db.query(EconomyHouseReservation)
+        .filter(
+            EconomyHouseReservation.release_scope == scope,
+            EconomyHouseReservation.status == "ACTIVE",
+        )
+        .order_by(EconomyHouseReservation.id.asc())
+        .with_for_update()
+        .all()
+    )
+    if not reservations:
+        return {
+            "release_scope": scope,
+            "released": False,
+            "released_amount": 0,
+            "reservation_count": 0,
+            "safe_default": True,
+        }
+
+    by_pool: dict[int, int] = {}
+    for reservation in reservations:
+        by_pool[int(reservation.pool_id)] = (
+            by_pool.get(int(reservation.pool_id), 0) + int(reservation.amount)
+        )
+
+    for pool_id, released_amount in by_pool.items():
+        pool = (
+            db.query(GamePool)
+            .filter(GamePool.id == pool_id)
+            .with_for_update()
+            .one()
+        )
+        current_reserved = int(pool.reserved_balance or 0)
+        if current_reserved < released_amount:
+            raise HTTPException(
+                status_code=500,
+                detail="House reservation ledger exceeds pool reserved balance",
+            )
+        pool.reserved_balance = current_reserved - released_amount
+
+    released_at = datetime.utcnow()
+    for reservation in reservations:
+        reservation.status = "RELEASED"
+        reservation.released_at = released_at
+
+    db.flush()
+    return {
+        "release_scope": scope,
+        "released": True,
+        "released_amount": sum(int(item.amount) for item in reservations),
+        "reservation_count": len(reservations),
+        "safe_default": False,
+    }
 
 
 def record_house_profit_or_loss(
@@ -86,7 +222,7 @@ def record_house_profit_or_loss(
         )
     )
     db.flush()
-    return {"recorded": True, "house_profit_or_loss": safe_amount, "house_pool_balance": after, "safe_default": False}
+    return {"recorded": True, "pool_id": pool.id, "house_profit_or_loss": safe_amount, "house_pool_balance": after, "safe_default": False}
 
 
 def calculate_payout_pressure(db: Session, pool_type: str) -> HousePoolRiskSnapshot:

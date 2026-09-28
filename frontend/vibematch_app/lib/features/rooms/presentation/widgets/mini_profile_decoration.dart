@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 
+import '../../../../core/assets/funkey_cdn_assets.dart';
+
 import '../live_room_models.dart';
 import 'room_avatar_frames.dart';
 import 'room_theme.dart';
@@ -486,8 +488,7 @@ class _MiniProfileCardSkin extends StatelessWidget {
 class MiniProfileHeaderDecoration extends StatelessWidget {
   const MiniProfileHeaderDecoration({super.key});
 
-  static const String _bannerAsset =
-      'assets/images/mini_profile_decorations/purple_gold_banner.png';
+  static String get _bannerUrl => FunKeyCdnAssets.miniProfilePurpleGoldBanner;
 
   @override
   Widget build(BuildContext context) {
@@ -505,8 +506,8 @@ class MiniProfileHeaderDecoration extends StatelessWidget {
               child: SizedBox(
                 width: screenWidth + 112,
                 height: 90,
-                child: Image.asset(
-                  _bannerAsset,
+                child: Image.network(
+                  _bannerUrl,
                   width: screenWidth + 112,
                   height: 90,
                   fit: BoxFit.contain,

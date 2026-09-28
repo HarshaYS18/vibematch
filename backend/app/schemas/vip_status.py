@@ -16,6 +16,7 @@ class UserVipStatusResponse(BaseModel):
 
 
 class UserVipStatusUpdateRequest(BaseModel):
+    request_id: str = Field(..., min_length=8, max_length=80)
     vip_level: int = Field(default=0, ge=0, le=50)
     svip_level: int = Field(default=0, ge=0, le=10)
     vip_is_active: bool = True

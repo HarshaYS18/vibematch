@@ -6,6 +6,7 @@ from pydantic import BaseModel, Field
 
 
 class LuckyCoinWagerRequest(BaseModel):
+    request_id: str | None = Field(default=None, min_length=8, max_length=80)
     gift_id: str | None = Field(default=None, max_length=80)
     room_public_id: str | None = None
     receiver_public_user_id: int | None = None
@@ -29,6 +30,7 @@ class LuckyCoinWagerResponse(BaseModel):
 
 class LuckyCoinSettleRequest(BaseModel):
     reference_id: str
+    request_id: str | None = Field(default=None, min_length=8, max_length=80)
     gift_id: str | None = Field(default=None, max_length=80)
     room_public_id: str | None = None
     receiver_public_user_id: int | None = None

@@ -49,7 +49,7 @@ extension _WalletPageController on _WalletPageModularState {
     } catch (error) {
       if (!mounted) return;
       _setWalletState(() {
-        _error = error.toString();
+        _error = VmFailurePresentation.messageFor(error, contentLabel: 'wallet');
         _loading = false;
       });
     }
@@ -71,7 +71,7 @@ extension _WalletPageController on _WalletPageModularState {
         'Recharge added ₹$amountInr = ${formatWalletNumber(amountInr * 1000)} coins',
       );
     } catch (error) {
-      _showToast(error.toString());
+      _showToast(VmFailurePresentation.messageFor(error, contentLabel: 'wallet action'));
     } finally {
       if (mounted) _setWalletState(() => _working = false);
     }
@@ -97,7 +97,7 @@ extension _WalletPageController on _WalletPageModularState {
       });
       _showToast('$amount Ruby converted to $amount coins');
     } catch (error) {
-      _showToast(error.toString());
+      _showToast(VmFailurePresentation.messageFor(error, contentLabel: 'wallet action'));
     } finally {
       if (mounted) _setWalletState(() => _working = false);
     }
@@ -119,38 +119,15 @@ extension _WalletPageController on _WalletPageModularState {
   }
 
   Widget _content() {
-    if (_loading)
-      return const Center(
-        child: CircularProgressIndicator(color: WalletColors.aqua),
-      );
+    if (_loading) {
+      return const VmLoadingState(message: 'Loading wallet…');
+    }
     final error = _error;
     if (error != null) {
-      return Center(
-        child: Padding(
-          padding: const EdgeInsets.all(20),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              const Icon(
-                Icons.error_outline_rounded,
-                color: WalletColors.coral,
-                size: 42,
-              ),
-              const SizedBox(height: 10),
-              Text(
-                error,
-                textAlign: TextAlign.center,
-                style: const TextStyle(
-                  color: WalletColors.deep,
-                  fontSize: 13,
-                  fontWeight: FontWeight.w800,
-                ),
-              ),
-              const SizedBox(height: 12),
-              WalletPrimarySmallButton(text: 'Retry', onTap: _loadWallet),
-            ],
-          ),
-        ),
+      return VmFailureState(
+        message: error,
+        contentLabel: 'wallet',
+        onRetry: _loadWallet,
       );
     }
     final wallet = _wallet;

@@ -1,15 +1,15 @@
 import 'package:flutter/material.dart';
 
-import '../../../core/network/api_client.dart';
+import '../../../foundation/networking/app_network_client.dart';
 import '../presentation/widgets/room_theme.dart';
 
 class RoomBackgroundConfigRepository {
-  const RoomBackgroundConfigRepository({ApiClient? apiClient})
+  const RoomBackgroundConfigRepository({AppNetworkClient? apiClient})
       : _apiClient = apiClient;
 
-  final ApiClient? _apiClient;
+  final AppNetworkClient? _apiClient;
 
-  ApiClient get _client => _apiClient ?? ApiClient();
+  AppNetworkClient get _client => _apiClient ?? AppNetworkRuntime.shared;
 
   Future<List<RoomBackgroundTheme>> fetchBackgrounds({
     required String mode,

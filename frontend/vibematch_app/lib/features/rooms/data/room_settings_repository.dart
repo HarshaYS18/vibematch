@@ -1,12 +1,18 @@
-import '../../../core/network/api_client.dart';
+import '../../../foundation/networking/app_network_client.dart';
 import '../../auth/data/auth_local_storage.dart';
 
+/// Stateless command repository for durable room settings.
+///
+/// PostgreSQL/backend room settings are authoritative. This class performs
+/// authenticated REST mutations and returns immutable DTO snapshots; callers
+/// must reconcile those responses into RoomSessionRepository rather than cache
+/// a second settings authority here.
 class RoomSettingsRepository {
-  RoomSettingsRepository({ApiClient? apiClient, AuthLocalStorage? authStorage})
-    : _apiClient = apiClient ?? ApiClient(),
+  RoomSettingsRepository({AppNetworkClient? apiClient, AuthLocalStorage? authStorage})
+    : _apiClient = apiClient ?? AppNetworkRuntime.shared,
       _authStorage = authStorage ?? AuthLocalStorage();
 
-  final ApiClient _apiClient;
+  final AppNetworkClient _apiClient;
   final AuthLocalStorage _authStorage;
 
   Future<RoomSettingsDto> fetchRoomSettings(String roomPublicId) async {
@@ -20,6 +26,9 @@ class RoomSettingsRepository {
     String? mode,
     String? lockPassword,
     bool? allowScreenshots,
+    bool? roomImagesEnabled,
+    bool? guestMessagesEnabled,
+    bool? applyOnlyModeEnabled,
   }) async {
     final response = await _apiClient.patchMap(
       '/rooms/$roomPublicId/settings',
@@ -30,6 +39,9 @@ class RoomSettingsRepository {
         if (lockPassword != null && lockPassword.trim().isNotEmpty)
           'lock_password': lockPassword.trim(),
         'allow_screenshots': ?allowScreenshots,
+        'room_images_enabled': ?roomImagesEnabled,
+        'guest_messages_enabled': ?guestMessagesEnabled,
+        'apply_only_mode_enabled': ?applyOnlyModeEnabled,
       },
     );
     return RoomSettingsDto.fromJson(response);
@@ -63,12 +75,22 @@ class RoomSettingsRepository {
     required String roomPublicId,
     required String seatLayoutId,
   }) async {
-    final response = await _apiClient.patchMap(
-      '/rooms/$roomPublicId/seat-layout',
+    final response = await _apiClient.postMap(
+      '/rooms/$roomPublicId/realtime/settings/seat-layout',
       headers: await _authHeaders(),
       body: {'seat_layout_id': seatLayoutId},
     );
-    return RoomSettingsDto.fromJson(response);
+    final rawRoom = response['room'];
+    final room = rawRoom is Map
+        ? rawRoom.cast<String, dynamic>()
+        : response;
+    return RoomSettingsDto.fromJson(<String, dynamic>{
+      ...room,
+      'room_public_id':
+          room['room_public_id']?.toString() ??
+          room['room_id']?.toString() ??
+          roomPublicId,
+    });
   }
 
   Future<RoomSettingsDto> updateAnnouncement({

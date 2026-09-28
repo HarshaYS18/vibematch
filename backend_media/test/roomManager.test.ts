@@ -47,7 +47,13 @@ test('last peer departure closes router and all media resources', async () => {
   f.manager.closePeer('socket');
   assert.deepEqual(closed, ['consumer', 'producer', 'transport']);
   assert.equal(f.closes(), 1);
-  assert.deepEqual(f.manager.getStats(), { roomCount: 0, peerCount: 0, roomIds: [] });
+  assert.deepEqual(f.manager.getStats(), {
+    roomCount: 0,
+    peerCount: 0,
+    hotRoomCount: 0,
+    maxRoomPeers: 0,
+    roomIds: [],
+  });
 });
 
 

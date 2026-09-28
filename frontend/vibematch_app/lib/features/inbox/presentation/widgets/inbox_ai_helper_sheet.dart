@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 
+import '../../../../core/network/vm_failure.dart';
+
 import '../../data/inbox_ai_api_service.dart';
 
 class InboxAiHelperSheet extends StatefulWidget {
@@ -35,7 +37,7 @@ class _InboxAiHelperSheetState extends State<InboxAiHelperSheet> {
       final response = await widget.onSearch(query);
       if (mounted) setState(() => _response = response);
     } catch (error) {
-      if (mounted) _toast(error.toString());
+      if (mounted) _toast(VmFailurePresentation.messageFor(error, contentLabel: 'Inbox AI helper'));
     } finally {
       if (mounted) setState(() => _searching = false);
     }

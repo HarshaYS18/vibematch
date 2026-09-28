@@ -25,8 +25,47 @@ jobs:
           - name: api
             dockerfile: backend/Dockerfile
             context: .
+          - name: inbox
+            dockerfile: apps/inbox-service/Dockerfile
+            context: .
+          - name: vibes
+            dockerfile: apps/vibes-service/Dockerfile
+            context: .
+          - name: room-control
+            dockerfile: apps/room-control-service/Dockerfile
+            context: .
+          - name: identity
+            dockerfile: apps/identity-service/Dockerfile
+            context: .
+          - name: profile-social
+            dockerfile: apps/profile-social-service/Dockerfile
+            context: .
+          - name: economy
+            dockerfile: apps/economy-service/Dockerfile
+            context: .
+          - name: game-platform
+            dockerfile: apps/game-platform-service/Dockerfile
+            context: .
+          - name: notification
+            dockerfile: apps/notification-service/Dockerfile
+            context: .
+          - name: graphql-bff
+            dockerfile: apps/graphql-bff/Dockerfile
+            context: .
           - name: worker
             dockerfile: apps/worker/Dockerfile
+            context: .
+          - name: kafka-event-bridge
+            dockerfile: apps/kafka-event-bridge/Dockerfile
+            context: .
+          - name: search
+            dockerfile: apps/search-service/Dockerfile
+            context: .
+          - name: recommendation
+            dockerfile: apps/recommendation-service/Dockerfile
+            context: .
+          - name: analytics-sink
+            dockerfile: apps/analytics-sink/Dockerfile
             context: .
           - name: realtime
             dockerfile: apps/realtime-gateway/Dockerfile

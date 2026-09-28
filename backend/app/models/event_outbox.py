@@ -15,6 +15,7 @@ class EventOutbox(Base):
     occurred_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False, default=lambda: datetime.now(timezone.utc))
     request_id: Mapped[str | None] = mapped_column(String(64), nullable=True)
     trace_id: Mapped[str | None] = mapped_column(String(64), nullable=True)
+    traceparent: Mapped[str | None] = mapped_column(String(255), nullable=True)
     actor_user_id: Mapped[int | None] = mapped_column(Integer, nullable=True)
     payload: Mapped[dict] = mapped_column(JSON, nullable=False)
     published_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True, index=True)

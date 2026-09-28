@@ -4,7 +4,7 @@ from sqlalchemy.orm import Session
 from app.api.routes.users import get_current_user
 from app.database import get_db
 from app.models.user import User
-from app.services import experience_service
+from app.services import economy_service_client, experience_service
 from app.services import level_progression_service as progression
 
 router = APIRouter(prefix="/experience", tags=["Experience"])
@@ -90,4 +90,57 @@ def get_experience_tasks():
                 "room": {"max_level": progression.max_level_for_track(progression.ProgressionTrack.ROOM)},
             },
         },
+    }
+
+
+@router.get("/community-events")
+def get_community_events(
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    return experience_service.community_events_for_user(db, current_user)
+
+
+@router.get("/social-missions")
+def get_social_missions(
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    return {
+        "cycle_key": experience_service.social_mission_cycle_key(),
+        "missions": experience_service.social_missions_for_user(db, current_user),
+    }
+
+
+@router.post("/social-missions/{mission_id}/claim")
+def claim_social_mission(
+    mission_id: str,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    missions = experience_service.social_missions_for_user(db, current_user)
+    mission = next((item for item in missions if item["id"] == mission_id), None)
+    if mission is None:
+        raise HTTPException(status_code=404, detail="Social mission not found")
+    if not mission["completed"]:
+        raise HTTPException(status_code=409, detail="Complete this social mission before claiming its reward")
+    reward = mission["reward"]
+    cycle_key = str(mission["cycle_key"])
+    try:
+        result = economy_service_client.claim_mission_reward(
+            user_id=current_user.id,
+            mission_id=mission_id,
+            cycle_key=cycle_key,
+            reward_coin_amount=int(reward["amount"]),
+        )
+    except economy_service_client.EconomyServiceUnavailable as exc:
+        raise HTTPException(status_code=503, detail=str(exc)) from exc
+    except economy_service_client.EconomyServiceError as exc:
+        raise HTTPException(status_code=exc.status_code, detail=exc.detail) from exc
+
+    refreshed = experience_service.social_missions_for_user(db, current_user)
+    return {
+        "credited": bool(result.get("credited")),
+        "coin_balance": int(result.get("coin_balance") or 0),
+        "mission": next(item for item in refreshed if item["id"] == mission_id),
     }

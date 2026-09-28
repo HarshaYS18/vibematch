@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 
+import '../../../../core/assets/funkey_cdn_assets.dart';
+
 import '../live_room_models.dart';
 import 'room_theme.dart';
 
@@ -39,7 +41,7 @@ class GiftPanel extends StatefulWidget {
   static const List<int> luckyCombos = [9, 69, 99, 999];
 
   static List<GiftItem> withMockExtras(List<GiftItem> gifts) {
-    const extras = <GiftItem>[
+    final extras = <GiftItem>[
       GiftItem(
         id: 'rose_rain',
         name: 'Rose Rain',
@@ -47,7 +49,7 @@ class GiftPanel extends StatefulWidget {
         coins: 5,
         icon: Icons.local_florist_rounded,
         chatSymbol: '🌹',
-        assetPath: 'assets/images/gifts/rose_rain.png',
+        assetUrl: FunKeyCdnAssets.url('gifts/rose_rain/v1/icon.webp'),
         colors: [Color(0xFFFF6B9A), Color(0xFFFFC2D8)],
       ),
       GiftItem(
@@ -57,7 +59,7 @@ class GiftPanel extends StatefulWidget {
         coins: 15,
         icon: Icons.star_rounded,
         chatSymbol: '⭐',
-        assetPath: 'assets/images/gifts/star_kiss.png',
+        assetUrl: FunKeyCdnAssets.url('gifts/star_kiss/v1/icon.webp'),
         colors: [Color(0xFFFFD166), Color(0xFFFF8A3D)],
       ),
       GiftItem(
@@ -67,7 +69,7 @@ class GiftPanel extends StatefulWidget {
         coins: 29,
         icon: Icons.music_note_rounded,
         chatSymbol: '🎵',
-        assetPath: 'assets/images/gifts/music_wave.png',
+        assetUrl: FunKeyCdnAssets.url('gifts/music_wave/v1/icon.webp'),
         colors: [Color(0xFF12C7B7), Color(0xFF6D5DF6)],
       ),
       GiftItem(
@@ -77,7 +79,7 @@ class GiftPanel extends StatefulWidget {
         coins: 39,
         icon: Icons.redeem_rounded,
         chatSymbol: '🧧',
-        assetPath: 'assets/images/gifts/lucky_packet.png',
+        assetUrl: FunKeyCdnAssets.url('gifts/lucky_packet/v1/icon.webp'),
         colors: [Color(0xFFE84C72), Color(0xFFFFB545)],
       ),
       GiftItem(
@@ -87,7 +89,7 @@ class GiftPanel extends StatefulWidget {
         coins: 59,
         icon: Icons.casino_rounded,
         chatSymbol: '🎰',
-        assetPath: 'assets/images/gifts/gold_spinner.png',
+        assetUrl: FunKeyCdnAssets.url('gifts/gold_spinner/v1/icon.webp'),
         colors: [Color(0xFFFFD166), Color(0xFFC99A3B)],
       ),
       GiftItem(
@@ -97,7 +99,7 @@ class GiftPanel extends StatefulWidget {
         coins: 89,
         icon: Icons.diamond_rounded,
         chatSymbol: '💠',
-        assetPath: 'assets/images/gifts/crystal_hunt.png',
+        assetUrl: FunKeyCdnAssets.url('gifts/crystal_hunt/v1/icon.webp'),
         colors: [Color(0xFF16D9E3), Color(0xFF6D5DF6)],
       ),
       GiftItem(
@@ -107,7 +109,7 @@ class GiftPanel extends StatefulWidget {
         coins: 129,
         icon: Icons.celebration_rounded,
         chatSymbol: '🎆',
-        assetPath: 'assets/images/gifts/event_firework.png',
+        assetUrl: FunKeyCdnAssets.url('gifts/event_firework/v1/icon.webp'),
         colors: [Color(0xFFFF7A45), Color(0xFF8C5CF6)],
       ),
       GiftItem(
@@ -117,7 +119,7 @@ class GiftPanel extends StatefulWidget {
         coins: 299,
         icon: Icons.emoji_events_rounded,
         chatSymbol: '🏆',
-        assetPath: 'assets/images/gifts/event_trophy.png',
+        assetUrl: FunKeyCdnAssets.url('gifts/event_trophy/v1/icon.webp'),
         colors: [Color(0xFFFFD166), Color(0xFFFF5F7E)],
       ),
       GiftItem(
@@ -127,7 +129,7 @@ class GiftPanel extends StatefulWidget {
         coins: 699,
         icon: Icons.auto_awesome_rounded,
         chatSymbol: '🐉',
-        assetPath: 'assets/images/gifts/svip_dragon.png',
+        assetUrl: FunKeyCdnAssets.url('gifts/svip_dragon/v1/icon.webp'),
         colors: [Color(0xFF8C5CF6), Color(0xFF111827)],
       ),
       GiftItem(
@@ -137,7 +139,7 @@ class GiftPanel extends StatefulWidget {
         coins: 899,
         icon: Icons.chair_rounded,
         chatSymbol: '🪑',
-        assetPath: 'assets/images/gifts/svip_throne.png',
+        assetUrl: FunKeyCdnAssets.url('gifts/svip_throne/v1/icon.webp'),
         colors: [Color(0xFFFFD166), Color(0xFF8C5CF6)],
       ),
       GiftItem(
@@ -147,7 +149,7 @@ class GiftPanel extends StatefulWidget {
         coins: 1299,
         icon: Icons.sailing_rounded,
         chatSymbol: '🛥️',
-        assetPath: 'assets/images/gifts/premium_yacht.png',
+        assetUrl: FunKeyCdnAssets.url('gifts/premium_yacht/v1/icon.webp'),
         colors: [Color(0xFF12C7B7), Color(0xFF111827)],
       ),
       GiftItem(
@@ -157,7 +159,7 @@ class GiftPanel extends StatefulWidget {
         coins: 1999,
         icon: Icons.castle_rounded,
         chatSymbol: '🏰',
-        assetPath: 'assets/images/gifts/premium_castle.png',
+        assetUrl: FunKeyCdnAssets.url('gifts/premium_castle/v1/icon.webp'),
         colors: [Color(0xFFC99A3B), Color(0xFF251538)],
       ),
       GiftItem(
@@ -167,7 +169,7 @@ class GiftPanel extends StatefulWidget {
         coins: 0,
         icon: Icons.favorite_rounded,
         chatSymbol: '❤️',
-        assetPath: 'assets/images/gifts/love_bomb.png',
+        assetUrl: FunKeyCdnAssets.url('gifts/love_bomb/v1/icon.webp'),
         colors: [Color(0xFFFF5F7E), Color(0xFFFFC857)],
       ),
       GiftItem(
@@ -177,7 +179,7 @@ class GiftPanel extends StatefulWidget {
         coins: 0,
         icon: Icons.rocket_launch_rounded,
         chatSymbol: '🚀',
-        assetPath: 'assets/images/gifts/rocket.png',
+        assetUrl: FunKeyCdnAssets.url('gifts/rocket/v1/icon.webp'),
         colors: [Color(0xFF18C7B7), Color(0xFF6C63FF)],
       ),
       GiftItem(
@@ -187,7 +189,7 @@ class GiftPanel extends StatefulWidget {
         coins: 0,
         icon: Icons.workspace_premium_rounded,
         chatSymbol: '👑',
-        assetPath: 'assets/images/gifts/royal_crown.png',
+        assetUrl: FunKeyCdnAssets.url('gifts/royal_crown/v1/icon.webp'),
         colors: [Color(0xFFFFD166), Color(0xFF111827)],
       ),
     ];
@@ -407,28 +409,30 @@ class GiftVisual extends StatelessWidget {
     super.key,
     required this.icon,
     required this.colors,
-    this.assetPath,
+    this.assetUrl,
     this.size = 36,
     this.padding = 5,
   });
 
   final IconData icon;
   final List<Color> colors;
-  final String? assetPath;
+  final String? assetUrl;
   final double size;
   final double padding;
 
   @override
   Widget build(BuildContext context) {
-    final visual = assetPath == null
+    final url = assetUrl?.trim();
+    final visual = url == null || url.isEmpty
         ? null
-        : Image.asset(
-            assetPath!,
+        : Image.network(
+            url,
             width: size - padding,
             height: size - padding,
             fit: BoxFit.contain,
             filterQuality: FilterQuality.high,
-            errorBuilder: (context, error, stackTrace) => Icon(icon, color: Colors.white, size: size * 0.46),
+            errorBuilder: (context, error, stackTrace) =>
+                Icon(icon, color: Colors.white, size: size * 0.46),
           );
 
     return Container(
@@ -565,7 +569,7 @@ class CompactGiftCard extends StatelessWidget {
         ),
         child: Column(
           children: [
-            GiftVisual(icon: gift.icon, colors: gift.colors, assetPath: gift.assetPath, size: 30, padding: 2),
+            GiftVisual(icon: gift.icon, colors: gift.colors, assetUrl: gift.assetUrl, size: 30, padding: 2),
             const SizedBox(height: 3),
             Text(gift.name, maxLines: 1, overflow: TextOverflow.ellipsis, textAlign: TextAlign.center, style: const TextStyle(color: Colors.white, fontSize: 9.7, fontWeight: FontWeight.w900)),
             const Spacer(),
@@ -724,7 +728,7 @@ class GiftSlideCard extends StatelessWidget {
                 const _GiftGlitterDot(left: 232, top: 12, size: 3.8, opacity: 0.85),
                 Row(
                   children: [
-                    GiftVisual(icon: slide.giftIcon, colors: slide.colors, assetPath: slide.giftAssetPath, size: 38, padding: 2),
+                    GiftVisual(icon: slide.giftIcon, colors: slide.colors, assetUrl: slide.giftAssetUrl, size: 38, padding: 2),
                     const SizedBox(width: 8),
                     Expanded(
                       child: Text(

@@ -78,6 +78,7 @@ class LuckyGiftHousePoolResponse(BaseModel):
 
 
 class LuckyGiftHousePoolUpdateRequest(BaseModel):
+    request_id: str | None = Field(default=None, min_length=8, max_length=160)
     balance: int | None = Field(default=None, ge=0)
     reserved_balance: int | None = Field(default=None, ge=0)
     max_payout_per_round: int | None = Field(default=None, ge=0)

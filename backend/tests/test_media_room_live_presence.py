@@ -117,7 +117,8 @@ class MediaRoomLivePresenceTests(TestCase):
         )
 
         with (
-            patch.object(media_control, "get_redis", return_value=redis_client),
+            patch.object(media_control, "get_realtime_redis", return_value=redis_client),
+            patch.object(media_control, "get_media_registry_redis", return_value=redis_client),
             patch.object(
                 media_control,
                 "has_active_room_user_lease",
@@ -177,7 +178,7 @@ class MediaRoomLivePresenceTests(TestCase):
         with (
             patch.object(
                 media_realtime_auth,
-                "get_redis",
+                "get_realtime_redis",
                 return_value=redis_client,
             ),
             patch.object(

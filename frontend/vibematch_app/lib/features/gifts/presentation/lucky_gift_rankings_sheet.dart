@@ -2,6 +2,9 @@ import 'dart:async';
 
 import 'package:flutter/material.dart';
 
+import '../../../core/network/vm_failure.dart';
+import '../../../core/ui/vm_motion.dart';
+
 import '../../auth/data/auth_api_service.dart';
 import '../../auth/models/current_user.dart';
 import '../data/lucky_gifts_api_service.dart';
@@ -23,6 +26,7 @@ class LuckyGiftRankingsSheet extends StatefulWidget {
   }) {
     return showModalBottomSheet<void>(
       context: context,
+      sheetAnimationStyle: VmMotion.sheetAnimationStyle,
       isScrollControlled: true,
       backgroundColor: Colors.transparent,
       builder: (_) => LuckyGiftRankingsSheet(
@@ -87,7 +91,7 @@ class _LuckyGiftRankingsSheetState extends State<LuckyGiftRankingsSheet> {
       if (!mounted) return;
       setState(() {
         _loading = false;
-        _error = error.toString().replaceFirst('Exception: ', '');
+        _error = VmFailurePresentation.messageFor(error, contentLabel: 'lucky gift rankings');
       });
     }
   }

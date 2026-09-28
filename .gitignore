@@ -110,6 +110,8 @@ backend/secrets/firebase-service-account.json
 # Local process metadata and logs written by scripts/dev-*.ps1.
 scripts/.dev-runtime/
 
-
 # mediasoup / TypeScript build output
 backend_media/dist/
+
+# Chunk 17 generated service-contract clients are CI artifacts, not source.
+contracts/proto/gen/

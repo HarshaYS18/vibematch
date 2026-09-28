@@ -1,11 +1,12 @@
-from datetime import datetime, timedelta
+from datetime import datetime
 
 from fastapi import HTTPException
 from sqlalchemy.orm import Session
 
+from app.models.economy import UserWallet
 from app.models.user import User
 from app.models.vip_status import UserVipStatus
-from app.services import economy_level_service, role_badge_service, role_service, store_service
+from app.services import economy_level_service, presence_projection_service, role_badge_service, role_service, store_service
 
 SVIP_NAME_GRADIENTS: dict[int, dict[str, object]] = {
     1: {"key": "svip_1_aqua_violet", "colors": ["#20E3B2", "#7C4DFF", "#E040FB"]},
@@ -28,35 +29,60 @@ def _gradient_for_svip(svip_level: int, is_active: bool) -> dict[str, object]:
 
 
 def vip_summary(db: Session, user: User, levels: dict | None = None) -> dict:
-    levels = levels or economy_level_service.user_level_payload(db, user.id)
     status = db.query(UserVipStatus).filter(UserVipStatus.user_id == user.id).first()
-    vip_level = int((levels.get("vip") or {}).get("level") or 0)
-    svip_level = int((levels.get("svip") or {}).get("level") or 0)
-    svip_active = svip_level > 0
+    if status is None:
+        levels = levels or economy_level_service.user_level_payload(db, user.id)
+        vip_level = int((levels.get("vip") or {}).get("level") or 0)
+        svip_level = int((levels.get("svip") or {}).get("level") or 0)
+        vip_active = vip_level > 0
+        svip_active = svip_level > 0
+        svip_expires_at = None
+    else:
+        vip_level = int(status.vip_level or 0)
+        svip_level = int(status.svip_level or 0)
+        vip_active = bool(status.vip_is_active and vip_level > 0)
+        svip_active = bool(status.svip_is_active and svip_level > 0)
+        if (
+            svip_active
+            and status.svip_expires_at is not None
+            and status.svip_expires_at <= datetime.utcnow()
+        ):
+            svip_active = False
+        svip_expires_at = status.svip_expires_at if svip_active else None
+
     gradient = _gradient_for_svip(svip_level, svip_active)
     return {
         "vip_level": vip_level,
         "svip_level": svip_level,
-        "vip_is_active": vip_level > 0,
+        "vip_is_active": vip_active,
         "svip_is_active": svip_active,
-        "svip_expires_at": status.svip_expires_at if status and svip_active else None,
+        "svip_expires_at": svip_expires_at,
         "name_gradient_key": str(gradient["key"]),
         "name_gradient_colors": list(gradient["colors"]),
     }
 
 
 def wallet_summary(db: Session, user: User, *, include_private_balances: bool = True) -> dict:
-    wallet = economy_level_service.get_or_create_wallet(db, user.id)
-    levels = economy_level_service.wallet_level_payload(db, wallet)
-    economy_level_service.sync_vip_status(db, user.id, levels)
-    coin_balance = wallet.coin_balance if include_private_balances else 0
-    ruby_balance = wallet.ruby_balance if include_private_balances else 0
+    """Read-only economy projection for profile rendering.
+
+    Profile/display reads must never create wallet rows or synchronize VIP state.
+    Missing wallet authority is rendered as zero balances while level progress is
+    derived from the durable ledgers/rules.
+    """
+    wallet = db.query(UserWallet).filter(UserWallet.user_id == user.id).first()
+    levels = economy_level_service.user_level_payload(db, user.id)
+
+    def wallet_value(field: str) -> int:
+        return int(getattr(wallet, field, 0) or 0) if wallet is not None else 0
+
+    coin_balance = wallet_value("coin_balance") if include_private_balances else 0
+    ruby_balance = wallet_value("ruby_balance") if include_private_balances else 0
     return {
         "coin_balance": coin_balance,
         "ruby_balance": ruby_balance,
-        "lifetime_coins_spent": wallet.lifetime_coins_spent,
-        "lifetime_coins_received_as_gifts": wallet.lifetime_coins_received_as_gifts,
-        "lifetime_rubies_earned": wallet.lifetime_rubies_earned,
+        "lifetime_coins_spent": wallet_value("lifetime_coins_spent"),
+        "lifetime_coins_received_as_gifts": wallet_value("lifetime_coins_received_as_gifts"),
+        "lifetime_rubies_earned": wallet_value("lifetime_rubies_earned"),
         "monthly_gift_coins_sent": levels["monthly_gift_coins_sent"],
         "monthly_gift_coins_received": levels["monthly_gift_coins_received"],
         "lifetime_send_exp": levels["lifetime_send_exp"],
@@ -82,9 +108,7 @@ def public_profile_payload(db: Session, public_user_id: int) -> dict:
         raise HTTPException(status_code=404, detail="User not found")
     user_roles = role_service.get_user_roles(user)
     primary_role = role_service.get_primary_role(user)
-    is_online = False
-    if user.last_seen_at:
-        is_online = user.last_seen_at >= datetime.utcnow() - timedelta(minutes=2)
+    is_online = presence_projection_service.is_user_online(user.id)
     return {
         "public_user_id": user.public_user_id,
         "display_custom_id": user.display_custom_id,

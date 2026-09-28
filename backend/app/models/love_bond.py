@@ -64,7 +64,7 @@ class LoveBondRequest(Base):
     card_type: Mapped[str] = mapped_column(String(40), index=True, nullable=False)
     card_name: Mapped[str] = mapped_column(String(80), nullable=False)
     status: Mapped[str] = mapped_column(String(40), default=LoveBondRequestStatus.PENDING.value, index=True)
-    inbox_message_id: Mapped[int | None] = mapped_column(ForeignKey("inbox_messages.id"), nullable=True, index=True)
+    inbox_message_public_id: Mapped[str | None] = mapped_column(String(100), nullable=True, index=True)
     response_note: Mapped[str | None] = mapped_column(Text, nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow, index=True)
     responded_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True, index=True)
@@ -72,7 +72,6 @@ class LoveBondRequest(Base):
 
     sender = relationship("User", foreign_keys=[sender_user_id])
     receiver = relationship("User", foreign_keys=[receiver_user_id])
-    inbox_message = relationship("InboxMessage")
 
 
 class LoveBond(Base):

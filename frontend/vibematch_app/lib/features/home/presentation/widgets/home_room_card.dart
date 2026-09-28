@@ -224,6 +224,7 @@ class _HomeRoomCover extends StatelessWidget {
             if (room.hasCoverPhoto)
               Image.network(
                 room.coverPhotoUrl!,
+                cacheWidth: (size * MediaQuery.devicePixelRatioOf(context)).round(),
                 fit: BoxFit.cover,
                 alignment: Alignment.center,
                 errorBuilder: (context, error, stackTrace) => fallback,

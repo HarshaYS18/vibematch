@@ -1,6 +1,9 @@
 import 'package:flutter/material.dart';
 
-import '../../../core/network/api_client.dart';
+import '../../../core/network/vm_failure.dart';
+import '../../../core/presentation/vm_async_state.dart';
+
+import 'package:vibematch_app/foundation/networking/app_network_client.dart';
 import '../../auth/data/auth_api_service.dart';
 
 class GamePropsPage extends StatefulWidget {
@@ -139,7 +142,7 @@ class _GamePropsPageState extends State<GamePropsPage> {
       if (!mounted) return;
       setState(() {
         _loading = false;
-        _error = error.toString().replaceFirst('Exception: ', '');
+        _error = VmFailurePresentation.messageFor(error, contentLabel: 'game settings');
       });
     }
   }
@@ -219,7 +222,7 @@ class _GamePropsPageState extends State<GamePropsPage> {
     } catch (error) {
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text(error.toString().replaceFirst('Exception: ', '')), behavior: SnackBarBehavior.floating),
+        SnackBar(content: Text(VmFailurePresentation.messageFor(error, contentLabel: 'game settings')), behavior: SnackBarBehavior.floating),
       );
     } finally {
       if (mounted) setState(() => _saving = false);
@@ -240,13 +243,12 @@ class _GamePropsPageState extends State<GamePropsPage> {
         ],
       ),
       body: _loading
-          ? const Center(child: CircularProgressIndicator(color: Color(0xFFFFC857)))
+          ? const VmLoadingState(message: 'Loading game settings…')
           : _error != null
-              ? Center(
-                  child: Padding(
-                    padding: const EdgeInsets.all(18),
-                    child: Text(_error!, textAlign: TextAlign.center),
-                  ),
+              ? VmFailureState(
+                  message: _error!,
+                  contentLabel: 'game settings',
+                  onRetry: _load,
                 )
               : ListView(
                   padding: const EdgeInsets.fromLTRB(16, 10, 16, 120),
@@ -376,11 +378,11 @@ class _TargetWeightController {
 }
 
 class _GamePropsApi {
-  _GamePropsApi({ApiClient? apiClient, AuthApiService? authApiService})
-      : _apiClient = apiClient ?? ApiClient(),
+  _GamePropsApi({AppNetworkClient? apiClient, AuthApiService? authApiService})
+      : _apiClient = apiClient ?? AppNetworkRuntime.shared,
         _authApiService = authApiService ?? const AuthApiService();
 
-  final ApiClient _apiClient;
+  final AppNetworkClient _apiClient;
   final AuthApiService _authApiService;
 
   Future<Map<String, dynamic>> getProps() {

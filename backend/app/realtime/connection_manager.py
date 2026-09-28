@@ -13,15 +13,42 @@ from redis.asyncio import Redis
 from starlette.websockets import WebSocketState
 
 from app.core.config import settings
+from app.core.telemetry import current_trace_id, current_traceparent
 
 
-_REDIS_PREFIX = "funkey:room"
+_REDIS_PREFIX = "funkey:realtime:room"
 _GLOBAL_ROOM_ID = "__global__"
 _SOCKET_LEASE_SECONDS = 30
 _SOCKET_LEASE_REFRESH_SECONDS = 10
 _COMMAND_CLAIM_SECONDS = 5 * 60
 _REMOTE_EVENT_TTL_SECONDS = 5 * 60
+_ROOM_REPLAY_TTL_SECONDS = 5 * 60
+_ROOM_REPLAY_MAX_EVENTS = 256
+_ROOM_STREAM_TTL_SECONDS = 24 * 60 * 60
 _GATEWAY_CHANNEL = "funkey:realtime:events"
+
+_ROOM_STREAM_SEQUENCE_SCRIPT = """
+local epoch = redis.call('GET', KEYS[1])
+if not epoch then
+    redis.call('SET', KEYS[1], ARGV[1], 'EX', ARGV[2], 'NX')
+    epoch = redis.call('GET', KEYS[1])
+end
+local sequence = redis.call('INCR', KEYS[2])
+redis.call('EXPIRE', KEYS[1], ARGV[2])
+redis.call('EXPIRE', KEYS[2], ARGV[2])
+return {epoch, sequence}
+"""
+
+_ROOM_REPLAY_APPEND_SCRIPT = """
+redis.call('ZADD', KEYS[1], ARGV[1], ARGV[2])
+local size = redis.call('ZCARD', KEYS[1])
+local maximum = tonumber(ARGV[3])
+if size > maximum then
+    redis.call('ZREMRANGEBYRANK', KEYS[1], 0, size - maximum - 1)
+end
+redis.call('EXPIRE', KEYS[1], ARGV[4])
+return size
+"""
 
 
 def room_user_lease_key(room_public_id: str, user_id: int) -> str:
@@ -98,15 +125,21 @@ class RealtimeConnectionManager:
         self._room_versions: dict[str, int] = {}
         self._instance_id = uuid4().hex
         self._redis: Redis = Redis.from_url(
-            settings.redis_url,
+            settings.realtime_redis_url,
             decode_responses=True,
             socket_connect_timeout=settings.REDIS_CONNECT_TIMEOUT_SECONDS,
             socket_timeout=settings.REDIS_SOCKET_TIMEOUT_SECONDS,
             health_check_interval=20,
+            max_connections=settings.REALTIME_REDIS_MAX_CONNECTIONS,
+            client_name="funkey-fastapi-realtime",
         )
         self._listener_task: asyncio.Task[None] | None = None
         self._local_command_claims: dict[str, float] = {}
         self._seen_remote_events: dict[str, float] = {}
+        self._room_replay_attempts = 0
+        self._room_replay_successes = 0
+        self._room_replay_fallbacks = 0
+        self._room_sequence_failures = 0
 
     async def _ensure_listener(self) -> None:
         if self._listener_task is not None and not self._listener_task.done():
@@ -323,6 +356,159 @@ class RealtimeConnectionManager:
         event.setdefault("sent_at", datetime.now(timezone.utc).isoformat())
         return event
 
+    @staticmethod
+    def _delta_only_event(payload: dict[str, Any]) -> dict[str, Any]:
+        event = dict(payload)
+        body = event.get("payload")
+        if isinstance(body, dict) and isinstance(body.get("delta"), dict):
+            body = dict(body)
+            body.pop("room", None)
+            event["payload"] = body
+        return event
+
+    @staticmethod
+    def _room_stream_epoch_key(room_public_id: str) -> str:
+        return f"{_REDIS_PREFIX}:stream-epoch:{room_public_id}"
+
+    @staticmethod
+    def _room_stream_sequence_key(room_public_id: str) -> str:
+        return f"{_REDIS_PREFIX}:stream-sequence:{room_public_id}"
+
+    @staticmethod
+    def _room_replay_key(room_public_id: str, epoch: str) -> str:
+        return f"{_REDIS_PREFIX}:replay:{room_public_id}:{epoch}"
+
+    async def _decorate_room(
+        self,
+        room_public_id: str,
+        payload: dict[str, Any],
+    ) -> dict[str, Any]:
+        event = self._decorate(payload)
+        try:
+            epoch, sequence = await self._redis.eval(
+                _ROOM_STREAM_SEQUENCE_SCRIPT,
+                2,
+                self._room_stream_epoch_key(room_public_id),
+                self._room_stream_sequence_key(room_public_id),
+                uuid4().hex,
+                _ROOM_STREAM_TTL_SECONDS,
+            )
+            resolved_epoch = str(epoch)
+            resolved_sequence = int(sequence)
+            stream = f"room:{room_public_id}:{resolved_epoch}"
+            event.update(
+                {
+                    "eventId": event["event_id"],
+                    "stream": stream,
+                    "sequence": resolved_sequence,
+                    "serverTime": event["sent_at"],
+                }
+            )
+            body = event.get("payload")
+            room = body.get("room") if isinstance(body, dict) else None
+            if isinstance(room, dict):
+                event["room_version"] = int(room.get("state_version") or 0)
+                event["event_sequence"] = int(room.get("event_sequence") or 0)
+            await self._redis.eval(
+                _ROOM_REPLAY_APPEND_SCRIPT,
+                1,
+                self._room_replay_key(room_public_id, resolved_epoch),
+                resolved_sequence,
+                json.dumps(
+                    self._delta_only_event(event),
+                    default=str,
+                    separators=(",", ":"),
+                ),
+                _ROOM_REPLAY_MAX_EVENTS,
+                _ROOM_REPLAY_TTL_SECONDS,
+            )
+        except Exception:
+            self._room_sequence_failures += 1
+            # The durable room action already committed. Local compatibility
+            # delivery may continue, but sequenced clients must resync because
+            # cross-instance replay is unavailable without Redis.
+            event.update(
+                {
+                    "eventId": event["event_id"],
+                    "stream": f"room:{room_public_id}:degraded:{self._instance_id}",
+                    "sequence": 0,
+                    "serverTime": event["sent_at"],
+                    "resync_required": True,
+                }
+            )
+        return event
+
+    async def replay_room(
+        self,
+        websocket: WebSocket,
+        room_public_id: str,
+        *,
+        stream: str,
+        after_sequence: int,
+    ) -> bool:
+        """Replay one bounded contiguous room stream, otherwise require snapshot."""
+        self._room_replay_attempts += 1
+        prefix = f"room:{room_public_id}:"
+        if after_sequence < 0 or not stream.startswith(prefix):
+            self._room_replay_fallbacks += 1
+            return False
+        epoch = stream[len(prefix):]
+        if not epoch or epoch.startswith("degraded:"):
+            self._room_replay_fallbacks += 1
+            return False
+        try:
+            current_epoch, current_sequence = await self._redis.mget(
+                self._room_stream_epoch_key(room_public_id),
+                self._room_stream_sequence_key(room_public_id),
+            )
+            if str(current_epoch or "") != epoch:
+                self._room_replay_fallbacks += 1
+                return False
+            current = int(current_sequence or 0)
+            if after_sequence >= current:
+                if after_sequence == current:
+                    self._room_replay_successes += 1
+                    return True
+                self._room_replay_fallbacks += 1
+                return False
+
+            raw_events = await self._redis.zrangebyscore(
+                self._room_replay_key(room_public_id, epoch),
+                f"({after_sequence}",
+                "+inf",
+            )
+            if not raw_events:
+                self._room_replay_fallbacks += 1
+                return False
+
+            expected = after_sequence + 1
+            events: list[dict[str, Any]] = []
+            for raw in raw_events:
+                decoded = json.loads(raw)
+                if (
+                    not isinstance(decoded, dict)
+                    or int(decoded.get("sequence") or 0) != expected
+                ):
+                    self._room_replay_fallbacks += 1
+                    return False
+                events.append(decoded)
+                expected += 1
+
+            if expected - 1 != current:
+                self._room_replay_fallbacks += 1
+                return False
+
+            for event in events:
+                if not await self.send_json(websocket, event):
+                    self._room_replay_fallbacks += 1
+                    return False
+
+            self._room_replay_successes += 1
+            return True
+        except Exception:
+            self._room_replay_fallbacks += 1
+            return False
+
     async def _publish(
         self,
         room_public_id: str,
@@ -361,8 +547,12 @@ class RealtimeConnectionManager:
             pass
 
     async def _publish_gateway(
-        self, payload: dict[str, Any], *, room_public_id: str | None = None,
+        self,
+        payload: dict[str, Any],
+        *,
+        room_public_id: str | None = None,
         user_id: int | None = None,
+        scope: str | None = None,
     ) -> None:
         """Mirror committed transport events for Go gateway shadow traffic.
 
@@ -370,17 +560,31 @@ class RealtimeConnectionManager:
         authoritative REST snapshot after reconnect. Durable domain events use
         the PostgreSQL outbox, not this transport channel.
         """
+        event_id = str(payload.get("event_id") or uuid4().hex)
+        # The Go/application realtime path is v2 delta-first. Keep the
+        # full replacement room only on the legacy FastAPI room socket.
+        gateway_payload = self._delta_only_event(payload)
         envelope = {
-            "event_id": str(uuid4()),
+            "event_id": event_id,
+            "eventId": event_id,
             "event_type": "room.realtime",
-            "event_version": 1,
+            "type": str(payload.get("type") or "room.realtime"),
+            "event_version": 2,
             "occurred_at": datetime.now(timezone.utc).isoformat(),
-            "scope": "user" if user_id is not None else "room",
-            "payload": payload,
+            "serverTime": payload.get("serverTime") or payload.get("sent_at"),
+            "trace_id": current_trace_id(),
+            "traceparent": current_traceparent(),
+            "scope": scope or ("user" if user_id is not None else "room"),
+            "stream": payload.get("stream"),
+            "sequence": int(payload.get("sequence") or 0),
+            "room_version": int(payload.get("room_version") or 0),
+            "event_sequence": int(payload.get("event_sequence") or 0),
+            "resync_required": bool(payload.get("resync_required", False)),
+            "payload": gateway_payload,
         }
         if user_id is not None:
             envelope["user_id"] = user_id
-        else:
+        elif (scope or "room") == "room":
             envelope["room_public_id"] = room_public_id
         try:
             await self._redis.publish(_GATEWAY_CHANNEL, json.dumps(envelope, default=str))
@@ -391,9 +595,10 @@ class RealtimeConnectionManager:
         event = self._decorate(payload)
         await self._deliver_global_local(event)
         await self._publish_global(event)
+        await self._publish_gateway(event, scope="all")
 
     async def broadcast_room(self, room_public_id: str, payload: dict[str, Any]) -> None:
-        event = self._decorate(payload)
+        event = await self._decorate_room(room_public_id, payload)
         await self._deliver_local(room_public_id, event)
         await self._publish(room_public_id, event)
         await self._publish_gateway(event, room_public_id=room_public_id)
@@ -402,6 +607,7 @@ class RealtimeConnectionManager:
         if global_gift_event is not None:
             await self._deliver_global_local(global_gift_event)
             await self._publish_global(global_gift_event)
+            await self._publish_gateway(global_gift_event, scope="all")
 
     async def send_room_user(
         self,
@@ -453,6 +659,25 @@ class RealtimeConnectionManager:
             return int(count or 0) > 0
         except Exception:
             return True
+
+    def render_room_state_metrics(self) -> str:
+        return "\n".join(
+            [
+                "# HELP funkey_room_replay_attempts_total Room replay attempts.",
+                "# TYPE funkey_room_replay_attempts_total counter",
+                f"funkey_room_replay_attempts_total {self._room_replay_attempts}",
+                "# HELP funkey_room_replay_success_total Successful contiguous room replays.",
+                "# TYPE funkey_room_replay_success_total counter",
+                f"funkey_room_replay_success_total {self._room_replay_successes}",
+                "# HELP funkey_room_replay_fallback_total Room replay attempts requiring snapshot fallback.",
+                "# TYPE funkey_room_replay_fallback_total counter",
+                f"funkey_room_replay_fallback_total {self._room_replay_fallbacks}",
+                "# HELP funkey_room_sequence_failures_total Redis room stream sequencing failures.",
+                "# TYPE funkey_room_sequence_failures_total counter",
+                f"funkey_room_sequence_failures_total {self._room_sequence_failures}",
+                "",
+            ]
+        )
 
     async def claim_command(
         self,

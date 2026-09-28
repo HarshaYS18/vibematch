@@ -1,4 +1,8 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+
+import '../../../core/network/vm_failure.dart';
+import '../../../core/presentation/vm_async_state.dart';
 
 import '../controllers/store_controller.dart';
 import '../models/store_models.dart';
@@ -6,32 +10,20 @@ import 'inventory_page.dart';
 import 'widgets/store_category_tabs.dart';
 import 'widgets/store_item_grid_section.dart';
 
-class StorePage extends StatefulWidget {
+class StorePage extends ConsumerStatefulWidget {
   const StorePage({super.key});
 
   @override
-  State<StorePage> createState() => _StorePageState();
+  ConsumerState<StorePage> createState() => _StorePageState();
 }
 
-class _StorePageState extends State<StorePage> {
-  late final StoreController _controller;
-
+class _StorePageState extends ConsumerState<StorePage> {
   @override
   void initState() {
     super.initState();
-    _controller = StoreController()..addListener(_onControllerChanged);
-    _controller.load();
-  }
-
-  @override
-  void dispose() {
-    _controller.removeListener(_onControllerChanged);
-    _controller.dispose();
-    super.dispose();
-  }
-
-  void _onControllerChanged() {
-    if (mounted) setState(() {});
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted) ref.read(storeControllerProvider.notifier).load();
+    });
   }
 
   void _showToast(String message) {
@@ -47,17 +39,19 @@ class _StorePageState extends State<StorePage> {
 
   Future<void> _purchase(StoreItem item) async {
     try {
-      final message = await _controller.purchase(item);
+      final message = await ref.read(storeControllerProvider.notifier).purchase(item);
       if (!mounted) return;
       _showToast(message);
     } catch (error) {
       if (!mounted) return;
-      _showToast(error.toString().replaceFirst('Exception: ', ''));
+      _showToast(VmFailurePresentation.messageFor(error, contentLabel: 'purchase'));
     }
   }
 
   @override
   Widget build(BuildContext context) {
+    final store = ref.watch(storeControllerProvider);
+    final controller = ref.read(storeControllerProvider.notifier);
     return Scaffold(
       backgroundColor: const Color(0xFFFAF7F1),
       appBar: AppBar(
@@ -73,36 +67,40 @@ class _StorePageState extends State<StorePage> {
           ),
           IconButton(
             tooltip: 'Refresh',
-            onPressed: _controller.load,
+            onPressed: controller.load,
             icon: const Icon(Icons.refresh_rounded),
           ),
         ],
       ),
       body: RefreshIndicator(
-        onRefresh: _controller.load,
+        onRefresh: controller.load,
         child: CustomScrollView(
           physics: const AlwaysScrollableScrollPhysics(parent: BouncingScrollPhysics()),
           slivers: [
-            SliverToBoxAdapter(child: _StoreHero(isLoading: _controller.isLoading || _controller.isPurchasing)),
+            SliverToBoxAdapter(child: _StoreHero(isLoading: store.isLoading || store.isPurchasing)),
             SliverToBoxAdapter(
               child: StoreCategoryTabs(
-                categories: _controller.categories,
-                selectedCategory: _controller.selectedCategory,
-                onSelected: _controller.selectCategory,
+                categories: store.categories,
+                selectedCategory: store.selectedCategory,
+                onSelected: controller.selectCategory,
               ),
             ),
-            if (_controller.isLoading)
+            if (store.isLoading)
               const SliverFillRemaining(
                 hasScrollBody: false,
-                child: Center(child: CircularProgressIndicator()),
+                child: VmLoadingState(message: 'Loading store…'),
               )
-            else if (_controller.errorMessage != null)
+            else if (store.errorMessage != null)
               SliverFillRemaining(
                 hasScrollBody: false,
-                child: _StoreError(message: _controller.errorMessage!, onRetry: _controller.load),
+                child: VmFailureState(
+                  message: store.errorMessage!,
+                  contentLabel: 'store',
+                  onRetry: controller.load,
+                ),
               )
             else
-              StoreItemGridSection(items: _controller.currentItems, onPurchase: _purchase),
+              StoreItemGridSection(items: store.currentItems, onPurchase: _purchase),
           ],
         ),
       ),
@@ -147,32 +145,6 @@ class _StoreHero extends StatelessWidget {
           if (isLoading)
             const SizedBox(width: 18, height: 18, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white)),
         ],
-      ),
-    );
-  }
-}
-
-class _StoreError extends StatelessWidget {
-  const _StoreError({required this.message, required this.onRetry});
-
-  final String message;
-  final VoidCallback onRetry;
-
-  @override
-  Widget build(BuildContext context) {
-    return Center(
-      child: Padding(
-        padding: const EdgeInsets.all(24),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            const Icon(Icons.wifi_off_rounded, color: Color(0xFFE84C72), size: 42),
-            const SizedBox(height: 10),
-            Text(message, textAlign: TextAlign.center, style: const TextStyle(color: Color(0xFF251538), fontWeight: FontWeight.w800)),
-            const SizedBox(height: 14),
-            FilledButton(onPressed: onRetry, child: const Text('Retry')),
-          ],
-        ),
       ),
     );
   }

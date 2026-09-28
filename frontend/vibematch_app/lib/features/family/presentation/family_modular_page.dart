@@ -1,4 +1,10 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+
+import '../../../core/presentation/vm_async_state.dart';
+import '../../../core/ui/vm_motion.dart';
 
 import '../models/family_ui_models.dart';
 import 'controllers/family_controller.dart';
@@ -15,7 +21,7 @@ import 'widgets/family_clan_hero.dart';
 import 'widgets/family_ranked_member_strip.dart';
 import 'widgets/family_redesign_shared.dart';
 
-class FamilyModularPage extends StatefulWidget {
+class FamilyModularPage extends ConsumerStatefulWidget {
   const FamilyModularPage({
     super.key,
     this.openCurrentFamily = false,
@@ -30,28 +36,31 @@ class FamilyModularPage extends StatefulWidget {
   final bool initialIsAdmin;
 
   @override
-  State<FamilyModularPage> createState() => _FamilyModularPageState();
+  ConsumerState<FamilyModularPage> createState() => _FamilyModularPageState();
 }
 
-class _FamilyModularPageState extends State<FamilyModularPage> {
-  late final FamilyController _controller = FamilyController(
-    initialHasFamily: widget.openCurrentFamily,
-    initialProfile: widget.initialFamilyProfile,
-    initialIsOwner: widget.initialIsOwner,
-    initialIsAdmin: widget.initialIsAdmin,
-  )..addListener(_sync);
+class _FamilyModularPageState extends ConsumerState<FamilyModularPage> {
+  late final FamilyControllerArgs _providerArgs;
   final TextEditingController _chatController = TextEditingController();
+
+  FamilyController get _controller =>
+      ref.read(familyControllerProvider(_providerArgs).notifier);
+
+  @override
+  void initState() {
+    super.initState();
+    _providerArgs = FamilyControllerArgs(
+      initialHasFamily: widget.openCurrentFamily,
+      initialProfile: widget.initialFamilyProfile,
+      initialIsOwner: widget.initialIsOwner,
+      initialIsAdmin: widget.initialIsAdmin,
+    );
+  }
 
   @override
   void dispose() {
-    _controller.removeListener(_sync);
-    _controller.dispose();
     _chatController.dispose();
     super.dispose();
-  }
-
-  void _sync() {
-    if (mounted) setState(() {});
   }
 
   void _toast(String message) {
@@ -111,6 +120,7 @@ class _FamilyModularPageState extends State<FamilyModularPage> {
   void _openCreateFamily() {
     showModalBottomSheet<void>(
       context: context,
+      sheetAnimationStyle: VmMotion.sheetAnimationStyle,
       isScrollControlled: true,
       backgroundColor: Colors.transparent,
       builder: (_) => CreateFamilySheet(
@@ -142,6 +152,7 @@ class _FamilyModularPageState extends State<FamilyModularPage> {
   void _openDisbandConfirmation() {
     showModalBottomSheet<void>(
       context: context,
+      sheetAnimationStyle: VmMotion.sheetAnimationStyle,
       isScrollControlled: true,
       backgroundColor: Colors.transparent,
       builder: (_) => DisbandFamilyConfirmationSheet(
@@ -158,6 +169,7 @@ class _FamilyModularPageState extends State<FamilyModularPage> {
   void _openSetAdminsSheet() {
     showModalBottomSheet<void>(
       context: context,
+      sheetAnimationStyle: VmMotion.sheetAnimationStyle,
       isScrollControlled: true,
       backgroundColor: Colors.transparent,
       builder: (_) => SetFamilyAdminsSheet(
@@ -176,6 +188,7 @@ class _FamilyModularPageState extends State<FamilyModularPage> {
   void _openActions() {
     showModalBottomSheet<void>(
       context: context,
+      sheetAnimationStyle: VmMotion.sheetAnimationStyle,
       backgroundColor: Colors.transparent,
       builder: (_) => FamilyActionsSheet(
         isOwner: _controller.isOwner,
@@ -200,6 +213,7 @@ class _FamilyModularPageState extends State<FamilyModularPage> {
   void _openLevelDetails() {
     showModalBottomSheet<void>(
       context: context,
+      sheetAnimationStyle: VmMotion.sheetAnimationStyle,
       isScrollControlled: true,
       backgroundColor: Colors.transparent,
       builder: (_) => FamilyLevelDetailsSheet(
@@ -209,19 +223,48 @@ class _FamilyModularPageState extends State<FamilyModularPage> {
     );
   }
 
-  void _sendChat() {
-    final sent = _controller.sendMessage(_chatController.text);
+  Future<void> _sendChat() async {
+    final text = _chatController.text;
+    if (text.trim().isEmpty) return;
+    final sent = await _controller.sendMessage(text);
+    if (!mounted) return;
     if (sent) {
       _chatController.clear();
-    } else if (_chatController.text.trim().isNotEmpty) {
-      _toast(
-        'Family chat will be enabled when the backend message endpoint is available.',
-      );
+    } else {
+      _toast(_controller.backendError ?? 'Could not send family message.');
     }
   }
 
   @override
   Widget build(BuildContext context) {
+    ref.watch(familyControllerProvider(_providerArgs));
+
+    if (!_controller.hasFamily &&
+        (_controller.loadingBackend || _controller.loadingRankings) &&
+        _controller.rankings.isEmpty) {
+      return const Scaffold(
+        backgroundColor: FamilyRedesignColors.page,
+        body: SafeArea(
+          child: VmLoadingState(message: 'Loading family…'),
+        ),
+      );
+    }
+
+    if (!_controller.hasFamily &&
+        _controller.backendError != null &&
+        _controller.rankings.isEmpty) {
+      return Scaffold(
+        backgroundColor: FamilyRedesignColors.page,
+        body: SafeArea(
+          child: VmFailureState(
+            message: _controller.backendError!,
+            contentLabel: 'family',
+            onRetry: _controller.hydrateFromBackend,
+          ),
+        ),
+      );
+    }
+
     if (!_controller.hasFamily) {
       return FamilyRankingModule(
         rankings: _controller.rankings,
@@ -241,6 +284,13 @@ class _FamilyModularPageState extends State<FamilyModularPage> {
         child: CustomScrollView(
           physics: const BouncingScrollPhysics(),
           slivers: [
+            if (_controller.backendError != null)
+              SliverToBoxAdapter(
+                child: VmInlineFailure(
+                  message: _controller.backendError!,
+                  onRetry: _controller.hydrateFromBackend,
+                ),
+              ),
             SliverToBoxAdapter(
               child: FamilyClanHero(
                 profile: _controller.profile,
@@ -265,7 +315,7 @@ class _FamilyModularPageState extends State<FamilyModularPage> {
               child: FamilyChatSection(
                 messages: _controller.messages,
                 controller: _chatController,
-                onSend: _sendChat,
+                onSend: () => unawaited(_sendChat()),
               ),
             ),
           ],

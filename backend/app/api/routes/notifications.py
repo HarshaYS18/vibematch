@@ -8,6 +8,8 @@ from app.schemas.notification import (
     NotificationListResponse,
     NotificationMarkAllReadResponse,
     NotificationMarkReadResponse,
+    NotificationPreferenceResponse,
+    NotificationPreferenceUpdateRequest,
     NotificationResponse,
     NotificationUnreadCountResponse,
 )
@@ -33,6 +35,38 @@ def list_my_notifications(
 @router.get("/unread-count", response_model=NotificationUnreadCountResponse)
 def get_unread_count(db: Session = Depends(get_db), current_user: User = Depends(get_current_user)):
     return NotificationUnreadCountResponse(unread_count=notification_service.unread_count(db, current_user))
+
+
+@router.get("/preferences", response_model=NotificationPreferenceResponse)
+def get_notification_preferences(
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    preference = notification_service.get_or_create_preference(db, current_user.id)
+    db.commit()
+    return NotificationPreferenceResponse(**notification_service.preference_to_dict(preference))
+
+
+@router.put("/preferences", response_model=NotificationPreferenceResponse)
+def update_notification_preferences(
+    request: NotificationPreferenceUpdateRequest,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    try:
+        preference = notification_service.update_preference(
+            db,
+            user_id=current_user.id,
+            push_enabled=request.push_enabled,
+            quiet_start_minute=request.quiet_start_minute,
+            quiet_end_minute=request.quiet_end_minute,
+            timezone_name=request.timezone,
+            max_push_per_hour=request.max_push_per_hour,
+            notification_types=request.notification_types,
+        )
+    except ValueError as exc:
+        raise HTTPException(status_code=422, detail=str(exc)) from exc
+    return NotificationPreferenceResponse(**notification_service.preference_to_dict(preference))
 
 
 @router.post("/{notification_id}/read", response_model=NotificationMarkReadResponse)

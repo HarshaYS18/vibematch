@@ -1,0 +1,40 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://funkey.example/contracts/events/realtime-gateway-v2.schema.json",
+  "title": "FunKey realtime gateway event v2",
+  "type": "object",
+  "additionalProperties": true,
+  "required": ["event_id", "event_type", "event_version", "scope", "payload"],
+  "properties": {
+    "event_id": {"type": "string", "minLength": 1},
+    "event_type": {"type": "string", "minLength": 1},
+    "event_version": {"type": "integer", "minimum": 1},
+    "type": {"type": "string"},
+    "stream": {"type": "string"},
+    "sequence": {"type": "integer", "minimum": 0},
+    "serverTime": {"type": "string"},
+    "scope": {"enum": ["room", "user", "users", "staff", "all"]},
+    "room_public_id": {"type": "string", "minLength": 1, "maxLength": 128},
+    "user_id": {"type": "integer", "minimum": 1},
+    "user_ids": {
+      "type": "array",
+      "minItems": 1,
+      "maxItems": 256,
+      "uniqueItems": true,
+      "items": {"type": "integer", "minimum": 1}
+    },
+    "priority": {"enum": ["critical", "normal", "best_effort"]},
+    "room_version": {"type": "integer", "minimum": 0},
+    "event_sequence": {"type": "integer", "minimum": 0},
+    "trace_id": {"type": "string"},
+    "traceparent": {"type": "string"},
+    "payload": {}
+  },
+  "oneOf": [
+    {"properties": {"scope": {"const": "room"}}, "required": ["room_public_id"]},
+    {"properties": {"scope": {"const": "user"}}, "required": ["user_id"]},
+    {"properties": {"scope": {"const": "users"}}, "required": ["user_ids"]},
+    {"properties": {"scope": {"const": "staff"}}},
+    {"properties": {"scope": {"const": "all"}}}
+  ]
+}

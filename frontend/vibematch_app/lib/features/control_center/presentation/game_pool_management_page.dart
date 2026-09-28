@@ -1,6 +1,10 @@
 import 'package:flutter/material.dart';
 
-import '../../../core/network/api_client.dart';
+import '../../../core/network/vm_failure.dart';
+import '../../../core/presentation/vm_async_state.dart';
+import '../../../core/ui/vm_motion.dart';
+
+import 'package:vibematch_app/foundation/networking/app_network_client.dart';
 import '../../auth/data/auth_api_service.dart';
 
 class GamePoolManagementPage extends StatefulWidget {
@@ -62,8 +66,10 @@ class _GamePoolManagementPageState extends State<GamePoolManagementPage> {
     }
   }
 
-  String _clean(Object error) =>
-      error.toString().replaceFirst('Exception: ', '');
+  String _clean(Object error) => VmFailurePresentation.messageFor(
+        error,
+        contentLabel: 'game pools',
+      );
 
   void _toast(String message, {bool danger = false}) {
     ScaffoldMessenger.of(context)
@@ -402,6 +408,7 @@ class _GamePoolManagementPageState extends State<GamePoolManagementPage> {
   }) async {
     await showModalBottomSheet<void>(
       context: context,
+      sheetAnimationStyle: VmMotion.sheetAnimationStyle,
       isScrollControlled: true,
       backgroundColor: Colors.transparent,
       builder: (context) => Padding(
@@ -487,11 +494,9 @@ class _GamePoolManagementPageState extends State<GamePoolManagementPage> {
         ],
       ),
       body: _loading
-          ? const Center(
-              child: CircularProgressIndicator(color: Color(0xFFFFC857)),
-            )
+          ? const VmLoadingState(message: 'Loading game pools…')
           : _error != null
-              ? _GamePoolError(message: _error!, onRetry: _load)
+              ? VmFailureState(message: _error!, contentLabel: 'game pools', onRetry: _load)
               : RefreshIndicator(
                   color: const Color(0xFFFFC857),
                   onRefresh: _load,
@@ -987,41 +992,6 @@ class _EmptyGamesCard extends StatelessWidget {
       );
 }
 
-class _GamePoolError extends StatelessWidget {
-  const _GamePoolError({required this.message, required this.onRetry});
-
-  final String message;
-  final VoidCallback onRetry;
-
-  @override
-  Widget build(BuildContext context) => Center(
-        child: Padding(
-          padding: const EdgeInsets.all(18),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              const Icon(
-                Icons.error_outline_rounded,
-                color: Color(0xFFE84C72),
-                size: 44,
-              ),
-              const SizedBox(height: 10),
-              Text(
-                message,
-                textAlign: TextAlign.center,
-                style: const TextStyle(
-                  color: Color(0xFF251538),
-                  fontWeight: FontWeight.w800,
-                ),
-              ),
-              const SizedBox(height: 12),
-              FilledButton(onPressed: onRetry, child: const Text('Retry')),
-            ],
-          ),
-        ),
-      );
-}
-
 class _PrimaryButton extends StatelessWidget {
   const _PrimaryButton({
     required this.busy,
@@ -1058,12 +1028,12 @@ class _PrimaryButton extends StatelessWidget {
 
 class _GamePoolCpApi {
   _GamePoolCpApi({
-    ApiClient? apiClient,
+    AppNetworkClient? apiClient,
     AuthApiService? authApiService,
-  })  : _apiClient = apiClient ?? ApiClient(),
+  })  : _apiClient = apiClient ?? AppNetworkRuntime.shared,
         _authApiService = authApiService ?? const AuthApiService();
 
-  final ApiClient _apiClient;
+  final AppNetworkClient _apiClient;
   final AuthApiService _authApiService;
 
   Future<List<GamePoolCpItem>> listPools() async {

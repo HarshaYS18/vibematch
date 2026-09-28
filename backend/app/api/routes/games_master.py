@@ -5,7 +5,7 @@ from app.api.routes.users import get_current_user
 from app.database import get_db
 from app.models.economy_stats import UserGameStats
 from app.models.user import User
-from app.services import global_jungle_game_service_v2 as game_service
+from app.services import game_platform_runtime_service as game_service
 
 router = APIRouter(prefix="/games", tags=["Games Master And Rankings"])
 

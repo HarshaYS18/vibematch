@@ -1,11 +1,17 @@
 import 'package:flutter/material.dart';
 
-import '../../social/data/social_mock_data.dart';
-
 class VibeMentionTextController extends TextEditingController {
   VibeMentionTextController({super.text});
 
   static final RegExp _mentionRegex = RegExp(r'@([a-zA-Z0-9_]{2,24}|all)');
+  static final RegExp _mentionTokenRegex = RegExp(r'^[a-zA-Z0-9_]{2,24}$');
+
+  // Mention candidates come from the backend-backed SocialMentionPicker. This
+  // controller intentionally validates only token syntax and never depends on
+  // a fabricated/local social roster.
+  static bool _isValidMentionToken(String token) {
+    return token.toLowerCase() == 'all' || _mentionTokenRegex.hasMatch(token);
+  }
 
   bool get hasMentionTrigger {
     final cursor = selection.baseOffset;
@@ -40,7 +46,7 @@ class VibeMentionTextController extends TextEditingController {
         .map((match) => match.group(1))
         .whereType<String>()
         .where((token) => token.toLowerCase() != 'all')
-        .where((token) => SocialMockData.isValidMention(token))
+        .where(_isValidMentionToken)
         .map((token) => '${token[0].toUpperCase()}${token.substring(1)}')
         .toSet()
         .toList();
@@ -77,7 +83,7 @@ class VibeMentionTextController extends TextEditingController {
       }
 
       final token = match.group(1) ?? '';
-      final valid = token.toLowerCase() == 'all' || SocialMockData.isValidMention(token);
+      final valid = _isValidMentionToken(token);
       spans.add(
         TextSpan(
           text: text.substring(match.start, match.end),

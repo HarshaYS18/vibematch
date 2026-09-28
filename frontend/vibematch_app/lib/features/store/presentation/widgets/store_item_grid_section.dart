@@ -93,17 +93,12 @@ class _StoreItemCard extends StatelessWidget {
                     gradient: LinearGradient(colors: [Color(0xFF251538), Color(0xFF6D5DF6)]),
                   ),
                 ),
-                if (item.imageUrl != null)
+                if (item.imageUrl != null && item.imageUrl!.trim().isNotEmpty)
                   Image.network(
                     item.imageUrl!,
                     fit: BoxFit.cover,
-                    errorBuilder: (context, error, stackTrace) => const SizedBox.shrink(),
-                  )
-                else if (item.assetPath != null)
-                  Image.asset(
-                    item.assetPath!,
-                    fit: BoxFit.contain,
-                    errorBuilder: (context, error, stackTrace) => const SizedBox.shrink(),
+                    errorBuilder: (context, error, stackTrace) =>
+                        const Center(child: Icon(Icons.storefront_rounded, color: Colors.white, size: 42)),
                   )
                 else
                   const Center(child: Icon(Icons.storefront_rounded, color: Colors.white, size: 42)),

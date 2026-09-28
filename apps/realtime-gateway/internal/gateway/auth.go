@@ -9,10 +9,17 @@ import (
 	"io"
 	"net/http"
 	"time"
+
+	"go.opentelemetry.io/contrib/instrumentation/net/http/otelhttp"
 )
 
 type Principal struct {
-	UserID int64
+	UserID            int64
+	IsStaff           bool
+	SessionID         string
+	DeviceID          string
+	Permissions       []string
+	MembershipVersion int64
 }
 
 type Authorizer interface {
@@ -32,6 +39,7 @@ type verifyRequest struct {
 type verifyResponse struct {
 	Allowed bool  `json:"allowed"`
 	UserID  int64 `json:"user_id"`
+	IsStaff bool  `json:"is_staff"`
 }
 
 var ErrUnauthorized = errors.New("authorization denied")
@@ -41,11 +49,11 @@ func NewHTTPAuthorizer(url string, timeout time.Duration) *HTTPAuthorizer {
 		URL: url,
 		Client: &http.Client{
 			Timeout: timeout,
-			Transport: &http.Transport{
+			Transport: otelhttp.NewTransport(&http.Transport{
 				MaxIdleConns:        100,
 				MaxIdleConnsPerHost: 100,
 				IdleConnTimeout:     90 * time.Second,
-			},
+			}),
 		},
 	}
 }
@@ -79,5 +87,5 @@ func (a *HTTPAuthorizer) Verify(ctx context.Context, token, action, roomID strin
 	if !result.Allowed || result.UserID <= 0 {
 		return Principal{}, ErrUnauthorized
 	}
-	return Principal{UserID: result.UserID}, nil
+	return Principal{UserID: result.UserID, IsStaff: result.IsStaff}, nil
 }

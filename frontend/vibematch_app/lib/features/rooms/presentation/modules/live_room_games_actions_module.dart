@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../../../games/presentation/coin_game_rankings_sheet.dart';
-import '../../../games/presentation/jungle_hunt_global_game_page.dart';
+import '../../../../game_platform/presentation/remote_game_player_page.dart';
 import '../controllers/live_room_sheet_controller.dart';
 import '../widgets/live_room_games_sheet.dart';
 
@@ -10,6 +10,7 @@ class LiveRoomGamesActionsModule {
 
   static Future<void> openGamesSheet({
     required BuildContext context,
+    required String roomId,
   }) {
     FocusManager.instance.primaryFocus?.unfocus();
 
@@ -21,10 +22,14 @@ class LiveRoomGamesActionsModule {
           LiveRoomSheetController.showTransparentSheet<void>(
             context: context,
             isScrollControlled: true,
-            builder: (_) => const FractionallySizedBox(
+            builder: (_) => FractionallySizedBox(
               heightFactor: 0.70,
               alignment: Alignment.bottomCenter,
-              child: JungleHuntGlobalGamePage(embeddedInRoom: true),
+              child: RemoteGamePlayerPage(
+                gameId: 'jungle_hunt',
+                roomId: roomId,
+                embeddedInRoom: true,
+              ),
             ),
           );
         },

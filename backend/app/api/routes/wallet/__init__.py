@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from datetime import datetime
+from uuid import uuid4
 
 from fastapi import APIRouter, BackgroundTasks, Depends, Query
 from pydantic import BaseModel, Field
@@ -12,7 +13,7 @@ from app.models.economy import EconomyCurrency, EconomyDirection, UserWallet, Wa
 from app.models.user import User
 from app.models.vip_status import UserVipStatus
 from app.schemas.economy import RubyWithdrawRequestCreate
-from app.services import economy_level_service, economy_service
+from app.services import economy_level_service, economy_service, economy_service_client
 from app.websocket.inbox_ws import inbox_ws_manager
 
 router = APIRouter(prefix="/wallets", tags=["Wallets"])
@@ -79,6 +80,7 @@ class RechargeRequest(BaseModel):
 
 class RubyConvertRequest(BaseModel):
     ruby_amount: int = Field(ge=1, le=10_000_000)
+    request_id: str | None = Field(default=None, min_length=8, max_length=36)
 
 
 def _period() -> str:
@@ -144,22 +146,33 @@ def _get_or_update_vip_status(db: Session, user_id: int, lifetime_recharge: int,
 
 
 def _wallet_response(db: Session, user: User) -> WalletResponse:
-    wallet = economy_service.get_or_create_wallet(db, user.id)
-    levels = economy_level_service.wallet_level_payload(db, wallet)
-    status = economy_level_service.sync_vip_status(db, user.id, levels)
+    wallet = db.query(UserWallet).filter(UserWallet.user_id == user.id).first()
+    levels = economy_level_service.user_level_payload(db, user.id)
+    status = db.query(UserVipStatus).filter(UserVipStatus.user_id == user.id).first()
     vip_progress = levels["vip"]
     svip_progress = levels["svip"]
     lifetime_recharge = levels["lifetime_recharge_coin_exp"]
     monthly_recharge = levels["monthly_recharge_coin_exp"]
+
+    def value(field: str) -> int:
+        return int(getattr(wallet, field, 0) or 0) if wallet is not None else 0
+
+    vip_level = int(status.vip_level or 0) if status is not None else int(vip_progress.get("level") or 0)
+    svip_level = int(status.svip_level or 0) if status is not None else int(svip_progress.get("level") or 0)
+    svip_expires_at = status.svip_expires_at if status is not None else None
+
     return WalletResponse(
         user_id=user.id,
-        coin_balance=wallet.coin_balance,
-        ruby_balance=wallet.ruby_balance,
-        withdrawable_rubies=max(wallet.ruby_balance - wallet.locked_ruby_balance, 0),
-        pending_withdraw_rubies=wallet.pending_withdraw_rubies,
-        lifetime_coins_spent=wallet.lifetime_coins_spent,
-        lifetime_coins_received_as_gifts=wallet.lifetime_coins_received_as_gifts,
-        lifetime_rubies_earned=wallet.lifetime_rubies_earned,
+        coin_balance=value("coin_balance"),
+        ruby_balance=value("ruby_balance"),
+        withdrawable_rubies=max(
+            value("ruby_balance") - value("locked_ruby_balance"),
+            0,
+        ),
+        pending_withdraw_rubies=value("pending_withdraw_rubies"),
+        lifetime_coins_spent=value("lifetime_coins_spent"),
+        lifetime_coins_received_as_gifts=value("lifetime_coins_received_as_gifts"),
+        lifetime_rubies_earned=value("lifetime_rubies_earned"),
         lifetime_recharge_coins=lifetime_recharge,
         monthly_recharge_coins=monthly_recharge,
         monthly_recharge_period=_period(),
@@ -169,14 +182,18 @@ def _wallet_response(db: Session, user: User) -> WalletResponse:
         lifetime_receive_exp=levels["lifetime_receive_exp"],
         sent_level=int(levels["sent"].get("level") or 0),
         receive_level=int(levels["received"].get("level") or 0),
-        vip_level=status.vip_level,
-        svip_level=status.svip_level,
-        svip_expires_at=status.svip_expires_at,
+        vip_level=vip_level,
+        svip_level=svip_level,
+        svip_expires_at=svip_expires_at,
         coin_price_text=f"1 lakh coins = Rs {PRICE_PER_LAKH_COINS_INR}",
         vip_max_level=int(vip_progress.get("max_level") or VIP_MAX_LEVEL),
         svip_max_level=int(svip_progress.get("max_level") or SVIP_MAX_LEVEL),
-        vip_max_lifetime_recharge_coins=int(vip_progress.get("max_total_exp") or VIP_MAX_LIFETIME_RECHARGE_COINS),
-        svip_max_monthly_recharge_coins=int(svip_progress.get("max_total_exp") or SVIP_MAX_MONTHLY_RECHARGE_COINS),
+        vip_max_lifetime_recharge_coins=int(
+            vip_progress.get("max_total_exp") or VIP_MAX_LIFETIME_RECHARGE_COINS
+        ),
+        svip_max_monthly_recharge_coins=int(
+            svip_progress.get("max_total_exp") or SVIP_MAX_MONTHLY_RECHARGE_COINS
+        ),
         vip_progress_percent=round(float(vip_progress.get("progress") or 0) * 100, 2),
         svip_progress_percent=round(float(svip_progress.get("progress") or 0) * 100, 2),
         sent=levels["sent"],
@@ -184,7 +201,6 @@ def _wallet_response(db: Session, user: User) -> WalletResponse:
         vip=vip_progress,
         svip=svip_progress,
     )
-
 
 def _response_json(response: WalletResponse) -> dict:
     if hasattr(response, "model_dump"):
@@ -213,9 +229,7 @@ async def _broadcast_wallet_update(user_id: int, response: WalletResponse) -> No
 
 @router.get("/me", response_model=WalletResponse)
 def get_my_wallet(current_user: User = Depends(get_current_user), db: Session = Depends(get_db)):
-    response = _wallet_response(db, current_user)
-    db.commit()
-    return response
+    return _wallet_response(db, current_user)
 
 
 @router.get("/ledger", response_model=list[WalletLedgerEntryResponse])
@@ -248,38 +262,51 @@ def get_my_wallet_ledger(
 
 
 @router.post("/recharge", response_model=WalletResponse)
-def recharge_wallet(payload: RechargeRequest, background_tasks: BackgroundTasks, current_user: User = Depends(get_current_user), db: Session = Depends(get_db)):
-    coins = payload.amount_inr * COINS_PER_RUPEE
-    wallet = economy_service.get_or_create_wallet(db, current_user.id)
-    before = wallet.coin_balance
-    wallet.coin_balance += coins
-    db.add(wallet)
-    db.add(
-        WalletLedger(
+def recharge_wallet(
+    payload: RechargeRequest,
+    background_tasks: BackgroundTasks,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    provider_reference = (
+        payload.provider_reference or f"legacy-{uuid4()}"
+    ).strip()
+    try:
+        economy_service_client.recharge_wallet(
             user_id=current_user.id,
-            currency_type=EconomyCurrency.COIN.value,
-            direction=EconomyDirection.CREDIT.value,
-            amount=coins,
-            before_balance=before,
-            after_balance=wallet.coin_balance,
-            source_type="RECHARGE",
-            source_id=payload.provider_reference,
-            created_by_user_id=current_user.id,
-            reason=f"Recharge Rs {payload.amount_inr}",
+            amount_inr=payload.amount_inr,
+            provider_reference=provider_reference,
         )
-    )
-    db.flush()
+    except economy_service_client.EconomyServiceUnavailable as exc:
+        raise HTTPException(status_code=503, detail=str(exc)) from exc
+    except economy_service_client.EconomyServiceError as exc:
+        raise HTTPException(status_code=exc.status_code, detail=exc.detail) from exc
+    db.expire_all()
     response = _wallet_response(db, current_user)
-    db.commit()
     background_tasks.add_task(_broadcast_wallet_update, current_user.id, response)
     return response
 
 
 @router.post("/rubies/convert", response_model=WalletResponse)
-def convert_ruby_to_coins(payload: RubyConvertRequest, background_tasks: BackgroundTasks, current_user: User = Depends(get_current_user), db: Session = Depends(get_db)):
-    economy_service.convert_rubies_to_coins(db, current_user, payload.ruby_amount)
+def convert_ruby_to_coins(
+    payload: RubyConvertRequest,
+    background_tasks: BackgroundTasks,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    request_id = (payload.request_id or str(uuid4())).strip()
+    try:
+        economy_service_client.convert_ruby(
+            user_id=current_user.id,
+            ruby_amount=payload.ruby_amount,
+            request_id=request_id,
+        )
+    except economy_service_client.EconomyServiceUnavailable as exc:
+        raise HTTPException(status_code=503, detail=str(exc)) from exc
+    except economy_service_client.EconomyServiceError as exc:
+        raise HTTPException(status_code=exc.status_code, detail=exc.detail) from exc
+    db.expire_all()
     response = _wallet_response(db, current_user)
-    db.commit()
     background_tasks.add_task(_broadcast_wallet_update, current_user.id, response)
     return response
 
@@ -290,11 +317,21 @@ def request_ruby_withdrawal(
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db),
 ):
-    request = economy_service.create_withdraw_request(
-        db=db,
-        user=current_user,
-        ruby_amount=payload.ruby_amount,
-        payout_method=payload.payout_method,
-        payout_account_snapshot=payload.payout_account_snapshot,
-    )
-    return {"id": request.id, "ruby_amount": request.ruby_amount, "status": request.status}
+    request_id = (payload.request_id or str(uuid4())).strip()
+    try:
+        result = economy_service_client.withdraw_ruby(
+            user_id=current_user.id,
+            ruby_amount=payload.ruby_amount,
+            payout_method=payload.payout_method,
+            payout_account_snapshot=payload.payout_account_snapshot,
+            request_id=request_id,
+        )
+    except economy_service_client.EconomyServiceUnavailable as exc:
+        raise HTTPException(status_code=503, detail=str(exc)) from exc
+    except economy_service_client.EconomyServiceError as exc:
+        raise HTTPException(status_code=exc.status_code, detail=exc.detail) from exc
+    return {
+        "id": int(result["request_id"]),
+        "ruby_amount": int(result["ruby_amount"]),
+        "status": str(result["status"]),
+    }

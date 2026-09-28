@@ -43,6 +43,7 @@ def create_admin_log(
     metadata_json: dict | None = None,
     ip_address: str | None = None,
     device_id: str | None = None,
+    commit: bool = True,
 ) -> AdminLog:
     log = AdminLog(
         actor_user_id=actor_user_id,
@@ -57,8 +58,11 @@ def create_admin_log(
     )
 
     db.add(log)
-    db.commit()
-    db.refresh(log)
+    if commit:
+        db.commit()
+        db.refresh(log)
+    else:
+        db.flush()
 
     return log
 

@@ -3,10 +3,13 @@ import 'dart:async';
 import 'package:firebase_core/firebase_core.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:sentry_flutter/sentry_flutter.dart';
 
 import 'app/app_route_factory.dart';
 import 'app/app_routes.dart';
 import 'core/notifications/vm_push_notification_service.dart';
+import 'core/ui/vm_motion.dart';
 import 'features/auth/presentation/auth_gate.dart';
 import 'firebase_options.dart';
 
@@ -18,6 +21,22 @@ const bool _verboseFlutterErrors = bool.fromEnvironment(
   'VM_VERBOSE_ERRORS',
   defaultValue: false,
 );
+const String _sentryDsn = String.fromEnvironment('SENTRY_DSN');
+const String _sentryEnvironment = String.fromEnvironment(
+  'SENTRY_ENVIRONMENT',
+  defaultValue: 'development',
+);
+const String _sentryRelease = String.fromEnvironment('SENTRY_RELEASE');
+const String _sentryTracesSampleRateRaw = String.fromEnvironment(
+  'SENTRY_TRACES_SAMPLE_RATE',
+  defaultValue: '0.10',
+);
+
+double get _sentryTracesSampleRate =>
+    (double.tryParse(_sentryTracesSampleRateRaw) ?? 0.10)
+        .clamp(0.0, 1.0)
+        .toDouble();
+bool _sentryReady = false;
 
 void main() {
   runZonedGuarded<void>(
@@ -27,11 +46,15 @@ void main() {
 
       // Render FunKey immediately. Optional services such as Firebase/push must
       // never be able to block the first frame or leave the app on a white page.
-      runApp(const VibeMatchApp());
+      runApp(const ProviderScope(child: VibeMatchApp()));
 
       unawaited(_initializeOptionalServices());
+      unawaited(_initializeClientObservability());
     },
     (error, stackTrace) {
+      if (_sentryReady) {
+        unawaited(Sentry.captureException(error, stackTrace: stackTrace));
+      }
       debugPrint('[FK:E:App] ${error.runtimeType}: $error');
       if (_verboseFlutterErrors) {
         debugPrintStack(stackTrace: stackTrace);
@@ -42,6 +65,14 @@ void main() {
 
 void _installGlobalErrorHandling() {
   FlutterError.onError = (details) {
+    if (_sentryReady) {
+      unawaited(
+        Sentry.captureException(
+          details.exception,
+          stackTrace: details.stack,
+        ),
+      );
+    }
     if (_verboseFlutterErrors) {
       FlutterError.presentError(details);
       return;
@@ -101,6 +132,35 @@ void _installGlobalErrorHandling() {
   };
 }
 
+Future<void> _initializeClientObservability() async {
+  final dsn = _sentryDsn.trim();
+  if (dsn.isEmpty) return;
+
+  try {
+    await SentryFlutter.init((options) {
+      options.dsn = dsn;
+      options.environment = _sentryEnvironment.trim().isEmpty
+          ? 'development'
+          : _sentryEnvironment.trim();
+      if (_sentryRelease.trim().isNotEmpty) {
+        options.release = _sentryRelease.trim();
+      }
+      options.tracesSampleRate = _sentryTracesSampleRate.clamp(0.0, 1.0);
+      options.sendDefaultPii = false;
+      options.attachStacktrace = true;
+    });
+    _sentryReady = true;
+    // Sentry may install framework handlers during initialization. Restore the
+    // FunKey handler so UI rendering remains fail-open while still reporting.
+    _installGlobalErrorHandling();
+  } catch (error, stackTrace) {
+    debugPrint('[FK:E:Sentry] ${error.runtimeType}: $error');
+    if (_verboseFlutterErrors) {
+      debugPrintStack(stackTrace: stackTrace);
+    }
+  }
+}
+
 Future<void> _initializeOptionalServices() async {
   // The checked-in FlutterFire configuration currently contains Android
   // options only. Web must continue to run without Firebase until real web
@@ -154,6 +214,16 @@ class VibeMatchApp extends StatelessWidget {
         brightness: Brightness.light,
       ),
       scaffoldBackgroundColor: _surface,
+      pageTransitionsTheme: const PageTransitionsTheme(
+        builders: <TargetPlatform, PageTransitionsBuilder>{
+          TargetPlatform.android: FunKeyPageTransitionsBuilder(),
+          TargetPlatform.iOS: FunKeyPageTransitionsBuilder(),
+          TargetPlatform.macOS: FunKeyPageTransitionsBuilder(),
+          TargetPlatform.windows: FunKeyPageTransitionsBuilder(),
+          TargetPlatform.linux: FunKeyPageTransitionsBuilder(),
+          TargetPlatform.fuchsia: FunKeyPageTransitionsBuilder(),
+        },
+      ),
     );
 
     const compactText = TextTheme(
@@ -315,6 +385,7 @@ class VibeMatchApp extends StatelessWidget {
       title: 'FunKey',
       debugShowCheckedModeBanner: false,
       navigatorKey: rootNavigatorKey,
+      navigatorObservers: <NavigatorObserver>[SentryNavigatorObserver()],
       scaffoldMessengerKey: rootScaffoldMessengerKey,
       initialRoute: VmRoutes.auth,
       onGenerateRoute: AppRouteFactory.onGenerateRoute,

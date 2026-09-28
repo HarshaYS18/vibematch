@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 
+import '../../../core/network/vm_failure.dart';
+
 import '../../media/data/media_upload_service.dart';
 import '../data/auth_api_service.dart';
 import '../models/current_user.dart';
@@ -61,7 +63,7 @@ class _ProfileSetupPageState extends State<ProfileSetupPage> {
       // User cancelled image picking/cropping. Keep the setup screen open.
     } catch (error) {
       if (!mounted) return;
-      setState(() => _error = error.toString().replaceFirst('Exception: ', ''));
+      setState(() => _error = VmFailurePresentation.messageFor(error, contentLabel: 'profile setup'));
     } finally {
       if (mounted) setState(() => _isPickingPhoto = false);
     }
@@ -94,7 +96,7 @@ class _ProfileSetupPageState extends State<ProfileSetupPage> {
       widget.onCompleted(updated);
     } catch (error) {
       if (!mounted) return;
-      setState(() => _error = error.toString().replaceFirst('Exception: ', ''));
+      setState(() => _error = VmFailurePresentation.messageFor(error, contentLabel: 'profile setup'));
     } finally {
       if (mounted) setState(() => _isSaving = false);
     }

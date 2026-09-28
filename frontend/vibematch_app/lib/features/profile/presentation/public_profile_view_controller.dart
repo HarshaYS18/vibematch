@@ -25,9 +25,11 @@ extension _PublicProfileViewController on _PublicProfileViewPageState {
     if (publicUserId <= 0) return;
 
     try {
-      await LoveBondRealtimeService.syncPublicBondsFromBackend(
-        profilePublicUserId: publicUserId,
-      );
+      await ref
+          .read(loveBondRealtimeProvider.notifier)
+          .syncPublicBondsFromBackend(
+            profilePublicUserId: publicUserId,
+          );
     } catch (_) {}
   }
 
@@ -54,7 +56,7 @@ extension _PublicProfileViewController on _PublicProfileViewPageState {
     } catch (error) {
       if (!mounted) return;
       _setProfileState(
-        () => _familyError = error.toString().replaceFirst('Exception: ', ''),
+        () => _familyError = VmFailurePresentation.messageFor(error, contentLabel: 'profile'),
       );
     } finally {
       if (mounted) _setProfileState(() => _loadingFamily = false);
@@ -81,7 +83,7 @@ extension _PublicProfileViewController on _PublicProfileViewPageState {
     } catch (error) {
       if (!mounted) return;
       _setProfileState(
-        () => _profileError = error.toString().replaceFirst('Exception: ', ''),
+        () => _profileError = VmFailurePresentation.messageFor(error, contentLabel: 'profile'),
       );
     } finally {
       if (mounted) _setProfileState(() => _loadingProfile = false);
@@ -279,7 +281,7 @@ extension _PublicProfileViewController on _PublicProfileViewPageState {
       unawaited(_refreshRelationshipOnly());
     } catch (error) {
       if (!mounted) return;
-      final message = error.toString().replaceFirst('Exception: ', '');
+      final message = VmFailurePresentation.messageFor(error, contentLabel: 'profile');
       if (message.toLowerCase().contains('allow') ||
           message.toLowerCase().contains('block')) {
         _showFollowBlockedPopup(message);

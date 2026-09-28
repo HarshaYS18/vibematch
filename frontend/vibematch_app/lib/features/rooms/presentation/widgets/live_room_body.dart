@@ -4,13 +4,17 @@ import '../../data/live_room_media_signaling_service.dart';
 import '../live_room_models.dart';
 import '../modules/cricket_room_controls_module.dart';
 import '../modules/cricket_room_mode_module.dart';
-import '../modules/cricket_room_mode_registry.dart';
-import '../modules/cricket_room_mode_signal.dart';
 import 'live_room_input_dock.dart';
 import 'room_chat.dart';
 import 'room_seats.dart';
 import 'room_top_bar.dart';
 
+/// Renders one mounted room session from explicitly scoped controllers.
+///
+/// Durable room authority stays in RoomSessionRepository through the owning
+/// LiveRoomControllerBundle. This widget may observe route-local presentation
+/// controllers (such as Cricket Mode), but it must never create process-global
+/// room state or mutate a second room-state authority.
 class LiveRoomBody extends StatelessWidget {
   const LiveRoomBody({
     super.key,
@@ -41,6 +45,8 @@ class LiveRoomBody extends StatelessWidget {
     this.showMicButton,
     required this.inboxUnreadCount,
     required this.imagesEnabled,
+    required this.cricketModeController,
+    this.watchPartyModule,
     required this.onBack,
     required this.onJoinTap,
     required this.onShare,
@@ -65,6 +71,8 @@ class LiveRoomBody extends StatelessWidget {
     required this.onInboxTap,
     required this.onEmojiTap,
     required this.onSendTap,
+    required this.onImageMessage,
+    required this.onDismissSeatActions,
     required this.onMicTap,
     required this.onGamesTap,
     required this.onGiftTap,
@@ -99,6 +107,8 @@ class LiveRoomBody extends StatelessWidget {
   final bool? showMicButton;
   final int inboxUnreadCount;
   final bool imagesEnabled;
+  final CricketRoomModeController cricketModeController;
+  final Widget? watchPartyModule;
   final VoidCallback onBack;
   final VoidCallback onJoinTap;
   final VoidCallback onShare;
@@ -123,6 +133,14 @@ class LiveRoomBody extends StatelessWidget {
   final VoidCallback onInboxTap;
   final VoidCallback onEmojiTap;
   final VoidCallback onSendTap;
+  /// Canonical image-chat send callback owned by the scoped room controller.
+  final Future<void> Function({
+    required String imageUrl,
+    required String contentType,
+  }) onImageMessage;
+
+  /// Dismisses seat actions through the room-scoped seat controller.
+  final VoidCallback onDismissSeatActions;
   final VoidCallback onMicTap;
   final VoidCallback onGamesTap;
   final VoidCallback onGiftTap;
@@ -151,22 +169,16 @@ class LiveRoomBody extends StatelessWidget {
   Widget build(BuildContext context) {
     final shouldShowMicButton = showMicButton ?? _derivedShowMicButton;
 
-    return ValueListenableBuilder<Set<String>>(
-      valueListenable: CricketRoomModeSignal.activeRoomIds,
-      builder: (context, _, child) {
-        final cricketController =
-            CricketRoomModeRegistry.syncRoomModeFromSignal(
-              roomId: roomId,
-              roomName: roomName,
-              currentLayoutId: layoutId,
-            );
-        final cricketModeActive = cricketController?.active == true;
+    return AnimatedBuilder(
+      animation: cricketModeController,
+      builder: (context, child) {
+        final cricketController = cricketModeController;
+        final cricketModeActive = cricketController.active;
         final effectiveSeats = cricketModeActive ? _cricketSeats() : seats;
         final activeUser =
             LiveRoomMediaSignalingService.instance.activeLoggedInSeatUser;
         final canManageCricket =
             cricketModeActive &&
-            cricketController != null &&
             activeUser != null &&
             CricketRoomModeModule.canScore(
               seats: effectiveSeats,
@@ -234,6 +246,13 @@ class LiveRoomBody extends StatelessWidget {
                       onApply: onApplySeat,
                     ),
                   ),
+                  if (watchPartyModule != null) ...[
+                    const SizedBox(height: 6),
+                    Padding(
+                      padding: const EdgeInsets.symmetric(horizontal: 12),
+                      child: watchPartyModule!,
+                    ),
+                  ],
                   const SizedBox(height: 3),
                   Expanded(
                     child: GestureDetector(
@@ -245,7 +264,7 @@ class LiveRoomBody extends StatelessWidget {
                           children: [
                             if (cricketModeActive)
                               AnimatedBuilder(
-                                animation: cricketController!,
+                                animation: cricketController,
                                 builder: (context, child) =>
                                     CricketRoomModeModule.fixedScoreboard(
                                       state: cricketController.match,
@@ -280,6 +299,8 @@ class LiveRoomBody extends StatelessWidget {
                     onInboxTap: onInboxTap,
                     onEmojiTap: onEmojiTap,
                     onSendTap: onSendTap,
+                    onImageMessage: onImageMessage,
+                    onDismissSeatActions: onDismissSeatActions,
                     onMicTap: onMicTap,
                     onGamesTap: onGamesTap,
                     onGiftTap: onGiftTap,
@@ -288,7 +309,7 @@ class LiveRoomBody extends StatelessWidget {
               ),
               if (cricketModeActive)
                 AnimatedBuilder(
-                  animation: cricketController!,
+                  animation: cricketController,
                   builder: (context, child) {
                     return CricketRoomControlsModule(
                       controller: cricketController,

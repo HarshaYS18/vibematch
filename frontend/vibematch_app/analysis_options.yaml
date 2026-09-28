@@ -23,17 +23,12 @@ analyzer:
     # Current Profile/Vibes files contain old UI prototype patterns that do not
     # block runtime behavior. Keep analyze clean while live-room UI is refined;
     # refactor these files properly when Profile/Vibes polish resumes.
-    unused_field: ignore
-    unused_element_parameter: ignore
     unnecessary_nullable_for_final_variable_declarations: ignore
     library_private_types_in_public_api: ignore
     prefer_final_fields: ignore
 
-    # Legacy real-time media files intentionally keep stable code paths during
-    # mobile testing. These are non-blocking analyzer info lints and will be
-    # refactored during the dedicated WebRTC/media cleanup pass.
-    unnecessary_import: ignore
-    unused_import: ignore
+    # Context-lifetime and null-aware style cleanup are behavior-sensitive and
+    # remain separate from the dead-code/import minimization pass.
     use_build_context_synchronously: ignore
     prefer_null_aware_operators: ignore
 
