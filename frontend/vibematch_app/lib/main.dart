@@ -9,6 +9,7 @@ import 'package:sentry_flutter/sentry_flutter.dart';
 import 'app/app_route_factory.dart';
 import 'app/app_routes.dart';
 import 'core/notifications/vm_push_notification_service.dart';
+import 'core/ui/vm_motion.dart';
 import 'features/auth/presentation/auth_gate.dart';
 import 'firebase_options.dart';
 
@@ -213,6 +214,16 @@ class VibeMatchApp extends StatelessWidget {
         brightness: Brightness.light,
       ),
       scaffoldBackgroundColor: _surface,
+      pageTransitionsTheme: const PageTransitionsTheme(
+        builders: <TargetPlatform, PageTransitionsBuilder>{
+          TargetPlatform.android: FunKeyPageTransitionsBuilder(),
+          TargetPlatform.iOS: FunKeyPageTransitionsBuilder(),
+          TargetPlatform.macOS: FunKeyPageTransitionsBuilder(),
+          TargetPlatform.windows: FunKeyPageTransitionsBuilder(),
+          TargetPlatform.linux: FunKeyPageTransitionsBuilder(),
+          TargetPlatform.fuchsia: FunKeyPageTransitionsBuilder(),
+        },
+      ),
     );
 
     const compactText = TextTheme(
