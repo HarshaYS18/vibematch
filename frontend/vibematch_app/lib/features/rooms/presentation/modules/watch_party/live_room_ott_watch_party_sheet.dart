@@ -3,6 +3,8 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../../../../core/network/vm_failure.dart';
+
 import '../../../../../foundation/di/app_dependencies.dart';
 import '../../../../../foundation/runtime/media_resource_lifecycle.dart';
 import '../../../../../room_session/data/room_session_repository.dart';
@@ -396,7 +398,7 @@ class _LiveRoomOttWatchPartySheetState
   }
 
   String _cleanError(Object error) {
-    return error.toString().replaceFirst('Exception: ', '').trim();
+    return VmFailurePresentation.messageFor(error, contentLabel: 'OTT Watch Party');
   }
 
   @override
