@@ -2,6 +2,9 @@ import 'dart:async';
 
 import 'package:flutter/material.dart';
 
+import '../../../core/network/vm_failure.dart';
+import '../../../core/presentation/vm_async_state.dart';
+
 import '../data/gift_catalog_admin_api_service.dart';
 
 class GiftCatalogEditorPage extends StatefulWidget {
@@ -67,7 +70,7 @@ class _GiftCatalogEditorPageState extends State<GiftCatalogEditorPage> {
     } catch (error) {
       if (!mounted) return;
       setState(() {
-        _error = error.toString().replaceFirst('Exception: ', '');
+        _error = VmFailurePresentation.messageFor(error, contentLabel: 'gift catalog');
         _loading = false;
       });
     }
@@ -122,7 +125,7 @@ class _GiftCatalogEditorPageState extends State<GiftCatalogEditorPage> {
       await _load();
     } catch (error) {
       if (!mounted) return;
-      _showSnack(error.toString().replaceFirst('Exception: ', ''), isError: true);
+      _showSnack(VmFailurePresentation.messageFor(error, contentLabel: 'gift catalog'), isError: true);
     } finally {
       if (mounted) setState(() => _saving = false);
     }
@@ -233,7 +236,7 @@ class _GiftCatalogEditorPageState extends State<GiftCatalogEditorPage> {
         await _load();
       } catch (error) {
         if (!mounted) return;
-        _showSnack(error.toString().replaceFirst('Exception: ', ''), isError: true);
+        _showSnack(VmFailurePresentation.messageFor(error, contentLabel: 'gift catalog'), isError: true);
       } finally {
         if (mounted) setState(() => _saving = false);
       }
@@ -406,7 +409,7 @@ class _GiftCatalogEditorPageState extends State<GiftCatalogEditorPage> {
           await _load();
         } catch (error) {
           if (!mounted) return;
-          _showSnack(error.toString().replaceFirst('Exception: ', ''), isError: true);
+          _showSnack(VmFailurePresentation.messageFor(error, contentLabel: 'gift catalog'), isError: true);
         } finally {
           if (mounted) setState(() => _saving = false);
         }
@@ -477,9 +480,9 @@ class _GiftCatalogEditorPageState extends State<GiftCatalogEditorPage> {
               label: const Text('Add Gift'),
             ),
       body: _loading
-          ? const Center(child: CircularProgressIndicator())
+          ? const VmLoadingState(message: 'Loading gift catalog…')
           : _error != null
-              ? _ErrorView(message: _error!, onRetry: _load)
+              ? VmFailureState(message: _error!, contentLabel: 'gift catalog', onRetry: _load)
               : ListView(
                   padding: const EdgeInsets.fromLTRB(16, 8, 16, 120),
                   physics: const BouncingScrollPhysics(parent: AlwaysScrollableScrollPhysics()),
@@ -687,29 +690,5 @@ class _SectionTitle extends StatelessWidget {
   Widget build(BuildContext context) => Text(
         text,
         style: const TextStyle(color: Color(0xFF251538), fontSize: 17, fontWeight: FontWeight.w900),
-      );
-}
-
-class _ErrorView extends StatelessWidget {
-  const _ErrorView({required this.message, required this.onRetry});
-
-  final String message;
-  final VoidCallback onRetry;
-
-  @override
-  Widget build(BuildContext context) => Center(
-        child: Padding(
-          padding: const EdgeInsets.all(22),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              const Icon(Icons.error_outline_rounded, color: Color(0xFFE84C72), size: 42),
-              const SizedBox(height: 10),
-              Text(message, textAlign: TextAlign.center, style: const TextStyle(fontWeight: FontWeight.w800)),
-              const SizedBox(height: 12),
-              FilledButton(onPressed: onRetry, child: const Text('Retry')),
-            ],
-          ),
-        ),
       );
 }
