@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../../core/presentation/vm_async_state.dart';
+
 import '../controllers/vip_center_controller.dart';
 import '../models/vip_models.dart';
 
@@ -39,9 +41,9 @@ class _VipPageState extends ConsumerState<VipPage> {
         ],
       ),
       body: vip.isLoading
-          ? const Center(child: CircularProgressIndicator(color: Color(0xFF12C7B7)))
+          ? const VmLoadingState(message: 'Loading VIP center…')
           : vip.errorMessage != null
-              ? _VipErrorState(message: vip.errorMessage!, onRetry: controller.load)
+              ? VmFailureState(message: vip.errorMessage!, contentLabel: 'VIP center', onRetry: controller.load)
               : ListView(
                   padding: const EdgeInsets.fromLTRB(16, 8, 16, 28),
                   children: [
@@ -304,29 +306,6 @@ class _RuleNote extends StatelessWidget {
       padding: const EdgeInsets.all(14),
       decoration: BoxDecoration(color: const Color(0xFF251538).withValues(alpha: 0.06), borderRadius: BorderRadius.circular(20)),
       child: Text(text, style: const TextStyle(color: Color(0xFF4A2A63), fontSize: 12, height: 1.35, fontWeight: FontWeight.w800)),
-    );
-  }
-}
-
-class _VipErrorState extends StatelessWidget {
-  const _VipErrorState({required this.message, required this.onRetry});
-
-  final String message;
-  final VoidCallback onRetry;
-
-  @override
-  Widget build(BuildContext context) {
-    return Center(
-      child: Padding(
-        padding: const EdgeInsets.all(24),
-        child: Column(mainAxisSize: MainAxisSize.min, children: [
-          const Icon(Icons.error_outline_rounded, color: Color(0xFFE84C72), size: 38),
-          const SizedBox(height: 10),
-          Text(message, textAlign: TextAlign.center, style: const TextStyle(color: Color(0xFF7B6A86), fontWeight: FontWeight.w700)),
-          const SizedBox(height: 14),
-          FilledButton(onPressed: onRetry, child: const Text('Retry')),
-        ]),
-      ),
     );
   }
 }
