@@ -1,6 +1,8 @@
 import 'dart:async';
 
 import 'package:flutter/material.dart';
+
+import '../../../../core/ui/vm_motion.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:mobile_scanner/mobile_scanner.dart';
 import 'package:qr_flutter/qr_flutter.dart';
@@ -23,6 +25,7 @@ class ProfileQrActionsSheet extends StatelessWidget {
   static Future<void> show(BuildContext context, {required CurrentUser user, String title = 'Profile QR'}) {
     return showModalBottomSheet<void>(
       context: context,
+      sheetAnimationStyle: VmMotion.sheetAnimationStyle,
       isScrollControlled: true,
       backgroundColor: Colors.transparent,
       builder: (_) => ProfileQrActionsSheet(user: user, title: title),
