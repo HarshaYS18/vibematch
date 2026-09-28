@@ -1,5 +1,7 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../../core/network/vm_failure.dart';
+
 import '../../../shared/gradient_names/gradient_name_sync_service.dart';
 import '../data/store_api_service.dart';
 import '../models/store_models.dart';
@@ -81,7 +83,7 @@ class InventoryController extends AutoDisposeNotifier<InventoryState> {
       state = state.copyWith(
         inventory: UserInventory.empty,
         selectedCategory: null,
-        errorMessage: error.toString().replaceFirst('Exception: ', ''),
+        errorMessage: VmFailurePresentation.messageFor(error, contentLabel: 'inventory'),
       );
     } finally {
       state = state.copyWith(isLoading: false);
