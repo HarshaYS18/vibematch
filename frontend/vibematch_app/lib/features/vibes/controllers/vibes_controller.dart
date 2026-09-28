@@ -1,5 +1,7 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../../core/network/vm_failure.dart';
+
 import '../data/vibes_api_service.dart';
 import '../models/vibe_models.dart';
 
@@ -89,7 +91,7 @@ class VibesController extends AutoDisposeNotifier<VibesState> {
     } catch (error) {
       state = state.copyWith(
         vibes: const <VibeItem>[],
-        loadErrorMessage: error.toString().replaceFirst('Exception: ', ''),
+        loadErrorMessage: VmFailurePresentation.messageFor(error, contentLabel: 'Vibes'),
       );
     } finally {
       state = state.copyWith(isLoading: false);
@@ -111,7 +113,7 @@ class VibesController extends AutoDisposeNotifier<VibesState> {
     } catch (error) {
       state = state.copyWith(
         vibes: const <VibeItem>[],
-        loadErrorMessage: error.toString().replaceFirst('Exception: ', ''),
+        loadErrorMessage: VmFailurePresentation.messageFor(error, contentLabel: 'Vibes'),
       );
     } finally {
       state = state.copyWith(isLoading: false);
