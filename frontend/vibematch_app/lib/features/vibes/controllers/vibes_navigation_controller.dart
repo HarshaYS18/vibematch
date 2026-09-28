@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 
+import '../../../core/network/vm_failure.dart';
 import '../../../core/ui/vm_motion.dart';
 import '../../auth/data/auth_api_service.dart';
 import '../../social/widgets/friends_invite_sheet.dart';
@@ -75,7 +76,7 @@ class VibesNavigationController {
               if (context.mounted)
                 showAction(
                   context,
-                  error.toString().replaceFirst('Exception: ', ''),
+                  VmFailurePresentation.messageFor(error, contentLabel: 'Vibe action'),
                 );
             }
           },
@@ -151,7 +152,7 @@ class VibesNavigationController {
             if (context.mounted)
               showAction(
                 context,
-                error.toString().replaceFirst('Exception: ', ''),
+                VmFailurePresentation.messageFor(error, contentLabel: 'Vibe action'),
               );
           }
         },
@@ -181,7 +182,7 @@ class VibesNavigationController {
         showAction(context, 'Vibe submitted for official review.');
     } catch (error) {
       if (context.mounted)
-        showAction(context, error.toString().replaceFirst('Exception: ', ''));
+        showAction(context, VmFailurePresentation.messageFor(error, contentLabel: 'Vibe action'));
     }
   }
 
@@ -202,7 +203,7 @@ class VibesNavigationController {
       if (context.mounted) showAction(context, 'Vibe deleted.');
     } catch (error) {
       if (context.mounted)
-        showAction(context, error.toString().replaceFirst('Exception: ', ''));
+        showAction(context, VmFailurePresentation.messageFor(error, contentLabel: 'Vibe action'));
     }
   }
 
