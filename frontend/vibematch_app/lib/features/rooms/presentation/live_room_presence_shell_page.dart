@@ -3,6 +3,7 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../../core/network/vm_failure.dart';
 import '../../../core/ui/vm_motion.dart';
 import '../../../foundation/runtime/media_resource_lifecycle.dart';
 import '../../../room_session/data/room_session_repository.dart';
@@ -269,11 +270,11 @@ class _LiveRoomPresenceShellPageState
   }
 
   String _cleanPresenceError(Object error) {
-    final message = error.toString().replaceFirst('Exception: ', '').trim();
-    if (message.isEmpty) {
-      return 'Network is bad or lost. Please check your connection and retry.';
-    }
-    return message;
+    return VmFailurePresentation.messageFor(
+      error,
+      contentLabel: 'live room',
+      fallbackMessage: 'We could not connect to the live room. Please try again.',
+    );
   }
 
   void _seedIdentityFromPresence(LiveRoomPresenceSnapshot snapshot) {
