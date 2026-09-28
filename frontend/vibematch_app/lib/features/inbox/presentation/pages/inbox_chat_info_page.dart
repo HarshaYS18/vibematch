@@ -1,4 +1,6 @@
 import 'package:flutter/material.dart';
+
+import '../../../../core/ui/vm_motion.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../controllers/inbox_call_controller.dart';
@@ -38,6 +40,7 @@ class _InboxChatInfoPageState extends ConsumerState<InboxChatInfoPage> {
     }
     showModalBottomSheet<void>(
       context: context,
+      sheetAnimationStyle: VmMotion.sheetAnimationStyle,
       backgroundColor: Colors.transparent,
       isScrollControlled: true,
       builder: (_) => InboxCallActionSheet(
