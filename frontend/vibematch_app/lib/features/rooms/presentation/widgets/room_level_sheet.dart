@@ -2,6 +2,8 @@ import 'dart:async';
 
 import 'package:flutter/material.dart';
 
+import '../../../../core/network/vm_failure.dart';
+
 import '../../../../core/ui/vm_motion.dart';
 import '../../data/room_level_service.dart';
 import 'room_theme.dart';
@@ -86,7 +88,7 @@ class _RoomLevelSheetState extends State<RoomLevelSheet> {
         _summary = RoomLevelSummary.fallback(widget.fallbackLevel);
         _history = const <RoomLevelHistoryEntry>[];
         _loading = false;
-        _error = error.toString().replaceFirst('Exception: ', '');
+        _error = VmFailurePresentation.messageFor(error, contentLabel: 'room level');
       });
     }
   }
