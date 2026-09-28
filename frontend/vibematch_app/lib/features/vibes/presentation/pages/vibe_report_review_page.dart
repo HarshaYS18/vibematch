@@ -247,16 +247,6 @@ class _ReviewConfirmSheet extends StatelessWidget {
   }
 }
 
-class _LoadingCard extends StatelessWidget {
-  const _LoadingCard();
-
-  @override
-  Widget build(BuildContext context) => const Padding(
-        padding: EdgeInsets.all(24),
-        child: Center(child: CircularProgressIndicator(color: Color(0xFF111015))),
-      );
-}
-
 class _EmptyReportsCard extends StatelessWidget {
   const _EmptyReportsCard();
 
@@ -266,28 +256,6 @@ class _EmptyReportsCard extends StatelessWidget {
         decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(22), border: Border.all(color: const Color(0xFFECE2D8))),
         child: const Center(
           child: Text('No pending Vibe reports.', style: TextStyle(color: Color(0xFF8C8198), fontWeight: FontWeight.w900)),
-        ),
-      );
-}
-
-class _ErrorCard extends StatelessWidget {
-  const _ErrorCard({required this.message, required this.onRetry});
-
-  final String message;
-  final VoidCallback onRetry;
-
-  @override
-  Widget build(BuildContext context) => Container(
-        margin: const EdgeInsets.only(bottom: 12),
-        padding: const EdgeInsets.all(14),
-        decoration: BoxDecoration(color: const Color(0xFFFFF8E8), borderRadius: BorderRadius.circular(18)),
-        child: Row(
-          children: [
-            const Icon(Icons.warning_amber_rounded, color: Color(0xFFC99A3B)),
-            const SizedBox(width: 10),
-            Expanded(child: Text(message, maxLines: 3, overflow: TextOverflow.ellipsis, style: const TextStyle(color: Color(0xFF7B6A86), fontWeight: FontWeight.w800))),
-            TextButton(onPressed: onRetry, child: const Text('Retry')),
-          ],
         ),
       );
 }
