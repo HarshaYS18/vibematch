@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 
+import '../../../../core/network/vm_failure.dart';
+
 import '../../data/vip_admin_api_service.dart';
 import '../../models/vip_wallet_models.dart';
 import '../widgets/svip_gradient_name.dart';
@@ -63,7 +65,7 @@ class _VipSvipAdminPageState extends State<VipSvipAdminPage> {
       _toast('VIP/SVIP status loaded.');
     } catch (error) {
       if (!mounted) return;
-      _toast(error.toString().replaceFirst('Exception: ', ''));
+      _toast(VmFailurePresentation.messageFor(error, contentLabel: 'VIP admin action'));
     } finally {
       if (mounted) setState(() => _busy = false);
     }
@@ -93,7 +95,7 @@ class _VipSvipAdminPageState extends State<VipSvipAdminPage> {
       _toast('VIP/SVIP updated successfully.');
     } catch (error) {
       if (!mounted) return;
-      _toast(error.toString().replaceFirst('Exception: ', ''));
+      _toast(VmFailurePresentation.messageFor(error, contentLabel: 'VIP admin action'));
     } finally {
       if (mounted) setState(() => _busy = false);
     }
