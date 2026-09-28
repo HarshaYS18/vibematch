@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 
+import '../../../../../core/network/vm_failure.dart';
+
 import '../../../../social/widgets/friends_invite_sheet.dart';
 import '../../../data/chat_moderation_api_service.dart';
 import '../../controllers/live_room_sheet_controller.dart';
@@ -31,7 +33,7 @@ class LiveRoomChatModule {
     } catch (error) {
       RoomToast.show(
         bundle.context,
-        error.toString().replaceFirst('Exception: ', ''),
+        VmFailurePresentation.messageFor(error, contentLabel: 'room chat'),
       );
       return;
     }
@@ -47,7 +49,7 @@ class LiveRoomChatModule {
       if (!bundle.mounted) return;
       RoomToast.show(
         bundle.context,
-        error.toString().replaceFirst('Exception: ', ''),
+        VmFailurePresentation.messageFor(error, contentLabel: 'room chat'),
       );
     }
   }
