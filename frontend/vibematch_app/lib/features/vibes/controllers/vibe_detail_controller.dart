@@ -1,5 +1,7 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../../core/network/vm_failure.dart';
+
 import '../../auth/data/auth_api_service.dart';
 import '../data/vibes_api_service.dart';
 import '../models/vibe_models.dart';
@@ -189,7 +191,7 @@ class VibeDetailController
       );
     } catch (caughtError) {
       state = state.copyWith(
-        error: caughtError.toString().replaceFirst('Exception: ', ''),
+        error: VmFailurePresentation.messageFor(caughtError, contentLabel: 'comments'),
       );
     } finally {
       state = state.copyWith(loadingComments: false);
