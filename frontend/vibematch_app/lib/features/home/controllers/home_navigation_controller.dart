@@ -250,6 +250,7 @@ class HomeNavigationController {
   }) {
     showModalBottomSheet<void>(
       context: context,
+      sheetAnimationStyle: VmMotion.sheetAnimationStyle,
       backgroundColor: Colors.transparent,
       isScrollControlled: true,
       builder: (_) => HomeLockedRoomSheet(
@@ -311,6 +312,7 @@ class HomeNavigationController {
   }) {
     showModalBottomSheet<void>(
       context: context,
+      sheetAnimationStyle: VmMotion.sheetAnimationStyle,
       backgroundColor: Colors.transparent,
       isScrollControlled: true,
       sheetAnimationStyle: VmMotion.sheetAnimationStyle,
