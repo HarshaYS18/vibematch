@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../../../../core/network/vm_failure.dart';
+import '../../../../core/ui/vm_motion.dart';
 
 import '../../data/love_bond_api_service.dart';
 import '../../../store/presentation/store_page.dart';
@@ -78,6 +79,7 @@ class _LoveBondsPageState extends State<LoveBondsPage> {
 
     final confirmed = await showModalBottomSheet<bool>(
       context: context,
+      sheetAnimationStyle: VmMotion.sheetAnimationStyle,
       backgroundColor: Colors.transparent,
       builder: (_) => _PurchaseSlotSheet(
         priceCoins: state.nextSlotPriceCoins,
