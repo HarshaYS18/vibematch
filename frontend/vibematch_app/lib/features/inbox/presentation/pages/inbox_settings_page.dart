@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 
+import '../../../../core/network/vm_failure.dart';
+
 import '../../data/inbox_preferences_api_service.dart';
 import '../../models/inbox_models.dart';
 import '../widgets/inbox_lock_flow_sheets.dart';
@@ -81,8 +83,15 @@ class _InboxSettingsPageState extends State<InboxSettingsPage> {
         _strangersCanMessage = preferences.strangersCanMessage;
         _strangersCanMentionInVibes = preferences.strangersCanMentionInVibes;
       });
-    } catch (_) {
-      // Keep the existing values from the controller if backend preferences are unavailable.
+    } catch (error) {
+      if (!mounted) return;
+      _showFeedback(
+        VmFailurePresentation.messageFor(
+          error,
+          contentLabel: 'Inbox preferences',
+          fallbackMessage: 'Could not refresh Inbox preferences.',
+        ),
+      );
     }
   }
 
@@ -106,7 +115,7 @@ class _InboxSettingsPageState extends State<InboxSettingsPage> {
         _strangersCanMentionInVibes = saved.strangersCanMentionInVibes;
       });
       if (feedback != null) _showFeedback(feedback);
-    } catch (_) {
+    } catch (error) {
       if (!mounted) return;
       setState(() {
         _preferences = previous;
@@ -115,7 +124,13 @@ class _InboxSettingsPageState extends State<InboxSettingsPage> {
           _strangersCanMentionInVibes = previous.strangersCanMentionInVibes;
         }
       });
-      _showFeedback('Could not save Inbox privacy setting.');
+      _showFeedback(
+        VmFailurePresentation.messageFor(
+          error,
+          contentLabel: 'Inbox privacy setting',
+          fallbackMessage: 'Could not save Inbox privacy setting.',
+        ),
+      );
     } finally {
       if (mounted) setState(() => _preferencesBusy = false);
     }
@@ -194,8 +209,8 @@ class _InboxSettingsPageState extends State<InboxSettingsPage> {
     try {
       await widget.onBackupEnabledChanged(value);
       _showFeedback(value ? 'Chat backup enabled' : 'Chat backup disabled');
-    } catch (_) {
-      _showFeedback('Could not update backup setting.');
+    } catch (error) {
+      _showFeedback(VmFailurePresentation.messageFor(error, contentLabel: 'backup setting'));
     } finally {
       if (mounted) setState(() => _backupBusy = false);
     }
@@ -206,8 +221,8 @@ class _InboxSettingsPageState extends State<InboxSettingsPage> {
     try {
       await widget.onFrequencyChanged(frequency);
       _showFeedback('Backup frequency set to ${frequency.label}');
-    } catch (_) {
-      _showFeedback('Could not update backup frequency.');
+    } catch (error) {
+      _showFeedback(VmFailurePresentation.messageFor(error, contentLabel: 'backup frequency'));
     } finally {
       if (mounted) setState(() => _backupBusy = false);
     }
@@ -223,8 +238,8 @@ class _InboxSettingsPageState extends State<InboxSettingsPage> {
     try {
       await widget.onBackupNow();
       _showFeedback('Inbox backup completed.');
-    } catch (_) {
-      _showFeedback('Backup failed. Check Google Drive setup.');
+    } catch (error) {
+      _showFeedback(VmFailurePresentation.messageFor(error, contentLabel: 'Inbox backup'));
     } finally {
       if (mounted) setState(() => _backupBusy = false);
     }
@@ -240,8 +255,8 @@ class _InboxSettingsPageState extends State<InboxSettingsPage> {
     try {
       await widget.onRestoreTap();
       _showFeedback('Inbox restore completed.');
-    } catch (_) {
-      _showFeedback('Restore failed. No backup found or Drive setup failed.');
+    } catch (error) {
+      _showFeedback(VmFailurePresentation.messageFor(error, contentLabel: 'Inbox restore'));
     } finally {
       if (mounted) setState(() => _backupBusy = false);
     }
@@ -759,8 +774,8 @@ class _GoogleDriveSetupSheetState extends State<_GoogleDriveSetupSheet> {
             ? 'Backup setup ready. Tap Connect to enable chat backup.'
             : 'Google Drive authorization started. Paste auth code after approval.',
       );
-    } catch (_) {
-      _toast('Could not start Google Drive setup.');
+    } catch (error) {
+      _toast(VmFailurePresentation.messageFor(error, contentLabel: 'Google Drive setup'));
     } finally {
       if (mounted) setState(() => _busy = false);
     }
@@ -777,8 +792,8 @@ class _GoogleDriveSetupSheetState extends State<_GoogleDriveSetupSheet> {
       );
       if (mounted) Navigator.pop(context);
       _toast('Google Drive connected for Inbox backup.');
-    } catch (_) {
-      _toast('Could not connect Google Drive.');
+    } catch (error) {
+      _toast(VmFailurePresentation.messageFor(error, contentLabel: 'Google Drive connection'));
     } finally {
       if (mounted) setState(() => _busy = false);
     }
