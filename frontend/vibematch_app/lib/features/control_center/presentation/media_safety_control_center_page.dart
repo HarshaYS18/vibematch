@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 
 import '../../../core/network/vm_failure.dart';
 import '../../../core/presentation/vm_async_state.dart';
+import '../../../core/ui/vm_motion.dart';
 
 import '../data/media_safety_api_service.dart';
 
@@ -412,6 +413,7 @@ class _MediaSafetyControlCenterPageState extends State<MediaSafetyControlCenterP
   void _showAssetSheet(CdnMediaAsset asset) {
     showModalBottomSheet<void>(
       context: context,
+      sheetAnimationStyle: VmMotion.sheetAnimationStyle,
       showDragHandle: true,
       backgroundColor: const Color(0xFFFAF7F1),
       builder: (context) => SafeArea(
