@@ -1,6 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../../core/network/vm_failure.dart';
+import '../../../core/presentation/vm_async_state.dart';
+
 import '../controllers/inventory_controller.dart';
 import '../models/store_models.dart';
 import 'widgets/inventory_section.dart';
@@ -40,7 +43,7 @@ class _InventoryPageState extends ConsumerState<InventoryPage> {
       _showToast(message);
     } catch (error) {
       if (!mounted) return;
-      _showToast(error.toString().replaceFirst('Exception: ', ''));
+      _showToast(VmFailurePresentation.messageFor(error, contentLabel: 'inventory'));
     }
   }
 
@@ -79,12 +82,16 @@ class _InventoryPageState extends ConsumerState<InventoryPage> {
             if (inventory.isLoading)
               const SliverFillRemaining(
                 hasScrollBody: false,
-                child: Center(child: CircularProgressIndicator()),
+                child: VmLoadingState(message: 'Loading inventory…'),
               )
             else if (inventory.errorMessage != null)
               SliverFillRemaining(
                 hasScrollBody: false,
-                child: _InventoryError(message: inventory.errorMessage!, onRetry: controller.load),
+                child: VmFailureState(
+                  message: inventory.errorMessage!,
+                  contentLabel: 'inventory',
+                  onRetry: controller.load,
+                ),
               )
             else
               InventorySection(items: inventory.currentItems, onEquip: _equip),
@@ -132,32 +139,6 @@ class _InventoryHero extends StatelessWidget {
           if (isLoading)
             const SizedBox(width: 18, height: 18, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white)),
         ],
-      ),
-    );
-  }
-}
-
-class _InventoryError extends StatelessWidget {
-  const _InventoryError({required this.message, required this.onRetry});
-
-  final String message;
-  final VoidCallback onRetry;
-
-  @override
-  Widget build(BuildContext context) {
-    return Center(
-      child: Padding(
-        padding: const EdgeInsets.all(24),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            const Icon(Icons.wifi_off_rounded, color: Color(0xFFE84C72), size: 42),
-            const SizedBox(height: 10),
-            Text(message, textAlign: TextAlign.center, style: const TextStyle(color: Color(0xFF251538), fontWeight: FontWeight.w800)),
-            const SizedBox(height: 14),
-            FilledButton(onPressed: onRetry, child: const Text('Retry')),
-          ],
-        ),
       ),
     );
   }
