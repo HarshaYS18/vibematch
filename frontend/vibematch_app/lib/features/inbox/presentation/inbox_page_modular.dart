@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../../core/presentation/vm_async_state.dart';
+
 import '../controllers/inbox_controller.dart';
 import '../controllers/inbox_call_controller.dart';
 import '../data/inbox_ai_api_service.dart';
@@ -689,6 +691,16 @@ class _InboxPageState extends ConsumerState<InboxPage> {
                     const SliverFillRemaining(
                       hasScrollBody: false,
                       child: _InboxLoadingSkeletonV3(),
+                    )
+                  else if (_controller.errorMessage != null &&
+                      visibleConversations.isEmpty)
+                    SliverFillRemaining(
+                      hasScrollBody: false,
+                      child: VmFailureState(
+                        message: _controller.errorMessage!,
+                        contentLabel: 'messages',
+                        onRetry: _controller.loadFromBackend,
+                      ),
                     )
                   else if (visibleConversations.isEmpty)
                     SliverFillRemaining(
