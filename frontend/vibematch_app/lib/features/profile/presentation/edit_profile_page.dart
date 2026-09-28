@@ -2,6 +2,7 @@ import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
 
 import '../../../core/network/vm_failure.dart';
+import '../../../core/ui/vm_motion.dart';
 
 import '../../auth/models/current_user.dart';
 import '../../media/data/media_upload_service.dart';
@@ -133,6 +134,7 @@ class _EditProfilePageState extends State<EditProfilePage> {
     var selected = _dob ?? DateTime(2000, 1, 1);
     await showModalBottomSheet<void>(
       context: context,
+      sheetAnimationStyle: VmMotion.sheetAnimationStyle,
       backgroundColor: Colors.transparent,
       builder: (_) => _SheetShell(
         child: SizedBox(
