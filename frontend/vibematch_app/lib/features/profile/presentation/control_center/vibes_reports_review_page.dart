@@ -1,5 +1,8 @@
 import 'package:flutter/material.dart';
 
+import '../../../../core/network/vm_failure.dart';
+import '../../../../core/presentation/vm_async_state.dart';
+
 import '../../../vibes/data/vibes_report_api_service.dart';
 import 'widgets/control_deck_widgets.dart';
 import 'widgets/super_power_design.dart';
@@ -38,7 +41,7 @@ class _VibesReportsReviewPageState extends State<VibesReportsReviewPage> {
       if (!mounted) return;
       setState(() => _reports = reports);
     } catch (error) {
-      if (mounted) setState(() => _error = error.toString().replaceFirst('Exception: ', ''));
+      if (mounted) setState(() => _error = VmFailurePresentation.messageFor(error, contentLabel: 'reports'));
     } finally {
       if (mounted) setState(() => _loading = false);
     }
@@ -60,7 +63,7 @@ class _VibesReportsReviewPageState extends State<VibesReportsReviewPage> {
       _toast('Report #${result.id} updated to ${result.status}.');
       await _loadReportsAfterAction();
     } catch (error) {
-      if (mounted) _toast(error.toString().replaceFirst('Exception: ', ''));
+      if (mounted) _toast(VmFailurePresentation.messageFor(error, contentLabel: 'reports'));
     } finally {
       if (mounted) setState(() => _loading = false);
     }
@@ -160,7 +163,7 @@ class _VibesReportsReviewPageState extends State<VibesReportsReviewPage> {
                 SliverToBoxAdapter(
                   child: Padding(
                     padding: const EdgeInsets.fromLTRB(12, 8, 12, 8),
-                    child: _ErrorCard(message: _error!, onRetry: _loadReports),
+                    child: VmInlineFailure(message: _error!, onRetry: _loadReports),
                   ),
                 ),
               if (_reports.isEmpty && !_loading)
@@ -362,52 +365,6 @@ class _ConfirmReportActionSheet extends StatelessWidget {
           ]),
         ]),
       ),
-    );
-  }
-}
-
-class _ErrorCard extends StatelessWidget {
-  const _ErrorCard({required this.message, required this.onRetry});
-
-  final String message;
-  final VoidCallback onRetry;
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.all(12),
-      decoration: BoxDecoration(color: SuperPowerDesign.panel, borderRadius: BorderRadius.circular(18), border: Border.all(color: SuperPowerDesign.rose.withValues(alpha: 0.40))),
-      child: Row(children: [
-        const Icon(Icons.error_outline_rounded, color: SuperPowerDesign.rose),
-        const SizedBox(width: 9),
-        Expanded(child: Text(message, maxLines: 3, overflow: TextOverflow.ellipsis, style: const TextStyle(color: SuperPowerDesign.text, fontSize: 11.5, fontWeight: FontWeight.w800))),
-        TextButton(onPressed: onRetry, child: const Text('Retry')),
-      ]),
-    );
-  }
-}
-
-class _EmptyReports extends StatelessWidget {
-  const _EmptyReports();
-
-  @override
-  Widget build(BuildContext context) {
-    return const Center(child: Text('No Vibes reports in this queue.', style: TextStyle(color: SuperPowerDesign.muted, fontWeight: FontWeight.w800)));
-  }
-}
-
-class _RoundIcon extends StatelessWidget {
-  const _RoundIcon({required this.icon, required this.onTap});
-
-  final IconData icon;
-  final VoidCallback onTap;
-
-  @override
-  Widget build(BuildContext context) {
-    return InkWell(
-      onTap: onTap,
-      customBorder: const CircleBorder(),
-      child: Container(width: 38, height: 38, decoration: BoxDecoration(color: SuperPowerDesign.obsidian, shape: BoxShape.circle, border: Border.all(color: SuperPowerDesign.stroke)), child: Icon(icon, color: SuperPowerDesign.text, size: 21)),
     );
   }
 }
