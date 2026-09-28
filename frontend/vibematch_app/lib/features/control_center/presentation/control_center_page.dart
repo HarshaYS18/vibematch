@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 
 import '../../../core/network/vm_failure.dart';
 import '../../../core/presentation/vm_async_state.dart';
+import '../../../core/ui/vm_motion.dart';
 
 import '../data/control_center_api_service.dart';
 
@@ -153,6 +154,7 @@ class _ControlCenterPageState extends State<ControlCenterPage> {
     var enabled = true;
     await showModalBottomSheet<void>(
       context: context,
+      sheetAnimationStyle: VmMotion.sheetAnimationStyle,
       isScrollControlled: true,
       backgroundColor: Colors.transparent,
       builder: (context) => StatefulBuilder(
@@ -212,6 +214,7 @@ class _ControlCenterPageState extends State<ControlCenterPage> {
 
     await showModalBottomSheet<void>(
       context: context,
+      sheetAnimationStyle: VmMotion.sheetAnimationStyle,
       isScrollControlled: true,
       backgroundColor: Colors.transparent,
       builder: (context) => StatefulBuilder(
