@@ -2,6 +2,9 @@ import 'package:flutter/material.dart';
 
 import 'dart:async';
 
+import '../../../core/network/vm_failure.dart';
+import '../../../core/presentation/vm_async_state.dart';
+
 import '../data/events_repository.dart';
 import '../models/event_item.dart';
 
@@ -53,7 +56,7 @@ class _EventsPageState extends State<EventsPage> {
       if (!mounted) return;
       setState(() {
         _loading = false;
-        _error = error.toString().replaceFirst('Exception: ', '');
+        _error = VmFailurePresentation.messageFor(error, contentLabel: 'events');
       });
     }
   }
@@ -69,7 +72,7 @@ class _EventsPageState extends State<EventsPage> {
         ..clearSnackBars()
         ..showSnackBar(
           SnackBar(
-            content: Text(error.toString().replaceFirst('Exception: ', '')),
+            content: Text(VmFailurePresentation.messageFor(error, contentLabel: 'event reward')),
             behavior: SnackBarBehavior.floating,
           ),
         );
@@ -104,10 +107,11 @@ class _EventsPageState extends State<EventsPage> {
               ),
             Expanded(
               child: _loading
-                  ? const Center(child: CircularProgressIndicator())
+                  ? const VmLoadingState(message: 'Loading events…')
                   : _error != null
-                  ? _EventsLoadError(
+                  ? VmFailureState(
                       message: _error!,
+                      contentLabel: 'events',
                       onRetry: () => unawaited(_load(force: true)),
                     )
                   : selectedEvent == null
@@ -671,31 +675,6 @@ class _SocialMissionCard extends StatelessWidget {
             ),
           ]),
         ],
-      ),
-    );
-  }
-}
-
-class _EventsLoadError extends StatelessWidget {
-  const _EventsLoadError({required this.message, required this.onRetry});
-  final String message;
-  final VoidCallback onRetry;
-
-  @override
-  Widget build(BuildContext context) {
-    return Center(
-      child: Padding(
-        padding: const EdgeInsets.all(22),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            const Icon(Icons.cloud_off_rounded, size: 38),
-            const SizedBox(height: 10),
-            Text(message, textAlign: TextAlign.center, style: const TextStyle(fontWeight: FontWeight.w700)),
-            const SizedBox(height: 12),
-            FilledButton.icon(onPressed: onRetry, icon: const Icon(Icons.refresh_rounded), label: const Text('Retry')),
-          ],
-        ),
       ),
     );
   }
