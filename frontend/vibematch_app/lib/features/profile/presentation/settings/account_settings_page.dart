@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 
 import '../../../../core/network/vm_failure.dart';
 import '../../../../core/presentation/vm_async_state.dart';
+import '../../../../core/ui/vm_motion.dart';
 
 import 'account_settings_store.dart';
 
@@ -84,6 +85,7 @@ class _AccountSettingsPageState extends State<AccountSettingsPage> {
   Future<void> _resetSettings() async {
     final confirmed = await showModalBottomSheet<bool>(
       context: context,
+      sheetAnimationStyle: VmMotion.sheetAnimationStyle,
       backgroundColor: Colors.transparent,
       builder: (_) => _ConfirmResetSheet(
         onCancel: () => Navigator.pop(context, false),
@@ -148,6 +150,7 @@ class _AccountSettingsPageState extends State<AccountSettingsPage> {
 
     showModalBottomSheet<void>(
       context: context,
+      sheetAnimationStyle: VmMotion.sheetAnimationStyle,
       isScrollControlled: true,
       backgroundColor: Colors.transparent,
       builder: (_) => _TonePickerSheet(
