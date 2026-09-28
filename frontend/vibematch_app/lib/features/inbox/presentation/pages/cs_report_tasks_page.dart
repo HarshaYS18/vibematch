@@ -1,4 +1,6 @@
 import 'package:flutter/material.dart';
+
+import '../../../../core/ui/vm_motion.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../controllers/inbox_controller.dart';
@@ -34,6 +36,7 @@ class _CsReportTasksPageState extends ConsumerState<CsReportTasksPage> {
   void _openMonitorAction(InboxReportTask task) {
     showModalBottomSheet<void>(
       context: context,
+      sheetAnimationStyle: VmMotion.sheetAnimationStyle,
       backgroundColor: Colors.transparent,
       builder: (_) => _MonitorActionSheet(
         task: task,
