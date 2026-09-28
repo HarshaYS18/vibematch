@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../../core/network/vm_failure.dart';
+
 import '../data/home_repository.dart';
 import '../models/home_banner.dart';
 import '../models/home_room.dart';
@@ -173,12 +175,16 @@ class HomeController extends AutoDisposeNotifier<HomeState> {
             ? 'Some home content could not be refreshed.'
             : null,
       );
-    } catch (_) {
+    } catch (error) {
       state = state.copyWith(
         myCreatedRoom: null,
         eventBanners: const <HomeBanner>[],
         policyBanners: const <HomeBanner>[],
-        bannerErrorMessage: 'Could not load home banners. Pull to refresh.',
+        bannerErrorMessage: VmFailurePresentation.messageFor(
+          error,
+          contentLabel: 'home content',
+          fallbackMessage: 'Could not refresh home content. Pull to refresh.',
+        ),
       );
     } finally {
       state = state.copyWith(isLoadingHomeChrome: false);
@@ -218,10 +224,14 @@ class HomeController extends AutoDisposeNotifier<HomeState> {
         backendRooms: fetchedRooms,
         loadErrorMessage: null,
       );
-    } catch (_) {
+    } catch (error) {
       state = state.copyWith(
         backendRooms: const <HomeRoom>[],
-        loadErrorMessage: 'Could not load rooms. Pull to refresh.',
+        loadErrorMessage: VmFailurePresentation.messageFor(
+          error,
+          contentLabel: 'rooms',
+          fallbackMessage: 'Could not load rooms. Pull to refresh.',
+        ),
       );
     } finally {
       state = state.copyWith(
