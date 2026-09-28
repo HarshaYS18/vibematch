@@ -3,6 +3,8 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../../core/presentation/vm_async_state.dart';
+
 import '../models/family_ui_models.dart';
 import 'controllers/family_controller.dart';
 import 'family_list_page.dart';
@@ -230,6 +232,33 @@ class _FamilyModularPageState extends ConsumerState<FamilyModularPage> {
   @override
   Widget build(BuildContext context) {
     ref.watch(familyControllerProvider(_providerArgs));
+
+    if (!_controller.hasFamily &&
+        (_controller.loadingBackend || _controller.loadingRankings) &&
+        _controller.rankings.isEmpty) {
+      return const Scaffold(
+        backgroundColor: FamilyRedesignColors.page,
+        body: SafeArea(
+          child: VmLoadingState(message: 'Loading family…'),
+        ),
+      );
+    }
+
+    if (!_controller.hasFamily &&
+        _controller.backendError != null &&
+        _controller.rankings.isEmpty) {
+      return Scaffold(
+        backgroundColor: FamilyRedesignColors.page,
+        body: SafeArea(
+          child: VmFailureState(
+            message: _controller.backendError!,
+            contentLabel: 'family',
+            onRetry: _controller.hydrateFromBackend,
+          ),
+        ),
+      );
+    }
+
     if (!_controller.hasFamily) {
       return FamilyRankingModule(
         rankings: _controller.rankings,
@@ -249,6 +278,13 @@ class _FamilyModularPageState extends ConsumerState<FamilyModularPage> {
         child: CustomScrollView(
           physics: const BouncingScrollPhysics(),
           slivers: [
+            if (_controller.backendError != null)
+              SliverToBoxAdapter(
+                child: VmInlineFailure(
+                  message: _controller.backendError!,
+                  onRetry: _controller.hydrateFromBackend,
+                ),
+              ),
             SliverToBoxAdapter(
               child: FamilyClanHero(
                 profile: _controller.profile,
