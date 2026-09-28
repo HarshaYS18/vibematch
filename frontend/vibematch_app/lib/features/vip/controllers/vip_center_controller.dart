@@ -1,5 +1,7 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../../core/network/vm_failure.dart';
+
 import '../data/vip_api_service.dart';
 import '../models/vip_models.dart';
 
@@ -50,7 +52,7 @@ class VipCenterController extends AutoDisposeNotifier<VipCenterState> {
       );
     } catch (error) {
       state = state.copyWith(
-        errorMessage: error.toString().replaceFirst('Exception: ', ''),
+        errorMessage: VmFailurePresentation.messageFor(error, contentLabel: 'VIP center'),
       );
     } finally {
       state = state.copyWith(isLoading: false);
