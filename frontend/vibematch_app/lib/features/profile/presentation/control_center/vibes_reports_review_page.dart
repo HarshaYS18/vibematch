@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 
 import '../../../../core/network/vm_failure.dart';
 import '../../../../core/presentation/vm_async_state.dart';
+import '../../../../core/ui/vm_motion.dart';
 
 import '../../../vibes/data/vibes_report_api_service.dart';
 import 'widgets/control_deck_widgets.dart';
@@ -79,6 +80,7 @@ class _VibesReportsReviewPageState extends State<VibesReportsReviewPage> {
   Future<bool?> _confirmAction(VibeReportQueueItem report, {required String status, required bool deletePost}) {
     return showModalBottomSheet<bool>(
       context: context,
+      sheetAnimationStyle: VmMotion.sheetAnimationStyle,
       backgroundColor: Colors.transparent,
       builder: (_) => _ConfirmReportActionSheet(report: report, status: status, deletePost: deletePost),
     );
