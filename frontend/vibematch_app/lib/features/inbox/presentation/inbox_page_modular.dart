@@ -1,7 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../../core/network/vm_failure.dart';
 import '../../../core/presentation/vm_async_state.dart';
+import '../../../core/ui/vm_motion.dart';
 
 import '../controllers/inbox_controller.dart';
 import '../controllers/inbox_call_controller.dart';
@@ -206,6 +208,7 @@ class _InboxPageState extends ConsumerState<InboxPage> {
   Future<void> _openInboxAiHelper() async {
     await showModalBottomSheet<void>(
       context: context,
+      sheetAnimationStyle: VmMotion.sheetAnimationStyle,
       isScrollControlled: true,
       backgroundColor: Colors.transparent,
       builder: (_) => InboxAiHelperSheet(
@@ -277,6 +280,7 @@ class _InboxPageState extends ConsumerState<InboxPage> {
   void _openLockSetupSheet() {
     showModalBottomSheet<void>(
       context: context,
+      sheetAnimationStyle: VmMotion.sheetAnimationStyle,
       backgroundColor: Colors.transparent,
       isScrollControlled: true,
       builder: (_) => InboxLockSetupSheet(
@@ -293,6 +297,7 @@ class _InboxPageState extends ConsumerState<InboxPage> {
   void _openLockRecoverySheet() {
     showModalBottomSheet<void>(
       context: context,
+      sheetAnimationStyle: VmMotion.sheetAnimationStyle,
       backgroundColor: Colors.transparent,
       isScrollControlled: true,
       builder: (_) => InboxLockRecoverySheet(
@@ -336,6 +341,7 @@ class _InboxPageState extends ConsumerState<InboxPage> {
     }
     await showModalBottomSheet<void>(
       context: context,
+      sheetAnimationStyle: VmMotion.sheetAnimationStyle,
       isDismissible: true,
       enableDrag: true,
       backgroundColor: Colors.transparent,
@@ -447,6 +453,7 @@ class _InboxPageState extends ConsumerState<InboxPage> {
         _controller.conversationById(conversation.id) ?? conversation;
     await showModalBottomSheet<void>(
       context: context,
+      sheetAnimationStyle: VmMotion.sheetAnimationStyle,
       backgroundColor: Colors.transparent,
       isScrollControlled: true,
       builder: (_) => InboxChatThemePickerSheet(
@@ -481,6 +488,7 @@ class _InboxPageState extends ConsumerState<InboxPage> {
       if (!mounted) return;
       showModalBottomSheet<void>(
         context: context,
+        sheetAnimationStyle: VmMotion.sheetAnimationStyle,
         isScrollControlled: true,
         backgroundColor: Colors.transparent,
         builder: (_) => ReportConversationSheet(
@@ -541,6 +549,7 @@ class _InboxPageState extends ConsumerState<InboxPage> {
     }
     showModalBottomSheet<void>(
       context: context,
+      sheetAnimationStyle: VmMotion.sheetAnimationStyle,
       isDismissible: true,
       enableDrag: true,
       backgroundColor: Colors.transparent,
@@ -552,6 +561,7 @@ class _InboxPageState extends ConsumerState<InboxPage> {
   Future<void> _createStory() async {
     final result = await showModalBottomSheet<_StoryDraft>(
       context: context,
+      sheetAnimationStyle: VmMotion.sheetAnimationStyle,
       backgroundColor: Colors.transparent,
       isScrollControlled: true,
       builder: (_) => const _CreateStorySheetV3(),
@@ -566,7 +576,7 @@ class _InboxPageState extends ConsumerState<InboxPage> {
       );
       _refreshStories();
     } catch (error) {
-      _toast(error.toString());
+      _toast(VmFailurePresentation.messageFor(error, contentLabel: 'Inbox action'));
     }
   }
 
