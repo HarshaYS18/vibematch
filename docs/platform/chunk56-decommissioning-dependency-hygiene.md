@@ -16,6 +16,7 @@ Delivered:
 - Dependabot coverage for every direct dependency manifest, including Inbox and
   Worker service requirements
 - stale Vibe Match operational branding cleanup in Inbox backup/recovery surfaces
+- removed the production friend-invite fallback to fabricated social users; backend failures now surface the existing empty/error path instead of injecting mock identities
 - final static roadmap closure gate across Chunks 37–56
 - mandatory final documentation and CI wiring
 
