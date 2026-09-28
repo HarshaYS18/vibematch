@@ -2,6 +2,8 @@ import 'dart:async';
 
 import 'package:flutter/material.dart';
 
+import '../../../../core/network/vm_failure.dart';
+
 import '../../../../core/security/screenshot_guard_service.dart';
 import '../../../../core/ui/vm_motion.dart';
 import '../../data/room_settings_repository.dart';
@@ -161,7 +163,7 @@ class _LiveRoomPrivacySheetState extends State<LiveRoomPrivacySheet> {
     } catch (error) {
       if (!mounted) return;
       setState(() => _mode = widget.currentMode);
-      RoomToast.show(context, error.toString().replaceFirst('Exception: ', ''));
+      RoomToast.show(context, VmFailurePresentation.messageFor(error, contentLabel: 'room privacy'));
     } finally {
       if (mounted) setState(() => _saving = false);
     }
