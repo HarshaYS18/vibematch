@@ -3,6 +3,7 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../core/network/vm_failure.dart';
 import '../../foundation/di/app_dependencies.dart';
 import '../../foundation/runtime/media_resource_lifecycle.dart';
 import '../../session/data/session_repository.dart';
@@ -182,8 +183,11 @@ class _RemoteGamePlayerPageState extends ConsumerState<RemoteGamePlayerPage> {
   }
 
   String _displayError(Object error) {
-    final message = error.toString().replaceFirst('Exception: ', '').trim();
-    return message.isEmpty ? 'Game unavailable.' : message;
+    return VmFailurePresentation.messageFor(
+      error,
+      contentLabel: 'game',
+      fallbackMessage: 'Game unavailable. Please try again.',
+    );
   }
 
   @override
