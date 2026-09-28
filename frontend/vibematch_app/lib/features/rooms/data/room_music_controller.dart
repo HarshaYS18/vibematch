@@ -158,7 +158,7 @@ class RoomMusicController {
         isUploading: false,
         isPlaying: false,
         isPaused: false,
-        lastError: error.toString(),
+        lastError: VmFailurePresentation.messageFor(error, contentLabel: 'room music'),
       );
     }
   }
