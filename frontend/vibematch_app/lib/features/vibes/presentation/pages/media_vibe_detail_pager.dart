@@ -2,6 +2,9 @@ import 'dart:async';
 
 import 'package:flutter/material.dart';
 
+import '../../../../core/network/vm_failure.dart';
+import '../../../../core/ui/vm_motion.dart';
+
 import '../../../social/widgets/friends_invite_sheet.dart';
 import '../../data/vibes_api_service.dart';
 import '../../models/vibe_models.dart';
@@ -65,7 +68,7 @@ class _MediaVibeDetailPagerState extends State<MediaVibeDetailPager> {
         _stateById[_key(vibe)] = current.copyWith(likedByMe: result.likedByMe, likes: result.likesCount);
       });
     } catch (error) {
-      _toast(error.toString().replaceFirst('Exception: ', ''));
+      _toast(VmFailurePresentation.messageFor(error, contentLabel: 'Vibe action'));
     }
   }
 
@@ -80,7 +83,7 @@ class _MediaVibeDetailPagerState extends State<MediaVibeDetailPager> {
       });
       _toast(result.savedByMe ? 'Saved Vibe.' : 'Removed from saved Vibes.');
     } catch (error) {
-      _toast(error.toString().replaceFirst('Exception: ', ''));
+      _toast(VmFailurePresentation.messageFor(error, contentLabel: 'Vibe action'));
     }
   }
 
@@ -88,6 +91,7 @@ class _MediaVibeDetailPagerState extends State<MediaVibeDetailPager> {
     if (vibe.id.trim().isEmpty) return;
     await showModalBottomSheet<void>(
       context: context,
+      sheetAnimationStyle: VmMotion.sheetAnimationStyle,
       isScrollControlled: true,
       useSafeArea: false,
       backgroundColor: Colors.transparent,
@@ -108,7 +112,7 @@ class _MediaVibeDetailPagerState extends State<MediaVibeDetailPager> {
             });
             _toast('Vibe sent to ${friend.displayName}');
           } catch (error) {
-            _toast(error.toString().replaceFirst('Exception: ', ''));
+            _toast(VmFailurePresentation.messageFor(error, contentLabel: 'Vibe action'));
           }
         },
       ),
@@ -118,6 +122,7 @@ class _MediaVibeDetailPagerState extends State<MediaVibeDetailPager> {
   Future<void> _openComments(VibeItem vibe) async {
     await showModalBottomSheet<void>(
       context: context,
+      sheetAnimationStyle: VmMotion.sheetAnimationStyle,
       isScrollControlled: true,
       useSafeArea: true,
       backgroundColor: Colors.transparent,
