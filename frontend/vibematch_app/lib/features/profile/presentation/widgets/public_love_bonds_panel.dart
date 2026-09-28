@@ -3,6 +3,8 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../../../core/network/vm_failure.dart';
+
 import '../../../relationships/data/relationship_exp_api_service.dart';
 import '../../../relationships/presentation/relationship_exp_detail_sheet.dart';
 import '../../../relationships/presentation/relationship_rankings_sheet.dart';
@@ -70,7 +72,7 @@ class _PublicLoveBondsPanelState extends ConsumerState<PublicLoveBondsPanel> {
       if (!mounted) return;
       setState(() {
         _loading = false;
-        _error = error.toString().replaceFirst('Exception: ', '');
+        _error = VmFailurePresentation.messageFor(error, contentLabel: 'Love Bonds');
       });
     }
   }
