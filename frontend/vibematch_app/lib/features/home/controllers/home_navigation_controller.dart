@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 
 import '../../../app/app_routes.dart';
 import '../../../core/navigation/vm_navigator.dart';
+import '../../../core/network/vm_failure.dart';
 import '../../../core/ui/vm_motion.dart';
 import '../../auth/models/current_user.dart';
 import '../../create/presentation/create_page.dart';
@@ -134,7 +135,7 @@ class HomeNavigationController {
       );
     } catch (error) {
       if (context.mounted) {
-        showToast(context, error.toString().replaceFirst('Exception: ', ''));
+        showToast(context, VmFailurePresentation.messageFor(error, contentLabel: 'room'));
       }
     }
   }
@@ -206,7 +207,7 @@ class HomeNavigationController {
       return true;
     } catch (error) {
       if (!context.mounted) return false;
-      final message = error.toString().replaceFirst('Exception: ', '');
+      final message = VmFailurePresentation.messageFor(error, contentLabel: 'room');
       if (message.toLowerCase().contains('locked') &&
           (lockPassword == null || lockPassword.trim().isEmpty)) {
         openLockedRoomSheet(
@@ -293,7 +294,7 @@ class HomeNavigationController {
               showToast(
                 context,
                 _entryBlockedMessage(
-                  error.toString().replaceFirst('Exception: ', ''),
+                  VmFailurePresentation.messageFor(error, contentLabel: 'room'),
                 ),
               );
             }
@@ -312,6 +313,7 @@ class HomeNavigationController {
       context: context,
       backgroundColor: Colors.transparent,
       isScrollControlled: true,
+      sheetAnimationStyle: VmMotion.sheetAnimationStyle,
       builder: (_) => HomeLanguageSheet(
         languages: controller.availableLanguages,
         selectedLanguage: controller.selectedLanguage,
