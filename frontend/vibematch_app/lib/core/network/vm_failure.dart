@@ -43,20 +43,20 @@ class VmFailurePresentation {
       );
     }
 
-    if (_looksOffline(lower)) {
-      return const VmFailurePresentation(
-        kind: VmFailureKind.offline,
-        title: 'No connection',
-        message: 'You appear to be offline. Check your connection and try again.',
-        retryable: true,
-      );
-    }
-
     if (_looksTimedOut(lower)) {
       return const VmFailurePresentation(
         kind: VmFailureKind.timeout,
         title: 'Taking too long',
         message: 'This is taking longer than expected. Check your connection and try again.',
+        retryable: true,
+      );
+    }
+
+    if (_looksOffline(lower)) {
+      return const VmFailurePresentation(
+        kind: VmFailureKind.offline,
+        title: 'No connection',
+        message: 'You appear to be offline. Check your connection and try again.',
         retryable: true,
       );
     }
