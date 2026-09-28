@@ -1,5 +1,7 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../../core/network/vm_failure.dart';
+
 import '../data/inbox_api_service.dart';
 import '../data/inbox_backup_api_service.dart';
 import '../data/inbox_message_tools_api_service.dart';
@@ -340,7 +342,7 @@ class InboxController extends AutoDisposeNotifier<InboxState> {
       _reportTasks = await _apiService.loadReportTasks();
       await _socketService.connect(onEvent: _handleRealtimeEvent);
     } catch (error) {
-      errorMessage = error.toString();
+      errorMessage = VmFailurePresentation.messageFor(error, contentLabel: 'messages');
       _conversations = <InboxConversation>[];
     } finally {
       isLoading = false;
@@ -362,7 +364,7 @@ class InboxController extends AutoDisposeNotifier<InboxState> {
       ];
       _conversationNextCursor = page.nextCursor;
     } catch (error) {
-      errorMessage = error.toString();
+      errorMessage = VmFailurePresentation.messageFor(error, contentLabel: 'messages');
     } finally {
       _loadingMoreConversations = false;
       _safeNotify();
@@ -380,7 +382,7 @@ class InboxController extends AutoDisposeNotifier<InboxState> {
       _safeNotify();
     } catch (error) {
       preferenceSettings = previous;
-      errorMessage = error.toString();
+      errorMessage = VmFailurePresentation.messageFor(error, contentLabel: 'messages');
       _safeNotify();
     }
   }
@@ -667,7 +669,7 @@ class InboxController extends AutoDisposeNotifier<InboxState> {
       _upsertConversation(conversation);
       return conversation;
     } catch (error) {
-      errorMessage = error.toString();
+      errorMessage = VmFailurePresentation.messageFor(error, contentLabel: 'messages');
       _safeNotify();
       return null;
     }
@@ -693,7 +695,7 @@ class InboxController extends AutoDisposeNotifier<InboxState> {
       _upsertConversation(updated);
       markConversationRead(conversationId);
     } catch (error) {
-      errorMessage = error.toString();
+      errorMessage = VmFailurePresentation.messageFor(error, contentLabel: 'messages');
       _safeNotify();
     }
   }
@@ -731,7 +733,7 @@ class InboxController extends AutoDisposeNotifier<InboxState> {
       );
       return older.length;
     } catch (error) {
-      errorMessage = error.toString();
+      errorMessage = VmFailurePresentation.messageFor(error, contentLabel: 'messages');
       _safeNotify();
       return 0;
     }
@@ -748,7 +750,7 @@ class InboxController extends AutoDisposeNotifier<InboxState> {
       _upsertConversation(updated);
       _safeNotify();
     } catch (error) {
-      errorMessage = error.toString();
+      errorMessage = VmFailurePresentation.messageFor(error, contentLabel: 'messages');
       _safeNotify();
     }
   }
@@ -882,7 +884,7 @@ class InboxController extends AutoDisposeNotifier<InboxState> {
       );
       await openConversationFromBackend(conversation.id);
     } catch (error) {
-      errorMessage = error.toString();
+      errorMessage = VmFailurePresentation.messageFor(error, contentLabel: 'messages');
       _safeNotify();
     }
   }
@@ -1028,7 +1030,7 @@ class InboxController extends AutoDisposeNotifier<InboxState> {
       );
       _replaceLocalMessage(conversationId, local, sent);
     } catch (error) {
-      errorMessage = error.toString();
+      errorMessage = VmFailurePresentation.messageFor(error, contentLabel: 'messages');
       _updateMessage(
         conversationId: conversationId,
         message: local,
@@ -1066,7 +1068,7 @@ class InboxController extends AutoDisposeNotifier<InboxState> {
       );
       _replaceLocalMessage(conversationId, retrying, sent);
     } catch (error) {
-      errorMessage = error.toString();
+      errorMessage = VmFailurePresentation.messageFor(error, contentLabel: 'messages');
       _updateMessage(
         conversationId: conversationId,
         message: retrying,
@@ -1280,7 +1282,7 @@ class InboxController extends AutoDisposeNotifier<InboxState> {
         mapper: (_) => updated,
       );
     } catch (error) {
-      errorMessage = error.toString();
+      errorMessage = VmFailurePresentation.messageFor(error, contentLabel: 'messages');
       _updateMessage(
         conversationId: conversationId,
         message: message.copyWith(text: trimmed),
@@ -1301,7 +1303,7 @@ class InboxController extends AutoDisposeNotifier<InboxState> {
         messageId: message.id!,
       );
     } catch (error) {
-      errorMessage = error.toString();
+      errorMessage = VmFailurePresentation.messageFor(error, contentLabel: 'messages');
       _appendMessage(conversationId, message);
     }
   }
