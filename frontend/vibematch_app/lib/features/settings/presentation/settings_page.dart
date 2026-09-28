@@ -582,7 +582,7 @@ class _BlockedUsersSheetState extends State<_BlockedUsersSheet> {
       setState(() => _future = Future<List<BlockedUserSetting>>.value(users));
       widget.onToast('${user.displayName} unblocked.');
     } catch (error) {
-      widget.onToast(error.toString());
+      widget.onToast(VmFailurePresentation.messageFor(error, contentLabel: 'blocked users'));
     }
   }
 
