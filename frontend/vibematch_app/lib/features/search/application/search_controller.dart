@@ -2,6 +2,8 @@ import 'dart:async';
 
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../../core/network/vm_failure.dart';
+
 import '../data/search_api_service.dart';
 import '../models/search_result_item.dart';
 import '../models/search_result_type.dart';
@@ -170,7 +172,7 @@ class VibeSearchController extends AutoDisposeNotifier<VibeSearchState> {
       state = state.copyWith(
         results: const <SearchResultItem>[],
         isLoading: false,
-        errorMessage: error.toString().replaceFirst('Exception: ', ''),
+        errorMessage: VmFailurePresentation.messageFor(error, contentLabel: 'search results'),
       );
     }
   }
