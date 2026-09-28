@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../../../../app/app_routes.dart';
+import '../../../../core/ui/vm_motion.dart';
 import '../../data/live_room_media_signaling_service.dart';
 import '../live_room_presence_shell_page.dart';
 import 'live_room_route_args.dart';
@@ -8,9 +9,9 @@ import 'live_room_route_args.dart';
 class LiveRoomRoutes {
   const LiveRoomRoutes._();
 
-  static const Duration _standardEntryDuration = Duration(milliseconds: 420);
-  static const Duration _homeTopRightEntryDuration = Duration(milliseconds: 680);
-  static const Duration _exitDuration = Duration(milliseconds: 340);
+  static const Duration _standardEntryDuration = Duration(milliseconds: 300);
+  static const Duration _homeTopRightEntryDuration = Duration(milliseconds: 360);
+  static const Duration _exitDuration = Duration(milliseconds: 240);
 
   static PageRouteBuilder<void> liveRoom(LiveRoomRouteViewArgs args) {
     final currentUser = args.currentUser;
@@ -40,66 +41,52 @@ class LiveRoomRoutes {
           ),
       transitionsBuilder: (context, animation, secondaryAnimation, child) {
         return isHomeTopRightEntry
-            ? _homeTopRightRoomIconTransition(animation, child)
-            : _standardLiveRoomTransition(animation, child);
+            ? _homeTopRightRoomIconTransition(context, animation, child)
+            : VmMotion.buildPageTransition(
+                context: context,
+                animation: animation,
+                secondaryAnimation: secondaryAnimation,
+                child: child,
+                beginOffset: const Offset(0.025, 0.012),
+              );
       },
     );
   }
 
-  static Widget _standardLiveRoomTransition(
-    Animation<double> animation,
-    Widget child,
-  ) {
-    final curved = CurvedAnimation(
-      parent: animation,
-      curve: Curves.easeOutQuart,
-      reverseCurve: Curves.easeInCubic,
-    );
-    return FadeTransition(
-      opacity: curved,
-      child: SlideTransition(
-        position: Tween<Offset>(
-          begin: const Offset(0.028, 0.018),
-          end: Offset.zero,
-        ).animate(curved),
-        child: ScaleTransition(
-          scale: Tween<double>(begin: 0.988, end: 1).animate(curved),
-          child: child,
-        ),
-      ),
-    );
-  }
-
   static Widget _homeTopRightRoomIconTransition(
+    BuildContext context,
     Animation<double> animation,
     Widget child,
   ) {
+    if (MediaQuery.maybeOf(context)?.disableAnimations == true) {
+      return FadeTransition(opacity: animation, child: child);
+    }
     final curved = CurvedAnimation(
       parent: animation,
-      curve: Curves.easeOutQuart,
-      reverseCurve: Curves.easeInCubic,
+      curve: VmMotion.enterCurve,
+      reverseCurve: VmMotion.exitCurve,
     );
     final fade = CurvedAnimation(
       parent: animation,
-      curve: const Interval(0.04, 1, curve: Curves.easeOutCubic),
-      reverseCurve: Curves.easeInCubic,
+      curve: const Interval(0.02, 1, curve: VmMotion.enterCurve),
+      reverseCurve: VmMotion.exitCurve,
     );
     final preloadReveal = CurvedAnimation(
       parent: animation,
-      curve: const Interval(0, 0.84, curve: Curves.easeOutQuart),
-      reverseCurve: Curves.easeInCubic,
+      curve: const Interval(0, 0.92, curve: VmMotion.enterCurve),
+      reverseCurve: VmMotion.exitCurve,
     );
 
     return FadeTransition(
       opacity: fade,
       child: SlideTransition(
         position: Tween<Offset>(
-          begin: const Offset(0.12, -0.055),
+          begin: const Offset(0.075, -0.028),
           end: Offset.zero,
         ).animate(curved),
         child: ScaleTransition(
           alignment: Alignment.topRight,
-          scale: Tween<double>(begin: 0.955, end: 1).animate(preloadReveal),
+          scale: Tween<double>(begin: 0.975, end: 1).animate(preloadReveal),
           child: RepaintBoundary(child: child),
         ),
       ),
