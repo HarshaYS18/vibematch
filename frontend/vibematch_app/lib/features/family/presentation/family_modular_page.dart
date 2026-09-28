@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../core/presentation/vm_async_state.dart';
+import '../../../core/ui/vm_motion.dart';
 
 import '../models/family_ui_models.dart';
 import 'controllers/family_controller.dart';
@@ -119,6 +120,7 @@ class _FamilyModularPageState extends ConsumerState<FamilyModularPage> {
   void _openCreateFamily() {
     showModalBottomSheet<void>(
       context: context,
+      sheetAnimationStyle: VmMotion.sheetAnimationStyle,
       isScrollControlled: true,
       backgroundColor: Colors.transparent,
       builder: (_) => CreateFamilySheet(
@@ -150,6 +152,7 @@ class _FamilyModularPageState extends ConsumerState<FamilyModularPage> {
   void _openDisbandConfirmation() {
     showModalBottomSheet<void>(
       context: context,
+      sheetAnimationStyle: VmMotion.sheetAnimationStyle,
       isScrollControlled: true,
       backgroundColor: Colors.transparent,
       builder: (_) => DisbandFamilyConfirmationSheet(
@@ -166,6 +169,7 @@ class _FamilyModularPageState extends ConsumerState<FamilyModularPage> {
   void _openSetAdminsSheet() {
     showModalBottomSheet<void>(
       context: context,
+      sheetAnimationStyle: VmMotion.sheetAnimationStyle,
       isScrollControlled: true,
       backgroundColor: Colors.transparent,
       builder: (_) => SetFamilyAdminsSheet(
@@ -184,6 +188,7 @@ class _FamilyModularPageState extends ConsumerState<FamilyModularPage> {
   void _openActions() {
     showModalBottomSheet<void>(
       context: context,
+      sheetAnimationStyle: VmMotion.sheetAnimationStyle,
       backgroundColor: Colors.transparent,
       builder: (_) => FamilyActionsSheet(
         isOwner: _controller.isOwner,
@@ -208,6 +213,7 @@ class _FamilyModularPageState extends ConsumerState<FamilyModularPage> {
   void _openLevelDetails() {
     showModalBottomSheet<void>(
       context: context,
+      sheetAnimationStyle: VmMotion.sheetAnimationStyle,
       isScrollControlled: true,
       backgroundColor: Colors.transparent,
       builder: (_) => FamilyLevelDetailsSheet(
