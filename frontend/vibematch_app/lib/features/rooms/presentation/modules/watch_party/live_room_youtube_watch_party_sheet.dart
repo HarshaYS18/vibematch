@@ -2,6 +2,8 @@ import 'dart:async';
 
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+
+import '../../../../../core/network/vm_failure.dart';
 import 'package:youtube_player_iframe/youtube_player_iframe.dart';
 
 import '../../../../../session/data/session_repository.dart';
@@ -209,7 +211,7 @@ class _LiveRoomYoutubeWatchPartySheetState
   }
 
   String _cleanError(Object error) {
-    return error.toString().replaceFirst('Exception: ', '').trim();
+    return VmFailurePresentation.messageFor(error, contentLabel: 'YouTube Watch Party');
   }
 
   @override
