@@ -3,6 +3,8 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../../core/network/vm_failure.dart';
+
 import '../controllers/vibes_controller.dart';
 import '../controllers/vibes_navigation_controller.dart';
 import '../models/vibe_models.dart';
@@ -45,7 +47,7 @@ class _VibesPageState extends ConsumerState<VibesPage> {
     try {
       await ref.read(vibesControllerProvider.notifier).toggleLike(vibe);
     } catch (error) {
-      if (mounted) VibesNavigationController.showAction(context, error.toString().replaceFirst('Exception: ', ''));
+      if (mounted) VibesNavigationController.showAction(context, VmFailurePresentation.messageFor(error, contentLabel: 'Vibes'));
     }
   }
 
@@ -55,7 +57,7 @@ class _VibesPageState extends ConsumerState<VibesPage> {
       await ref.read(vibesControllerProvider.notifier).toggleSave(vibe);
       if (mounted) VibesNavigationController.showAction(context, wasSaved ? 'Removed from saved Vibes.' : 'Saved Vibe.');
     } catch (error) {
-      if (mounted) VibesNavigationController.showAction(context, error.toString().replaceFirst('Exception: ', ''));
+      if (mounted) VibesNavigationController.showAction(context, VmFailurePresentation.messageFor(error, contentLabel: 'Vibes'));
     }
   }
 
