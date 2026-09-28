@@ -1,5 +1,8 @@
 import 'package:flutter/material.dart';
 
+import '../../../core/network/vm_failure.dart';
+import '../../../core/presentation/vm_async_state.dart';
+
 import '../data/game_api_service.dart';
 
 class GameTestPage extends StatefulWidget {
@@ -45,7 +48,7 @@ class _GameTestPageState extends State<GameTestPage> {
       await action();
     } catch (error) {
       if (!mounted) return;
-      setState(() => _error = error.toString().replaceFirst('Exception: ', ''));
+      setState(() => _error = VmFailurePresentation.messageFor(error, contentLabel: 'game catalog'));
     } finally {
       if (mounted) setState(() => _loading = false);
     }
@@ -158,7 +161,7 @@ class _GameTestPageState extends State<GameTestPage> {
             children: [
               _HeroCard(game: game, round: _round),
               const SizedBox(height: 14),
-              if (_error != null) _ErrorCard(message: _error!, onRetry: _loadCatalog),
+              if (_error != null) VmInlineFailure(message: _error!, onRetry: _loadCatalog),
               if (_error != null) const SizedBox(height: 14),
               _Card(
                 child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
@@ -427,16 +430,6 @@ class _Line extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) => Padding(padding: const EdgeInsets.symmetric(vertical: 4), child: Row(children: [Expanded(child: Text(label, style: const TextStyle(color: Colors.white54, fontSize: 12, fontWeight: FontWeight.w800))), Text(value, style: TextStyle(color: color ?? Colors.white, fontSize: 12.5, fontWeight: FontWeight.w900))]));
-}
-
-class _ErrorCard extends StatelessWidget {
-  const _ErrorCard({required this.message, required this.onRetry});
-
-  final String message;
-  final VoidCallback onRetry;
-
-  @override
-  Widget build(BuildContext context) => _Card(child: Row(children: [const Icon(Icons.error_outline_rounded, color: Color(0xFFE84C72)), const SizedBox(width: 10), Expanded(child: Text(message, maxLines: 3, overflow: TextOverflow.ellipsis, style: const TextStyle(color: Colors.white70, fontSize: 12, fontWeight: FontWeight.w800))), TextButton(onPressed: onRetry, child: const Text('Retry'))]));
 }
 
 InputDecoration _inputDecoration(String label) => InputDecoration(labelText: label, labelStyle: const TextStyle(color: Colors.white60, fontWeight: FontWeight.w800), filled: true, fillColor: const Color(0xFF171425), border: OutlineInputBorder(borderRadius: BorderRadius.circular(18), borderSide: BorderSide(color: Colors.white.withValues(alpha: 0.10))), enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(18), borderSide: BorderSide(color: Colors.white.withValues(alpha: 0.10))), focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(18), borderSide: const BorderSide(color: Color(0xFFFFD36A))));
