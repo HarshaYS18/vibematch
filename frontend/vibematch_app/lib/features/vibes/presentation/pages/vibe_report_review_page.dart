@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 
 import '../../../../core/network/vm_failure.dart';
 import '../../../../core/presentation/vm_async_state.dart';
+import '../../../../core/ui/vm_motion.dart';
 
 import '../../data/vibes_api_service.dart';
 
@@ -52,6 +53,7 @@ class _VibeReportReviewPageState extends State<VibeReportReviewPage> {
   Future<void> _reviewReport(VibeReportQueueItem report, {required bool deletePost}) async {
     final shouldContinue = await showModalBottomSheet<bool>(
       context: context,
+      sheetAnimationStyle: VmMotion.sheetAnimationStyle,
       backgroundColor: Colors.transparent,
       builder: (_) => _ReviewConfirmSheet(deletePost: deletePost),
     );
