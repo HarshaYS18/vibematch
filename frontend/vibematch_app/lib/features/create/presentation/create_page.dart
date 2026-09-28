@@ -3,6 +3,7 @@ import 'package:flutter/services.dart';
 
 import '../../../core/navigation/vm_navigator.dart';
 import '../../../core/network/vm_failure.dart';
+import '../../../core/ui/vm_motion.dart';
 import '../../auth/models/current_user.dart';
 import '../../media/data/media_upload_service.dart';
 import '../../rooms/data/room_api_service.dart';
@@ -83,6 +84,7 @@ class _CreatePageState extends State<CreatePage> {
   void _openLanguageSheet() {
     showModalBottomSheet(
       context: context,
+      sheetAnimationStyle: VmMotion.sheetAnimationStyle,
       backgroundColor: Colors.transparent,
       builder: (context) {
         return _CreateSheet(
@@ -161,6 +163,7 @@ class _CreatePageState extends State<CreatePage> {
   void _showRoomReadySheet(RealRoom room) {
     showModalBottomSheet(
       context: context,
+      sheetAnimationStyle: VmMotion.sheetAnimationStyle,
       backgroundColor: Colors.transparent,
       isScrollControlled: true,
       builder: (sheetContext) {
