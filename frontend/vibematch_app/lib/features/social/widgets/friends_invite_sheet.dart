@@ -1,7 +1,6 @@
 import 'package:flutter/material.dart';
 
 import '../data/social_api_service.dart';
-import '../data/social_mock_data.dart';
 import '../models/social_user.dart';
 
 class FriendsInviteSheet extends StatefulWidget {
@@ -50,15 +49,8 @@ class _FriendsInviteSheetState extends State<FriendsInviteSheet> {
   }
 
   Future<List<SocialUser>> _loadFriends() async {
-    try {
-      final users = await widget.socialApiService.listFriendUsers(onlineOnly: widget.onlineOnly);
-      return _sortedFriends(users);
-    } catch (_) {
-      final fallback = widget.onlineOnly
-          ? SocialMockData.friends.where((user) => user.isOnline).toList(growable: false)
-          : SocialMockData.friends;
-      return _sortedFriends(fallback);
-    }
+    final users = await widget.socialApiService.listFriendUsers(onlineOnly: widget.onlineOnly);
+    return _sortedFriends(users);
   }
 
   List<SocialUser> _sortedFriends(List<SocialUser> users) {
