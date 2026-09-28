@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../app/app_shell.dart';
+import '../../../core/network/vm_failure.dart';
 import '../../../identity/data/identity_repository.dart';
 import '../../../session/data/session_repository.dart';
 import '../data/auth_api_service.dart';
@@ -181,11 +182,14 @@ class _AuthGateState extends ConsumerState<AuthGate> {
         });
       }
     } catch (error) {
-      final message = error.toString();
-      final lower = message.toLowerCase();
-      final helpfulMessage = lower.contains('api exception: 10') || lower.contains('sign_in_failed')
-          ? 'Google Sign-In config mismatch. ${GoogleSignInConfig.setupHint}'
-          : message;
+      final raw = error.toString().toLowerCase();
+      final helpfulMessage =
+          raw.contains('api exception: 10') || raw.contains('sign_in_failed')
+              ? 'Google Sign-In config mismatch. ${GoogleSignInConfig.setupHint}'
+              : VmFailurePresentation.messageFor(
+                  error,
+                  contentLabel: 'sign in',
+                );
       if (mounted) setState(() => _error = helpfulMessage);
     } finally {
       if (mounted) setState(() => _isLoading = false);
