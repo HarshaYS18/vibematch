@@ -2,6 +2,8 @@ import 'dart:async';
 
 import 'package:flutter/material.dart';
 
+import '../../../../core/network/vm_failure.dart';
+
 import '../../../gifts/presentation/lucky_gift_rankings_sheet.dart';
 import '../../data/gift_catalog_api_service.dart';
 import '../../data/lucky_packet_realtime_service.dart';
@@ -33,7 +35,7 @@ class LiveRoomGiftActionsModule {
       if (context.mounted) {
         RoomToast.show(
           context,
-          error.toString().replaceFirst('Exception: ', ''),
+          VmFailurePresentation.messageFor(error, contentLabel: 'gift action'),
         );
       }
       return;
@@ -148,7 +150,7 @@ class LiveRoomGiftActionsModule {
               if (context.mounted) Navigator.pop(context);
             } catch (error) {
               giftController.onToast(
-                error.toString().replaceFirst('Exception: ', ''),
+                VmFailurePresentation.messageFor(error, contentLabel: 'gift action'),
               );
               unawaited(giftController.refreshCoinBalance());
             }
