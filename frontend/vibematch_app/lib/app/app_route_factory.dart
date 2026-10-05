@@ -264,7 +264,7 @@ class AppRouteFactory {
     }
   }
 
-  static PageRouteBuilder<dynamic> _buildRoute(
+  static Route<dynamic> _buildRoute(
     RouteSettings settings,
     Widget page,
   ) => VmMotion.pageRoute(settings: settings, page: page);
