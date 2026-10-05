@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../../../../app/app_routes.dart';
+import '../../../../core/network/vm_failure.dart';
 import '../../../../core/ui/vm_motion.dart';
 import '../../../experience/presentation/experience_detail_page.dart';
 import '../../../inbox/data/inbox_api_service.dart';
@@ -192,7 +193,7 @@ class LiveRoomMiniProfileLauncher {
       );
       return relation;
     } catch (error) {
-      _showMiniToast(context, error.toString().replaceFirst('Exception: ', ''));
+      _showMiniToast(context, VmFailurePresentation.messageFor(error, contentLabel: 'profile action'));
       return MiniProfileSocialRelation.follow;
     }
   }
@@ -365,7 +366,7 @@ class LiveRoomMiniProfileLauncher {
         LiveRoomProfileNavigator.openModulePage(
           context: context,
           title: 'Message ${user.name}',
-          subtitle: error.toString().replaceFirst('Exception: ', ''),
+          subtitle: VmFailurePresentation.messageFor(error, contentLabel: 'profile action'),
           icon: Icons.chat_bubble_rounded,
         );
       });
