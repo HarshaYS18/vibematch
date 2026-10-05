@@ -437,7 +437,7 @@ class LiveRoomStateController {
   RoomBackgroundTheme _themeFromId(String themeId) {
     final cleanId = themeId.trim();
     return <RoomBackgroundTheme>[
-      ...ownedRoomBackgroundThemes,
+      ...roomBackgroundThemes,
       ...cricketModeBackgroundThemes,
       ...cricketRoomBackgroundThemes,
     ].firstWhere(
