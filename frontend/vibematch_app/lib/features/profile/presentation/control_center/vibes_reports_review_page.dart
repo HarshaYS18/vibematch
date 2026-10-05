@@ -370,3 +370,28 @@ class _ConfirmReportActionSheet extends StatelessWidget {
     );
   }
 }
+
+class _EmptyReports extends StatelessWidget {
+  const _EmptyReports();
+
+  @override
+  Widget build(BuildContext context) {
+    return const Center(child: Text('No Vibes reports in this queue.', style: TextStyle(color: SuperPowerDesign.muted, fontWeight: FontWeight.w800)));
+  }
+}
+
+class _RoundIcon extends StatelessWidget {
+  const _RoundIcon({required this.icon, required this.onTap});
+
+  final IconData icon;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    return InkWell(
+      onTap: onTap,
+      customBorder: const CircleBorder(),
+      child: Container(width: 38, height: 38, decoration: BoxDecoration(color: SuperPowerDesign.obsidian, shape: BoxShape.circle, border: Border.all(color: SuperPowerDesign.stroke)), child: Icon(icon, color: SuperPowerDesign.text, size: 21)),
+    );
+  }
+}
