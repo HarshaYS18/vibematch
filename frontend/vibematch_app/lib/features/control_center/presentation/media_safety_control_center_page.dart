@@ -777,19 +777,15 @@ class _TinyChip extends StatelessWidget {
 }
 
 class _EmptyCard extends StatelessWidget {
-  const _EmptyCard({required this.message, this.actionLabel, this.onAction});
+  const _EmptyCard({required this.message});
   final String message;
-  final String? actionLabel;
-  final VoidCallback? onAction;
+
   @override
   Widget build(BuildContext context) {
     return Container(
       padding: const EdgeInsets.all(18),
       decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(24), border: Border.all(color: const Color(0xFFEDE3D7))),
-      child: Column(children: [
-        Text(message, textAlign: TextAlign.center, style: const TextStyle(color: Color(0xFF7B6A86), fontWeight: FontWeight.w800)),
-        if (actionLabel != null && onAction != null) ...[const SizedBox(height: 10), FilledButton(onPressed: onAction, child: Text(actionLabel!))],
-      ]),
+      child: Text(message, textAlign: TextAlign.center, style: const TextStyle(color: Color(0xFF7B6A86), fontWeight: FontWeight.w800)),
     );
   }
 }
