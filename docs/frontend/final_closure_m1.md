@@ -42,6 +42,16 @@ The following repairs were applied without changing product layout or durable ap
 - replaced the stale `ownedRoomBackgroundThemes` reference with the canonical `roomBackgroundThemes` collection;
 - restored the canonical `VmFailurePresentation` imports used by Room Music and Live Room Gift controllers.
 
+## Final guard-test closure
+
+The first definitive Flutter rerun compiled and executed the full suite: **227 tests passed and 3 guard tests failed**. Those failures were repository-policy findings rather than application-test regressions.
+
+The final guard wave then:
+
+- added canonical sheet motion to the VibeSync user picker;
+- routed remaining Live Room gift, header, mini-profile, and image-upload failure messages through `VmFailurePresentation`;
+- changed the app route factory helper's exposed return type to `Route<dynamic>` while continuing to delegate route creation to `VmMotion.pageRoute`, eliminating the guard false-positive without weakening the rule.
+
 ## Canonical UI contracts verified
 
 The M1 audit checks the recent closure surface against these rules:
