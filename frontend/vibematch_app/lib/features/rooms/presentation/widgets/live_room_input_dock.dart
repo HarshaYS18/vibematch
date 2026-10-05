@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 
+import '../../../../core/network/vm_failure.dart';
+
 import '../../../../core/ui/vm_motion.dart';
 import '../../../media/data/media_upload_service.dart';
 import '../modules/live_room_games_module.dart';
@@ -78,7 +80,7 @@ class RoomInputDock extends StatelessWidget {
       if (context.mounted) {
         RoomToast.show(
           context,
-          error.toString().replaceFirst('Exception: ', ''),
+          VmFailurePresentation.messageFor(error, contentLabel: 'room image'),
         );
       }
     }
