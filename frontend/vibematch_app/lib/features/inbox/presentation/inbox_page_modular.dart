@@ -583,17 +583,13 @@ class _InboxPageState extends ConsumerState<InboxPage> {
   Future<void> _openStory(List<InboxStoryItem> stories, int index) async {
     final story = stories[index];
     await Navigator.of(context).push(
-      PageRouteBuilder<void>(
-        opaque: true,
-        transitionDuration: const Duration(milliseconds: 180),
-        reverseTransitionDuration: const Duration(milliseconds: 140),
-        pageBuilder: (context, animation, child) => FadeTransition(
-          opacity: animation,
-          child: _StoryViewerPage(
-            stories: stories,
-            initialIndex: index,
-            onViewed: (item) => _storiesApi.markViewed(item.id),
-          ),
+      VmMotion.pageRoute<void>(
+        settings: const RouteSettings(name: '/inbox/story'),
+        beginOffset: Offset.zero,
+        page: _StoryViewerPage(
+          stories: stories,
+          initialIndex: index,
+          onViewed: (item) => _storiesApi.markViewed(item.id),
         ),
       ),
     );
