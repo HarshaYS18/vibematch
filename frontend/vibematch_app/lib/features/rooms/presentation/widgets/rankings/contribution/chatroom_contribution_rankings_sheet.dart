@@ -2,7 +2,7 @@ import 'dart:async';
 
 import 'package:flutter/material.dart';
 
-import '../../../../../core/network/vm_failure.dart';
+import '../../../../../../core/network/vm_failure.dart';
 
 import '../../../../../auth/data/auth_api_service.dart';
 import '../../../../../auth/models/current_user.dart';
