@@ -315,7 +315,6 @@ class HomeNavigationController {
       sheetAnimationStyle: VmMotion.sheetAnimationStyle,
       backgroundColor: Colors.transparent,
       isScrollControlled: true,
-      sheetAnimationStyle: VmMotion.sheetAnimationStyle,
       builder: (_) => HomeLanguageSheet(
         languages: controller.availableLanguages,
         selectedLanguage: controller.selectedLanguage,
