@@ -36,7 +36,11 @@ The following repairs were applied without changing product layout or durable ap
 - restored Vibes report-review helper widgets while retaining canonical failure presentation and sheet motion;
 - corrected the Room Contribution Rankings `VmFailurePresentation` import path;
 - added an exact fingerprint ignore for the historical `SECURITY.md` Gitleaks false-positive;
-- migrated Inbox Story Viewer navigation to `VmMotion.pageRoute` with a zero slide offset, removing the feature-owned `PageRouteBuilder`.
+- migrated Inbox Story Viewer navigation to `VmMotion.pageRoute` with a zero slide offset, removing the feature-owned `PageRouteBuilder`;
+- restored the VIP compact-number formatter removed by the cleanup wave;
+- removed the duplicated Home language-sheet `sheetAnimationStyle` argument;
+- replaced the stale `ownedRoomBackgroundThemes` reference with the canonical `roomBackgroundThemes` collection;
+- restored the canonical `VmFailurePresentation` imports used by Room Music and Live Room Gift controllers.
 
 ## Canonical UI contracts verified
 
