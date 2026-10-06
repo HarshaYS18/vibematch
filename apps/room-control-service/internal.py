@@ -11,6 +11,7 @@ from app.core.config import settings
 from app.database import get_db
 from app.models.room import Room
 from app.models.user import User
+from app.realtime.connection_manager import room_realtime_connections
 from app.services import realtime_command_service
 from app.services.permissions.media_room_permission_service import evaluate_media_room_permission
 from app.schemas.rooms.cricket import (
@@ -22,7 +23,8 @@ from app.schemas.rooms.cricket import (
     CricketTournamentCreateRequest,
     CricketTournamentUpdateRequest,
 )
-from app.services.rooms import cricket_service
+from app.schemas.rooms.pk import RoomPkGiftScoreRequest
+from app.services.rooms import cricket_service, room_pk_service
 from app.services.rooms.room_theme_service import (
     grant_room_theme_inventory,
     room_theme_purchase_quote,
@@ -72,6 +74,40 @@ def require_internal_token(
     provided = (x_funkey_internal_token or "").strip()
     if not expected or not hmac.compare_digest(provided, expected):
         raise HTTPException(status_code=403, detail="Internal Room Control access denied")
+
+
+@router.post(
+    "/pk/gift-score",
+    dependencies=[Depends(require_internal_token)],
+)
+async def apply_pk_gift_score(
+    payload: RoomPkGiftScoreRequest,
+    db: Session = Depends(get_db),
+):
+    match, applied = room_pk_service.apply_gift_score(
+        db,
+        room_public_id=payload.room_public_id,
+        source_event_id=payload.source_event_id,
+        coin_value=payload.coin_value,
+    )
+    if match is None:
+        return {"applied": False, "pk": None}
+
+    state = room_pk_service.match_payload(db, match)
+    if applied:
+        challenger_room_id, opponent_room_id = room_pk_service.affected_room_ids(
+            db, match
+        )
+        event = {
+            "type": "room_pk/state",
+            "payload": {
+                "event_type": "score_updated",
+                "pk": state,
+            },
+        }
+        await room_realtime_connections.broadcast_room(challenger_room_id, event)
+        await room_realtime_connections.broadcast_room(opponent_room_id, event)
+    return {"applied": applied, "pk": state}
 
 
 @router.get(
