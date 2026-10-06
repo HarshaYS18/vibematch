@@ -38,6 +38,8 @@ class LiveRoomOverlaysModule {
       pendingSeatInviteIndex: bundle.pendingSeatInvite?.seatIndex,
       onRejectSeatInvite: () => LiveRoomSeatsModule.rejectSeatInvite(bundle),
       onAcceptSeatInvite: () => LiveRoomSeatsModule.acceptSeatInvite(bundle),
+      pkController: bundle.pkController,
+      canManagePk: bundle.viewerCanManageRoom,
     );
   }
 }
