@@ -3,6 +3,7 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../../core/navigation/vm_navigator.dart';
 import '../../../core/network/vm_failure.dart';
 
 import '../controllers/vibes_controller.dart';
@@ -137,7 +138,11 @@ class _VibesPageState extends ConsumerState<VibesPage> {
                   hasError: vibes.loadErrorMessage != null,
                   playbackGate: widget.playbackGate,
                   actionPillKey: _actionPillKey,
-                  onProfileTap: (vibe) => VibesNavigationController.showAction(context, '${vibe.authorName} profile will open.'),
+                  onProfileTap: (vibe) => VmNavigator.openPublicProfile(
+                    context,
+                    userId: vibe.authorId,
+                    displayName: vibe.authorName,
+                  ),
                   onLikeTap: _toggleLike,
                   onCommentTap: (vibe) => VibesNavigationController.openVibeDetail(context: context, controller: controller, vibe: vibe, playbackGate: widget.playbackGate),
                   onShareTap: (vibe) => VibesNavigationController.openShareSheet(context: context, controller: controller, vibe: vibe),

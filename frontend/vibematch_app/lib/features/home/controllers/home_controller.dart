@@ -177,9 +177,7 @@ class HomeController extends AutoDisposeNotifier<HomeState> {
       );
     } catch (error) {
       state = state.copyWith(
-        myCreatedRoom: null,
-        eventBanners: const <HomeBanner>[],
-        policyBanners: const <HomeBanner>[],
+        // Preserve the last usable chrome snapshot on refresh failure.
         bannerErrorMessage: VmFailurePresentation.messageFor(
           error,
           contentLabel: 'home content',
@@ -226,7 +224,7 @@ class HomeController extends AutoDisposeNotifier<HomeState> {
       );
     } catch (error) {
       state = state.copyWith(
-        backendRooms: const <HomeRoom>[],
+        // Keep the last-known-good room list visible when refresh fails.
         loadErrorMessage: VmFailurePresentation.messageFor(
           error,
           contentLabel: 'rooms',
@@ -234,10 +232,7 @@ class HomeController extends AutoDisposeNotifier<HomeState> {
         ),
       );
     } finally {
-      state = state.copyWith(
-        isLoadingRooms: false,
-        visibleRoomCount: 8,
-      );
+      state = state.copyWith(isLoadingRooms: false);
     }
   }
 

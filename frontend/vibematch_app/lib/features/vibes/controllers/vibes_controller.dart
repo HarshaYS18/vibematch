@@ -90,7 +90,7 @@ class VibesController extends AutoDisposeNotifier<VibesState> {
       );
     } catch (error) {
       state = state.copyWith(
-        vibes: const <VibeItem>[],
+        // Do not destructively clear a usable feed because a refresh failed.
         loadErrorMessage: VmFailurePresentation.messageFor(error, contentLabel: 'Vibes'),
       );
     } finally {
@@ -112,7 +112,7 @@ class VibesController extends AutoDisposeNotifier<VibesState> {
       );
     } catch (error) {
       state = state.copyWith(
-        vibes: const <VibeItem>[],
+        // Do not destructively clear a usable feed because a refresh failed.
         loadErrorMessage: VmFailurePresentation.messageFor(error, contentLabel: 'Vibes'),
       );
     } finally {

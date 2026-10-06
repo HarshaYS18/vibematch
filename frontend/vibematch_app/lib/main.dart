@@ -208,7 +208,7 @@ class VibeMatchApp extends StatelessWidget {
       useMaterial3: true,
       fontFamily: 'Roboto',
       visualDensity: VisualDensity.compact,
-      materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
+      materialTapTargetSize: MaterialTapTargetSize.padded,
       colorScheme: ColorScheme.fromSeed(
         seedColor: _aqua,
         brightness: Brightness.light,
@@ -357,23 +357,23 @@ class VibeMatchApp extends StatelessWidget {
       iconButtonTheme: IconButtonThemeData(
         style: IconButton.styleFrom(
           iconSize: 17,
-          minimumSize: const Size(30, 30),
-          tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+          minimumSize: const Size(44, 44),
+          tapTargetSize: MaterialTapTargetSize.padded,
           padding: const EdgeInsets.all(5),
         ),
       ),
       elevatedButtonTheme: ElevatedButtonThemeData(
         style: ElevatedButton.styleFrom(
-          minimumSize: const Size(44, 34),
+          minimumSize: const Size(44, 44),
           padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
-          tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+          tapTargetSize: MaterialTapTargetSize.padded,
         ),
       ),
       textButtonTheme: TextButtonThemeData(
         style: TextButton.styleFrom(
-          minimumSize: const Size(38, 30),
+          minimumSize: const Size(44, 44),
           padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-          tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+          tapTargetSize: MaterialTapTargetSize.padded,
         ),
       ),
     );
@@ -390,18 +390,9 @@ class VibeMatchApp extends StatelessWidget {
       initialRoute: VmRoutes.auth,
       onGenerateRoute: AppRouteFactory.onGenerateRoute,
       theme: _theme(),
-      builder: (context, child) {
-        final media = MediaQuery.of(context);
-        return MediaQuery(
-          data: media.copyWith(
-            textScaler: media.textScaler.clamp(
-              minScaleFactor: 0.82,
-              maxScaleFactor: 0.92,
-            ),
-          ),
-          child: child ?? const AuthGate(),
-        );
-      },
+      // Respect the user's platform text-scale preference. Individual screens
+      // must adapt instead of globally shrinking accessibility text.
+      builder: (context, child) => child ?? const AuthGate(),
     );
   }
 }

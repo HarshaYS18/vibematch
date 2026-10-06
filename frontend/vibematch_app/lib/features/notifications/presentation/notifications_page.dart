@@ -51,8 +51,10 @@ class _NotificationsPageState extends State<NotificationsPage> {
   }
 
   Future<void> _loadNotifications() async {
+    final hadItems = _items.isNotEmpty;
     setState(() {
-      _loading = true;
+      // Initial load owns the full-screen spinner. Refreshes preserve content.
+      _loading = !hadItems;
       _error = null;
     });
     try {
@@ -64,11 +66,15 @@ class _NotificationsPageState extends State<NotificationsPage> {
       });
     } catch (error) {
       if (!mounted) return;
+      final message = VmFailurePresentation.messageFor(
+        error,
+        contentLabel: 'notifications',
+      );
       setState(() {
-        _items = const <NotificationItem>[];
         _loading = false;
-        _error = VmFailurePresentation.messageFor(error, contentLabel: 'notifications');
+        _error = hadItems ? null : message;
       });
+      if (hadItems) _toast(message);
     }
   }
 

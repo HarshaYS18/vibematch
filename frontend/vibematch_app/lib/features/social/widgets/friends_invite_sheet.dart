@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 
+import '../../../core/network/vm_failure.dart';
+
 import '../data/social_api_service.dart';
 import '../models/social_user.dart';
 
@@ -99,7 +101,10 @@ class _FriendsInviteSheetState extends State<FriendsInviteSheet> {
           SnackBar(
             behavior: SnackBarBehavior.floating,
             backgroundColor: const Color(0xFF251538),
-            content: Text('Action failed: $error', style: const TextStyle(fontWeight: FontWeight.w800)),
+            content: Text(
+              VmFailurePresentation.messageFor(error, contentLabel: 'invite'),
+              style: const TextStyle(fontWeight: FontWeight.w800),
+            ),
           ),
         );
     }
