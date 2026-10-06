@@ -31,6 +31,7 @@ from app.services import (
     lucky_gift_house_service,
     lucky_gift_props_service,
     lucky_gift_stats_service,
+    room_control_service_client,
 )
 from app.services.rooms.room_contribution_service import room_contribution_rankings
 from app.websocket.inbox_ws import inbox_ws_manager
@@ -302,6 +303,28 @@ def _queue_room_level_and_rankings(
     )
 
 
+def _record_pk_score_safely(
+    *,
+    room_public_id: str,
+    source_event_id: str,
+    total_coin_value: int,
+) -> None:
+    try:
+        room_control_service_client.apply_pk_gift_score(
+            room_public_id=room_public_id,
+            source_event_id=source_event_id,
+            coin_value=total_coin_value,
+        )
+    except (
+        room_control_service_client.RoomControlServiceUnavailable,
+        room_control_service_client.RoomControlServiceError,
+    ):
+        # Gift settlement is financial authority and must not be rolled back by
+        # a disposable PK score projection failure. The room can resync/finalize
+        # independently while Economy remains committed.
+        return
+
+
 def _queue_room_gift_event(
     background_tasks: BackgroundTasks,
     db: Session,
@@ -336,6 +359,13 @@ def _queue_room_gift_event(
     event_id = (
         f"gift_{result.get('gift_transaction_id') or datetime.utcnow().timestamp()}_"
         f"{receiver.public_user_id}"
+    )
+
+    background_tasks.add_task(
+        _record_pk_score_safely,
+        room_public_id=room.room_public_id,
+        source_event_id=event_id,
+        total_coin_value=total_coin_value,
     )
     receiver_name = receiver.display_name or receiver.username or str(receiver.public_user_id)
     message = f"sent to {receiver_name} {gift_name} x{quantity}"
