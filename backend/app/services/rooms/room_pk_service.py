@@ -109,9 +109,9 @@ def affected_room_ids(db: Session, match: RoomPkMatch) -> tuple[str, str]:
 
 
 def _ensure_not_busy(db: Session, room: Room) -> None:
-    current = _match_for_room(db, room, statuses=OPEN_MATCH_STATUSES)
+    current = _match_for_room(db, room, statuses=OPEN_MATCH_STATUSES, lock=True)
     if current is not None:
-        _expire_if_needed(db, current)
+        _expire_if_needed(db, current, commit=False)
         if current.status in OPEN_MATCH_STATUSES:
             raise HTTPException(status_code=409, detail="Room is already in a PK challenge or battle")
 
@@ -386,7 +386,13 @@ def _reconcile_scores_from_economy(
     match.opponent_score = scores.get(int(match.opponent_room_id), 0)
 
 
-def _finish(db: Session, match: RoomPkMatch, *, reason: str) -> RoomPkMatch:
+def _finish(
+    db: Session,
+    match: RoomPkMatch,
+    *,
+    reason: str,
+    commit: bool = True,
+) -> RoomPkMatch:
     now = datetime.utcnow()
     if match.status == "challenged":
         match.status = "cancelled"
@@ -406,22 +412,33 @@ def _finish(db: Session, match: RoomPkMatch, *, reason: str) -> RoomPkMatch:
     match.finished_at = now
     match.finished_reason = reason
     match.updated_at = now
-    db.commit()
+    if commit:
+        db.commit()
+    else:
+        db.flush()
     db.refresh(match)
     return match
 
 
-def _expire_if_needed(db: Session, match: RoomPkMatch) -> RoomPkMatch:
+def _expire_if_needed(
+    db: Session,
+    match: RoomPkMatch,
+    *,
+    commit: bool = True,
+) -> RoomPkMatch:
     now = datetime.utcnow()
     if match.status == "challenged" and now >= match.challenge_expires_at:
         match.status = "cancelled"
         match.finished_reason = "challenge_expired"
         match.finished_at = now
         match.updated_at = now
-        db.commit()
+        if commit:
+            db.commit()
+        else:
+            db.flush()
         db.refresh(match)
     elif match.status == "active" and match.ends_at is not None and now >= match.ends_at:
-        _finish(db, match, reason="timer_elapsed")
+        _finish(db, match, reason="timer_elapsed", commit=commit)
     return match
 
 
