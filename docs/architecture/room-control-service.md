@@ -9,7 +9,7 @@
 
 ## Purpose
 
-Chunk 26 physically separates room correctness from the core API. Room Control owns durable room configuration, membership/admin state, kickouts, seats and seat applications, member requests, room chat persistence, room event/version state, activities, Watch Party durable state, Room Cricket tournament/match/ball state, room themes/reviews/inventory, and room moderation commands.
+Chunk 26 physically separates room correctness from the core API. Room Control owns durable room configuration, membership/admin state, kickouts, seats and seat applications, member requests, room chat persistence, room event/version state, activities, Watch Party durable state, Room Cricket tournament/match/ball state, room themes/reviews/inventory, and room moderation commands, and Room-vs-Room PK challenge/match/result authority.
 
 The extraction does not create a second room source of truth. PostgreSQL remains authoritative; Redis remains ephemeral/rebuildable and the Go gateway remains transport.
 
@@ -29,7 +29,7 @@ The catch-all proxy is registered after those exact routes so it cannot shadow t
 
 `deploy/postgres/room-control-ownership.sql` transfers these tables to `funkey_room_control_owner` and grants DML to `funkey_room_control_runtime`:
 
-`rooms`, `room_participants`, `room_seat_states`, `room_realtime_events`, `room_member_requests`, `room_seat_applications`, `room_chat_messages`, `room_kickouts`, `room_themes`, `user_room_theme_inventory`, `room_theme_reviews`, `cricket_tournaments`, `cricket_matches`, and `cricket_ball_events`.
+`rooms`, `room_participants`, `room_seat_states`, `room_realtime_events`, `room_member_requests`, `room_seat_applications`, `room_chat_messages`, `room_kickouts`, `room_themes`, `user_room_theme_inventory`, `room_theme_reviews`, `room_pk_matches`, `room_pk_score_receipts`, `cricket_tournaments`, `cricket_matches`, and `cricket_ball_events`.
 
 Identity/profile/economy tables are read-only compatibility dependencies. Room Control never writes wallets, identity last-seen state, or connected-liveness presence. Online presence is the Go realtime Redis lease projection; the legacy `user_room_presence` table has no Room Control runtime write grant.
 
@@ -74,3 +74,21 @@ to querying `rooms`, `room_participants` or `room_seat_states` directly.
 ## Room Cricket mutation safety
 
 Cricket tournament/match mutations require Room Control host/admin authorization and serialize on locked durable rows. Ball scoring is append-only in `cricket_ball_events`; `(match_id, sequence)` prevents ordering collisions. First-party clients also send a stable per-ball `event_id`, persisted across ambiguous HTTP retries, and Room Control enforces `(match_id, source_event_id)` uniqueness. This prevents a successful-but-timed-out ball POST from being counted twice without falsely deduplicating two genuinely identical consecutive deliveries.
+
+
+## Room PK authority
+
+Room-vs-Room PK belongs to Room Control. PostgreSQL stores the challenge,
+active match, final scores and winner. The UI never computes or persists the
+winner.
+
+PK contribution scoring consumes only successfully settled Economy gift
+transactions. Core Economy posts an idempotent receipt to Room Control after the
+financial settlement has committed. A Room Control outage cannot roll back a
+gift settlement; duplicate score receipts are rejected by stable source-event
+identity.
+
+Realtime PK events are transport/projection only. Both participating rooms
+receive the same authoritative state through the existing room realtime
+delivery and Go gateway path. Redis remains replay/fanout state and is never the
+battle result authority.
