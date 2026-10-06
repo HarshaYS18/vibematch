@@ -352,6 +352,31 @@
       "migration_status": "Chunk 26 authority; post-Chunk-32 repair moved durable Cricket state under Room Control with serialized ball events"
     },
     {
+      "id": "rooms.pk",
+      "domain": "rooms",
+      "classification": "AUTHORITY",
+      "logical_owner": "room-control",
+      "current_deployable": "room-control-service",
+      "current_storage": [
+        "postgres:room_pk_matches",
+        "postgres:room_pk_score_receipts"
+      ],
+      "target_storage": [
+        "room-control service postgres"
+      ],
+      "mutated_by": [
+        "room_pk_service",
+        "idempotent post-settlement Economy score receipt"
+      ],
+      "source_states": [],
+      "rebuild_from": [],
+      "change_contract": {
+        "status": "live",
+        "name": "room_pk/state"
+      },
+      "migration_status": "M5 Room-vs-Room PK durable authority added under Room Control"
+    },
+    {
       "id": "presence.online_lease",
       "domain": "presence",
       "classification": "EPHEMERAL",
