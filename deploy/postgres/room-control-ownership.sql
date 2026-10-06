@@ -30,6 +30,8 @@ ALTER TABLE room_kickouts OWNER TO funkey_room_control_owner;
 ALTER TABLE room_themes OWNER TO funkey_room_control_owner;
 ALTER TABLE user_room_theme_inventory OWNER TO funkey_room_control_owner;
 ALTER TABLE room_theme_reviews OWNER TO funkey_room_control_owner;
+ALTER TABLE room_pk_matches OWNER TO funkey_room_control_owner;
+ALTER TABLE room_pk_score_receipts OWNER TO funkey_room_control_owner;
 ALTER TABLE cricket_tournaments OWNER TO funkey_room_control_owner;
 ALTER TABLE cricket_matches OWNER TO funkey_room_control_owner;
 ALTER TABLE cricket_ball_events OWNER TO funkey_room_control_owner;
@@ -46,6 +48,8 @@ REVOKE ALL ON TABLE
     room_themes,
     user_room_theme_inventory,
     room_theme_reviews,
+    room_pk_matches,
+    room_pk_score_receipts,
     cricket_tournaments,
     cricket_matches,
     cricket_ball_events
@@ -63,6 +67,8 @@ GRANT SELECT, INSERT, UPDATE, DELETE ON TABLE
     room_themes,
     user_room_theme_inventory,
     room_theme_reviews,
+    room_pk_matches,
+    room_pk_score_receipts,
     cricket_tournaments,
     cricket_matches,
     cricket_ball_events
@@ -81,6 +87,8 @@ GRANT SELECT ON TABLE
     room_themes,
     user_room_theme_inventory,
     room_theme_reviews,
+    room_pk_matches,
+    room_pk_score_receipts,
     cricket_tournaments,
     cricket_matches,
     cricket_ball_events
@@ -132,6 +140,8 @@ BEGIN
         'room_themes',
         'user_room_theme_inventory',
         'room_theme_reviews',
+        'room_pk_matches',
+        'room_pk_score_receipts',
         'cricket_tournaments',
         'cricket_matches',
         'cricket_ball_events'
