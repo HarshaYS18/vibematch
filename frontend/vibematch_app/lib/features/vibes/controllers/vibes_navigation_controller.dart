@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 
+import '../../../core/network/vm_failure.dart';
 import '../../../core/ui/vm_motion.dart';
 import '../../auth/data/auth_api_service.dart';
 import '../../social/widgets/friends_invite_sheet.dart';
@@ -9,6 +10,7 @@ import '../presentation/pages/media_vibe_detail_pager.dart';
 import '../presentation/pages/vibe_detail_backend_page.dart';
 import '../presentation/pages/vibes_settings_page.dart';
 import '../presentation/widgets/vibe_action_sheets.dart';
+import '../presentation/widgets/vibe_media_playback_gate.dart';
 import 'vibes_controller.dart';
 
 class VibesNavigationController {
@@ -58,12 +60,14 @@ class VibesNavigationController {
   static void openCreateVibe({
     required BuildContext context,
     required VibesController controller,
+    required VibeMediaPlaybackGate playbackGate,
   }) {
     Navigator.of(context).push(
       VmMotion.pageRoute<void>(
         settings: const RouteSettings(name: 'create-vibe'),
         page: CreateVibePageModular(
           canUseMentionAllToday: controller.canUseMentionAllToday,
+          playbackGate: playbackGate,
           onPublish: (newVibe) async {
             try {
               await controller.publishVibe(newVibe);
@@ -72,7 +76,7 @@ class VibesNavigationController {
               if (context.mounted)
                 showAction(
                   context,
-                  error.toString().replaceFirst('Exception: ', ''),
+                  VmFailurePresentation.messageFor(error, contentLabel: 'Vibe action'),
                 );
             }
           },
@@ -85,6 +89,7 @@ class VibesNavigationController {
     required BuildContext context,
     required VibesController controller,
     required VibeItem vibe,
+    required VibeMediaPlaybackGate playbackGate,
   }) {
     if (vibe.mediaType != VibeMediaType.text) {
       final mediaVibes = controller.visibleVibes
@@ -99,6 +104,7 @@ class VibesNavigationController {
           settings: const RouteSettings(name: 'media-vibe-detail'),
           page: MediaVibeDetailPager(
             vibes: mediaVibes.isEmpty ? <VibeItem>[vibe] : mediaVibes,
+            playbackGate: playbackGate,
             initialIndex: idIndex >= 0
                 ? idIndex
                 : (fallbackIndex >= 0 ? fallbackIndex : 0),
@@ -146,7 +152,7 @@ class VibesNavigationController {
             if (context.mounted)
               showAction(
                 context,
-                error.toString().replaceFirst('Exception: ', ''),
+                VmFailurePresentation.messageFor(error, contentLabel: 'Vibe action'),
               );
           }
         },
@@ -176,7 +182,7 @@ class VibesNavigationController {
         showAction(context, 'Vibe submitted for official review.');
     } catch (error) {
       if (context.mounted)
-        showAction(context, error.toString().replaceFirst('Exception: ', ''));
+        showAction(context, VmFailurePresentation.messageFor(error, contentLabel: 'Vibe action'));
     }
   }
 
@@ -197,7 +203,7 @@ class VibesNavigationController {
       if (context.mounted) showAction(context, 'Vibe deleted.');
     } catch (error) {
       if (context.mounted)
-        showAction(context, error.toString().replaceFirst('Exception: ', ''));
+        showAction(context, VmFailurePresentation.messageFor(error, contentLabel: 'Vibe action'));
     }
   }
 

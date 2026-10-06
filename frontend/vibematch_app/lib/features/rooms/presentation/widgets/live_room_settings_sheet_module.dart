@@ -7,10 +7,15 @@ import '../live_room_models.dart';
 import 'live_room_blocked_list_sheet.dart';
 import 'room_settings_sheet.dart';
 
+/// Presentation wrapper for the room settings bottom sheet.
+///
+/// The room music controller is injected from the mounted room bundle so music
+/// overlay state follows room lifecycle and cannot leak through a singleton.
 class LiveRoomSettingsSheetModule extends StatelessWidget {
   const LiveRoomSettingsSheetModule({
     super.key,
     this.roomId = 'VM257808',
+    required this.roomMusicController,
     required this.privacyMode,
     required this.roomImagesEnabled,
     required this.guestMessagesEnabled,
@@ -32,11 +37,14 @@ class LiveRoomSettingsSheetModule extends StatelessWidget {
     required this.onWatchPartyTap,
     required this.onClearChatTap,
     required this.onCricketModeTap,
+    required this.onPkModeTap,
     required this.canCloseRoom,
     this.cricketModeActive = false,
+    this.pkModeEngaged = false,
   });
 
   final String roomId;
+  final RoomMusicController roomMusicController;
   final RoomPrivacyMode privacyMode;
   final bool roomImagesEnabled;
   final bool guestMessagesEnabled;
@@ -59,8 +67,10 @@ class LiveRoomSettingsSheetModule extends StatelessWidget {
   final VoidCallback onWatchPartyTap;
   final VoidCallback onClearChatTap;
   final VoidCallback onCricketModeTap;
+  final VoidCallback onPkModeTap;
   final bool canCloseRoom;
   final bool cricketModeActive;
+  final bool pkModeEngaged;
 
   void _openBlockedList(BuildContext context) {
     showModalBottomSheet<void>(
@@ -76,7 +86,7 @@ class LiveRoomSettingsSheetModule extends StatelessWidget {
   void _openMusicModule(BuildContext context) {
     Navigator.of(context).pop();
     Future<void>.delayed(const Duration(milliseconds: 80), () {
-      RoomMusicController.instance.showOverlay();
+      roomMusicController.showOverlay();
     });
   }
 
@@ -99,6 +109,7 @@ class LiveRoomSettingsSheetModule extends StatelessWidget {
       onVibeSyncTap: onVibeSyncTap,
       onWatchPartyTap: onWatchPartyTap,
       onCricketModeTap: onCricketModeTap,
+      onPkModeTap: onPkModeTap,
       onReportsTap: () => LiveRoomProfileNavigator.openModulePage(
         context: context,
         title: 'Reports',
@@ -123,6 +134,7 @@ class LiveRoomSettingsSheetModule extends StatelessWidget {
       canCloseRoom: canCloseRoom,
       showSeatLayoutOption: !cricketModeActive,
       cricketModeActive: cricketModeActive,
+      pkModeEngaged: pkModeEngaged,
     );
   }
 }

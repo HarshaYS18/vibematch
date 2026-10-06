@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 
 import '../../../app/app_routes.dart';
 import '../../../core/navigation/vm_navigator.dart';
+import '../../../core/network/vm_failure.dart';
 import '../../../core/ui/vm_motion.dart';
 import '../../auth/models/current_user.dart';
 import '../../create/presentation/create_page.dart';
@@ -111,6 +112,34 @@ class HomeNavigationController {
     showToast(context, 'Room saved. Pull to refresh if it does not appear.');
   }
 
+  static Future<void> quickMatch({
+    required BuildContext context,
+    required HomeController controller,
+    required CurrentUser? currentUser,
+  }) async {
+    if (currentUser == null) {
+      showToast(context, 'Login session not ready. Refresh and try again.');
+      return;
+    }
+    try {
+      final room = await controller.quickMatch();
+      if (!context.mounted) return;
+      if (room == null) {
+        showToast(context, 'No public room is available right now.');
+        return;
+      }
+      await _joinAndEnter(
+        context: context,
+        room: room,
+        currentUser: currentUser,
+      );
+    } catch (error) {
+      if (context.mounted) {
+        showToast(context, VmFailurePresentation.messageFor(error, contentLabel: 'room'));
+      }
+    }
+  }
+
   static void openRoom({
     required BuildContext context,
     required HomeRoom room,
@@ -178,7 +207,7 @@ class HomeNavigationController {
       return true;
     } catch (error) {
       if (!context.mounted) return false;
-      final message = error.toString().replaceFirst('Exception: ', '');
+      final message = VmFailurePresentation.messageFor(error, contentLabel: 'room');
       if (message.toLowerCase().contains('locked') &&
           (lockPassword == null || lockPassword.trim().isEmpty)) {
         openLockedRoomSheet(
@@ -221,6 +250,7 @@ class HomeNavigationController {
   }) {
     showModalBottomSheet<void>(
       context: context,
+      sheetAnimationStyle: VmMotion.sheetAnimationStyle,
       backgroundColor: Colors.transparent,
       isScrollControlled: true,
       builder: (_) => HomeLockedRoomSheet(
@@ -265,7 +295,7 @@ class HomeNavigationController {
               showToast(
                 context,
                 _entryBlockedMessage(
-                  error.toString().replaceFirst('Exception: ', ''),
+                  VmFailurePresentation.messageFor(error, contentLabel: 'room'),
                 ),
               );
             }
@@ -282,10 +312,11 @@ class HomeNavigationController {
   }) {
     showModalBottomSheet<void>(
       context: context,
+      sheetAnimationStyle: VmMotion.sheetAnimationStyle,
       backgroundColor: Colors.transparent,
       isScrollControlled: true,
       builder: (_) => HomeLanguageSheet(
-        languages: controller.languages,
+        languages: controller.availableLanguages,
         selectedLanguage: controller.selectedLanguage,
         onLanguageSelected: (language) {
           controller.selectLanguage(language);

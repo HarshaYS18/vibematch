@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 
+import '../../../../core/network/vm_failure.dart';
+
 import '../../data/coin_sales_api_service.dart';
 
 class CoinSupplyGrantPage extends StatefulWidget {
@@ -71,7 +73,7 @@ class _CoinSupplyGrantPageState extends State<CoinSupplyGrantPage> {
       _toast('Supply granted. New pool balance: ${_formatNumber(pool.balance)}');
     } catch (error) {
       if (!mounted) return;
-      _toast(error.toString().replaceFirst('Exception: ', ''));
+      _toast(VmFailurePresentation.messageFor(error, contentLabel: 'coin supply action'));
     } finally {
       if (mounted) setState(() => _busy = false);
     }

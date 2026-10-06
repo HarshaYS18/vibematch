@@ -1,14 +1,45 @@
-import 'package:flutter/foundation.dart';
+import '../../../foundation/realtime/realtime_event_envelope.dart';
 
-class LiveRoomSystemEventBus {
-  LiveRoomSystemEventBus._();
+LiveRoomSystemEvent? decodeLiveRoomSystemEvent(
+  RealtimeEventEnvelope envelope, {
+  String? roomId,
+}) {
+  final decoded = envelope.toLegacyEvent();
+  final wireType = decoded['type']?.toString() ?? '';
+  final rawPayload = decoded['payload'];
+  final payload = rawPayload is Map
+      ? rawPayload.cast<String, dynamic>()
+      : <String, dynamic>{};
 
-  static final ValueNotifier<LiveRoomSystemEvent?> latestEvent =
-      ValueNotifier<LiveRoomSystemEvent?>(null);
-
-  static void publish(LiveRoomSystemEvent event) {
-    latestEvent.value = event;
+  final eventType =
+      payload['event_type']?.toString() ??
+      payload['type']?.toString() ??
+      (wireType == 'room/system_event' ? '' : wireType);
+  if (wireType != 'room/system_event' &&
+      eventType != 'global_gift_broadcast' &&
+      !eventType.startsWith('lucky_packet_') &&
+      eventType != 'room_gift_sent') {
+    return null;
   }
+
+  final event = LiveRoomSystemEvent.fromJson(<String, dynamic>{
+    ...payload,
+    if ((payload['event_type']?.toString().trim() ?? '').isEmpty)
+      'event_type': eventType,
+    if ((payload['room_id']?.toString().trim() ?? '').isEmpty &&
+        decoded['room_id'] != null)
+      'room_id': decoded['room_id'],
+  });
+
+  final expectedRoomId = roomId?.trim();
+  if (event.type != 'global_gift_broadcast' &&
+      expectedRoomId != null &&
+      expectedRoomId.isNotEmpty &&
+      event.roomId.trim().isNotEmpty &&
+      event.roomId.trim() != expectedRoomId) {
+    return null;
+  }
+  return event;
 }
 
 class LiveRoomSystemEvent {
@@ -140,14 +171,10 @@ class LiveRoomSystemEvent {
       giftVideoUrl: _text(
         json['video_url'] ?? json['gift_video_url'] ?? json['giftVideoUrl'],
       ),
-      giftAssetPath: _text(
-        json['asset_path'] ?? json['gift_asset_path'] ?? json['giftAssetPath'],
-      ),
-      giftVideoAssetPath: _text(
-        json['video_asset_path'] ??
-            json['gift_video_asset_path'] ??
-            json['giftVideoAssetPath'],
-      ),
+      // Legacy local Flutter paths are intentionally ignored. Product media is
+      // CDN-owned and only public URLs are eligible for rendering.
+      giftAssetPath: null,
+      giftVideoAssetPath: null,
       giftCategory: (json['gift_category'] ?? json['category'] ?? 'classic')
           .toString(),
       giftType: (json['gift_type'] ?? 'normal').toString(),

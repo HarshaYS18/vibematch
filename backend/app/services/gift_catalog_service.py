@@ -42,7 +42,7 @@ NORMAL_GIFTS = [
         "max_combo": 999,
         "icon_key": "local_favorite",
         "chat_symbol": "🌹",
-        "asset_path": "assets/gifts/normal/rose_bloom.webp",
+        "asset_path": None,
         "video_asset_path": None,
         "cdn_asset_path": "gifts/rose_bloom/v1/icon.webp",
         "cdn_video_path": None,
@@ -64,7 +64,7 @@ NORMAL_GIFTS = [
         "max_combo": 999,
         "icon_key": "local_paid",
         "chat_symbol": "🪙",
-        "asset_path": "assets/gifts/normal/gold_coin.webp",
+        "asset_path": None,
         "video_asset_path": None,
         "cdn_asset_path": "gifts/gold_coin/v1/icon.webp",
         "cdn_video_path": None,
@@ -86,7 +86,7 @@ NORMAL_GIFTS = [
         "max_combo": 999,
         "icon_key": "local_celebration",
         "chat_symbol": "🎉",
-        "asset_path": "assets/gifts/normal/party_pop.webp",
+        "asset_path": None,
         "video_asset_path": None,
         "cdn_asset_path": "gifts/party_pop/v1/icon.webp",
         "cdn_video_path": None,
@@ -108,8 +108,8 @@ NORMAL_GIFTS = [
         "max_combo": 1,
         "icon_key": "local_rocket",
         "chat_symbol": "🚀",
-        "asset_path": "assets/gifts/love_rocket/icon/love_rocket_icon.webp",
-        "video_asset_path": "assets/videos/gifts/love_rocket.mp4",
+        "asset_path": None,
+        "video_asset_path": None,
         "cdn_asset_path": "gifts/love_rocket/v1/icon.webp",
         "cdn_video_path": "gifts/love_rocket/v1/animation.mp4",
         "animation_type": "video",
@@ -130,8 +130,8 @@ NORMAL_GIFTS = [
         "max_combo": 1,
         "icon_key": "local_favorite",
         "chat_symbol": "💍",
-        "asset_path": "assets/images/gifts/proposal.png",
-        "video_asset_path": "assets/videos/gifts/boy_proposing_girl_d_romantic.mp4",
+        "asset_path": None,
+        "video_asset_path": None,
         "cdn_asset_path": "gifts/proposal/v1/icon.webp",
         "cdn_video_path": "gifts/proposal/v1/animation.mp4",
         "animation_type": "video",
@@ -152,8 +152,8 @@ NORMAL_GIFTS = [
         "max_combo": 1,
         "icon_key": "local_flutter_dash",
         "chat_symbol": "🦋",
-        "asset_path": "assets/images/gifts/butterfly.png",
-        "video_asset_path": "assets/videos/gifts/pretty_girl_butterfly_animation.mp4",
+        "asset_path": None,
+        "video_asset_path": None,
         "cdn_asset_path": "gifts/butterfly/v1/icon.webp",
         "cdn_video_path": "gifts/butterfly/v1/animation.mp4",
         "animation_type": "video",
@@ -174,8 +174,8 @@ NORMAL_GIFTS = [
         "max_combo": 1,
         "icon_key": "local_auto_fix_high",
         "chat_symbol": "🪄",
-        "asset_path": "assets/images/gifts/premium_magic_1.png",
-        "video_asset_path": "assets/videos/gifts/premium_magic_1.mp4",
+        "asset_path": None,
+        "video_asset_path": None,
         "cdn_asset_path": "gifts/premium_magic_1/v1/icon.webp",
         "cdn_video_path": "gifts/premium_magic_1/v1/animation.mp4",
         "animation_type": "video",
@@ -196,8 +196,8 @@ NORMAL_GIFTS = [
         "max_combo": 1,
         "icon_key": "local_auto_awesome",
         "chat_symbol": "✨",
-        "asset_path": "assets/images/gifts/premium_magic_2.png",
-        "video_asset_path": "assets/videos/gifts/premium_magic_2.mp4",
+        "asset_path": None,
+        "video_asset_path": None,
         "cdn_asset_path": "gifts/premium_magic_2/v1/icon.webp",
         "cdn_video_path": "gifts/premium_magic_2/v1/animation.mp4",
         "animation_type": "video",
@@ -218,8 +218,8 @@ NORMAL_GIFTS = [
         "max_combo": 1,
         "icon_key": "local_workspace_premium",
         "chat_symbol": "👑",
-        "asset_path": "assets/images/gifts/premium_magic_3.png",
-        "video_asset_path": "assets/videos/gifts/premium_magic_3.mp4",
+        "asset_path": None,
+        "video_asset_path": None,
         "cdn_asset_path": "gifts/premium_magic_3/v1/icon.webp",
         "cdn_video_path": "gifts/premium_magic_3/v1/animation.mp4",
         "animation_type": "video",
@@ -240,7 +240,7 @@ NORMAL_GIFTS = [
         "max_combo": 999,
         "icon_key": "local_sailing",
         "chat_symbol": "🛥️",
-        "asset_path": "assets/images/gifts/premium_yacht.png",
+        "asset_path": None,
         "video_asset_path": None,
         "cdn_asset_path": "gifts/premium_yacht/v1/icon.webp",
         "cdn_video_path": None,
@@ -262,7 +262,7 @@ NORMAL_GIFTS = [
         "max_combo": 999,
         "icon_key": "local_castle",
         "chat_symbol": "🏰",
-        "asset_path": "assets/images/gifts/premium_castle.png",
+        "asset_path": None,
         "video_asset_path": None,
         "cdn_asset_path": "gifts/premium_castle/v1/icon.webp",
         "cdn_video_path": None,
@@ -287,7 +287,7 @@ LUCKY_GIFTS = [
         "max_combo": 999,
         "icon_key": "local_auto_fix_high",
         "chat_symbol": "🪄",
-        "asset_path": "assets/gifts/lucky/arcane_crystal_wand.png",
+        "asset_path": None,
         "video_asset_path": None,
         "cdn_asset_path": "gifts/arcane_crystal_wand/v1/icon.webp",
         "cdn_video_path": None,
@@ -310,7 +310,7 @@ LUCKY_GIFTS = [
         "max_combo": 999,
         "icon_key": "local_favorite_border",
         "chat_symbol": "🌹",
-        "asset_path": "assets/gifts/lucky/celestial_rose.png",
+        "asset_path": None,
         "video_asset_path": None,
         "cdn_asset_path": "gifts/celestial_rose/v1/icon.webp",
         "cdn_video_path": None,
@@ -333,7 +333,7 @@ LUCKY_GIFTS = [
         "max_combo": 999,
         "icon_key": "local_diamond",
         "chat_symbol": "💍",
-        "asset_path": "assets/gifts/lucky/eternal_bond_rings.png",
+        "asset_path": None,
         "video_asset_path": None,
         "cdn_asset_path": "gifts/eternal_bond_rings/v1/icon.webp",
         "cdn_video_path": None,
@@ -356,7 +356,7 @@ LUCKY_GIFTS = [
         "max_combo": 999,
         "icon_key": "local_pets",
         "chat_symbol": "🐘",
-        "asset_path": "assets/gifts/lucky/bubble_elephant.png",
+        "asset_path": None,
         "video_asset_path": None,
         "cdn_asset_path": "gifts/bubble_elephant/v1/icon.webp",
         "cdn_video_path": None,
@@ -379,7 +379,7 @@ LUCKY_GIFTS = [
         "max_combo": 999,
         "icon_key": "local_wb_sunny",
         "chat_symbol": "☀️",
-        "asset_path": "assets/gifts/lucky/sun_fortune_coin.png",
+        "asset_path": None,
         "video_asset_path": None,
         "cdn_asset_path": "gifts/sun_fortune_coin/v1/icon.webp",
         "cdn_video_path": None,
@@ -402,7 +402,7 @@ LUCKY_GIFTS = [
         "max_combo": 999,
         "icon_key": "local_waves",
         "chat_symbol": "🐟",
-        "asset_path": "assets/gifts/lucky/moonlit_koi.png",
+        "asset_path": None,
         "video_asset_path": None,
         "cdn_asset_path": "gifts/moonlit_koi/v1/icon.webp",
         "cdn_video_path": None,
@@ -425,7 +425,7 @@ LUCKY_GIFTS = [
         "max_combo": 999,
         "icon_key": "local_auto_stories",
         "chat_symbol": "📖",
-        "asset_path": "assets/gifts/lucky/spellbound_tome.png",
+        "asset_path": None,
         "video_asset_path": None,
         "cdn_asset_path": "gifts/spellbound_tome/v1/icon.webp",
         "cdn_video_path": None,
@@ -452,12 +452,19 @@ MULTIPLIER_TABLE = [
 ]
 
 
+def _gift_cdn_base_url() -> str:
+    return (
+        settings.GIFT_CDN_BASE_URL.strip()
+        or settings.MEDIA_CDN_BASE_URL.strip()
+    ).rstrip("/")
+
+
 def _cdn_url(relative_path: str | None) -> str | None:
     if not relative_path:
         return None
     if relative_path.startswith("http://") or relative_path.startswith("https://"):
         return relative_path
-    base = settings.GIFT_CDN_BASE_URL.strip().rstrip("/")
+    base = _gift_cdn_base_url()
     if not base:
         return None
     clean_path = relative_path.lstrip("/")
@@ -470,7 +477,12 @@ def _with_dynamic_urls(gift: dict) -> dict:
     item = deepcopy(gift)
     item["asset_url"] = _cdn_url(item.get("cdn_asset_path"))
     item["video_url"] = _cdn_url(item.get("cdn_video_path"))
-    item["cdn_enabled"] = bool(settings.GIFT_CDN_BASE_URL.strip())
+    # Local Flutter media paths are legacy migration metadata only. Public
+    # catalog payloads are CDN-only so clients cannot silently reintroduce
+    # bundled product media.
+    item["asset_path"] = None
+    item["video_asset_path"] = None
+    item["cdn_enabled"] = bool(_gift_cdn_base_url())
     item["catalog_version"] = GIFT_CATALOG_VERSION
     item["min_combo"] = max(1, int(item.get("min_combo") or 1))
     item["max_combo"] = max(item["min_combo"], int(item.get("max_combo") or 999))
@@ -611,7 +623,7 @@ def admin_catalog_snapshot(db: Session) -> dict:
     gifts = [_with_dynamic_urls(_item_to_gift_dict(item)) for item in items]
     return {
         "catalog_version": GIFT_CATALOG_VERSION,
-        "cdn_base_url": settings.GIFT_CDN_BASE_URL.strip(),
+        "cdn_base_url": _gift_cdn_base_url(),
         "categories": [_category_to_payload(category) for category in categories],
         "items": gifts,
         "normal": [gift for gift in gifts if gift.get("gift_type") == "normal"],
@@ -634,7 +646,7 @@ def list_gifts(db: Session | None = None) -> dict:
         all_gifts = [_with_dynamic_urls(_item_to_gift_dict(item)) for item in items]
         return {
             "catalog_version": GIFT_CATALOG_VERSION,
-            "cdn_base_url": settings.GIFT_CDN_BASE_URL.strip(),
+            "cdn_base_url": _gift_cdn_base_url(),
             "categories": [_category_to_payload(category) for category in categories],
             "normal": [gift for gift in all_gifts if gift.get("gift_type") == "normal"],
             "lucky": [gift for gift in all_gifts if gift.get("gift_type") == "lucky"],
@@ -646,7 +658,7 @@ def list_gifts(db: Session | None = None) -> dict:
     all_gifts = [_with_dynamic_urls(gift) for gift in _all_static_gifts() if gift.get("is_enabled")]
     return {
         "catalog_version": GIFT_CATALOG_VERSION,
-        "cdn_base_url": settings.GIFT_CDN_BASE_URL.strip(),
+        "cdn_base_url": _gift_cdn_base_url(),
         "categories": _static_categories_from_gifts(all_gifts),
         "normal": [gift for gift in all_gifts if gift.get("gift_type") == "normal"],
         "lucky": [gift for gift in all_gifts if gift.get("gift_type") == "lucky"],

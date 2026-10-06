@@ -28,7 +28,7 @@ class VipBadge extends StatelessWidget {
     final child = _safeLevel <= 0
         ? _ZeroLevelBadge(metrics: metrics)
         : _AssetBadgeImage(
-            assetPath: VipSvipTagAssets.vipTagForLevel(_safeLevel),
+            imageUrl: VipSvipTagAssets.vipTagForLevel(_safeLevel),
             width: metrics.width,
             height: metrics.height,
             fallbackLabel: 'VIP $_safeLevel',
@@ -63,7 +63,7 @@ class SvipBadge extends StatelessWidget {
 
     final metrics = _SvipBadgeMetrics.forSize(size);
     final child = _AssetBadgeImage(
-      assetPath: VipSvipTagAssets.svipTagForLevel(_safeLevel),
+      imageUrl: VipSvipTagAssets.svipTagForLevel(_safeLevel),
       width: metrics.width,
       height: metrics.height,
       fallbackLabel: 'SVIP $_safeLevel',
@@ -80,13 +80,13 @@ class SvipBadge extends StatelessWidget {
 
 class _AssetBadgeImage extends StatelessWidget {
   const _AssetBadgeImage({
-    required this.assetPath,
+    required this.imageUrl,
     required this.width,
     required this.height,
     required this.fallbackLabel,
   });
 
-  final String assetPath;
+  final String imageUrl;
   final double width;
   final double height;
   final String fallbackLabel;
@@ -96,8 +96,8 @@ class _AssetBadgeImage extends StatelessWidget {
     return SizedBox(
       width: width,
       height: height,
-      child: Image.asset(
-        assetPath,
+      child: Image.network(
+        imageUrl,
         fit: BoxFit.contain,
         filterQuality: FilterQuality.high,
         errorBuilder: (context, error, stackTrace) =>

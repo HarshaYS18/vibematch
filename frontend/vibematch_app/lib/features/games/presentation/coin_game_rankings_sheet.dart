@@ -2,6 +2,9 @@ import 'dart:async';
 
 import 'package:flutter/material.dart';
 
+import '../../../core/network/vm_failure.dart';
+import '../../../core/ui/vm_motion.dart';
+
 import '../data/coin_game_rankings_api_service.dart';
 
 class CoinGameRankingsSheet extends StatefulWidget {
@@ -24,6 +27,7 @@ class CoinGameRankingsSheet extends StatefulWidget {
   }) {
     return showModalBottomSheet<void>(
       context: context,
+      sheetAnimationStyle: VmMotion.sheetAnimationStyle,
       isScrollControlled: true,
       backgroundColor: Colors.transparent,
       builder: (_) => CoinGameRankingsSheet(
@@ -71,7 +75,7 @@ class _CoinGameRankingsSheetState extends State<CoinGameRankingsSheet> {
       if (backendGames.isEmpty) return _games.isEmpty ? _fallbackGames : _games;
       return backendGames;
     } catch (error) {
-      final message = error.toString();
+      final message = VmFailurePresentation.messageFor(error, contentLabel: 'game rankings');
       if (message.contains('404')) _gameListApiMissing = true;
       return _games.isEmpty ? _fallbackGames : _games;
     }
@@ -107,7 +111,7 @@ class _CoinGameRankingsSheetState extends State<CoinGameRankingsSheet> {
       if (!mounted) return;
       setState(() {
         _loading = false;
-        _error = error.toString().replaceFirst('Exception: ', '');
+        _error = VmFailurePresentation.messageFor(error, contentLabel: 'game rankings');
       });
     }
   }

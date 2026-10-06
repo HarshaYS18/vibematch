@@ -16,6 +16,9 @@ resource "terraform_data" "deployment_contract" {
     precondition {
       condition = (
         var.connection_budget.api_max_pods * var.connection_budget.api_pool_per_pod +
+        var.connection_budget.inbox_max_pods * var.connection_budget.inbox_pool_per_pod +
+        var.connection_budget.vibes_max_pods * var.connection_budget.vibes_pool_per_pod +
+        var.connection_budget.room_control_max_pods * var.connection_budget.room_control_pool_per_pod +
         var.connection_budget.worker_max_pods * var.connection_budget.worker_pool_per_pod +
         var.connection_budget.reserved_connections
       ) <= var.connection_budget.database_max_connections
@@ -31,6 +34,10 @@ resource "terraform_data" "deployment_contract" {
           var.services.object_bucket,
           var.services.api_dns,
           var.services.websocket_dns,
+          var.services.media_dns,
+          var.services.cdn_dns,
+          var.services.waf_policy_ref,
+          var.services.origin_restriction_ref,
           var.services.certificate_ref,
           var.services.secret_manager_ref,
           var.services.workload_identity_ref,
@@ -47,6 +54,22 @@ resource "terraform_data" "deployment_contract" {
         var.kubernetes.node_pools["media"].min_nodes >= 3,
       ])
       error_message = "Production node pools do not meet the minimum high-availability floor."
+    }
+    precondition {
+      condition = var.environment != "production" || alltrue([
+        lower(var.services.api_dns) == "api.funkey.com",
+        lower(var.services.websocket_dns) == "realtime.funkey.com",
+        lower(var.services.media_dns) == "media.funkey.com",
+        lower(var.services.cdn_dns) == "cdn.funkey.com",
+      ])
+      error_message = "Production public DNS must use the canonical Chunk 35 FunKey edge hostnames."
+    }
+    precondition {
+      condition = (
+        var.environment != "production" ||
+        var.services.edge_security_binding_verified
+      )
+      error_message = "Production requires an operator-verified WAF and origin-restriction binding before apply."
     }
   }
 }

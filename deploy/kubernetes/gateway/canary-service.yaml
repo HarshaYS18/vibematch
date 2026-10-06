@@ -1,0 +1,15 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: funkey-api-canary
+  labels:
+    app: funkey-api
+    funkey.io/release-track: canary
+spec:
+  selector:
+    app: funkey-api
+    funkey.io/release-track: canary
+  ports:
+    - name: http
+      port: 8000
+      targetPort: http

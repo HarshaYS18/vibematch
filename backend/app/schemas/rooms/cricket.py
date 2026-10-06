@@ -81,6 +81,7 @@ class CricketMatchLineupRequest(BaseModel):
 
 
 class CricketBallEventRequest(BaseModel):
+    event_id: str | None = Field(default=None, min_length=8, max_length=80)
     sequence: int | None = None
     innings: int = Field(ge=1, le=4)
     over: int = Field(ge=0)

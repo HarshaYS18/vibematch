@@ -133,9 +133,8 @@ def has_active_special_permission(
         return False
 
     if special_permission.expires_at is not None and special_permission.expires_at <= now:
-        special_permission.is_active = False
-        db.add(special_permission)
-        db.commit()
+        # Authorization reads are side-effect free. Expired grants are treated
+        # inactive immediately; maintenance can compact them asynchronously.
         return False
 
     return True

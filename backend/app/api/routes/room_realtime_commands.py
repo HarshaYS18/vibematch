@@ -11,7 +11,7 @@ from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
 
 from app.api.routes.users import get_current_user
-from app.database import SessionLocal, get_db
+from app.database import get_db
 from app.models.room import Room
 from app.models.room_kickout import RoomKickout
 from app.models.room_participant import RoomParticipant
@@ -19,6 +19,7 @@ from app.models.room_realtime_state import RoomChatMessage, RoomRealtimeEvent
 from app.models.user import User
 from app.realtime.connection_manager import room_realtime_connections
 from app.schemas.room_realtime import (
+    RoomActivityCommand,
     RoomAdminMuteCommand,
     RoomBackgroundThemeCommand,
     RoomChatSendCommand,
@@ -29,9 +30,12 @@ from app.schemas.room_realtime import (
     RoomSeatLeaveCommand,
     RoomSeatLockCommand,
     RoomSeatTakeCommand,
+    RoomWatchPartyCommand,
 )
 from app.services.permissions import room_permission_service as policy_permissions
-from app.services.rooms import room_action_service, room_permission_service, room_state_service
+from app.services import realtime_revocation_service
+from app.services.rooms import room_action_service, room_activity_service, room_permission_service, room_state_service, watch_party_service
+from app.services.rooms.room_db_context import room_session
 from app.services.user_master_state_service import get_user_master_state
 
 
@@ -100,6 +104,41 @@ def _bool(payload: dict[str, Any], key: str, default: bool = False) -> bool:
     return str(value).strip().lower() in {"1", "true", "yes", "on"}
 
 
+def _chat_message_fields(
+    payload: dict[str, Any],
+) -> tuple[str | None, str, str | None]:
+    """Validate canonical user chat fields before durable persistence.
+
+    Text and image messages have different required payloads. Image messages
+    must carry an HTTP(S) media URL; fake placeholder text is never required.
+    """
+
+    message_type = str(payload.get("message_type") or "text").strip().lower()
+    if not message_type:
+        message_type = "text"
+
+    text = str(payload.get("text") or "").strip() or None
+    media_url = str(
+        payload.get("media_url") or payload.get("image_url") or ""
+    ).strip() or None
+
+    if message_type == "image":
+        if media_url is None:
+            raise HTTPException(status_code=400, detail="Image URL cannot be empty")
+        if len(media_url) > 500:
+            raise HTTPException(status_code=400, detail="Image URL is too long")
+        if not media_url.lower().startswith(("https://", "http://")):
+            raise HTTPException(status_code=400, detail="Image URL must use HTTP(S)")
+        content_type = str(payload.get("content_type") or "").strip().lower()
+        if content_type and not content_type.startswith("image/"):
+            raise HTTPException(status_code=400, detail="Invalid image content type")
+        return text, message_type, media_url
+
+    if text is None:
+        raise HTTPException(status_code=400, detail="Message cannot be empty")
+    return text, message_type, None
+
+
 def _room_user_key(user: User | None) -> str:
     return f"user_{user.public_user_id}" if user is not None else ""
 
@@ -110,8 +149,63 @@ def _display_name(user: User | None, fallback: str = "Vibe User") -> str:
     return user.display_name or user.username or str(user.public_user_id)
 
 
+def _room_delta(event_type: str, snapshot: dict[str, Any]) -> dict[str, Any]:
+    """Return the bounded v2 section delta for one authoritative room mutation."""
+    base = {
+        "room_id": snapshot.get("room_id"),
+        "room_version": int(snapshot.get("state_version") or 0),
+        "event_sequence": int(snapshot.get("event_sequence") or 0),
+    }
+    if event_type.startswith(("seat/", "seat_", "admin_mute/", "mic/")):
+        keys = (
+            "seats", "locked_seat_indexes", "active_seated_count",
+            "participants", "peers", "peer_count",
+        )
+    elif event_type.startswith(("room_member/", "room/member", "room_admin/")):
+        keys = (
+            "membership_roster", "participants", "peers", "peer_count",
+            "pending_room_member_requests", "pending_room_member_request_count",
+        )
+    elif event_type.startswith("room_settings/"):
+        keys = (
+            "is_secret", "is_locked", "is_members_only", "allow_screenshots",
+            "room_images_enabled", "guest_messages_enabled",
+            "apply_only_mode_enabled", "background_theme_id",
+            "seat_layout_id", "seat_count", "announcement_text",
+        )
+    elif event_type.startswith("watch_party/"):
+        keys = ("watch_party",)
+    elif event_type.startswith("room_activity/"):
+        keys = ("activity",)
+    elif event_type in {"room.chat.message_created", "room/chat_cleared"}:
+        keys = ("recent_messages",)
+    elif event_type in {"room/joined", "room/peer_left", "room/kicked"}:
+        keys = (
+            "participants", "peers", "peer_count", "public_online_count",
+            "online_count", "active_seated_count", "seats",
+        )
+    else:
+        keys = (
+            "participants", "peers", "peer_count", "seats",
+            "membership_roster", "activity", "watch_party",
+        )
+    return {
+        **base,
+        **{key: snapshot[key] for key in keys if key in snapshot},
+    }
+
+
 def _event(event_type: str, room: Room, snapshot: dict[str, Any], extra: dict[str, Any] | None = None) -> dict[str, Any]:
-    payload: dict[str, Any] = {"room_id": room.room_public_id, "room": snapshot}
+    payload: dict[str, Any] = {
+        "room_id": room.room_public_id,
+        # Legacy compatibility: FastAPI room socket consumers still receive
+        # the replacement snapshot until the Chunk 21 Go gateway cutover.
+        "room": snapshot,
+        "delta": _room_delta(event_type, snapshot),
+        "protocol": "room-state-v2",
+        "room_version": int(snapshot.get("state_version") or 0),
+        "event_sequence": int(snapshot.get("event_sequence") or 0),
+    }
     if extra:
         payload.update(extra)
     return {"type": event_type, "payload": payload}
@@ -426,6 +520,17 @@ def _execute_room_command_in_session(
             )
         )
         emissions.append(RoomCommandEmission(target="room", room_id=room.room_public_id, message=_system_event(room, "user_removed", f"{_display_name(target)} was removed from the room", actor=actor, target=target)))
+        emissions.append(
+            RoomCommandEmission(
+                target="permission_revoke",
+                room_id=room.room_public_id,
+                user_id=target.id,
+                message={
+                    "reason": "room_kicked",
+                    "membership_version": int(snapshot.get("state_version") or 0),
+                },
+            )
+        )
         return snapshot
 
     if event_type == "admin/kick_remove":
@@ -452,7 +557,20 @@ def _execute_room_command_in_session(
         else:
             room_action_service.remove_room_member(db, room, actor, target)
             decision = "removed"
-        return _finish(db, room, emissions, "room_member/request_updated", extra={"target_user_id": target.id, "decision": decision})
+        snapshot = _finish(db, room, emissions, "room_member/request_updated", extra={"target_user_id": target.id, "decision": decision})
+        if decision == "removed":
+            emissions.append(
+                RoomCommandEmission(
+                    target="permission_revoke",
+                    room_id=room.room_public_id,
+                    user_id=target.id,
+                    message={
+                        "reason": "room_membership_removed",
+                        "membership_version": int(snapshot.get("state_version") or 0),
+                    },
+                )
+            )
+        return snapshot
 
     if event_type == "room_admin/set":
         target = resolve_target_user(db, payload)
@@ -474,7 +592,18 @@ def _execute_room_command_in_session(
 
     if event_type == "room_settings/privacy":
         room_action_service.set_room_privacy(db, room, actor, str(payload.get("mode") or payload.get("privacy_mode") or "Open"))
-        return _finish(db, room, emissions, "room_settings/updated")
+        snapshot = _finish(db, room, emissions, "room_settings/updated")
+        emissions.append(
+            RoomCommandEmission(
+                target="permission_revoke_room",
+                room_id=room.room_public_id,
+                message={
+                    "reason": "room_privacy_changed",
+                    "membership_version": int(snapshot.get("state_version") or 0),
+                },
+            )
+        )
+        return snapshot
 
     if event_type == "room_settings/screenshots":
         room_action_service.set_room_screenshots(db, room, actor, _bool(payload, "allow_screenshots", True))
@@ -503,10 +632,16 @@ def _execute_room_command_in_session(
 
     if event_type in {"room_chat/send", "room/chat"}:
         room_permission_service.require_chat_send(db, room, actor)
-        text = str(payload.get("text") or "").strip()
-        if not text:
-            raise HTTPException(status_code=400, detail="Message cannot be empty")
-        room_action_service.create_chat_message(db, room, actor, text, message_type=str(payload.get("message_type") or "text"), metadata=payload)
+        text, message_type, media_url = _chat_message_fields(payload)
+        room_action_service.create_chat_message(
+            db,
+            room,
+            actor,
+            text,
+            message_type=message_type,
+            media_url=media_url,
+            metadata=payload,
+        )
         return _finish(db, room, emissions, "room.chat.message_created")
 
     if event_type == "room/chat_clear":
@@ -526,6 +661,70 @@ def _execute_room_command_in_session(
         snapshot = _finish(db, room, emissions, "room.snapshot")
         emissions.append(RoomCommandEmission(target="room", room_id=room.room_public_id, message=_system_event(room, "room_system_message", message, actor=actor)))
         return snapshot
+
+    if event_type.startswith("room_activity/"):
+        action = event_type.split("/", 1)[1].strip().upper()
+        if action == "INVITE":
+            target = resolve_target_user(db, payload)
+            if target is None:
+                raise HTTPException(status_code=404, detail="Activity invite target not found")
+            invite = room_activity_service.record_activity_invite(db, room, actor, target, payload)
+            snapshot = _finish(
+                db,
+                room,
+                emissions,
+                "room_activity/invite_sent",
+                extra={"activity_invite": invite},
+            )
+            emissions.append(
+                RoomCommandEmission(
+                    target="user",
+                    room_id=room.room_public_id,
+                    user_id=target.id,
+                    message={
+                        "type": "room_activity/invite_received",
+                        "payload": {
+                            **invite,
+                            "room": snapshot,
+                            "inviter_public_user_id": actor.public_user_id,
+                            "inviter_name": _display_name(actor),
+                            "inviter_avatar_url": actor.avatar_url,
+                        },
+                    },
+                )
+            )
+            return snapshot
+        activity_state = room_activity_service.apply_activity_command(
+            db,
+            room,
+            actor,
+            action,
+            payload,
+        )
+        return _finish(
+            db,
+            room,
+            emissions,
+            f"room_activity/{action.lower()}",
+            extra={"activity": activity_state},
+        )
+
+    if event_type.startswith("watch_party/"):
+        action = event_type.split("/", 1)[1].strip().upper()
+        watch_state = watch_party_service.apply_watch_party_command(
+            db,
+            room,
+            actor,
+            action,
+            payload,
+        )
+        return _finish(
+            db,
+            room,
+            emissions,
+            f"watch_party/{action.lower()}",
+            extra={"watch_party": watch_state},
+        )
 
     if event_type == "profile/update":
         room_permission_service.require_join(db, room, actor)
@@ -560,12 +759,12 @@ def _execute_room_command_transaction(
     payload: dict[str, Any],
 ) -> RoomCommandOutcome:
     emissions: list[RoomCommandEmission] = []
-    with SessionLocal() as db:
+    with room_session() as db:
         try:
             actor = db.query(User).filter(User.id == actor_user_id).first()
             if actor is None or actor.is_banned or not actor.is_active:
                 raise HTTPException(status_code=401, detail="Room session is no longer valid")
-            room = room_or_404(db, room_public_id)
+            room = room_or_404(db, room_public_id, for_update=True)
             snapshot = _execute_room_command_in_session(db, room, actor, event_type, payload, emissions)
             return RoomCommandOutcome(snapshot=snapshot, emissions=emissions)
         except Exception:
@@ -575,7 +774,17 @@ def _execute_room_command_transaction(
 
 async def _emit_room_command(outcome: RoomCommandOutcome) -> None:
     for emission in outcome.emissions:
-        if emission.target == "user":
+        if emission.target in {"permission_revoke", "permission_revoke_room"}:
+            reason = str(emission.message.get("reason") or "room_permission_changed")
+            membership_version = int(emission.message.get("membership_version") or 0)
+            await asyncio.to_thread(
+                realtime_revocation_service.publish_room_permission_revoked,
+                emission.room_id,
+                reason=reason,
+                membership_version=membership_version,
+                user_id=emission.user_id if emission.target == "permission_revoke" else None,
+            )
+        elif emission.target == "user":
             if emission.user_id is None:
                 continue
             await room_realtime_connections.send_room_user(emission.room_id, emission.user_id, emission.message)
@@ -626,6 +835,19 @@ async def join(room_public_id: str, command: RoomJoinCommand, db: Session = Depe
     room = room_or_404(db, room_public_id)
     data = await execute_room_command(db, room, current_user, "room/join", command.model_dump())
     return {"room_id": room_public_id, "room": data}
+
+
+@router.post("/heartbeat", deprecated=True)
+def heartbeat(room_public_id: str):
+    """Retired REST heartbeat.
+
+    Room liveness is refreshed by the authenticated realtime socket lease; this
+    endpoint intentionally performs no PostgreSQL reads or writes.
+    """
+    raise HTTPException(
+        status_code=410,
+        detail="Room REST heartbeat retired; realtime socket lease owns liveness",
+    )
 
 
 @router.post("/leave")
@@ -687,6 +909,76 @@ async def background_theme(room_public_id: str, command: RoomBackgroundThemeComm
 
 @router.post("/chat/send")
 async def chat_send(room_public_id: str, command: RoomChatSendCommand, db: Session = Depends(get_db), current_user: User = Depends(get_current_user)):
+    """Persist a canonical text/image chat command and fan out its room delta."""
     room = room_or_404(db, room_public_id)
-    data = await execute_room_command(db, room, current_user, "room_chat/send", {"text": command.text, "message_type": command.message_type})
+    payload = command.model_dump(exclude_none=True)
+    data = await execute_room_command(
+        db,
+        room,
+        current_user,
+        "room_chat/send",
+        payload,
+    )
+    return {"room_id": room_public_id, "room": data}
+
+
+@router.post("/chat/clear")
+async def chat_clear(
+    room_public_id: str,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """Clear durable room chat through the canonical room command path.
+
+    Authorization and deletion semantics are owned by execute_room_command;
+    the returned snapshot contains authoritative recent_messages after clear.
+    """
+    room = room_or_404(db, room_public_id)
+    data = await execute_room_command(
+        db,
+        room,
+        current_user,
+        "room/chat_clear",
+        {},
+    )
+    return {"room_id": room_public_id, "room": data}
+
+
+@router.post("/watch-party/command")
+async def watch_party_command(
+    room_public_id: str,
+    command: RoomWatchPartyCommand,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    room = room_or_404(db, room_public_id)
+    payload = command.model_dump(exclude_none=True)
+    action = str(payload.pop("action", "")).strip().upper()
+    data = await execute_room_command(
+        db,
+        room,
+        current_user,
+        f"watch_party/{action.lower()}",
+        payload,
+    )
+    return {"room_id": room_public_id, "room": data}
+
+
+@router.post("/activity/command")
+async def activity_command(
+    room_public_id: str,
+    command: RoomActivityCommand,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    room = room_or_404(db, room_public_id)
+    payload = command.model_dump(exclude_none=True)
+    action = str(payload.pop("action", "")).strip().upper()
+    data = await execute_room_command(
+        db,
+        room,
+        current_user,
+        f"room_activity/{action.lower()}",
+        payload,
+    )
     return {"room_id": room_public_id, "room": data}

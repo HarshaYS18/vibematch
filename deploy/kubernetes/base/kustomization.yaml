@@ -5,8 +5,20 @@ resources:
   - namespace.yaml
   - config.yaml
   - api.yaml
+  - inbox.yaml
+  - vibes.yaml
+  - room-control.yaml
+  - identity.yaml
+  - profile-social.yaml
+  - economy.yaml
+  - game-platform.yaml
+  - notification.yaml
+  - graphql-bff.yaml
+  - kafka-event-bridge.yaml
+  - search.yaml
+  - recommendation.yaml
+  - analytics-sink.yaml
   - realtime.yaml
   - worker.yaml
   - autoscaling.yaml
-  - ingress.yaml
   - network-policy.yaml

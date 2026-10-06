@@ -1,0 +1,82 @@
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: funkey-room-control
+automountServiceAccountToken: false
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: funkey-room-control
+  labels: {app: funkey-room-control}
+spec:
+  replicas: 3
+  revisionHistoryLimit: 5
+  strategy:
+    type: RollingUpdate
+    rollingUpdate: {maxSurge: 1, maxUnavailable: 0}
+  selector:
+    matchLabels: {app: funkey-room-control}
+  template:
+    metadata:
+      annotations:
+        prometheus.io/scrape: "true"
+        prometheus.io/path: /metrics
+        prometheus.io/port: "8085"
+      labels: {app: funkey-room-control}
+    spec:
+      serviceAccountName: funkey-room-control
+      automountServiceAccountToken: false
+      terminationGracePeriodSeconds: 60
+      nodeSelector: {funkey.io/workload: application}
+      securityContext: {runAsNonRoot: true, seccompProfile: {type: RuntimeDefault}}
+      topologySpreadConstraints:
+        - maxSkew: 1
+          topologyKey: topology.kubernetes.io/zone
+          whenUnsatisfiable: ScheduleAnyway
+          labelSelector: {matchLabels: {app: funkey-room-control}}
+        - maxSkew: 1
+          topologyKey: kubernetes.io/hostname
+          whenUnsatisfiable: DoNotSchedule
+          labelSelector: {matchLabels: {app: funkey-room-control}}
+      containers:
+        - name: room-control
+          image: funkey-room-control:dev
+          imagePullPolicy: IfNotPresent
+          ports: [{name: http, containerPort: 8085}]
+          envFrom:
+            - configMapRef: {name: funkey-config}
+            - secretRef: {name: funkey-room-control-secrets}
+          resources:
+            requests: {cpu: 300m, memory: 512Mi}
+            limits: {cpu: "1", memory: 1Gi}
+          startupProbe:
+            httpGet: {path: /live, port: http}
+            failureThreshold: 30
+            periodSeconds: 2
+          livenessProbe:
+            httpGet: {path: /live, port: http}
+            periodSeconds: 20
+          readinessProbe:
+            httpGet: {path: /ready, port: http}
+            periodSeconds: 5
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            capabilities: {drop: [ALL]}
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: funkey-room-control
+spec:
+  selector: {app: funkey-room-control}
+  ports: [{name: http, port: 8085, targetPort: http}]
+---
+apiVersion: policy/v1
+kind: PodDisruptionBudget
+metadata:
+  name: funkey-room-control
+spec:
+  minAvailable: 2
+  selector: {matchLabels: {app: funkey-room-control}}

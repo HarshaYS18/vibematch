@@ -1,0 +1,56 @@
+syntax = "proto3";
+
+package funkey.game.v1;
+
+import "funkey/common/v1/context.proto";
+
+option go_package = "github.com/HarshaYS18/vibematch/gen/go/funkey/game/v1;gamev1";
+
+service GamePlatformService {
+  rpc GetGame(GetGameRequest) returns (GetGameResponse);
+  rpc StartRound(StartRoundRequest) returns (StartRoundResponse);
+  rpc RequestSettlement(RequestSettlementRequest) returns (RequestSettlementResponse);
+}
+
+message GetGameRequest {
+  funkey.common.v1.RequestContext context = 1;
+  string game_key = 2;
+}
+
+message GetGameResponse {
+  GameDefinition game = 1;
+}
+
+message GameDefinition {
+  string game_key = 1;
+  string version = 2;
+  bool enabled = 3;
+  string manifest_url = 4;
+}
+
+message StartRoundRequest {
+  funkey.common.v1.RequestContext context = 1;
+  string game_key = 2;
+  string room_public_id = 3;
+}
+
+message StartRoundResponse {
+  GameRound round = 1;
+}
+
+message GameRound {
+  string round_id = 1;
+  string game_key = 2;
+  string state = 3;
+  uint64 revision = 4;
+}
+
+message RequestSettlementRequest {
+  funkey.common.v1.RequestContext context = 1;
+  string round_id = 2;
+}
+
+message RequestSettlementResponse {
+  string settlement_request_id = 1;
+  string state = 2;
+}

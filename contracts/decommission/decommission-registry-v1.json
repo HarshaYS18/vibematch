@@ -1,0 +1,92 @@
+{
+  "schema_version": 1,
+  "removed": [
+    {
+      "id": "android-example-package",
+      "paths": [
+        "frontend/vibematch_app/android/app/src/main/kotlin/com/example/vibematch_app/MainActivity.kt",
+        "frontend/vibematch_app/android/app/src/main/kotlin/com/example/vibematch_app/LiveRoomForegroundService.kt"
+      ],
+      "replacement": "frontend/vibematch_app/android/app/src/main/kotlin/com/funkey/app/",
+      "evidence": [
+        "Android namespace/applicationId are com.funkey.app",
+        "AndroidManifest relative activity/service names resolve under com.funkey.app"
+      ]
+    },
+    {
+      "id": "bundled-jungle-hunt-assets",
+      "paths": [
+        "frontend/vibematch_app/assets/games/jungle_hunt/"
+      ],
+      "replacement": "verified Game Platform CDN/HTML runtime",
+      "evidence": [
+        "pubspec.yaml does not declare assets/games/",
+        "remote-game architecture requires manifest/version/SHA-256 verified CDN bundles"
+      ]
+    },
+    {
+      "id": "flutter-api-client-alias",
+      "paths": [
+        "frontend/vibematch_app/lib/core/network/api_client.dart"
+      ],
+      "replacement": "frontend/vibematch_app/lib/foundation/networking/app_network_client.dart",
+      "evidence": [
+        "zero supported Flutter source imports",
+        "canonical networking architecture test forbids reintroduction",
+        "AppNetworkClient -> CanonicalNetworkTransport -> Dio is authoritative"
+      ]
+    },
+    {
+      "id": "unsupported-flutter-desktop-runners",
+      "paths": [
+        "frontend/vibematch_app/linux/",
+        "frontend/vibematch_app/macos/",
+        "frontend/vibematch_app/windows/"
+      ],
+      "replacement": "supported Flutter targets: Android, iOS and Web",
+      "evidence": [
+        "no repository workflow builds Flutter Linux, macOS or Windows",
+        "frontend Flutter metadata now tracks only Android, iOS and Web",
+        "the application architecture and release paths target Android, iOS and Web"
+      ]
+    },
+    {
+      "id": "flutter-bundled-product-media",
+      "paths": [
+        "frontend/vibematch_app/assets/gifts/",
+        "frontend/vibematch_app/assets/images/",
+        "frontend/vibematch_app/assets/videos/"
+      ],
+      "replacement": "versioned public CDN media via VmApiConfig.cdnOrigin and authoritative backend media URLs",
+      "evidence": [
+        "Flutter pubspec declares only assets/branding/funkey_logo.png",
+        "Flutter hygiene CI rejects every other bundled product-media file and local media renderer",
+        "gift catalog public payloads clear legacy local asset/video paths and publish CDN URLs",
+        "room backgrounds, VIP/SVIP tags, family badges and decorations resolve through CDN URLs"
+      ]
+    }
+  ],
+  "retained_compatibility": [
+    {
+      "id": "alembic-legacy-snapshot",
+      "path": "backend/legacy_snapshot.py",
+      "status": "required_migration_bridge",
+      "reason": "Alembic history still uses the frozen bootstrap snapshot; deleting it would break database replay.",
+      "removal_condition": "Only a formally approved migration-history compaction may retire it after every supported database is beyond the bridge."
+    },
+    {
+      "id": "flutter-vibematch-directory-name",
+      "path": "frontend/vibematch_app/",
+      "status": "repository_path_compatibility",
+      "reason": "The product is FunKey; the historical directory/package path remains for build/source compatibility.",
+      "removal_condition": "Dedicated package-rename migration with Android/iOS/web build verification."
+    },
+    {
+      "id": "mediasoup-socketio-signaling",
+      "path": "frontend/vibematch_app/lib/features/audio_mediasoup/data/mediasoup_socket_service.dart",
+      "status": "active_media_transport",
+      "reason": "This Socket.IO channel is mediasoup transport signaling, not a second application WebSocket.",
+      "removal_condition": "Only when the canonical media transport itself is replaced."
+    }
+  ]
+}

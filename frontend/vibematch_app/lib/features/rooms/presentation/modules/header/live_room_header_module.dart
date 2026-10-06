@@ -2,6 +2,8 @@ import 'dart:async';
 
 import 'package:flutter/material.dart';
 
+import '../../../../../core/network/vm_failure.dart';
+
 import '../../controllers/live_room_sheet_controller.dart';
 import '../../widgets/live_room_users_sheet.dart';
 import '../../widgets/room_level_sheet.dart';
@@ -82,7 +84,7 @@ class LiveRoomHeaderModule {
       if (!bundle.mounted) return;
       RoomToast.show(
         bundle.context,
-        error.toString().replaceFirst('Exception: ', ''),
+        VmFailurePresentation.messageFor(error, contentLabel: 'room settings'),
       );
     }
   }

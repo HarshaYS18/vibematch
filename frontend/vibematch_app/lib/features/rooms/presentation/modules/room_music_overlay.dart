@@ -7,12 +7,17 @@ import 'room_music_library_sheet.dart';
 import '../widgets/room_theme.dart';
 
 class RoomMusicOverlayHost extends StatelessWidget {
-  const RoomMusicOverlayHost({super.key});
+  const RoomMusicOverlayHost({
+    super.key,
+    required this.controller,
+  });
+
+  final RoomMusicController controller;
 
   @override
   Widget build(BuildContext context) {
     return ValueListenableBuilder<RoomMusicState>(
-      valueListenable: RoomMusicController.instance.state,
+      valueListenable: controller.state,
       builder: (context, state, _) {
         final children = <Widget>[];
 
@@ -21,14 +26,14 @@ class RoomMusicOverlayHost extends StatelessWidget {
             Positioned.fill(
               child: GestureDetector(
                 behavior: HitTestBehavior.translucent,
-                onTap: RoomMusicController.instance.minimizeOverlay,
+                onTap: controller.minimizeOverlay,
                 child: const SizedBox.expand(),
               ),
             ),
           );
-          children.add(RoomMusicBottomOverlay(state: state));
+          children.add(RoomMusicBottomOverlay(state: state, controller: controller));
         } else if (state.isMinimized || state.isPlaying || state.isUploading || state.isPaused) {
-          children.add(RoomMusicDiscBubble(state: state));
+          children.add(RoomMusicDiscBubble(state: state, controller: controller));
         }
 
         if (children.isEmpty) return const SizedBox.shrink();
@@ -39,9 +44,14 @@ class RoomMusicOverlayHost extends StatelessWidget {
 }
 
 class RoomMusicBottomOverlay extends StatefulWidget {
-  const RoomMusicBottomOverlay({super.key, required this.state});
+  const RoomMusicBottomOverlay({
+    super.key,
+    required this.state,
+    required this.controller,
+  });
 
   final RoomMusicState state;
+  final RoomMusicController controller;
 
   @override
   State<RoomMusicBottomOverlay> createState() => _RoomMusicBottomOverlayState();
@@ -108,7 +118,7 @@ class _RoomMusicBottomOverlayState extends State<RoomMusicBottomOverlay> {
                   const SizedBox(width: 10),
                   Expanded(
                     child: GestureDetector(
-                      onTap: () => RoomMusicLibrarySheet.open(context),
+                      onTap: () => RoomMusicLibrarySheet.open(context, controller: widget.controller),
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
@@ -148,13 +158,13 @@ class _RoomMusicBottomOverlayState extends State<RoomMusicBottomOverlay> {
                   IconButton(
                     visualDensity: VisualDensity.compact,
                     tooltip: 'Add songs',
-                    onPressed: () => RoomMusicLibrarySheet.open(context),
+                    onPressed: () => RoomMusicLibrarySheet.open(context, controller: widget.controller),
                     icon: const Icon(Icons.playlist_add_rounded, color: Colors.white),
                   ),
                   IconButton(
                     visualDensity: VisualDensity.compact,
                     tooltip: 'Minimize',
-                    onPressed: RoomMusicController.instance.minimizeOverlay,
+                    onPressed: widget.controller.minimizeOverlay,
                     icon: const Icon(Icons.keyboard_arrow_down_rounded, color: Colors.white),
                   ),
                 ],
@@ -185,14 +195,14 @@ class _RoomMusicBottomOverlayState extends State<RoomMusicBottomOverlay> {
                             ? null
                             : (value) {
                                 setState(() => _dragValue = value);
-                                RoomMusicController.instance.previewSeekPosition(value.round());
+                                widget.controller.previewSeekPosition(value.round());
                               },
                         onChangeEnd: durationMs <= 0
                             ? null
                             : (value) async {
                                 final seekValue = value.round();
                                 setState(() => _dragValue = null);
-                                await RoomMusicController.instance.seekTo(seekValue);
+                                await widget.controller.seekTo(seekValue);
                               },
                       ),
                     ),
@@ -213,7 +223,7 @@ class _RoomMusicBottomOverlayState extends State<RoomMusicBottomOverlay> {
                 children: [
                   _RoundControlButton(
                     icon: Icons.skip_previous_rounded,
-                    onTap: RoomMusicController.instance.playPrevious,
+                    onTap: widget.controller.playPrevious,
                   ),
                   const SizedBox(width: 12),
                   _MainControlButton(
@@ -223,22 +233,22 @@ class _RoomMusicBottomOverlayState extends State<RoomMusicBottomOverlay> {
                     onTap: () {
                       if (state.isUploading) return;
                       if (state.isPlaying) {
-                        RoomMusicController.instance.pause();
+                        widget.controller.pause();
                       } else {
-                        RoomMusicController.instance.playCurrentOrFirst();
+                        widget.controller.playCurrentOrFirst();
                       }
                     },
                   ),
                   const SizedBox(width: 12),
                   _RoundControlButton(
                     icon: Icons.skip_next_rounded,
-                    onTap: RoomMusicController.instance.playNext,
+                    onTap: widget.controller.playNext,
                   ),
                   const SizedBox(width: 18),
                   _RoundControlButton(
                     icon: Icons.stop_rounded,
                     danger: true,
-                    onTap: RoomMusicController.instance.stop,
+                    onTap: widget.controller.stop,
                   ),
                 ],
               ),
@@ -264,9 +274,14 @@ class _RoomMusicBottomOverlayState extends State<RoomMusicBottomOverlay> {
 }
 
 class RoomMusicDiscBubble extends StatelessWidget {
-  const RoomMusicDiscBubble({super.key, required this.state});
+  const RoomMusicDiscBubble({
+    super.key,
+    required this.state,
+    required this.controller,
+  });
 
   final RoomMusicState state;
+  final RoomMusicController controller;
 
   Offset _defaultOffset(BuildContext context) {
     final size = MediaQuery.sizeOf(context);
@@ -293,7 +308,7 @@ class RoomMusicDiscBubble extends StatelessWidget {
       top: offset.dy,
       child: GestureDetector(
         onPanUpdate: (details) {
-          RoomMusicController.instance.setBubbleOffset(
+          controller.setBubbleOffset(
             _clampOffset(context, offset + details.delta),
           );
         },
@@ -303,7 +318,7 @@ class RoomMusicDiscBubble extends StatelessWidget {
             mainAxisSize: MainAxisSize.min,
             children: [
               GestureDetector(
-                onTap: RoomMusicController.instance.showOverlay,
+                onTap: controller.showOverlay,
                 child: Container(
                   width: 58,
                   height: 58,
@@ -337,7 +352,7 @@ class RoomMusicDiscBubble extends StatelessWidget {
               Transform.translate(
                 offset: const Offset(-9, -20),
                 child: GestureDetector(
-                  onTap: RoomMusicController.instance.stop,
+                  onTap: controller.stop,
                   child: Container(
                     width: 25,
                     height: 25,

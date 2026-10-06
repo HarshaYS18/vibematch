@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 
+import '../../../../../core/network/vm_failure.dart';
+
 import '../../../../social/widgets/friends_invite_sheet.dart';
 import '../../../data/chat_moderation_api_service.dart';
 import '../../controllers/live_room_sheet_controller.dart';
@@ -10,6 +12,12 @@ import '../live_room_emoji_actions_module.dart';
 import '../live_room_inbox_actions_module.dart';
 import '../live_room_message_actions_module.dart';
 
+/// Room-scoped chat actions layered on canonical RoomSessionRepository state.
+///
+/// Moderation runs before the durable command. Text/image messages are sent by
+/// LiveRoomMessageController through RoomSessionRepository; this module never
+/// writes a local durable chat list or uses the media singleton as chat
+/// authority.
 class LiveRoomChatModule {
   const LiveRoomChatModule._();
 
@@ -25,7 +33,7 @@ class LiveRoomChatModule {
     } catch (error) {
       RoomToast.show(
         bundle.context,
-        error.toString().replaceFirst('Exception: ', ''),
+        VmFailurePresentation.messageFor(error, contentLabel: 'room chat'),
       );
       return;
     }
@@ -33,8 +41,17 @@ class LiveRoomChatModule {
       RoomToast.show(bundle.context, moderation.userMessage);
       return;
     }
-    bundle.roomMessageController.sendMessage(text);
-    bundle.messageController.clear();
+    try {
+      await bundle.roomMessageController.sendMessage(text);
+      if (!bundle.mounted) return;
+      bundle.messageController.clear();
+    } catch (error) {
+      if (!bundle.mounted) return;
+      RoomToast.show(
+        bundle.context,
+        VmFailurePresentation.messageFor(error, contentLabel: 'room chat'),
+      );
+    }
   }
 
   static void insertSystemMessage(
@@ -56,6 +73,7 @@ class LiveRoomChatModule {
       controller: bundle.messageController,
       focusNode: bundle.messageFocusNode,
       imagesEnabled: bundle.roomImagesEnabled,
+      onDismissSeatActions: bundle.seatController.clearSelectedSeat,
       onSendText: () => sendMessage(bundle),
       onImageTap: () => handleImageMessageTap(bundle),
       onSendFloatingText: () => sendMessage(bundle),

@@ -1,5 +1,8 @@
 import 'package:flutter/material.dart';
 
+import '../../../core/network/vm_failure.dart';
+import '../../../core/presentation/vm_async_state.dart';
+
 import '../../auth/data/auth_api_service.dart';
 import '../../auth/models/current_user.dart';
 import 'public_profile_view_page.dart';
@@ -49,7 +52,7 @@ class _PublicProfilePageState extends State<PublicProfilePage> {
     } catch (error) {
       if (!mounted) return;
       setState(() {
-        _error = error.toString().replaceFirst('Exception: ', '');
+        _error = VmFailurePresentation.messageFor(error, contentLabel: 'profile');
         _loading = false;
       });
     }
@@ -62,24 +65,17 @@ class _PublicProfilePageState extends State<PublicProfilePage> {
     if (_loading) {
       return const Scaffold(
         backgroundColor: Color(0xFFFAF7F1),
-        body: SafeArea(child: LinearProgressIndicator(minHeight: 3, color: Color(0xFF12C7B7), backgroundColor: Color(0xFFECE2D8))),
+        body: SafeArea(child: VmLoadingState(message: 'Loading profile…')),
       );
     }
     if (_error != null || viewer == null || publicUserId <= 0) {
       return Scaffold(
         backgroundColor: const Color(0xFFFAF7F1),
         body: SafeArea(
-          child: Center(
-            child: Padding(
-              padding: const EdgeInsets.all(20),
-              child: Column(mainAxisSize: MainAxisSize.min, children: [
-                const Icon(Icons.wifi_off_rounded, color: Color(0xFFC99A3B), size: 34),
-                const SizedBox(height: 10),
-                Text(_error ?? 'Invalid public user ID.', textAlign: TextAlign.center, style: const TextStyle(color: Color(0xFF251538), fontSize: 14, fontWeight: FontWeight.w800)),
-                const SizedBox(height: 10),
-                TextButton(onPressed: _loadViewer, child: const Text('Retry', style: TextStyle(fontWeight: FontWeight.w900))),
-              ]),
-            ),
+          child: VmFailureState(
+            message: _error ?? 'This profile link is invalid.',
+            contentLabel: 'profile',
+            onRetry: _error == null ? null : _loadViewer,
           ),
         ),
       );

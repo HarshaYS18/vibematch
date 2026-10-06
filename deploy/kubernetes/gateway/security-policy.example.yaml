@@ -1,0 +1,18 @@
+# Optional defense-in-depth edge authorization integration.
+# This file is deliberately NOT referenced by kustomization.yaml. Apply it only
+# after deploying a production ext-auth service named funkey-edge-auth.
+apiVersion: gateway.envoyproxy.io/v1alpha1
+kind: SecurityPolicy
+metadata:
+  name: funkey-api-ext-auth
+  namespace: funkey
+spec:
+  targetRefs:
+    - group: gateway.networking.k8s.io
+      kind: HTTPRoute
+      name: funkey-api
+  extAuth:
+    grpc:
+      backendRefs:
+        - name: funkey-edge-auth
+          port: 9002

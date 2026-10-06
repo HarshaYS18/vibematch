@@ -1,21 +1,91 @@
 import 'package:flutter/material.dart';
 
-import '../data/events_mock_data.dart';
+import 'dart:async';
+
+import '../../../core/network/vm_failure.dart';
+import '../../../core/presentation/vm_async_state.dart';
+
+import '../data/events_repository.dart';
 import '../models/event_item.dart';
 
 class EventsPage extends StatefulWidget {
-  const EventsPage({super.key});
+  const EventsPage({super.key, this.initialEventId});
+
+  final String? initialEventId;
 
   @override
   State<EventsPage> createState() => _EventsPageState();
 }
 
 class _EventsPageState extends State<EventsPage> {
+  final EventsRepository _repository = EventsRepository();
   int _selectedIndex = 0;
+  List<EventItem> _events = const <EventItem>[];
+  List<SocialMissionItem> _missions = const <SocialMissionItem>[];
+  bool _loading = true;
+  String? _error;
 
-  List<EventItem> get _activeEvents {
-    return EventsMockData.activeEvents.where((event) => event.isActive).toList()
-      ..sort((a, b) => a.endsAt.compareTo(b.endsAt));
+  List<EventItem> get _activeEvents =>
+      _events.where((event) => event.isActive).toList()
+        ..sort((a, b) => a.endsAt.compareTo(b.endsAt));
+
+  @override
+  void initState() {
+    super.initState();
+    unawaited(_load());
+  }
+
+  @override
+  void dispose() {
+    _repository.close();
+    super.dispose();
+  }
+
+  Future<void> _load({bool force = false}) async {
+    setState(() {
+      _loading = true;
+      _error = null;
+    });
+    try {
+      final data = await _repository.fetch(force: force);
+      if (!mounted) return;
+      final active = data.events.where((event) => event.isActive).toList()
+        ..sort((a, b) => a.endsAt.compareTo(b.endsAt));
+      final requestedId = widget.initialEventId?.trim();
+      final requestedIndex = requestedId == null || requestedId.isEmpty
+          ? -1
+          : active.indexWhere((event) => event.id == requestedId);
+      setState(() {
+        _events = data.events;
+        _missions = data.missions;
+        if (requestedIndex >= 0) _selectedIndex = requestedIndex;
+        _loading = false;
+      });
+    } catch (error) {
+      if (!mounted) return;
+      setState(() {
+        _loading = false;
+        _error = VmFailurePresentation.messageFor(error, contentLabel: 'events');
+      });
+    }
+  }
+
+  Future<void> _claimMission(SocialMissionItem mission) async {
+    if (!mission.claimable) return;
+    try {
+      await _repository.claimMission(mission.id);
+      await _load(force: true);
+    } catch (error) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context)
+        ..clearSnackBars()
+        ..showSnackBar(
+          SnackBar(
+            content: Text(VmFailurePresentation.messageFor(error, contentLabel: 'event reward')),
+            behavior: SnackBarBehavior.floating,
+          ),
+        );
+    }
   }
 
   void _selectEvent(int index) {
@@ -45,9 +115,21 @@ class _EventsPageState extends State<EventsPage> {
                 onSelected: _selectEvent,
               ),
             Expanded(
-              child: selectedEvent == null
+              child: _loading
+                  ? const VmLoadingState(message: 'Loading events…')
+                  : _error != null
+                  ? VmFailureState(
+                      message: _error!,
+                      contentLabel: 'events',
+                      onRetry: () => unawaited(_load(force: true)),
+                    )
+                  : selectedEvent == null
                   ? const _EmptyEventsState()
-                  : _SelectedEventDetails(event: selectedEvent),
+                  : _SelectedEventDetails(
+                      event: selectedEvent,
+                      missions: _missions,
+                      onClaimMission: (mission) => unawaited(_claimMission(mission)),
+                    ),
             ),
           ],
         ),
@@ -232,9 +314,15 @@ class _EventIconButton extends StatelessWidget {
 }
 
 class _SelectedEventDetails extends StatelessWidget {
-  const _SelectedEventDetails({required this.event});
+  const _SelectedEventDetails({
+    required this.event,
+    required this.missions,
+    required this.onClaimMission,
+  });
 
   final EventItem event;
+  final List<SocialMissionItem> missions;
+  final ValueChanged<SocialMissionItem> onClaimMission;
 
   @override
   Widget build(BuildContext context) {
@@ -248,6 +336,16 @@ class _SelectedEventDetails extends StatelessWidget {
         _EventRewardsCard(event: event),
         const SizedBox(height: 12),
         _EventActionCard(event: event),
+        if (missions.isNotEmpty) ...[
+          const SizedBox(height: 12),
+          for (final mission in missions) ...[
+            _SocialMissionCard(
+              mission: mission,
+              onClaim: () => onClaimMission(mission),
+            ),
+            const SizedBox(height: 9),
+          ],
+        ],
       ],
     );
   }
@@ -289,6 +387,7 @@ class _EventHero extends StatelessWidget {
               ? _EventFallbackArt(event: event)
               : Image.network(
                   event.imageUrl!,
+                  cacheWidth: (MediaQuery.sizeOf(context).width * MediaQuery.devicePixelRatioOf(context)).round(),
                   fit: BoxFit.cover,
                   width: double.infinity,
                   errorBuilder: (_, _, _) => _EventFallbackArt(event: event),
@@ -445,7 +544,7 @@ class _EventActionCard extends StatelessWidget {
           const SizedBox(width: 10),
           Expanded(
             child: Text(
-              '${event.title} backend details, ranking, rules and rewards will connect here.',
+              '${event.title} is live from backend event state. Progress and rewards update without an app release.',
               style: const TextStyle(
                 color: Colors.white,
                 fontSize: 12.2,
@@ -542,6 +641,49 @@ class _EmptyEventsState extends StatelessWidget {
             ),
           ],
         ),
+      ),
+    );
+  }
+}
+
+
+class _SocialMissionCard extends StatelessWidget {
+  const _SocialMissionCard({required this.mission, required this.onClaim});
+  final SocialMissionItem mission;
+  final VoidCallback onClaim;
+
+  @override
+  Widget build(BuildContext context) {
+    final denominator = mission.requiredCount <= 0 ? 1 : mission.requiredCount;
+    final progress = (mission.progress / denominator).clamp(0.0, 1.0);
+    return Container(
+      padding: const EdgeInsets.all(14),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(22),
+        border: Border.all(color: const Color(0xFFECE2D8)),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(children: [
+            Expanded(child: Text(mission.title, style: const TextStyle(color: Color(0xFF251538), fontSize: 14, fontWeight: FontWeight.w900))),
+            Text('+${mission.rewardCoins} coins', style: const TextStyle(color: Color(0xFFC99A3B), fontSize: 11, fontWeight: FontWeight.w900)),
+          ]),
+          const SizedBox(height: 5),
+          Text(mission.description, style: const TextStyle(color: Color(0xFF7B6A86), fontSize: 11.5, fontWeight: FontWeight.w700)),
+          const SizedBox(height: 9),
+          LinearProgressIndicator(value: progress),
+          const SizedBox(height: 7),
+          Row(children: [
+            Text('${mission.progress}/${mission.requiredCount}', style: const TextStyle(color: Color(0xFF7B6A86), fontSize: 10.5, fontWeight: FontWeight.w800)),
+            const Spacer(),
+            TextButton(
+              onPressed: mission.claimable ? onClaim : null,
+              child: Text(mission.claimed ? 'Claimed' : mission.completed ? 'Claim reward' : 'In progress'),
+            ),
+          ]),
+        ],
       ),
     );
   }

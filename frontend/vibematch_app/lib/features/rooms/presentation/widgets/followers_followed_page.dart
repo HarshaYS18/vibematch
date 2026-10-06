@@ -2,6 +2,9 @@ import 'dart:async';
 
 import 'package:flutter/material.dart';
 
+import '../../../../core/network/vm_failure.dart';
+import '../../../../core/presentation/vm_async_state.dart';
+
 import '../../../social/data/social_api_service.dart';
 import '../../../social/models/social_user.dart';
 import '../live_room_models.dart';
@@ -64,7 +67,7 @@ class _FollowersFollowedPageState extends State<FollowersFollowedPage> with Sing
     } catch (error) {
       if (!mounted) return;
       setState(() {
-        _error = error.toString().replaceFirst('Exception: ', '');
+        _error = VmFailurePresentation.messageFor(error, contentLabel: 'followers');
         _followers = const <SocialUser>[];
         _following = const <SocialUser>[];
         _loading = false;
@@ -132,18 +135,9 @@ class _FollowersFollowedPageState extends State<FollowersFollowedPage> with Sing
             ),
             if (_loading) const LinearProgressIndicator(minHeight: 3, color: RoomColors.aqua, backgroundColor: Color(0xFFECE2D8)),
             if (_error != null)
-              Container(
-                margin: const EdgeInsets.fromLTRB(14, 0, 14, 10),
-                padding: const EdgeInsets.all(10),
-                decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(16), border: Border.all(color: const Color(0xFFE8C77C))),
-                child: Row(
-                  children: [
-                    const Icon(Icons.wifi_off_rounded, color: Color(0xFFC99A3B), size: 18),
-                    const SizedBox(width: 8),
-                    Expanded(child: Text(_error!, maxLines: 2, overflow: TextOverflow.ellipsis, style: const TextStyle(color: Color(0xFF7B6A86), fontSize: 11.5, fontWeight: FontWeight.w800))),
-                    TextButton(onPressed: _load, child: const Text('Retry')),
-                  ],
-                ),
+              VmInlineFailure(
+                message: _error!,
+                onRetry: _load,
               ),
             Expanded(
               child: TabBarView(

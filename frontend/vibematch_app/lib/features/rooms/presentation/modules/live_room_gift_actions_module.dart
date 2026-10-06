@@ -2,6 +2,8 @@ import 'dart:async';
 
 import 'package:flutter/material.dart';
 
+import '../../../../core/network/vm_failure.dart';
+
 import '../../../gifts/presentation/lucky_gift_rankings_sheet.dart';
 import '../../data/gift_catalog_api_service.dart';
 import '../../data/lucky_packet_realtime_service.dart';
@@ -20,6 +22,7 @@ class LiveRoomGiftActionsModule {
   static Future<void> openGiftPanel({
     required BuildContext context,
     required LiveRoomGiftController giftController,
+    required LuckyPacketRealtimeService luckyPacketService,
     required List<SeatUser> roomUsers,
   }) async {
     FocusManager.instance.primaryFocus?.unfocus();
@@ -32,7 +35,7 @@ class LiveRoomGiftActionsModule {
       if (context.mounted) {
         RoomToast.show(
           context,
-          error.toString().replaceFirst('Exception: ', ''),
+          VmFailurePresentation.messageFor(error, contentLabel: 'gift action'),
         );
       }
       return;
@@ -79,6 +82,7 @@ class LiveRoomGiftActionsModule {
               _openLuckyPacketSetup(
                 context: context,
                 giftController: giftController,
+                luckyPacketService: luckyPacketService,
                 roomUsers: roomUsers,
               );
             });
@@ -121,9 +125,9 @@ class LiveRoomGiftActionsModule {
   static Future<void> _openLuckyPacketSetup({
     required BuildContext context,
     required LiveRoomGiftController giftController,
+    required LuckyPacketRealtimeService luckyPacketService,
     required List<SeatUser> roomUsers,
   }) {
-    LuckyPacketRealtimeService.instance.attach();
     return LiveRoomSheetController.showTransparentSheet<void>(
       context: context,
       isScrollControlled: true,
@@ -132,7 +136,7 @@ class LiveRoomGiftActionsModule {
         onSend: (coinAmount, peopleCount, message) {
           unawaited(() async {
             try {
-              final result = await LuckyPacketRealtimeService.instance.create(
+              final result = await luckyPacketService.create(
                 coinAmount: coinAmount,
                 winnerCount: peopleCount,
                 message: message,
@@ -146,7 +150,7 @@ class LiveRoomGiftActionsModule {
               if (context.mounted) Navigator.pop(context);
             } catch (error) {
               giftController.onToast(
-                error.toString().replaceFirst('Exception: ', ''),
+                VmFailurePresentation.messageFor(error, contentLabel: 'gift action'),
               );
               unawaited(giftController.refreshCoinBalance());
             }

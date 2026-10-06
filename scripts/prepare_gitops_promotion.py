@@ -7,8 +7,44 @@ import argparse
 import re
 from pathlib import Path
 
-_IMAGE_KEYS = ("api", "worker", "realtime", "media")
-_IMAGE_NAMES = {key: f"funkey-{key}" for key in _IMAGE_KEYS}
+_IMAGE_KEYS = (
+    "api",
+    "inbox",
+    "vibes",
+    "room_control",
+    "identity",
+    "profile_social",
+    "economy",
+    "game_platform",
+    "notification",
+    "graphql_bff",
+    "worker",
+    "kafka_event_bridge",
+    "search",
+    "recommendation",
+    "analytics_sink",
+    "realtime",
+    "media",
+)
+_IMAGE_NAMES = {
+    "api": "funkey-api",
+    "inbox": "funkey-inbox",
+    "vibes": "funkey-vibes",
+    "room_control": "funkey-room-control",
+    "identity": "funkey-identity",
+    "profile_social": "funkey-profile-social",
+    "economy": "funkey-economy",
+    "game_platform": "funkey-game-platform",
+    "notification": "funkey-notification",
+    "graphql_bff": "funkey-graphql-bff",
+    "worker": "funkey-worker",
+    "kafka_event_bridge": "funkey-kafka-event-bridge",
+    "search": "funkey-search",
+    "recommendation": "funkey-recommendation",
+    "analytics_sink": "funkey-analytics-sink",
+    "realtime": "funkey-realtime",
+    "media": "funkey-media",
+}
 _REF_RE = re.compile(r"^(?P<name>[^\s@]+)@(?P<digest>sha256:[0-9a-fA-F]{64})$")
 
 
@@ -49,7 +85,7 @@ def main() -> None:
     parser = argparse.ArgumentParser()
     parser.add_argument("--environment", choices=("staging", "production"), required=True)
     for key in _IMAGE_KEYS:
-        parser.add_argument(f"--{key}", required=True)
+        parser.add_argument(f"--{key.replace('_', '-')}", dest=key, required=True)
     args = parser.parse_args()
     root = Path(__file__).resolve().parents[1]
     path = root / "deploy" / "kubernetes" / "overlays" / args.environment / "kustomization.yaml"

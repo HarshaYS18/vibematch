@@ -1,6 +1,13 @@
 import 'dart:async';
 
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+
+import '../../../core/growth/vm_growth_coordinator.dart';
+import '../../../core/growth/vm_growth_link.dart';
+import '../../../core/localization/funkey_localizations.dart';
+import '../../../core/network/vm_failure.dart';
+import '../../../core/presentation/vm_async_state.dart';
 
 import '../../auth/data/auth_api_service.dart';
 import '../../auth/models/current_user.dart';
@@ -24,7 +31,12 @@ import 'widgets/public_profile_widgets.dart';
 part 'public_profile_view_controller.dart';
 part 'public_profile_view_support.dart';
 
-class PublicProfileViewPage extends StatefulWidget {
+/// Public profile route backed by API data and session-scoped Riverpod state.
+///
+/// Love Bond synchronization is delegated to [loveBondRealtimeProvider].
+/// Widget-local timers/controllers remain route-owned and are disposed with the
+/// page.
+class PublicProfileViewPage extends ConsumerStatefulWidget {
   const PublicProfileViewPage({
     super.key,
     required this.user,
@@ -49,10 +61,12 @@ class PublicProfileViewPage extends StatefulWidget {
   final int? publicUserId;
 
   @override
-  State<PublicProfileViewPage> createState() => _PublicProfileViewPageState();
+  ConsumerState<PublicProfileViewPage> createState() =>
+      _PublicProfileViewPageState();
 }
 
-class _PublicProfileViewPageState extends State<PublicProfileViewPage> {
+class _PublicProfileViewPageState
+    extends ConsumerState<PublicProfileViewPage> {
   final PageController _coverController = PageController();
   final ProfileApiService _profileApi = const ProfileApiService();
   final AuthApiService _authApi = const AuthApiService();
@@ -110,6 +124,27 @@ class _PublicProfileViewPageState extends State<PublicProfileViewPage> {
   }
 
   void _setProfileState(VoidCallback update) => setState(update);
+
+  Future<void> _shareProfile(String displayName) async {
+    final targetId = _targetPublicUserId();
+    if (targetId <= 0) return;
+    final viewerId = (_viewer ?? _authApi.cachedUser)?.publicUserId;
+    final link = VmGrowthLinks.profile(
+      targetId.toString(),
+      referrerId: viewerId?.toString(),
+    );
+    final strings = FunKeyLocalizations.of(context);
+    final result = await VmGrowthCoordinator.instance.shareText(
+      strings.profileShareText(displayName, link.toString()),
+    );
+    if (!mounted) return;
+    _showAction(
+      context,
+      result == VmGrowthShareResult.shared
+          ? strings.shareOpened
+          : strings.linkCopied,
+    );
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -178,8 +213,7 @@ class _PublicProfileViewPageState extends State<PublicProfileViewPage> {
                 onCoverChanged: (index) => setState(() => _coverIndex = index),
                 onBackTap: () => Navigator.pop(context),
                 onQrTap: _openProfileQrActions,
-                onShareTap: () =>
-                    _showAction(context, 'Profile share sheet will open.'),
+                onShareTap: () => unawaited(_shareProfile(displayName)),
                 onAddCoverTap: () => _showAction(
                   context,
                   'Add cover photos flow will open. Users can upload multiple covers.',

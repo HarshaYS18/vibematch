@@ -6,7 +6,7 @@ class RoomRealtimeBaseCommand(BaseModel):
 
 
 class RoomJoinCommand(RoomRealtimeBaseCommand):
-    pass
+    lock_password: str | None = Field(default=None, max_length=128)
 
 
 class RoomLeaveCommand(RoomRealtimeBaseCommand):
@@ -44,5 +44,41 @@ class RoomBackgroundThemeCommand(RoomRealtimeBaseCommand):
 
 
 class RoomChatSendCommand(RoomRealtimeBaseCommand):
-    text: str
-    message_type: str = "text"
+    """Canonical durable room-chat command.
+
+    Text messages require text. Image messages require media_url and may omit
+    text; content_type is retained as presentation metadata.
+    """
+
+    text: str | None = Field(default=None, max_length=4000)
+    message_type: str = Field(default="text", max_length=40)
+    media_url: str | None = Field(default=None, max_length=500)
+    content_type: str | None = Field(default=None, max_length=120)
+
+
+class RoomWatchPartyCommand(RoomRealtimeBaseCommand):
+    action: str = Field(min_length=1, max_length=32)
+    expected_revision: int | None = Field(default=None, ge=0)
+    provider: str | None = Field(default=None, max_length=64)
+    content_id: str | None = Field(default=None, max_length=500)
+    content_url: str | None = Field(default=None, max_length=2000)
+    content_title: str | None = Field(default=None, max_length=500)
+    position_ms: int | None = Field(default=None, ge=0)
+    playback_state: str | None = Field(default=None, max_length=20)
+    playback_rate: float | None = Field(default=None, ge=0.25, le=4.0)
+    timeline_mode: str | None = Field(default=None, pattern="^(vod|live)$")
+    target_live_latency_ms: int | None = Field(default=None, ge=1000, le=120000)
+    target_user_id: int | None = Field(default=None, gt=0)
+
+
+class RoomActivityCommand(RoomRealtimeBaseCommand):
+    action: str = Field(min_length=1, max_length=24)
+    expected_revision: int | None = Field(default=None, ge=0)
+    kind: str | None = Field(default=None, max_length=32)
+    activity_id: str | None = Field(default=None, max_length=120)
+    title: str | None = Field(default=None, max_length=160)
+    phase: str | None = Field(default=None, max_length=32)
+    game_id: str | None = Field(default=None, max_length=120)
+    target_user_id: int | None = Field(default=None, gt=0)
+    metadata: dict[str, object] | None = None
+    post_game: dict[str, object] | None = None

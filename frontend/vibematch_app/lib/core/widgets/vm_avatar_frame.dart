@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 
+import '../../foundation/images/app_image.dart';
+
 class VmAvatarFrameStyle {
   const VmAvatarFrameStyle({
     required this.id,
@@ -76,7 +78,6 @@ class _VmAvatarFrameHostState extends State<VmAvatarFrameHost>
 
     final frameSize = widget.size + widget.framePadding;
     final imageUrl = frame.imageUrl?.trim();
-    final assetPath = frame.assetPath?.trim();
 
     return SizedBox(
       width: frameSize,
@@ -86,27 +87,13 @@ class _VmAvatarFrameHostState extends State<VmAvatarFrameHost>
         clipBehavior: Clip.none,
         children: [
           if (imageUrl != null && imageUrl.isNotEmpty)
-            Image.network(
+            AppImage.network(
               imageUrl,
               width: frameSize,
               height: frameSize,
               fit: BoxFit.contain,
               filterQuality: FilterQuality.high,
-              errorBuilder: (context, error, stackTrace) => _GeneratedVmAvatarFrame(
-                frame: frame,
-                size: frameSize,
-                controller: _controller,
-                staticStrokeWidth: widget.staticStrokeWidth,
-              ),
-            )
-          else if (assetPath != null && assetPath.isNotEmpty)
-            Image.asset(
-              assetPath,
-              width: frameSize,
-              height: frameSize,
-              fit: BoxFit.contain,
-              filterQuality: FilterQuality.high,
-              errorBuilder: (context, error, stackTrace) => _GeneratedVmAvatarFrame(
+              fallback: _GeneratedVmAvatarFrame(
                 frame: frame,
                 size: frameSize,
                 controller: _controller,

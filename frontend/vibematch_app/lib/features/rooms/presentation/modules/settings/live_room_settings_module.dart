@@ -3,15 +3,14 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
 
+import '../../../../../core/network/vm_failure.dart';
+
 import '../../../data/live_room_media_signaling_service.dart';
-import '../../../data/live_room_member_request_service.dart';
-import '../../../data/live_room_membership_service.dart';
 import '../../../data/room_api_service.dart';
 import '../../controllers/live_room_sheet_controller.dart';
 import '../../live_room_models.dart';
 import '../../widgets/cricket_room_backgrounds.dart';
 import '../../widgets/live_room_announcement_sheet.dart';
-import '../../widgets/live_room_background_sheet.dart';
 import '../../widgets/live_room_info_sheet.dart';
 import '../../widgets/live_room_join_requests_sheet.dart';
 import '../../widgets/live_room_privacy_sheet.dart';
@@ -21,13 +20,18 @@ import '../../widgets/room_theme.dart';
 import '../../widgets/vibesync_room_module.dart';
 import '../chat/live_room_chat_module.dart';
 import '../cricket/live_room_cricket_module.dart';
-import '../cricket_room_mode_signal.dart';
 import '../games/live_room_games_entry_module.dart';
 import '../lifecycle/live_room_lifecycle_module.dart';
+import '../pk/live_room_pk_module.dart';
 import '../live_room_controller_bundle.dart';
 import '../seats/live_room_seats_module.dart';
 import '../watch_party/live_room_watch_party_entry_module.dart';
 
+/// Coordinates live-room settings sheets and commands for one room bundle.
+///
+/// Canonical settings are read from the scoped bundle and mutations are
+/// delegated to backend/realtime services. Sheet state is ephemeral and this
+/// module owns no persistent settings cache.
 class LiveRoomSettingsModule {
   const LiveRoomSettingsModule._();
 
@@ -38,12 +42,15 @@ class LiveRoomSettingsModule {
       isScrollControlled: true,
       builder: (sheetContext, setSheetState) => LiveRoomSettingsSheetModule(
         roomId: bundle.roomId,
+        roomMusicController: bundle.roomMusicController,
         privacyMode: bundle.privacyMode,
         roomImagesEnabled: bundle.roomImagesEnabled,
         guestMessagesEnabled: bundle.guestMessagesEnabled,
         applyOnlyModeEnabled: bundle.applyOnlyModeEnabled,
         joinRequestCount: bundle.pendingRoomMemberRequests.length,
-        cricketModeActive: CricketRoomModeSignal.isActive(bundle.roomId),
+        cricketModeActive: bundle.cricketModeController.active,
+        pkModeEngaged:
+            bundle.pkController.pending || bundle.pkController.active,
         onBackgroundTap: () =>
             openBackgroundPickerFromSettings(bundle, sheetContext),
         onCoverPhotoTap: () =>
@@ -66,9 +73,22 @@ class LiveRoomSettingsModule {
           bundle: bundle,
           sheetContext: sheetContext,
         ),
-        onClearChatTap: () {
-          LiveRoomMediaSignalingService.instance.broadcastChatCleared();
-          RoomToast.show(bundle.context, 'Chat clear broadcasted');
+        onPkModeTap: () => LiveRoomPkModule.openFromSettings(
+          bundle: bundle,
+          sheetContext: sheetContext,
+        ),
+        onClearChatTap: () async {
+          try {
+            await bundle.roomSessionRepository.clearChat();
+            if (!bundle.mounted) return;
+            RoomToast.show(bundle.context, 'Chat cleared for everyone');
+          } catch (error) {
+            if (!bundle.mounted) return;
+            RoomToast.show(
+              bundle.context,
+              VmFailurePresentation.messageFor(error, contentLabel: 'room settings'),
+            );
+          }
         },
         canCloseRoom: bundle.currentUser.isHost,
         onToggleRoomImages: (value) {
@@ -135,7 +155,7 @@ class LiveRoomSettingsModule {
       if (!bundle.mounted) return;
       RoomToast.show(
         bundle.context,
-        error.toString().replaceFirst('Exception: ', ''),
+        VmFailurePresentation.messageFor(error, contentLabel: 'room settings'),
       );
     }
   }
@@ -178,7 +198,7 @@ class LiveRoomSettingsModule {
       if (!bundle.mounted) return;
       RoomToast.show(
         bundle.context,
-        error.toString().replaceFirst('Exception: ', ''),
+        VmFailurePresentation.messageFor(error, contentLabel: 'room settings'),
       );
     }
   }
@@ -196,7 +216,7 @@ class LiveRoomSettingsModule {
     }
     Navigator.pop(sheetContext);
 
-    if (CricketRoomModeSignal.isActive(bundle.roomId)) {
+    if (bundle.cricketModeController.active) {
       final currentCricketTheme =
           isCricketRoomBackground(bundle.selectedBackgroundTheme)
           ? bundle.selectedBackgroundTheme
@@ -207,10 +227,8 @@ class LiveRoomSettingsModule {
         builder: (context) => CricketRoomBackgroundPickerSheet(
           currentTheme: currentCricketTheme,
           onThemeSelected: (theme) {
+            // The room state controller owns the durable settings command.
             bundle.roomStateController.setSelectedBackgroundTheme(theme);
-            LiveRoomMediaSignalingService.instance.setRoomBackgroundTheme(
-              theme.id,
-            );
             RoomToast.show(context, '${theme.name} applied');
             LiveRoomChatModule.insertSystemMessage(
               bundle,
@@ -237,10 +255,8 @@ class LiveRoomSettingsModule {
             );
             return;
           }
+          // The room state controller owns the durable settings command.
           bundle.roomStateController.setSelectedBackgroundTheme(theme);
-          LiveRoomMediaSignalingService.instance.setRoomBackgroundTheme(
-            theme.id,
-          );
           RoomToast.show(context, '${theme.name} applied');
           LiveRoomChatModule.insertSystemMessage(
             bundle,
@@ -300,7 +316,7 @@ class LiveRoomSettingsModule {
               if (!bundle.mounted) return;
               RoomToast.show(
                 context,
-                error.toString().replaceFirst('Exception: ', ''),
+                VmFailurePresentation.messageFor(error, contentLabel: 'room settings'),
               );
             }
           },
@@ -310,7 +326,7 @@ class LiveRoomSettingsModule {
       if (!bundle.mounted) return;
       RoomToast.show(
         bundle.context,
-        error.toString().replaceFirst('Exception: ', ''),
+        VmFailurePresentation.messageFor(error, contentLabel: 'room settings'),
       );
     }
   }
@@ -349,6 +365,10 @@ class LiveRoomSettingsModule {
     LiveRoomControllerBundle bundle,
     BuildContext sheetContext,
   ) {
+    if (bundle.pkController.pending || bundle.pkController.active) {
+      RoomToast.show(bundle.context, 'End Room PK before starting VibeSync');
+      return;
+    }
     Navigator.pop(sheetContext);
     Future<void>.delayed(const Duration(milliseconds: 80), () {
       if (bundle.mounted) openVibeSyncSheet(bundle);
@@ -438,19 +458,10 @@ class LiveRoomSettingsModule {
       );
       return;
     }
-    if (approved) {
-      LiveRoomMemberRequestService.instance.approveMembership(user);
-      LiveRoomMembershipService.markMember(
-        roomId: bundle.roomId,
-        userId: user.id,
-      );
-    } else {
-      LiveRoomMemberRequestService.instance.rejectMembership(user);
-      LiveRoomMembershipService.markGuest(
-        roomId: bundle.roomId,
-        userId: user.id,
-      );
-    }
+    bundle.resolveRoomMembership(
+      user,
+      approved: approved,
+    );
     RoomToast.show(
       bundle.context,
       approved
@@ -466,6 +477,7 @@ class LiveRoomSettingsModule {
       isScrollControlled: true,
       builder: (context) => LiveRoomPrivacySheet(
         currentMode: bundle.privacyMode,
+        roomId: bundle.roomId,
         onModeChanged: (mode) {
           LiveRoomChatModule.insertSystemMessage(
             bundle,
@@ -481,7 +493,7 @@ class LiveRoomSettingsModule {
   }
 
   static void openSeatLayoutSheet(LiveRoomControllerBundle bundle) {
-    if (CricketRoomModeSignal.isActive(bundle.roomId)) {
+    if (bundle.cricketModeController.active) {
       RoomToast.show(
         bundle.context,
         'Seat layout is fixed during Cricket Mode',
@@ -551,7 +563,7 @@ class LiveRoomSettingsModule {
       if (!bundle.mounted) return;
       RoomToast.show(
         bundle.context,
-        error.toString().replaceFirst('Exception: ', ''),
+        VmFailurePresentation.messageFor(error, contentLabel: 'room settings'),
       );
     }
   }

@@ -1,6 +1,5 @@
 import 'package:flutter/material.dart';
 
-import '../widgets/room_seats.dart';
 import '../widgets/room_theme.dart';
 
 class LiveRoomMessageComposerModule extends StatefulWidget {
@@ -9,6 +8,7 @@ class LiveRoomMessageComposerModule extends StatefulWidget {
     required this.controller,
     this.focusNode,
     required this.imagesEnabled,
+    required this.onDismissSeatActions,
     required this.onSendText,
     required this.onImageTap,
     required this.onSendFloatingText,
@@ -17,6 +17,9 @@ class LiveRoomMessageComposerModule extends StatefulWidget {
   final TextEditingController controller;
   final FocusNode? focusNode;
   final bool imagesEnabled;
+
+  /// Clears the owning room's selected seat through scoped seat state.
+  final VoidCallback onDismissSeatActions;
   final VoidCallback onSendText;
   final VoidCallback onImageTap;
   final VoidCallback onSendFloatingText;
@@ -56,7 +59,7 @@ class _LiveRoomMessageComposerModuleState
   }
 
   void _toggleFloatingMode() {
-    dismissRoomSeatActionPill();
+    widget.onDismissSeatActions();
     setState(() {
       _floatingMode = !_floatingMode;
       if (_floatingMode &&
@@ -74,7 +77,7 @@ class _LiveRoomMessageComposerModuleState
   }
 
   void _send() {
-    dismissRoomSeatActionPill();
+    widget.onDismissSeatActions();
 
     final text = widget.controller.text.trim();
     if (text.isEmpty) {
@@ -106,7 +109,7 @@ class _LiveRoomMessageComposerModuleState
   }
 
   void _handleImageTap() {
-    dismissRoomSeatActionPill();
+    widget.onDismissSeatActions();
 
     if (!widget.imagesEnabled) {
       RoomToast.show(context, 'Image messages are disabled in this room');

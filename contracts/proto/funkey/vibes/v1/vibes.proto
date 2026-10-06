@@ -1,0 +1,30 @@
+syntax = "proto3";
+
+package funkey.vibes.v1;
+
+import "funkey/common/v1/context.proto";
+
+option go_package = "github.com/HarshaYS18/vibematch/gen/go/funkey/vibes/v1;vibesv1";
+
+service VibesService {
+  rpc GetFeed(GetFeedRequest) returns (GetFeedResponse);
+}
+
+message GetFeedRequest {
+  funkey.common.v1.RequestContext context = 1;
+  string cursor = 2;
+  uint32 limit = 3;
+}
+
+message VibePost {
+  string post_id = 1;
+  int64 author_user_id = 2;
+  string caption = 3;
+  string media_url = 4;
+  int64 created_at_unix_ms = 5;
+}
+
+message GetFeedResponse {
+  repeated VibePost posts = 1;
+  string next_cursor = 2;
+}

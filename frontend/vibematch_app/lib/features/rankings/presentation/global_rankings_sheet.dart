@@ -2,6 +2,9 @@ import 'dart:async';
 
 import 'package:flutter/material.dart';
 
+import '../../../core/network/vm_failure.dart';
+import '../../../core/ui/vm_motion.dart';
+
 import '../../rooms/presentation/widgets/chat_vip_badge.dart';
 import '../data/global_rankings_api_service.dart';
 
@@ -22,6 +25,7 @@ class GlobalRankingsSheet extends StatefulWidget {
   }) {
     return showModalBottomSheet<void>(
       context: context,
+      sheetAnimationStyle: VmMotion.sheetAnimationStyle,
       isScrollControlled: true,
       backgroundColor: Colors.transparent,
       builder: (_) => GlobalRankingsSheet(
@@ -73,7 +77,7 @@ class _GlobalRankingsSheetState extends State<GlobalRankingsSheet> {
       if (!mounted) return;
       setState(() {
         _loading = false;
-        _error = error.toString().replaceFirst('Exception: ', '');
+        _error = VmFailurePresentation.messageFor(error, contentLabel: 'rankings');
       });
     }
   }

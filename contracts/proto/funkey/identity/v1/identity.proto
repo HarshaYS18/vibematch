@@ -1,0 +1,41 @@
+syntax = "proto3";
+
+package funkey.identity.v1;
+
+import "funkey/common/v1/context.proto";
+
+option go_package = "github.com/HarshaYS18/vibematch/gen/go/funkey/identity/v1;identityv1";
+
+service IdentityService {
+  rpc GetIdentity(GetIdentityRequest) returns (GetIdentityResponse);
+  rpc Authorize(AuthorizeRequest) returns (AuthorizeResponse);
+}
+
+message GetIdentityRequest {
+  funkey.common.v1.RequestContext context = 1;
+  int64 user_id = 2;
+}
+
+message Identity {
+  int64 user_id = 1;
+  int64 public_user_id = 2;
+  string display_name = 3;
+  string avatar_url = 4;
+  bool active = 5;
+}
+
+message GetIdentityResponse {
+  Identity identity = 1;
+}
+
+message AuthorizeRequest {
+  funkey.common.v1.RequestContext context = 1;
+  string action = 2;
+  string resource_type = 3;
+  string resource_id = 4;
+}
+
+message AuthorizeResponse {
+  bool allowed = 1;
+  string reason_code = 2;
+}

@@ -1,0 +1,43 @@
+apiVersion: gateway.networking.k8s.io/v1
+kind: Gateway
+metadata:
+  name: funkey-public
+  labels:
+    app.kubernetes.io/part-of: funkey
+    funkey.io/component: edge-gateway
+spec:
+  gatewayClassName: funkey-envoy
+  listeners:
+    - name: api
+      hostname: api.funkey.com
+      port: 443
+      protocol: HTTPS
+      tls:
+        mode: Terminate
+        certificateRefs:
+          - kind: Secret
+            name: funkey-api-tls
+      allowedRoutes:
+        namespaces: {from: Same}
+    - name: realtime
+      hostname: realtime.funkey.com
+      port: 443
+      protocol: HTTPS
+      tls:
+        mode: Terminate
+        certificateRefs:
+          - kind: Secret
+            name: funkey-realtime-tls
+      allowedRoutes:
+        namespaces: {from: Same}
+    - name: media
+      hostname: media.funkey.com
+      port: 443
+      protocol: HTTPS
+      tls:
+        mode: Terminate
+        certificateRefs:
+          - kind: Secret
+            name: funkey-media-tls
+      allowedRoutes:
+        namespaces: {from: Same}

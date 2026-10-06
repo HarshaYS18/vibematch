@@ -1,6 +1,10 @@
 import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
 
+import '../../../../core/network/vm_failure.dart';
+import '../../../../core/presentation/vm_async_state.dart';
+import '../../../../core/ui/vm_motion.dart';
+
 import 'account_settings_store.dart';
 
 class AccountSettingsPage extends StatefulWidget {
@@ -35,7 +39,7 @@ class _AccountSettingsPageState extends State<AccountSettingsPage> {
       });
     } catch (error) {
       if (!mounted) return;
-      setState(() => _loadError = error.toString());
+      setState(() => _loadError = VmFailurePresentation.messageFor(error, contentLabel: 'account settings'));
     }
   }
 
@@ -55,7 +59,7 @@ class _AccountSettingsPageState extends State<AccountSettingsPage> {
       await AccountSettingsStore.save(next);
     } catch (error) {
       if (mounted) {
-        _toast(error.toString());
+        _toast(VmFailurePresentation.messageFor(error, contentLabel: 'account settings'));
         setState(() => _state = current);
       }
     } finally {
@@ -81,6 +85,7 @@ class _AccountSettingsPageState extends State<AccountSettingsPage> {
   Future<void> _resetSettings() async {
     final confirmed = await showModalBottomSheet<bool>(
       context: context,
+      sheetAnimationStyle: VmMotion.sheetAnimationStyle,
       backgroundColor: Colors.transparent,
       builder: (_) => _ConfirmResetSheet(
         onCancel: () => Navigator.pop(context, false),
@@ -94,7 +99,7 @@ class _AccountSettingsPageState extends State<AccountSettingsPage> {
       await _loadSettings();
       if (mounted) _toast('Settings reset to default.');
     } catch (error) {
-      if (mounted) _toast(error.toString());
+      if (mounted) _toast(VmFailurePresentation.messageFor(error, contentLabel: 'account settings'));
     }
   }
 
@@ -145,6 +150,7 @@ class _AccountSettingsPageState extends State<AccountSettingsPage> {
 
     showModalBottomSheet<void>(
       context: context,
+      sheetAnimationStyle: VmMotion.sheetAnimationStyle,
       isScrollControlled: true,
       backgroundColor: Colors.transparent,
       builder: (_) => _TonePickerSheet(
@@ -189,16 +195,15 @@ class _AccountSettingsPageState extends State<AccountSettingsPage> {
             ),
             if (_loadError != null)
               Expanded(
-                child: _SettingsErrorState(
+                child: VmFailureState(
                   message: _loadError!,
+                  contentLabel: 'account settings',
                   onRetry: _loadSettings,
                 ),
               )
             else if (state == null)
               const Expanded(
-                child: Center(
-                  child: CircularProgressIndicator(color: Color(0xFF251538)),
-                ),
+                child: VmLoadingState(message: 'Loading account settings…'),
               )
             else
               Expanded(
@@ -594,54 +599,6 @@ const List<String> _builtInNotificationTones = [
   'Gift Spark',
   'Room Invite Chime',
 ];
-
-class _SettingsErrorState extends StatelessWidget {
-  const _SettingsErrorState({required this.message, required this.onRetry});
-
-  final String message;
-  final VoidCallback onRetry;
-
-  @override
-  Widget build(BuildContext context) {
-    return Center(
-      child: Padding(
-        padding: const EdgeInsets.all(24),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            const Icon(
-              Icons.cloud_off_rounded,
-              color: Color(0xFF7B6A86),
-              size: 36,
-            ),
-            const SizedBox(height: 10),
-            const Text(
-              'Settings unavailable',
-              style: TextStyle(
-                color: Color(0xFF251538),
-                fontSize: 17,
-                fontWeight: FontWeight.w900,
-              ),
-            ),
-            const SizedBox(height: 6),
-            Text(
-              message,
-              textAlign: TextAlign.center,
-              style: const TextStyle(
-                color: Color(0xFF7B6A86),
-                fontSize: 12.5,
-                height: 1.35,
-                fontWeight: FontWeight.w700,
-              ),
-            ),
-            const SizedBox(height: 14),
-            FilledButton(onPressed: onRetry, child: const Text('Retry')),
-          ],
-        ),
-      ),
-    );
-  }
-}
 
 class _SettingsHeader extends StatelessWidget {
   const _SettingsHeader({

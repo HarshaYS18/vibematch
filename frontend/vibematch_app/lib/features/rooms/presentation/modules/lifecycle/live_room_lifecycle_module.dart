@@ -5,7 +5,6 @@ import '../live_room_controller_bundle.dart';
 import '../live_room_leave_actions_module.dart';
 import '../seats/live_room_seats_module.dart';
 import '../../widgets/live_room_minimized_overlay_service.dart';
-import '../../widgets/room_seats.dart';
 
 class LiveRoomLifecycleModule {
   const LiveRoomLifecycleModule._();
@@ -53,7 +52,7 @@ class LiveRoomLifecycleModule {
       allowRoomPop: bundle.allowRoomPop,
       didPop: didPop,
     )) {
-      dismissRoomSeatActionPill();
+      bundle.seatController.clearSelectedSeat();
       openLeaveSheet(bundle);
     }
   }
@@ -74,7 +73,7 @@ class LiveRoomLifecycleModule {
       modeTitle: bundle.config.modeTitle,
       onlineCount: onlineCount,
       restoreState: restoreState,
-      dismissSeatActionPill: dismissRoomSeatActionPill,
+      dismissSeatActionPill: bundle.seatController.clearSelectedSeat,
       clearFocus: () => clearFocus(bundle),
       restoreMinimizedRoom: () => restoreMinimizedRoom(bundle),
       mountedGetter: () => bundle.mounted,
@@ -96,7 +95,7 @@ class LiveRoomLifecycleModule {
 
   static void restoreMinimizedRoom(LiveRoomControllerBundle bundle) {
     if (!bundle.mounted) return;
-    dismissRoomSeatActionPill();
+    bundle.seatController.clearSelectedSeat();
     clearFocus(bundle);
     bundle.roomStateController.setBubbleOffset(
       LiveRoomMinimizedOverlayService.instance.offset,

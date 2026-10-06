@@ -1,7 +1,8 @@
 import 'package:flutter/material.dart';
 
+import '../../../core/network/vm_failure.dart';
+
 import '../data/social_api_service.dart';
-import '../data/social_mock_data.dart';
 import '../models/social_user.dart';
 
 class FriendsInviteSheet extends StatefulWidget {
@@ -50,15 +51,8 @@ class _FriendsInviteSheetState extends State<FriendsInviteSheet> {
   }
 
   Future<List<SocialUser>> _loadFriends() async {
-    try {
-      final users = await widget.socialApiService.listFriendUsers(onlineOnly: widget.onlineOnly);
-      return _sortedFriends(users);
-    } catch (_) {
-      final fallback = widget.onlineOnly
-          ? SocialMockData.friends.where((user) => user.isOnline).toList(growable: false)
-          : SocialMockData.friends;
-      return _sortedFriends(fallback);
-    }
+    final users = await widget.socialApiService.listFriendUsers(onlineOnly: widget.onlineOnly);
+    return _sortedFriends(users);
   }
 
   List<SocialUser> _sortedFriends(List<SocialUser> users) {
@@ -107,7 +101,10 @@ class _FriendsInviteSheetState extends State<FriendsInviteSheet> {
           SnackBar(
             behavior: SnackBarBehavior.floating,
             backgroundColor: const Color(0xFF251538),
-            content: Text('Action failed: $error', style: const TextStyle(fontWeight: FontWeight.w800)),
+            content: Text(
+              VmFailurePresentation.messageFor(error, contentLabel: 'invite'),
+              style: const TextStyle(fontWeight: FontWeight.w800),
+            ),
           ),
         );
     }
@@ -250,6 +247,7 @@ class _FriendsInviteSheetState extends State<FriendsInviteSheet> {
                         borderRadius: BorderRadius.circular(15),
                         child: Image.network(
                           user.avatarUrl!,
+                          cacheWidth: (38 * MediaQuery.devicePixelRatioOf(context)).round(),
                           width: 38,
                           height: 38,
                           fit: BoxFit.cover,

@@ -2,6 +2,9 @@ import 'dart:async';
 
 import 'package:flutter/material.dart';
 
+import '../../../core/network/vm_failure.dart';
+import '../../../core/presentation/vm_async_state.dart';
+
 import '../../vibes/data/vibes_api_service.dart';
 import '../../vibes/presentation/pages/vibe_detail_backend_page.dart';
 import '../data/notifications_api_service.dart';
@@ -48,8 +51,10 @@ class _NotificationsPageState extends State<NotificationsPage> {
   }
 
   Future<void> _loadNotifications() async {
+    final hadItems = _items.isNotEmpty;
     setState(() {
-      _loading = true;
+      // Initial load owns the full-screen spinner. Refreshes preserve content.
+      _loading = !hadItems;
       _error = null;
     });
     try {
@@ -61,11 +66,15 @@ class _NotificationsPageState extends State<NotificationsPage> {
       });
     } catch (error) {
       if (!mounted) return;
+      final message = VmFailurePresentation.messageFor(
+        error,
+        contentLabel: 'notifications',
+      );
       setState(() {
-        _items = const <NotificationItem>[];
         _loading = false;
-        _error = error.toString().replaceFirst('Exception: ', '');
+        _error = hadItems ? null : message;
       });
+      if (hadItems) _toast(message);
     }
   }
 
@@ -74,7 +83,7 @@ class _NotificationsPageState extends State<NotificationsPage> {
       await _api.markAllRead();
       await _loadNotifications();
     } catch (error) {
-      if (mounted) _toast(error.toString().replaceFirst('Exception: ', ''));
+      if (mounted) _toast(VmFailurePresentation.messageFor(error, contentLabel: 'notification'));
     }
   }
 
@@ -112,7 +121,7 @@ class _NotificationsPageState extends State<NotificationsPage> {
           MaterialPageRoute(builder: (_) => VibeDetailBackendPage(vibe: vibe)),
         );
       } catch (error) {
-        if (mounted) _toast(error.toString().replaceFirst('Exception: ', ''));
+        if (mounted) _toast(VmFailurePresentation.messageFor(error, contentLabel: 'notification'));
       } finally {
         if (mounted) setState(() => _openingTarget = false);
       }
@@ -149,9 +158,9 @@ class _NotificationsPageState extends State<NotificationsPage> {
                     onRefresh: _loadNotifications,
                     color: const Color(0xFF251538),
                     child: _loading
-                        ? const Center(child: CircularProgressIndicator(color: Color(0xFF251538)))
+                        ? const VmLoadingState(message: 'Loading notifications…')
                         : _error != null
-                            ? _NotificationsErrorState(message: _error!, onRetry: _loadNotifications)
+                            ? VmFailureState(message: _error!, contentLabel: 'notifications', onRetry: _loadNotifications)
                             : visibleItems.isEmpty
                                 ? const _EmptyNotificationsState()
                                 : ListView.separated(
@@ -352,36 +361,6 @@ class _NotificationTile extends StatelessWidget {
           ),
         ),
       ),
-    );
-  }
-}
-
-class _NotificationsErrorState extends StatelessWidget {
-  const _NotificationsErrorState({required this.message, required this.onRetry});
-
-  final String message;
-  final Future<void> Function() onRetry;
-
-  @override
-  Widget build(BuildContext context) {
-    return ListView(
-      physics: const AlwaysScrollableScrollPhysics(),
-      children: [
-        Container(
-          margin: const EdgeInsets.all(22),
-          padding: const EdgeInsets.all(22),
-          decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(28), border: Border.all(color: const Color(0xFFE8C77C))),
-          child: Column(mainAxisSize: MainAxisSize.min, children: [
-            const Icon(Icons.wifi_off_rounded, color: Color(0xFFC99A3B), size: 40),
-            const SizedBox(height: 12),
-            const Text('Could not load notifications', style: TextStyle(color: Color(0xFF251538), fontSize: 18, fontWeight: FontWeight.w900)),
-            const SizedBox(height: 6),
-            Text(message, textAlign: TextAlign.center, style: const TextStyle(color: Color(0xFF7B6A86), fontSize: 12.5, height: 1.35, fontWeight: FontWeight.w700)),
-            const SizedBox(height: 14),
-            FilledButton(onPressed: () => unawaited(onRetry()), child: const Text('Retry')),
-          ]),
-        ),
-      ],
     );
   }
 }

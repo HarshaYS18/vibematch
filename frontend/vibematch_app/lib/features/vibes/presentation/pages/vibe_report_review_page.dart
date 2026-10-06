@@ -2,6 +2,10 @@ import 'dart:async';
 
 import 'package:flutter/material.dart';
 
+import '../../../../core/network/vm_failure.dart';
+import '../../../../core/presentation/vm_async_state.dart';
+import '../../../../core/ui/vm_motion.dart';
+
 import '../../data/vibes_api_service.dart';
 
 class VibeReportReviewPage extends StatefulWidget {
@@ -40,7 +44,7 @@ class _VibeReportReviewPageState extends State<VibeReportReviewPage> {
       });
     } catch (error) {
       if (!mounted) return;
-      setState(() => _error = error.toString().replaceFirst('Exception: ', ''));
+      setState(() => _error = VmFailurePresentation.messageFor(error, contentLabel: 'Vibe reports'));
     } finally {
       if (mounted) setState(() => _loading = false);
     }
@@ -49,6 +53,7 @@ class _VibeReportReviewPageState extends State<VibeReportReviewPage> {
   Future<void> _reviewReport(VibeReportQueueItem report, {required bool deletePost}) async {
     final shouldContinue = await showModalBottomSheet<bool>(
       context: context,
+      sheetAnimationStyle: VmMotion.sheetAnimationStyle,
       backgroundColor: Colors.transparent,
       builder: (_) => _ReviewConfirmSheet(deletePost: deletePost),
     );
@@ -63,7 +68,7 @@ class _VibeReportReviewPageState extends State<VibeReportReviewPage> {
       setState(() => _reports.removeWhere((item) => item.id == report.id));
       _toast(deletePost ? 'Report action taken. Vibe removed.' : 'Report rejected and closed.');
     } catch (error) {
-      if (mounted) _toast(error.toString().replaceFirst('Exception: ', ''));
+      if (mounted) _toast(VmFailurePresentation.messageFor(error, contentLabel: 'Vibe reports'));
     }
   }
 
@@ -103,8 +108,8 @@ class _VibeReportReviewPageState extends State<VibeReportReviewPage> {
             padding: const EdgeInsets.fromLTRB(14, 8, 14, 26),
             children: [
               const _OfficialReviewNotice(),
-              if (_loading) const _LoadingCard(),
-              if (_error != null) _ErrorCard(message: _error!, onRetry: _loadReports),
+              if (_loading) const VmLoadingState(compact: true),
+              if (_error != null) VmInlineFailure(message: _error!, onRetry: _loadReports),
               if (!_loading && _error == null && _reports.isEmpty) const _EmptyReportsCard(),
               ..._reports.map((report) => _ReportCard(
                     report: report,
@@ -244,16 +249,6 @@ class _ReviewConfirmSheet extends StatelessWidget {
   }
 }
 
-class _LoadingCard extends StatelessWidget {
-  const _LoadingCard();
-
-  @override
-  Widget build(BuildContext context) => const Padding(
-        padding: EdgeInsets.all(24),
-        child: Center(child: CircularProgressIndicator(color: Color(0xFF111015))),
-      );
-}
-
 class _EmptyReportsCard extends StatelessWidget {
   const _EmptyReportsCard();
 
@@ -263,28 +258,6 @@ class _EmptyReportsCard extends StatelessWidget {
         decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(22), border: Border.all(color: const Color(0xFFECE2D8))),
         child: const Center(
           child: Text('No pending Vibe reports.', style: TextStyle(color: Color(0xFF8C8198), fontWeight: FontWeight.w900)),
-        ),
-      );
-}
-
-class _ErrorCard extends StatelessWidget {
-  const _ErrorCard({required this.message, required this.onRetry});
-
-  final String message;
-  final VoidCallback onRetry;
-
-  @override
-  Widget build(BuildContext context) => Container(
-        margin: const EdgeInsets.only(bottom: 12),
-        padding: const EdgeInsets.all(14),
-        decoration: BoxDecoration(color: const Color(0xFFFFF8E8), borderRadius: BorderRadius.circular(18)),
-        child: Row(
-          children: [
-            const Icon(Icons.warning_amber_rounded, color: Color(0xFFC99A3B)),
-            const SizedBox(width: 10),
-            Expanded(child: Text(message, maxLines: 3, overflow: TextOverflow.ellipsis, style: const TextStyle(color: Color(0xFF7B6A86), fontWeight: FontWeight.w800))),
-            TextButton(onPressed: onRetry, child: const Text('Retry')),
-          ],
         ),
       );
 }

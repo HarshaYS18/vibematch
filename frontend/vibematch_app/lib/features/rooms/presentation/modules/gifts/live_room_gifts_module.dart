@@ -4,12 +4,17 @@ import '../lifecycle/live_room_lifecycle_module.dart';
 import '../../controllers/live_room_gift_controller.dart';
 import '../../widgets/room_theme.dart';
 
+/// Creates room-scoped gift controllers from the canonical controller bundle.
+///
+/// Durable room identity is injected into the gift controller; this module does
+/// not consult transport/global active-room state.
 class LiveRoomGiftsModule {
   const LiveRoomGiftsModule._();
 
   static LiveRoomGiftController controllerFor(LiveRoomControllerBundle bundle) {
     return bundle.giftControllerInstance ??= LiveRoomGiftController(
       currentUser: bundle.currentUser,
+      roomPublicId: bundle.roomId,
       onChanged: bundle.notifyGiftChanged,
       onFinalGiftMessage: (entry) {
         if (!bundle.mounted) return;
@@ -22,21 +27,14 @@ class LiveRoomGiftsModule {
     );
   }
 
-  static void bindLuckyPacketBusIfReady(LiveRoomControllerBundle bundle) {
-    final controller = bundle.giftControllerInstance;
-    if (controller == null) return;
-    controller.ensureDefaultReceiver(bundle.roomUsers);
-    LuckyPacketRoomBus.bind(
-      controller: controller,
-      roomUsers: bundle.allRoomUsers,
-    );
-  }
-
   static void openGiftPanel(LiveRoomControllerBundle bundle) {
     LiveRoomLifecycleModule.clearFocus(bundle);
+    final controller = controllerFor(bundle);
+    controller.refreshCoinBalance();
     LiveRoomGiftActionsModule.openGiftPanel(
       context: bundle.context,
-      giftController: controllerFor(bundle),
+      giftController: controller,
+      luckyPacketService: bundle.luckyPacketRealtimeService,
       roomUsers: bundle.roomUsers,
     );
   }

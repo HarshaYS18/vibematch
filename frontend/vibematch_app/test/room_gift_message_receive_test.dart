@@ -26,6 +26,7 @@ void main() {
       isCurrentUser: true,
     );
     final controller = LiveRoomMessageController(
+      roomId: 'LUCKYROOM',
       currentUser: currentUser,
       onChanged: () => changes++,
       restoreState: const LiveRoomMessageRestoreState(
@@ -34,7 +35,7 @@ void main() {
       ),
     );
 
-    LiveRoomSystemEventBus.publish(
+    controller.applySystemEvent(
       LiveRoomSystemEvent.fromJson(<String, dynamic>{
         'id': 'gift_77_6418000022',
         'event_type': 'room_gift_sent',
@@ -53,7 +54,7 @@ void main() {
         'quantity': 3,
         'coin_value': 500,
         'total_coin_value': 1500,
-        'asset_path': 'assets/gifts/normal/crown.webp',
+        'asset_url': 'https://cdn.example/gifts/golden_crown/v1/icon.webp',
         'created_at': '2026-09-13T10:00:00Z',
       }),
     );
@@ -68,7 +69,8 @@ void main() {
     expect(message.vipLevel, 5);
     expect(message.sendingLevel, 8);
     expect(message.receivingLevel, 3);
-    expect(message.giftAssetPath, 'assets/gifts/normal/crown.webp');
+    expect(message.giftAssetPath, isNull);
+    expect(message.giftAssetUrl, 'https://cdn.example/gifts/golden_crown/v1/icon.webp');
   });
 
   test('lucky receive entry includes multiplier and quantity', () {
@@ -88,6 +90,7 @@ void main() {
       isCurrentUser: true,
     );
     final controller = LiveRoomMessageController(
+      roomId: 'LUCKYROOM',
       currentUser: currentUser,
       onChanged: () {},
       restoreState: const LiveRoomMessageRestoreState(
@@ -96,7 +99,7 @@ void main() {
       ),
     );
 
-    LiveRoomSystemEventBus.publish(
+    controller.applySystemEvent(
       LiveRoomSystemEvent.fromJson(<String, dynamic>{
         'id': 'gift_99_7000000002',
         'event_type': 'room_gift_sent',
@@ -142,6 +145,7 @@ void main() {
       isCurrentUser: true,
     );
     final controller = LiveRoomMessageController(
+      roomId: 'LUCKYROOM',
       currentUser: currentUser,
       onChanged: () {},
       restoreState: const LiveRoomMessageRestoreState(
@@ -156,11 +160,11 @@ void main() {
         senderId: 'LUCKYROOM_user_7000000001',
         message: 'sent to Lucky Receiver Lucky Star x100 x18',
         isGift: true,
-        giftAssetPath: 'assets/gifts/lucky/lucky_star.webp',
+        giftAssetUrl: 'https://cdn.example/gifts/lucky_star/v1/icon.webp',
       ),
     );
 
-    LiveRoomSystemEventBus.publish(
+    controller.applySystemEvent(
       LiveRoomSystemEvent.fromJson(<String, dynamic>{
         'id': 'gift_combo_7000000001_2',
         'event_type': 'room_gift_sent',
@@ -178,7 +182,7 @@ void main() {
         'is_lucky': true,
         'lucky_multiplier': 500,
         'lucky_reward_coin_amount': 450000,
-        'asset_path': 'assets/gifts/lucky/lucky_star.webp',
+        'asset_url': 'https://cdn.example/gifts/lucky_star/v1/icon.webp',
         'created_at': '2026-09-13T10:00:02Z',
       }),
     );
@@ -195,7 +199,7 @@ void main() {
         senderId: '7000000001',
         message: 'sent to Lucky Receiver Lucky Star x500 x27',
         isGift: true,
-        giftAssetPath: 'assets/gifts/lucky/lucky_star.webp',
+        giftAssetUrl: 'https://cdn.example/gifts/lucky_star/v1/icon.webp',
       ),
     );
 

@@ -40,6 +40,8 @@ class InboxConversationResponse(BaseModel):
     last_seen_at: datetime | None = None
     colors: list[str] = Field(default_factory=list)
     messages: list[InboxMessageResponse] = Field(default_factory=list)
+    messages_next_cursor: str | None = None
+    has_older_messages: bool = False
     current_room_name: str | None = None
     current_room_id: str | None = None
     is_locked_by_backend: bool = False
@@ -57,6 +59,19 @@ class InboxConversationResponse(BaseModel):
 
 class InboxConversationListResponse(BaseModel):
     conversations: list[InboxConversationResponse]
+    next_cursor: str | None = None
+
+
+class InboxMessagePageResponse(BaseModel):
+    messages: list[InboxMessageResponse]
+    next_cursor: str | None = None
+    has_more: bool = False
+
+
+class InboxReadReceiptResponse(BaseModel):
+    conversation_id: str
+    last_read_message_id: str | None = None
+    unread_count: int = 0
 
 
 class InboxDirectConversationRequest(BaseModel):
@@ -88,6 +103,7 @@ class InboxMessageActionRequest(BaseModel):
 class InboxConversationStateRequest(BaseModel):
     is_muted: bool | None = None
     is_pinned: bool | None = None
+    is_archived: bool | None = None
     is_locked: bool | None = None
     is_blocked: bool | None = None
 

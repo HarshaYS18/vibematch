@@ -24,6 +24,7 @@ class CurrentUser {
   final List<RoleBadge> roleBadges;
   final UserVipSummary vip;
   final UserWalletSummary wallet;
+  final bool profileSetupCompleted;
   final bool isActive;
   final bool isBanned;
   final String? lastDeviceId;
@@ -54,6 +55,7 @@ class CurrentUser {
     required this.roleBadges,
     this.vip = const UserVipSummary.empty(),
     this.wallet = const UserWalletSummary.empty(),
+    this.profileSetupCompleted = false,
     required this.isActive,
     required this.isBanned,
     required this.lastDeviceId,
@@ -122,6 +124,13 @@ class CurrentUser {
         json['wallet'] is Map
             ? (json['wallet'] as Map).cast<String, dynamic>()
             : null,
+      ),
+      profileSetupCompleted: _boolFromJson(
+        json,
+        keys: const ['profile_setup_completed', 'profileSetupCompleted'],
+        fallback:
+            identity.displayName?.trim().isNotEmpty == true &&
+            identity.avatarUrl?.trim().isNotEmpty == true,
       ),
       isActive: _boolFromJson(
         json,
@@ -271,6 +280,7 @@ class CurrentUser {
           .toList(growable: false),
       'vip': vip.toJson(),
       'wallet': wallet.toJson(),
+      'profile_setup_completed': profileSetupCompleted,
       'is_active': isActive,
       'is_banned': isBanned,
       'last_device_id': lastDeviceId,
@@ -303,6 +313,7 @@ class CurrentUser {
     List<RoleBadge>? roleBadges,
     UserVipSummary? vip,
     UserWalletSummary? wallet,
+    bool? profileSetupCompleted,
     bool? isActive,
     bool? isBanned,
     String? lastDeviceId,
@@ -347,6 +358,8 @@ class CurrentUser {
       roleBadges: roleBadges ?? this.roleBadges,
       vip: vip ?? this.vip,
       wallet: wallet ?? this.wallet,
+      profileSetupCompleted:
+          profileSetupCompleted ?? this.profileSetupCompleted,
       isActive: isActive ?? this.isActive,
       isBanned: isBanned ?? this.isBanned,
       lastDeviceId: clearLastDeviceId

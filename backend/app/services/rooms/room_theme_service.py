@@ -6,7 +6,6 @@ from uuid import uuid4
 from fastapi import HTTPException, status
 from sqlalchemy.orm import Session
 
-from app.models.economy import EconomyCurrency, EconomyDirection, UserWallet, WalletLedger
 from app.models.room import Room
 from app.models.room_participant import RoomParticipant
 from app.models.room_theme import RoomTheme, RoomThemeOwnershipType, RoomThemeReview, RoomThemeReviewStatus, UserRoomThemeInventory
@@ -86,16 +85,6 @@ def seed_default_room_themes(db: Session) -> None:
     db.flush()
 
 
-def _wallet_for_update(db: Session, user_id: int) -> UserWallet:
-    wallet = db.query(UserWallet).filter(UserWallet.user_id == user_id).with_for_update().first()
-    if wallet is not None:
-        return wallet
-    wallet = UserWallet(user_id=user_id)
-    db.add(wallet)
-    db.flush()
-    return wallet
-
-
 def _is_owned(db: Session, user_id: int, theme: RoomTheme) -> bool:
     if theme.ownership_type in {RoomThemeOwnershipType.FREE.value, RoomThemeOwnershipType.CUSTOM.value}:
         return True
@@ -126,38 +115,56 @@ def list_store_room_themes(db: Session, user: User) -> list[RoomThemeResponse]:
     return [theme_payload(db, theme, user.id) for theme in themes]
 
 
-def purchase_room_theme(db: Session, user: User, theme_id: str) -> RoomThemeResponse:
-    seed_default_room_themes(db)
-    theme = db.query(RoomTheme).filter(RoomTheme.theme_id == theme_id, RoomTheme.is_active.is_(True)).first()
-    if theme is None:
-        raise HTTPException(status_code=404, detail="Room background theme not found")
-    if theme.ownership_type in {RoomThemeOwnershipType.FREE.value, RoomThemeOwnershipType.CUSTOM.value}:
-        if db.query(UserRoomThemeInventory.id).filter(UserRoomThemeInventory.user_id == user.id, UserRoomThemeInventory.theme_id == theme.theme_id).first() is None:
-            db.add(UserRoomThemeInventory(user_id=user.id, theme_id=theme.theme_id, source=theme.ownership_type))
-            db.commit()
-        return theme_payload(db, theme, user.id)
-    existing = db.query(UserRoomThemeInventory).filter(UserRoomThemeInventory.user_id == user.id, UserRoomThemeInventory.theme_id == theme.theme_id).first()
-    if existing is not None:
-        return theme_payload(db, theme, user.id)
-    wallet = _wallet_for_update(db, user.id)
-    price = int(theme.price_coins or 0)
-    if wallet.coin_balance < price:
-        raise HTTPException(status_code=400, detail="Insufficient coins to purchase this room background")
-    before = wallet.coin_balance
-    wallet.coin_balance -= price
-    wallet.lifetime_coins_spent += price
-    db.add(WalletLedger(user_id=user.id, currency_type=EconomyCurrency.COIN.value, direction=EconomyDirection.DEBIT.value, amount=price, before_balance=before, after_balance=wallet.coin_balance, source_type="ROOM_THEME_PURCHASE", source_id=theme.theme_id, created_by_user_id=user.id, reason=f"Purchased room background {theme.name}"))
-    db.add(UserRoomThemeInventory(user_id=user.id, theme_id=theme.theme_id, source="purchase"))
-    db.commit()
-    return theme_payload(db, theme, user.id)
-
-
 def _theme_or_404(db: Session, theme_id: str) -> RoomTheme:
     seed_default_room_themes(db)
     theme = db.query(RoomTheme).filter(RoomTheme.theme_id == theme_id, RoomTheme.is_active.is_(True)).first()
     if theme is None:
         raise HTTPException(status_code=404, detail="Room background theme not found")
     return theme
+
+
+def room_theme_purchase_quote(
+    db: Session,
+    *,
+    user_id: int,
+    theme_id: str,
+) -> dict:
+    theme = _theme_or_404(db, theme_id)
+    return {
+        "theme_id": theme.theme_id,
+        "name": theme.name,
+        "ownership_type": theme.ownership_type,
+        "price_coins": int(theme.price_coins or 0),
+        "is_owned": _is_owned(db, user_id, theme),
+    }
+
+
+def grant_room_theme_inventory(
+    db: Session,
+    *,
+    user_id: int,
+    theme_id: str,
+    source: str,
+) -> RoomThemeResponse:
+    theme = _theme_or_404(db, theme_id)
+    existing = (
+        db.query(UserRoomThemeInventory)
+        .filter(
+            UserRoomThemeInventory.user_id == user_id,
+            UserRoomThemeInventory.theme_id == theme.theme_id,
+        )
+        .first()
+    )
+    if existing is None:
+        db.add(
+            UserRoomThemeInventory(
+                user_id=user_id,
+                theme_id=theme.theme_id,
+                source=(source or theme.ownership_type or "purchase")[:40],
+            )
+        )
+        db.commit()
+    return theme_payload(db, theme, user_id)
 
 
 def apply_room_theme(db: Session, room: Room, user: User, theme_id: str) -> Room:

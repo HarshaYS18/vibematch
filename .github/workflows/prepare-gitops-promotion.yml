@@ -11,8 +11,47 @@ on:
       api_image:
         description: Immutable API image (name@sha256:digest)
         required: true
+      inbox_image:
+        description: Immutable Inbox image (name@sha256:digest)
+        required: true
+      vibes_image:
+        description: Immutable Vibes image (name@sha256:digest)
+        required: true
+      room_control_image:
+        description: Immutable Room Control image (name@sha256:digest)
+        required: true
+      identity_image:
+        description: Immutable Identity image (name@sha256:digest)
+        required: true
+      profile_social_image:
+        description: Immutable Profile/Social image (name@sha256:digest)
+        required: true
+      economy_image:
+        description: Immutable Economy image (name@sha256:digest)
+        required: true
+      game_platform_image:
+        description: Immutable Game Platform image (name@sha256:digest)
+        required: true
+      notification_image:
+        description: Immutable Notification image (name@sha256:digest)
+        required: true
+      graphql_bff_image:
+        description: Immutable GraphQL BFF image (name@sha256:digest)
+        required: true
       worker_image:
         description: Immutable worker image (name@sha256:digest)
+        required: true
+      kafka_event_bridge_image:
+        description: Immutable Kafka Event Bridge image (name@sha256:digest)
+        required: true
+      search_image:
+        description: Immutable Search service image (name@sha256:digest)
+        required: true
+      recommendation_image:
+        description: Immutable Recommendation service image (name@sha256:digest)
+        required: true
+      analytics_sink_image:
+        description: Immutable Analytics Sink image (name@sha256:digest)
         required: true
       realtime_image:
         description: Immutable realtime image (name@sha256:digest)
@@ -32,13 +71,26 @@ jobs:
     steps:
       - uses: actions/checkout@v4
         with:
-          ref: codex/funkey-production-backend-v1
+          ref: main
       - name: Pin immutable image digests
         run: |
           python scripts/prepare_gitops_promotion.py \
             --environment "${{ inputs.environment }}" \
             --api "${{ inputs.api_image }}" \
+            --inbox "${{ inputs.inbox_image }}" \
+            --vibes "${{ inputs.vibes_image }}" \
+            --room-control "${{ inputs.room_control_image }}" \
+            --identity "${{ inputs.identity_image }}" \
+            --profile-social "${{ inputs.profile_social_image }}" \
+            --economy "${{ inputs.economy_image }}" \
+            --game-platform "${{ inputs.game_platform_image }}" \
+            --notification "${{ inputs.notification_image }}" \
+            --graphql-bff "${{ inputs.graphql_bff_image }}" \
             --worker "${{ inputs.worker_image }}" \
+            --kafka-event-bridge "${{ inputs.kafka_event_bridge_image }}" \
+            --search "${{ inputs.search_image }}" \
+            --recommendation "${{ inputs.recommendation_image }}" \
+            --analytics-sink "${{ inputs.analytics_sink_image }}" \
             --realtime "${{ inputs.realtime_image }}" \
             --media "${{ inputs.media_image }}"
       - uses: azure/setup-kubectl@v4
@@ -59,7 +111,7 @@ jobs:
           git commit -m "deploy: promote FunKey ${TARGET} images"
           git push origin "$branch"
           gh pr create \
-            --base codex/funkey-production-backend-v1 \
+            --base main \
             --head "$branch" \
             --title "deploy: promote FunKey ${TARGET} images" \
             --body "Pins signed immutable backend image digests for ${TARGET}. Validate staging, migration compatibility, readiness, dashboards, and rollback before production sync."

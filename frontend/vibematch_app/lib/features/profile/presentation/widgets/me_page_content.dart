@@ -1,6 +1,7 @@
 import 'dart:async';
 
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../auth/data/auth_api_service.dart';
 import '../../../auth/models/current_user.dart';
@@ -8,13 +9,14 @@ import '../../../control_center/presentation/control_center_hub_page.dart';
 import '../../../economy/presentation/merchant_seller_panel_page.dart';
 import '../../../family/models/family_ui_models.dart';
 import '../../../family/presentation/family_modular_page.dart';
-import '../../../games/presentation/game_test_page.dart';
 import '../../../presence/data/presence_api_service.dart';
 import '../../../store/presentation/store_page.dart';
 import '../../../vip/presentation/vip_program_page.dart';
 import '../../../wallet/data/wallet_api_service.dart';
 import '../../../wallet/presentation/wallet_page_modular.dart';
 import '../../../../core/navigation/vm_navigator.dart';
+import '../../../../core/network/vm_failure.dart';
+import '../../../../core/presentation/vm_async_state.dart';
 import '../../data/love_bond_realtime_service.dart';
 import '../../data/profile_api_service.dart';
 import '../control_center/coin_supply_grant_page.dart';
@@ -201,7 +203,7 @@ class _MePageContentState extends State<MePageContent> {
     } catch (error) {
       if (!mounted) return;
       setState(() {
-        _loadError = error.toString().replaceFirst('Exception: ', '');
+        _loadError = VmFailurePresentation.messageFor(error, contentLabel: 'profile');
         _loadingRealData = false;
       });
     }
@@ -302,19 +304,6 @@ class _MePageContentState extends State<MePageContent> {
     Navigator.of(context)
         .push(MaterialPageRoute(builder: (_) => const CoinSupplyGrantPage()))
         .then((_) => _refreshAll());
-  }
-
-  void _openGameTest(BuildContext context) {
-    if (!_isOwnerToolsUser) {
-      _showAction(
-        context,
-        'Game backend test is available only for Owner/Super Owner.',
-      );
-      return;
-    }
-    Navigator.of(
-      context,
-    ).push(MaterialPageRoute(builder: (_) => const GameTestPage()));
   }
 
   void _openMerchantSellerPanel(BuildContext context) {
@@ -420,9 +409,9 @@ class _MePageContentState extends State<MePageContent> {
   }
 
   bool _shouldShowItem(MeActionItem item) {
+    if (item.action == 'game_test') return false;
     if (item.action == 'vip_svip_admin' ||
-        item.action == 'coin_supply_grant' ||
-        item.action == 'game_test')
+        item.action == 'coin_supply_grant')
       return _isOwnerToolsUser;
     if (item.title == 'Control Center') return _isOfficialOrPanelUser;
     if (item.title == 'Merchant & Seller Panel') return _isMerchantPanelUser;
@@ -464,7 +453,7 @@ class _MePageContentState extends State<MePageContent> {
               backgroundColor: Color(0xFFECE2D8),
             ),
           if (_loadError != null)
-            _RealDataErrorBanner(message: _loadError!, onRetry: _loadRealData),
+            VmInlineFailure(message: _loadError!, onRetry: _loadRealData),
           MePremiumProfileHero(
             displayName: _displayName,
             publicId: user.visibleId,
@@ -521,8 +510,6 @@ class _MePageContentState extends State<MePageContent> {
                         _openVipSvipAdmin(context);
                       } else if (item.action == 'coin_supply_grant') {
                         _openCoinSupplyGrant(context);
-                      } else if (item.action == 'game_test') {
-                        _openGameTest(context);
                       } else if (item.action == 'family' ||
                           item.title == 'Family') {
                         _openFamily(context);
@@ -566,51 +553,20 @@ class _MePageContentState extends State<MePageContent> {
   }
 }
 
-class _RealDataErrorBanner extends StatelessWidget {
-  const _RealDataErrorBanner({required this.message, required this.onRetry});
-  final String message;
-  final VoidCallback onRetry;
-  @override
-  Widget build(BuildContext context) => Container(
-    margin: const EdgeInsets.only(bottom: 10),
-    padding: const EdgeInsets.all(11),
-    decoration: BoxDecoration(
-      color: Colors.white,
-      borderRadius: BorderRadius.circular(18),
-      border: Border.all(color: const Color(0xFFE8C77C)),
-    ),
-    child: Row(
-      children: [
-        const Icon(Icons.wifi_off_rounded, color: Color(0xFFC99A3B), size: 18),
-        const SizedBox(width: 8),
-        Expanded(
-          child: Text(
-            message,
-            maxLines: 2,
-            overflow: TextOverflow.ellipsis,
-            style: const TextStyle(
-              color: Color(0xFF7B6A86),
-              fontSize: 11.5,
-              fontWeight: FontWeight.w800,
-            ),
-          ),
-        ),
-        TextButton(onPressed: onRetry, child: const Text('Retry')),
-      ],
-    ),
-  );
-}
-
-class _MeLoveBondBackendSyncGate extends StatefulWidget {
+/// Invisible lifecycle gate that synchronizes the signed-in user's Love Bonds.
+///
+/// Backend data is written into [loveBondRealtimeProvider]; the gate owns only
+/// the once-per-user sync trigger and no relationship state of its own.
+class _MeLoveBondBackendSyncGate extends ConsumerStatefulWidget {
   const _MeLoveBondBackendSyncGate({required this.user});
   final CurrentUser user;
   @override
-  State<_MeLoveBondBackendSyncGate> createState() =>
+  ConsumerState<_MeLoveBondBackendSyncGate> createState() =>
       _MeLoveBondBackendSyncGateState();
 }
 
 class _MeLoveBondBackendSyncGateState
-    extends State<_MeLoveBondBackendSyncGate> {
+    extends ConsumerState<_MeLoveBondBackendSyncGate> {
   bool _started = false;
   @override
   void initState() {
@@ -631,7 +587,9 @@ class _MeLoveBondBackendSyncGateState
     if (_started) return;
     _started = true;
     try {
-      await LoveBondRealtimeService.syncMyBondsFromBackend(
+      await ref
+          .read(loveBondRealtimeProvider.notifier)
+          .syncMyBondsFromBackend(
         currentUserId: widget.user.id,
         currentPublicUserId: widget.user.publicUserId,
         currentDisplayName:

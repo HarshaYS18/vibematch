@@ -3,23 +3,105 @@ name: funkey-dev
 services:
   postgres:
     image: postgres:16-alpine
+    command:
+      - postgres
+      - -c
+      - shared_preload_libraries=pg_stat_statements
+      - -c
+      - track_io_timing=on
+      - -c
+      - log_lock_waits=on
+      - -c
+      - deadlock_timeout=1s
     environment:
       POSTGRES_USER: funkey
       POSTGRES_PASSWORD: funkey_dev_only
       POSTGRES_DB: funkey
     ports: ["127.0.0.1:5432:5432"]
-    volumes: ["postgres_data:/var/lib/postgresql/data"]
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ./postgres/init:/docker-entrypoint-initdb.d:ro
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U funkey -d funkey"]
       interval: 5s
       timeout: 3s
       retries: 20
 
-  redis:
+  pgbouncer:
+    image: pgbouncer/pgbouncer:1.25.2
+    environment:
+      DATABASES_HOST: postgres
+      DATABASES_PORT: "5432"
+      DATABASES_USER: funkey
+      DATABASES_PASSWORD: funkey_dev_only
+      DATABASES_DBNAME: funkey
+      DATABASES_MAX_DB_CONNECTIONS: "30"
+      PGBOUNCER_LISTEN_PORT: "6432"
+      PGBOUNCER_POOL_MODE: transaction
+      PGBOUNCER_MAX_CLIENT_CONN: "100"
+      PGBOUNCER_DEFAULT_POOL_SIZE: "20"
+      PGBOUNCER_RESERVE_POOL_SIZE: "5"
+      PGBOUNCER_MAX_PREPARED_STATEMENTS: "200"
+      PGBOUNCER_AUTH_TYPE: scram-sha-256
+      PGBOUNCER_QUERY_WAIT_TIMEOUT: "5"
+      QUIET: "1"
+    ports: ["127.0.0.1:6432:6432"]
+    depends_on:
+      postgres: {condition: service_healthy}
+    healthcheck:
+      test: ["CMD-SHELL", "nc -z 127.0.0.1 6432"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+
+  cache-redis:
     image: redis:7-alpine
-    command: ["redis-server", "--appendonly", "yes"]
+    command:
+      - redis-server
+      - --appendonly
+      - "no"
+      - --maxmemory
+      - 256mb
+      - --maxmemory-policy
+      - allkeys-lfu
     ports: ["127.0.0.1:6379:6379"]
-    volumes: ["redis_data:/data"]
+    volumes: ["cache_redis_data:/data"]
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+
+  realtime-redis:
+    image: redis:7-alpine
+    command:
+      - redis-server
+      - --appendonly
+      - "no"
+      - --maxmemory
+      - 256mb
+      - --maxmemory-policy
+      - volatile-ttl
+    ports: ["127.0.0.1:6380:6379"]
+    volumes: ["realtime_redis_data:/data"]
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+
+  media-redis:
+    image: redis:7-alpine
+    command:
+      - redis-server
+      - --appendonly
+      - "yes"
+      - --maxmemory
+      - 256mb
+      - --maxmemory-policy
+      - noeviction
+    ports: ["127.0.0.1:6381:6379"]
+    volumes: ["media_redis_data:/data"]
     healthcheck:
       test: ["CMD", "redis-cli", "ping"]
       interval: 5s
@@ -39,6 +121,144 @@ services:
       timeout: 3s
       retries: 20
 
+  kafka:
+    profiles: ["data"]
+    image: apache/kafka:4.1.0
+    ports:
+      - "127.0.0.1:19092:19092"
+    environment:
+      CLUSTER_ID: MkU3OEVBNTcwNTJENDM2Qk
+      KAFKA_NODE_ID: "1"
+      KAFKA_PROCESS_ROLES: broker,controller
+      KAFKA_LISTENERS: INTERNAL://:9092,CONTROLLER://:9093,EXTERNAL://:19092
+      KAFKA_ADVERTISED_LISTENERS: INTERNAL://kafka:9092,EXTERNAL://127.0.0.1:19092
+      KAFKA_CONTROLLER_LISTENER_NAMES: CONTROLLER
+      KAFKA_INTER_BROKER_LISTENER_NAME: INTERNAL
+      KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: CONTROLLER:PLAINTEXT,INTERNAL:PLAINTEXT,EXTERNAL:PLAINTEXT
+      KAFKA_CONTROLLER_QUORUM_VOTERS: 1@kafka:9093
+      KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: "1"
+      KAFKA_TRANSACTION_STATE_LOG_REPLICATION_FACTOR: "1"
+      KAFKA_TRANSACTION_STATE_LOG_MIN_ISR: "1"
+      KAFKA_DEFAULT_REPLICATION_FACTOR: "1"
+      KAFKA_MIN_INSYNC_REPLICAS: "1"
+      KAFKA_GROUP_INITIAL_REBALANCE_DELAY_MS: "0"
+      KAFKA_AUTO_CREATE_TOPICS_ENABLE: "false"
+      KAFKA_LOG_DIRS: /var/lib/kafka/data
+    volumes: ["kafka_data:/var/lib/kafka/data"]
+    healthcheck:
+      test: ["CMD-SHELL", "/opt/kafka/bin/kafka-topics.sh --bootstrap-server 127.0.0.1:9092 --list >/dev/null 2>&1"]
+      interval: 10s
+      timeout: 5s
+      retries: 30
+      start_period: 20s
+
+  kafka-topics:
+    profiles: ["data"]
+    build: {context: .., dockerfile: apps/kafka-event-bridge/Dockerfile}
+    command: ["python", "provision_topics.py"]
+    environment:
+      KAFKA_BOOTSTRAP_SERVERS: kafka:9092
+      KAFKA_SECURITY_PROTOCOL: PLAINTEXT
+      KAFKA_TOPIC_REPLICATION_FACTOR: "1"
+    depends_on:
+      kafka: {condition: service_healthy}
+    restart: "no"
+
+  opensearch:
+    profiles: ["search"]
+    image: opensearchproject/opensearch:2.19.1
+    environment:
+      discovery.type: single-node
+      DISABLE_SECURITY_PLUGIN: "true"
+      OPENSEARCH_JAVA_OPTS: "-Xms512m -Xmx512m"
+    ports:
+      - "127.0.0.1:19200:9200"
+    volumes: ["opensearch_data:/usr/share/opensearch/data"]
+    healthcheck:
+      test: ["CMD-SHELL", "curl -fsS http://127.0.0.1:9200/_cluster/health >/dev/null"]
+      interval: 10s
+      timeout: 5s
+      retries: 40
+      start_period: 30s
+
+  search-service:
+    profiles: ["search"]
+    build: {context: .., dockerfile: apps/search-service/Dockerfile}
+    environment:
+      OPENSEARCH_URL: http://opensearch:9200
+      SEARCH_INDEX_PREFIX: funkey-search-v1
+      NATS_URL: nats://nats:4222
+      NATS_STREAM: FUNKEY_EVENTS
+      SEARCH_NATS_DURABLE: funkey-search-projector-v1
+      SEARCH_PORT: "8093"
+    ports: ["127.0.0.1:8093:8093"]
+    depends_on:
+      opensearch: {condition: service_healthy}
+      nats: {condition: service_healthy}
+
+  recommendation-service:
+    profiles: ["recommendation"]
+    build: {context: .., dockerfile: apps/recommendation-service/Dockerfile}
+    environment:
+      KAFKA_BOOTSTRAP_SERVERS: kafka:9092
+      KAFKA_SECURITY_PROTOCOL: PLAINTEXT
+      RECOMMENDATION_REDIS_URL: redis://cache-redis:6379/0
+      RECOMMENDATION_PORT: "8094"
+      RECOMMENDATION_FEED_TTL_SECONDS: "21600"
+      RECOMMENDATION_KAFKA_GROUP: funkey-recommendation-v1
+    ports: ["127.0.0.1:8094:8094"]
+    depends_on:
+      kafka: {condition: service_healthy}
+      cache-redis: {condition: service_healthy}
+
+  clickhouse:
+    profiles: ["analytics"]
+    image: clickhouse/clickhouse-server:25.8
+    ports:
+      - "127.0.0.1:18123:8123"
+    volumes: ["clickhouse_data:/var/lib/clickhouse"]
+    healthcheck:
+      test: ["CMD-SHELL", "wget -q -O - http://127.0.0.1:8123/ping | grep -q Ok"]
+      interval: 10s
+      timeout: 5s
+      retries: 30
+
+  analytics-sink:
+    profiles: ["analytics"]
+    build: {context: .., dockerfile: apps/analytics-sink/Dockerfile}
+    environment:
+      APP_ENV: development
+      KAFKA_BOOTSTRAP_SERVERS: kafka:9092
+      KAFKA_SECURITY_PROTOCOL: PLAINTEXT
+      ANALYTICS_KAFKA_GROUP: funkey-analytics-sink-v1
+      CLICKHOUSE_URL: http://clickhouse:8123
+      CLICKHOUSE_DATABASE: funkey_analytics
+      ANALYTICS_OBJECT_STORE_MODE: file
+      ANALYTICS_LOCAL_LAKE_PATH: /lake
+      ANALYTICS_PORT: "8095"
+    volumes: ["analytics_lake_data:/lake"]
+    ports: ["127.0.0.1:8095:8095"]
+    depends_on:
+      kafka: {condition: service_healthy}
+      clickhouse: {condition: service_healthy}
+
+  kafka-event-bridge:
+    profiles: ["data"]
+    build: {context: .., dockerfile: apps/kafka-event-bridge/Dockerfile}
+    environment:
+      NATS_URL: nats://nats:4222
+      NATS_STREAM: FUNKEY_EVENTS
+      NATS_DLQ_STREAM: FUNKEY_DLQ
+      KAFKA_BOOTSTRAP_SERVERS: kafka:9092
+      KAFKA_SECURITY_PROTOCOL: PLAINTEXT
+      KAFKA_TOPIC_REPLICATION_FACTOR: "1"
+      KAFKA_BRIDGE_HEALTH_PORT: "8092"
+    ports: ["127.0.0.1:8092:8092"]
+    depends_on:
+      nats: {condition: service_healthy}
+      kafka: {condition: service_healthy}
+      kafka-topics: {condition: service_completed_successfully}
+
   migrate:
     profiles: ["app"]
     build: {context: .., dockerfile: backend/Dockerfile}
@@ -47,10 +267,42 @@ services:
     environment: &api_environment
       APP_ENV: development
       ENFORCE_SCHEMA_CURRENT: "false"
-      database_url: postgresql://funkey:funkey_dev_only@postgres:5432/funkey
-      redis_url: redis://redis:6379/0
+      database_url: postgresql://funkey:funkey_dev_only@pgbouncer:6432/funkey
+      MIGRATION_DATABASE_URL: postgresql://funkey:funkey_dev_only@postgres:5432/funkey
+      DB_POOLER_MODE: transaction
+      DB_APPLICATION_NAME: funkey-api
+      redis_url: redis://cache-redis:6379/0
+      CACHE_REDIS_URL: redis://cache-redis:6379/0
+      REALTIME_REDIS_URL: redis://realtime-redis:6379/0
+      MEDIA_REGISTRY_REDIS_URL: redis://media-redis:6379/0
       JWT_SECRET_KEY: local-development-only-secret-change-before-production
       MEDIA_INTERNAL_TOKEN: local-development-only-media-token-change-me
+      INBOX_SERVICE_URL: http://inbox:8083/api/v1
+      INBOX_INTERNAL_URL: http://inbox:8083/internal/inbox
+      INBOX_INTERNAL_TOKEN: local-development-inbox-internal-token-2026
+      INBOX_REALTIME_TRANSPORT: nats
+      INBOX_NATS_SUBJECT: funkey.events.inbox.realtime
+      VIBES_SERVICE_URL: http://vibes:8084/api/v1
+      VIBES_INTERNAL_URL: http://vibes:8084/internal/vibes
+      VIBES_INTERNAL_TOKEN: local-development-vibes-internal-token-2026
+      ROOM_CONTROL_SERVICE_URL: http://room-control:8085/api/v1
+      ROOM_CONTROL_INTERNAL_URL: http://room-control:8085/internal/room-control
+      ROOM_CONTROL_INTERNAL_TOKEN: local-development-room-control-token-2026
+      IDENTITY_SERVICE_URL: http://identity:8086/api/v1
+      IDENTITY_INTERNAL_URL: http://identity:8086/internal/identity
+      IDENTITY_INTERNAL_TOKEN: local-development-identity-internal-token-2026
+      PROFILE_SOCIAL_SERVICE_URL: http://profile-social:8087/api/v1
+      PROFILE_SOCIAL_INTERNAL_URL: http://profile-social:8087/internal/profile-social
+      PROFILE_SOCIAL_INTERNAL_TOKEN: local-development-profile-social-token-2026
+      ECONOMY_SERVICE_URL: http://economy:8088/api/v1
+      ECONOMY_INTERNAL_URL: http://economy:8088/internal/economy
+      ECONOMY_INTERNAL_TOKEN: local-development-economy-internal-token-2026
+      GAME_PLATFORM_SERVICE_URL: http://game-platform:8089/api/v1
+      GAME_PLATFORM_SERVICE_TIMEOUT_SECONDS: "5"
+      NOTIFICATION_SERVICE_URL: http://notification:8090/api/v1
+      NOTIFICATION_INTERNAL_URL: http://notification:8090/internal/notifications
+      NOTIFICATION_INTERNAL_TOKEN: local-development-notification-internal-token-2026
+      NATS_URL: nats://nats:4222
       CORS_ALLOWED_ORIGINS: http://localhost:3000,http://localhost:8080
       ENABLE_DEV_LOGIN: "true"
     depends_on:
@@ -63,7 +315,175 @@ services:
     ports: ["127.0.0.1:8000:8000"]
     depends_on:
       migrate: {condition: service_completed_successfully}
-      redis: {condition: service_healthy}
+      pgbouncer: {condition: service_healthy}
+      cache-redis: {condition: service_healthy}
+      identity: {condition: service_started}
+
+  inbox:
+    profiles: ["app"]
+    build: {context: .., dockerfile: apps/inbox-service/Dockerfile}
+    environment:
+      <<: *api_environment
+      DB_APPLICATION_NAME: funkey-inbox
+      INBOX_DATABASE_URL: postgresql://funkey:funkey_dev_only@pgbouncer:6432/funkey
+      INBOX_REALTIME_TRANSPORT: nats
+      NATS_URL: nats://nats:4222
+    ports: ["127.0.0.1:8083:8083"]
+    depends_on:
+      migrate: {condition: service_completed_successfully}
+      pgbouncer: {condition: service_healthy}
+      nats: {condition: service_healthy}
+      realtime-redis: {condition: service_healthy}
+
+  vibes:
+    profiles: ["app"]
+    build: {context: .., dockerfile: apps/vibes-service/Dockerfile}
+    environment:
+      <<: *api_environment
+      DB_APPLICATION_NAME: funkey-vibes
+      VIBES_DATABASE_URL: postgresql://funkey:funkey_dev_only@pgbouncer:6432/funkey
+    ports: ["127.0.0.1:8084:8084"]
+    depends_on:
+      migrate: {condition: service_completed_successfully}
+      pgbouncer: {condition: service_healthy}
+      nats: {condition: service_healthy}
+
+  room-control:
+    profiles: ["app"]
+    build: {context: .., dockerfile: apps/room-control-service/Dockerfile}
+    environment:
+      <<: *api_environment
+      DB_APPLICATION_NAME: funkey-room-control
+      ROOM_CONTROL_DATABASE_URL: postgresql://funkey:funkey_dev_only@pgbouncer:6432/funkey
+    ports: ["127.0.0.1:8085:8085"]
+    depends_on:
+      migrate: {condition: service_completed_successfully}
+      pgbouncer: {condition: service_healthy}
+      realtime-redis: {condition: service_healthy}
+
+  identity:
+    profiles: ["app"]
+    build: {context: .., dockerfile: apps/identity-service/Dockerfile}
+    environment:
+      <<: *api_environment
+      DB_APPLICATION_NAME: funkey-identity
+      IDENTITY_DATABASE_URL: postgresql://funkey:funkey_dev_only@pgbouncer:6432/funkey
+    ports: ["127.0.0.1:8086:8086"]
+    depends_on:
+      migrate: {condition: service_completed_successfully}
+      pgbouncer: {condition: service_healthy}
+
+  profile-social:
+    profiles: ["app"]
+    build: {context: .., dockerfile: apps/profile-social-service/Dockerfile}
+    environment:
+      <<: *api_environment
+      DB_APPLICATION_NAME: funkey-profile-social
+      PROFILE_SOCIAL_DATABASE_URL: postgresql://funkey:funkey_dev_only@pgbouncer:6432/funkey
+    ports: ["127.0.0.1:8087:8087"]
+    depends_on:
+      migrate: {condition: service_completed_successfully}
+      pgbouncer: {condition: service_healthy}
+      inbox: {condition: service_started}
+
+  economy:
+    profiles: ["app"]
+    build:
+      context: ..
+      dockerfile: apps/economy-service/Dockerfile
+    environment:
+      <<: *api_environment
+      DB_APPLICATION_NAME: funkey-economy
+      ECONOMY_DATABASE_URL: postgresql://funkey:funkey_dev_only@pgbouncer:6432/funkey
+    ports:
+      - "127.0.0.1:8088:8088"
+    depends_on:
+      migrate:
+        condition: service_completed_successfully
+      pgbouncer:
+        condition: service_healthy
+
+  game-platform:
+    profiles: ["app"]
+    build: {context: .., dockerfile: apps/game-platform-service/Dockerfile}
+    environment:
+      <<: *api_environment
+      DB_APPLICATION_NAME: funkey-game-platform
+      GAME_PLATFORM_DATABASE_URL: postgresql://funkey:funkey_dev_only@pgbouncer:6432/funkey
+    ports: ["127.0.0.1:8089:8089"]
+    depends_on:
+      migrate: {condition: service_completed_successfully}
+      pgbouncer: {condition: service_healthy}
+      economy: {condition: service_started}
+
+  notification:
+    profiles: ["app"]
+    build: {context: .., dockerfile: apps/notification-service/Dockerfile}
+    environment:
+      <<: *api_environment
+      DB_APPLICATION_NAME: funkey-notification
+      NOTIFICATION_DATABASE_URL: postgresql://funkey:funkey_dev_only@pgbouncer:6432/funkey
+    ports: ["127.0.0.1:8090:8090"]
+    depends_on:
+      migrate: {condition: service_completed_successfully}
+      pgbouncer: {condition: service_healthy}
+
+  notification-provider:
+    profiles: ["app"]
+    build: {context: .., dockerfile: apps/notification-service/Dockerfile}
+    command: ["python", "/app/apps/notification-service/provider_worker.py"]
+    environment:
+      <<: *api_environment
+      DB_APPLICATION_NAME: funkey-notification-provider
+      NOTIFICATION_DATABASE_URL: postgresql://funkey:funkey_dev_only@pgbouncer:6432/funkey
+      NOTIFICATION_PROVIDER_HEALTH_PORT: "8091"
+    healthcheck:
+      test:
+        - CMD
+        - python
+        - -c
+        - "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8091/ready', timeout=2)"
+      interval: 10s
+      timeout: 3s
+      retries: 10
+      start_period: 5s
+    depends_on:
+      migrate: {condition: service_completed_successfully}
+      pgbouncer: {condition: service_healthy}
+
+  economy-bulk-worker:
+    profiles: ["app"]
+    build:
+      context: ..
+      dockerfile: apps/economy-service/Dockerfile
+    command: ["python", "/app/apps/economy-service/bulk_worker.py"]
+    environment:
+      <<: *api_environment
+      DB_APPLICATION_NAME: funkey-economy-bulk-worker
+      ECONOMY_DATABASE_URL: postgresql://funkey:funkey_dev_only@pgbouncer:6432/funkey
+      ECONOMY_BULK_HEALTH_PORT: "8090"
+      ECONOMY_BULK_WORKER_DB_POOL_SIZE: "2"
+      ECONOMY_BULK_WORKER_DB_MAX_OVERFLOW: "0"
+      ECONOMY_RECONCILIATION_INTERVAL_SECONDS: "60"
+      ECONOMY_RECONCILIATION_WALLET_BATCH_SIZE: "500"
+      ECONOMY_RECONCILIATION_POOL_BATCH_SIZE: "500"
+      ECONOMY_RECONCILIATION_JOURNAL_BATCH_SIZE: "1000"
+      ECONOMY_LUCKY_PACKET_FINALIZE_BATCH_SIZE: "50"
+    healthcheck:
+      test:
+        - CMD
+        - python
+        - -c
+        - "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8090/ready', timeout=2)"
+      interval: 10s
+      timeout: 3s
+      retries: 10
+      start_period: 5s
+    depends_on:
+      migrate:
+        condition: service_completed_successfully
+      pgbouncer:
+        condition: service_healthy
 
   realtime:
     profiles: ["app"]
@@ -71,26 +491,99 @@ services:
     environment:
       REALTIME_LISTEN_ADDR: :8081
       REALTIME_AUTH_VERIFY_URL: http://api:8000/api/v1/realtime/verify
-      REALTIME_REDIS_URL: redis://redis:6379/0
+      REALTIME_REDIS_URL: redis://realtime-redis:6379/0
+      REALTIME_NATS_URL: nats://nats:4222
+      REALTIME_NATS_INBOX_SUBJECT: funkey.events.inbox.realtime
+      REALTIME_INBOX_COMMAND_URL: http://inbox:8083/api/v1/realtime/command
       REALTIME_ORIGINS: http://localhost:3000,http://localhost:8080
       REALTIME_NODE_ID: realtime-local-1
       REALTIME_DRAIN_TIMEOUT: 30s
     ports: ["127.0.0.1:8081:8081"]
     depends_on:
       api: {condition: service_started}
-      redis: {condition: service_healthy}
+      realtime-redis: {condition: service_healthy}
+      nats: {condition: service_healthy}
 
   worker:
     profiles: ["app"]
     build: {context: .., dockerfile: apps/worker/Dockerfile}
     environment:
       <<: *api_environment
+      DB_APPLICATION_NAME: funkey-worker-general
+      DB_POOL_SIZE: "3"
+      DB_MAX_OVERFLOW: "0"
       NATS_URL: nats://nats:4222
+      WORKER_POOL: general
+    depends_on:
+      nats: {condition: service_healthy}
+      migrate: {condition: service_completed_successfully}
+      pgbouncer: {condition: service_healthy}
+
+  worker-notification:
+    profiles: ["app"]
+    build: {context: .., dockerfile: apps/worker/Dockerfile}
+    environment:
+      <<: *api_environment
+      DB_APPLICATION_NAME: funkey-worker-notification
+      DB_POOL_SIZE: "3"
+      DB_MAX_OVERFLOW: "0"
+      NATS_URL: nats://nats:4222
+      WORKER_POOL: notification
+    depends_on:
+      nats: {condition: service_healthy}
+      notification: {condition: service_started}
+
+  worker-media:
+    profiles: ["app"]
+    build: {context: .., dockerfile: apps/worker/Dockerfile}
+    environment:
+      <<: *api_environment
+      DB_APPLICATION_NAME: funkey-worker-media
+      DB_POOL_SIZE: "3"
+      DB_MAX_OVERFLOW: "0"
+      NATS_URL: nats://nats:4222
+      WORKER_POOL: media
     depends_on:
       nats: {condition: service_healthy}
       migrate: {condition: service_completed_successfully}
 
+  worker-fanout:
+    profiles: ["app"]
+    build: {context: .., dockerfile: apps/worker/Dockerfile}
+    environment:
+      <<: *api_environment
+      DB_APPLICATION_NAME: funkey-worker-fanout
+      DB_POOL_SIZE: "3"
+      DB_MAX_OVERFLOW: "0"
+      NATS_URL: nats://nats:4222
+      WORKER_POOL: fanout
+    depends_on:
+      nats: {condition: service_healthy}
+      vibes: {condition: service_started}
+      inbox: {condition: service_started}
+      notification: {condition: service_started}
+
+  worker-maintenance:
+    profiles: ["app"]
+    build: {context: .., dockerfile: apps/worker/Dockerfile}
+    environment:
+      <<: *api_environment
+      DB_APPLICATION_NAME: funkey-worker-maintenance
+      DB_POOL_SIZE: "3"
+      DB_MAX_OVERFLOW: "0"
+      NATS_URL: nats://nats:4222
+      WORKER_POOL: maintenance
+    depends_on:
+      nats: {condition: service_healthy}
+      inbox: {condition: service_started}
+
 volumes:
   postgres_data:
-  redis_data:
+  cache_redis_data:
+  realtime_redis_data:
+  media_redis_data:
   nats_data:
+  kafka_data:
+  opensearch_data:
+  clickhouse_data:
+  analytics_lake_data:

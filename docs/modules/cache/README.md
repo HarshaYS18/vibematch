@@ -22,7 +22,7 @@ PostgreSQL remains the durable source of truth for application state.
 
 ## Important files
 
-`backend/app/core/redis_client.py`, `backend/app/services/media_node_registry_service.py`, `backend/app/realtime/event_bus.py`.
+`backend/app/core/redis_client.py`, `backend/app/realtime/connection_manager.py`, `backend/app/services/media_node_registry_service.py`, `contracts/redis/topology.json`, and `deploy/redis`.
 
 ## Public API/contracts
 
@@ -42,7 +42,7 @@ Database: None as source of truth; replay from PostgreSQL for durable facts.
 
 ## Redis keys/state owned
 
-funkey:media:nodes:*, funkey:media:rooms:*, funkey:media:draining:*, funkey:media:reservations:*, funkey:media:node_index.
+`funkey:cache:*` and `funkey:ratelimit:*` on the application role; `funkey:realtime:*` on the realtime/presence role; `funkey:media:*` on the dedicated media-registry role.
 
 ## Dependencies
 
@@ -54,7 +54,7 @@ Private network, authentication, TLS, eviction policy, and key namespace discipl
 
 ## Failure modes
 
-Media registry Lua spans dynamic keys and requires dedicated single-primary HA topology.
+Application-cache pressure, realtime routing, and media registry are isolated into three Redis/Valkey roles. Media registry Lua spans dynamic keys and requires dedicated single-primary HA topology. Redis loss may degrade availability or reset ephemeral state but must not destroy durable business correctness.
 
 ## Retry/idempotency behavior
 
@@ -90,4 +90,4 @@ Review security boundaries, schema changes, resource limits, autoscaling signals
 
 ## Known migration status
 
-Active Redis use; cluster migration prohibited until scripts are redesigned and tested.
+Chunk 19 role isolation is implemented in application configuration, local Compose, exporters, tests, and deployment contracts. Production HA endpoints, memory ceilings, ACL/TLS, and failover remain environment prerequisites. Current clients are single-endpoint clients; Redis Cluster is not claimed as supported.

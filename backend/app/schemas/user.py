@@ -40,14 +40,16 @@ class UserProfileUpdateRequest(BaseModel):
     display_name: str | None = Field(default=None, max_length=80)
     bio: str | None = Field(default=None, max_length=240)
     avatar_url: str | None = Field(default=None, max_length=500)
-    cover_photo_urls: list[str] = Field(default_factory=list, max_length=6)
+    # PATCH semantics: omitted fields must remain unchanged. Collection fields
+    # therefore use None for "not supplied"; an explicit [] still clears them.
+    cover_photo_urls: list[str] | None = Field(default=None, max_length=6)
     date_of_birth: date | None = None
     gender: str | None = Field(default=None, max_length=30)
     profession: str | None = Field(default=None, max_length=80)
     marital_status: str | None = Field(default=None, max_length=30)
     friend_gender_preference: str | None = Field(default=None, max_length=30)
     friend_marital_preference: str | None = Field(default=None, max_length=30)
-    interests: list[str] = Field(default_factory=list, max_length=40)
+    interests: list[str] | None = Field(default=None, max_length=40)
 
 
 class UserMeResponse(BaseModel):

@@ -23,6 +23,7 @@ class ClaimedOutboxEvent:
     occurred_at: datetime
     request_id: str | None
     trace_id: str | None
+    traceparent: str | None
     actor_user_id: int | None
     payload: dict
     attempt_count: int
@@ -72,6 +73,7 @@ def claim_outbox_batch(
                     occurred_at=row.occurred_at,
                     request_id=row.request_id,
                     trace_id=row.trace_id,
+                    traceparent=row.traceparent,
                     actor_user_id=row.actor_user_id,
                     payload=dict(row.payload or {}),
                     attempt_count=row.attempt_count,

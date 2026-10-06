@@ -1,5 +1,8 @@
 import 'package:flutter/material.dart';
 
+import '../../../../core/network/vm_failure.dart';
+import '../../../../core/ui/vm_motion.dart';
+
 import '../../data/support_api_service.dart';
 import 'help_center_models.dart';
 import 'help_center_store.dart';
@@ -42,7 +45,7 @@ class _HelpCenterPageState extends State<HelpCenterPage> {
       if (!mounted) return;
       setState(() {
         _tickets = const <HelpCenterTicket>[];
-        _ticketLoadError = error.toString();
+        _ticketLoadError = VmFailurePresentation.messageFor(error, contentLabel: 'support');
       });
     }
   }
@@ -78,6 +81,7 @@ class _HelpCenterPageState extends State<HelpCenterPage> {
   Future<void> _openTicketSheet({String? category, String? subject}) async {
     final created = await showModalBottomSheet<bool>(
       context: context,
+      sheetAnimationStyle: VmMotion.sheetAnimationStyle,
       isScrollControlled: true,
       backgroundColor: Colors.transparent,
       builder: (_) => _CreateTicketSheet(
@@ -108,6 +112,7 @@ class _HelpCenterPageState extends State<HelpCenterPage> {
   Future<void> _openAssistantSheet() async {
     await showModalBottomSheet<void>(
       context: context,
+      sheetAnimationStyle: VmMotion.sheetAnimationStyle,
       isScrollControlled: true,
       backgroundColor: Colors.transparent,
       builder: (_) => _AssistantSheet(
@@ -845,7 +850,7 @@ class _CreateTicketSheetState extends State<_CreateTicketSheet> {
       if (!mounted) return;
       Navigator.pop(context, true);
     } catch (error) {
-      if (mounted) _showLocalError(error.toString());
+      if (mounted) _showLocalError(VmFailurePresentation.messageFor(error, contentLabel: 'support'));
     } finally {
       if (mounted) setState(() => _saving = false);
     }
@@ -1032,7 +1037,7 @@ class _AssistantSheetState extends State<_AssistantSheet> {
       final reply = await widget.onAsk(message);
       if (mounted) setState(() => _reply = reply);
     } catch (error) {
-      if (mounted) _showError(error.toString());
+      if (mounted) _showError(VmFailurePresentation.messageFor(error, contentLabel: 'support'));
     } finally {
       if (mounted) setState(() => _asking = false);
     }
@@ -1051,7 +1056,7 @@ class _AssistantSheetState extends State<_AssistantSheet> {
       );
       if (mounted) Navigator.pop(context);
     } catch (error) {
-      if (mounted) _showError(error.toString());
+      if (mounted) _showError(VmFailurePresentation.messageFor(error, contentLabel: 'support'));
     } finally {
       if (mounted) setState(() => _creating = false);
     }

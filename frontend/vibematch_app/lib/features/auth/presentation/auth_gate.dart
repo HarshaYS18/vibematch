@@ -1,26 +1,36 @@
 import 'dart:async';
 
 import 'package:flutter/material.dart';
-import 'package:shared_preferences/shared_preferences.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../app/app_shell.dart';
+import '../../../app/growth/vm_growth_router.dart';
+import '../../../core/growth/vm_growth_coordinator.dart';
+import '../../../core/growth/vm_growth_link.dart';
+import '../../../core/localization/vm_locale_controller.dart';
+import '../../../core/network/vm_failure.dart';
+import '../../../identity/data/identity_repository.dart';
+import '../../../session/data/session_repository.dart';
 import '../data/auth_api_service.dart';
 import '../data/google_sign_in_config.dart';
 import '../data/google_sign_in_session_service.dart';
 import '../models/current_user.dart';
 import 'profile_setup_page.dart';
 
-class AuthGate extends StatefulWidget {
+Future<bool> resolveProfileSetupRequirement({
+  required CurrentUser user,
+}) async {
+  return !user.profileSetupCompleted;
+}
+
+class AuthGate extends ConsumerStatefulWidget {
   const AuthGate({super.key});
 
   @override
-  State<AuthGate> createState() => _AuthGateState();
+  ConsumerState<AuthGate> createState() => _AuthGateState();
 }
 
-class _AuthGateState extends State<AuthGate> {
-  static const String _profileSetupDonePrefix = 'vm_profile_setup_done_';
-
-  final AuthApiService _authApiService = AuthApiService();
+class _AuthGateState extends ConsumerState<AuthGate> {
   final GoogleSignInSessionService _googleSignIn =
       GoogleSignInSessionService.instance;
 
@@ -30,6 +40,7 @@ class _AuthGateState extends State<AuthGate> {
   String? _error;
   CurrentUser? _currentUser;
   StreamSubscription<void>? _signedOutSubscription;
+  StreamSubscription<VmGrowthLink>? _growthLinkSubscription;
 
   @override
   void initState() {
@@ -37,16 +48,22 @@ class _AuthGateState extends State<AuthGate> {
     _signedOutSubscription = AuthUserRealtimeService.instance.signedOut.listen(
       (_) => _handleSessionSignedOut(),
     );
+    _growthLinkSubscription =
+        VmGrowthCoordinator.instance.links.listen(_handleGrowthLink);
+    unawaited(VmGrowthCoordinator.instance.initialize());
     _checkSavedLogin();
   }
 
   @override
   void dispose() {
     _signedOutSubscription?.cancel();
+    _growthLinkSubscription?.cancel();
     super.dispose();
   }
 
   void _handleSessionSignedOut() {
+    ref.read(sessionRepositoryProvider.notifier).handleExternalSignOut();
+    ref.read(identityRepositoryProvider.notifier).clear();
     if (!mounted) return;
     setState(() {
       _currentUser = null;
@@ -62,14 +79,15 @@ class _AuthGateState extends State<AuthGate> {
     });
 
     try {
-      await _authApiService.restoreSavedSession();
-      final user = await _authApiService.getCurrentUser();
+      final user = await ref.read(sessionRepositoryProvider.notifier).restore();
+      ref.read(identityRepositoryProvider.notifier).accept(user);
       final needsSetup = await _shouldShowProfileSetup(user);
       if (mounted) {
         setState(() {
           _currentUser = user;
           _needsProfileSetup = needsSetup;
         });
+        _activateAuthenticatedUser(user, needsSetup: needsSetup);
       }
     } catch (_) {
       if (mounted) {
@@ -113,23 +131,22 @@ class _AuthGateState extends State<AuthGate> {
     });
 
     try {
-      await _authApiService.logout();
+      await ref.read(sessionRepositoryProvider.notifier).logout();
+      ref.read(identityRepositoryProvider.notifier).clear();
       await _googleSignIn.signOutIfUsed();
-      final result = await _authApiService.devLogin(
+      final user = await ref.read(sessionRepositoryProvider.notifier).devLogin(
         email: email,
         username: username,
         displayName: displayName,
       );
-      final user = await _authApiService.getCurrentUser(
-        accessToken: result.accessToken,
-        forceRefresh: true,
-      );
+      ref.read(identityRepositoryProvider.notifier).accept(user);
       final needsSetup = await _shouldShowProfileSetup(user);
       if (mounted) {
         setState(() {
           _currentUser = user;
           _needsProfileSetup = needsSetup;
         });
+        _activateAuthenticatedUser(user, needsSetup: needsSetup);
       }
     } catch (error) {
       if (mounted) {
@@ -149,7 +166,8 @@ class _AuthGateState extends State<AuthGate> {
     });
 
     try {
-      await _authApiService.logout();
+      await ref.read(sessionRepositoryProvider.notifier).logout();
+      ref.read(identityRepositoryProvider.notifier).clear();
       await _googleSignIn.signOutIfUsed();
       final account = await _googleSignIn.signIn();
       if (account == null) {
@@ -163,24 +181,27 @@ class _AuthGateState extends State<AuthGate> {
         throw Exception('Google did not return an ID token. ${GoogleSignInConfig.setupHint}');
       }
 
-      final result = await _authApiService.googleLogin(idToken: idToken);
-      final user = await _authApiService.getCurrentUser(
-        accessToken: result.accessToken,
-        forceRefresh: true,
-      );
+      final user = await ref
+          .read(sessionRepositoryProvider.notifier)
+          .googleLogin(idToken: idToken);
+      ref.read(identityRepositoryProvider.notifier).accept(user);
       final needsSetup = await _shouldShowProfileSetup(user);
       if (mounted) {
         setState(() {
           _currentUser = user;
           _needsProfileSetup = needsSetup;
         });
+        _activateAuthenticatedUser(user, needsSetup: needsSetup);
       }
     } catch (error) {
-      final message = error.toString();
-      final lower = message.toLowerCase();
-      final helpfulMessage = lower.contains('api exception: 10') || lower.contains('sign_in_failed')
-          ? 'Google Sign-In config mismatch. ${GoogleSignInConfig.setupHint}'
-          : message;
+      final raw = error.toString().toLowerCase();
+      final helpfulMessage =
+          raw.contains('api exception: 10') || raw.contains('sign_in_failed')
+              ? 'Google Sign-In config mismatch. ${GoogleSignInConfig.setupHint}'
+              : VmFailurePresentation.messageFor(
+                  error,
+                  contentLabel: 'sign in',
+                );
       if (mounted) setState(() => _error = helpfulMessage);
     } finally {
       if (mounted) setState(() => _isLoading = false);
@@ -188,7 +209,8 @@ class _AuthGateState extends State<AuthGate> {
   }
 
   Future<void> _logout() async {
-    await _authApiService.logout();
+    await ref.read(sessionRepositoryProvider.notifier).logout();
+    ref.read(identityRepositoryProvider.notifier).clear();
     await _googleSignIn.clearGoogleSessionIfUsed();
     if (!mounted) return;
     setState(() {
@@ -198,30 +220,68 @@ class _AuthGateState extends State<AuthGate> {
     });
   }
 
-  Future<bool> _shouldShowProfileSetup(CurrentUser user) async {
-    final prefs = await SharedPreferences.getInstance();
-    final setupKey = '$_profileSetupDonePrefix${user.publicUserId}';
-    final alreadyCompleted = prefs.getBool(setupKey) ?? false;
-    if (alreadyCompleted) return false;
-
-    final hasName = user.displayName?.trim().isNotEmpty == true;
-    final hasAvatar = user.avatarUrl?.trim().isNotEmpty == true;
-    return !hasName || !hasAvatar;
-  }
-
-  Future<void> _markProfileSetupCompleted(CurrentUser user) async {
-    final prefs = await SharedPreferences.getInstance();
-    await prefs.setBool('$_profileSetupDonePrefix${user.publicUserId}', true);
+  Future<bool> _shouldShowProfileSetup(CurrentUser user) {
+    return resolveProfileSetupRequirement(user: user);
   }
 
   Future<void> _handleProfileSetupCompleted(CurrentUser user) async {
-    await _markProfileSetupCompleted(user);
-    await _authApiService.persistCurrentUser(user);
+    await ref.read(identityRepositoryProvider.notifier).persist(user);
     if (!mounted) return;
     setState(() {
       _currentUser = user;
       _needsProfileSetup = false;
     });
+    _activateAuthenticatedUser(user, needsSetup: false);
+  }
+
+  void _activateAuthenticatedUser(
+    CurrentUser user, {
+    required bool needsSetup,
+  }) {
+    unawaited(VmLocaleController.instance.syncFromBackend());
+    if (needsSetup) return;
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted) unawaited(_drainPendingGrowthLink(user));
+    });
+  }
+
+  void _handleGrowthLink(VmGrowthLink link) {
+    final user = _currentUser;
+    if (user == null || _needsProfileSetup) return;
+    VmGrowthCoordinator.instance.markConsumed(link);
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted) unawaited(_openGrowthLink(link, user));
+    });
+  }
+
+  Future<void> _drainPendingGrowthLink(CurrentUser user) async {
+    final link = VmGrowthCoordinator.instance.takePending();
+    if (link == null) return;
+    await _openGrowthLink(link, user);
+  }
+
+  Future<void> _openGrowthLink(
+    VmGrowthLink link,
+    CurrentUser user,
+  ) async {
+    try {
+      await VmGrowthRouter.open(context, link: link, currentUser: user);
+    } catch (error) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context)
+        ..clearSnackBars()
+        ..showSnackBar(
+          SnackBar(
+            behavior: SnackBarBehavior.floating,
+            content: Text(
+              VmFailurePresentation.messageFor(
+                error,
+                contentLabel: 'shared link',
+              ),
+            ),
+          ),
+        );
+    }
   }
 
   @override
@@ -250,7 +310,6 @@ class _AuthGateState extends State<AuthGate> {
     return AppShell(
       currentUser: user,
       onLogoutPressed: _logout,
-      onRefreshPressed: _checkSavedLogin,
     );
   }
 }

@@ -1,5 +1,8 @@
 import 'package:flutter/material.dart';
 
+import '../../../core/network/vm_failure.dart';
+import '../../../core/presentation/vm_async_state.dart';
+
 import '../data/control_center_api_service.dart';
 
 class EconomyStoreControlCenterPage extends StatefulWidget {
@@ -64,6 +67,7 @@ class _EconomyStoreControlCenterPageState
   bool _categoryActive = true;
   bool _itemActive = true;
   bool _busy = true;
+  String? _loadError;
 
   @override
   void initState() {
@@ -112,7 +116,10 @@ class _EconomyStoreControlCenterPageState
       .toList(growable: false);
 
   Future<void> _load() async {
-    setState(() => _busy = true);
+    setState(() {
+      _busy = true;
+      _loadError = null;
+    });
     try {
       final results = await Future.wait([
         _api.loadEconomyRuleSets(),
@@ -128,7 +135,12 @@ class _EconomyStoreControlCenterPageState
         _syncStoreSelection();
       });
     } catch (error) {
-      _toast(error.toString(), danger: true);
+      final message = VmFailurePresentation.messageFor(
+        error,
+        contentLabel: 'control center',
+      );
+      if (mounted) setState(() => _loadError = message);
+      _toast(message, danger: true);
     } finally {
       if (mounted) setState(() => _busy = false);
     }
@@ -197,7 +209,7 @@ class _EconomyStoreControlCenterPageState
       _toast('Economy rule saved');
       await _load();
     } catch (error) {
-      _toast(error.toString(), danger: true);
+      _toast(VmFailurePresentation.messageFor(error, contentLabel: 'control center action'), danger: true);
     }
   }
 
@@ -214,7 +226,7 @@ class _EconomyStoreControlCenterPageState
       _toast('Store category saved');
       await _load();
     } catch (error) {
-      _toast(error.toString(), danger: true);
+      _toast(VmFailurePresentation.messageFor(error, contentLabel: 'control center action'), danger: true);
     }
   }
 
@@ -235,7 +247,7 @@ class _EconomyStoreControlCenterPageState
       _toast('Store item saved');
       await _load();
     } catch (error) {
-      _toast(error.toString(), danger: true);
+      _toast(VmFailurePresentation.messageFor(error, contentLabel: 'control center action'), danger: true);
     }
   }
 
@@ -258,7 +270,7 @@ class _EconomyStoreControlCenterPageState
     if (!mounted) return;
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
-        content: Text(message.replaceFirst('Exception: ', '')),
+        content: Text(message),
         backgroundColor: danger
             ? const Color(0xFFE84C72)
             : const Color(0xFF12C7B7),
@@ -292,8 +304,14 @@ class _EconomyStoreControlCenterPageState
           ),
         ),
         body: _busy
-            ? const Center(child: CircularProgressIndicator())
-            : TabBarView(
+            ? const VmLoadingState(message: 'Loading economy controls…')
+            : _loadError != null
+                ? VmFailureState(
+                    message: _loadError!,
+                    contentLabel: 'control center',
+                    onRetry: _load,
+                  )
+                : TabBarView(
                 children: [
                   _buildEconomyPage(),
                   _buildStorePage(),

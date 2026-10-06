@@ -2,8 +2,10 @@ apiVersion: autoscaling/v2
 kind: HorizontalPodAutoscaler
 metadata:
   name: funkey-api
+  annotations:
+    argocd.argoproj.io/sync-wave: "1"
 spec:
-  scaleTargetRef: {apiVersion: apps/v1, kind: Deployment, name: funkey-api}
+  scaleTargetRef: {apiVersion: apps/v1, kind: Deployment, name: funkey-api-stable}
   minReplicas: 3
   maxReplicas: 30
   behavior:
@@ -44,25 +46,277 @@ spec:
 ---
 apiVersion: keda.sh/v1alpha1
 kind: ScaledObject
-metadata:
-  name: funkey-worker
+metadata: {name: funkey-kafka-event-bridge}
 spec:
-  scaleTargetRef: {name: funkey-worker}
+  scaleTargetRef: {name: funkey-kafka-event-bridge}
+  pollingInterval: 15
+  cooldownPeriod: 300
+  minReplicaCount: 2
+  maxReplicaCount: 12
+  fallback: {failureThreshold: 3, replicas: 3}
+  triggers:
+    - type: nats-jetstream
+      metadata: {natsServerMonitoringEndpoint: nats-monitoring.example.invalid:8222, account: $G, stream: FUNKEY_EVENTS, consumer: funkey-kafka-bridge-v1, lagThreshold: "1000", activationLagThreshold: "100"}
+---
+apiVersion: keda.sh/v1alpha1
+kind: ScaledObject
+metadata: {name: funkey-worker-notification}
+spec:
+  scaleTargetRef: {name: funkey-worker-notification}
   pollingInterval: 15
   cooldownPeriod: 300
   minReplicaCount: 1
-  maxReplicaCount: 20
-  fallback:
-    failureThreshold: 3
-    replicas: 2
-  advanced:
-    restoreToOriginalReplicaCount: false
+  maxReplicaCount: 5
+  fallback: {failureThreshold: 3, replicas: 2}
   triggers:
     - type: nats-jetstream
-      metadata:
-        natsServerMonitoringEndpoint: nats-monitoring.example.invalid:8222
-        account: $G
-        stream: FUNKEY_EVENTS
-        consumer: funkey-worker
-        lagThreshold: "100"
-        activationLagThreshold: "10"
+      metadata: {natsServerMonitoringEndpoint: nats-monitoring.example.invalid:8222, account: $G, stream: FUNKEY_EVENTS, consumer: funkey-worker-notification, lagThreshold: "100", activationLagThreshold: "10"}
+---
+apiVersion: keda.sh/v1alpha1
+kind: ScaledObject
+metadata: {name: funkey-worker-fanout}
+spec:
+  scaleTargetRef: {name: funkey-worker-fanout}
+  pollingInterval: 15
+  cooldownPeriod: 300
+  minReplicaCount: 1
+  maxReplicaCount: 4
+  fallback: {failureThreshold: 3, replicas: 2}
+  triggers:
+    - type: nats-jetstream
+      metadata: {natsServerMonitoringEndpoint: nats-monitoring.example.invalid:8222, account: $G, stream: FUNKEY_EVENTS, consumer: funkey-worker-fanout, lagThreshold: "100", activationLagThreshold: "10"}
+---
+apiVersion: keda.sh/v1alpha1
+kind: ScaledObject
+metadata: {name: funkey-worker-media}
+spec:
+  scaleTargetRef: {name: funkey-worker-media}
+  pollingInterval: 15
+  cooldownPeriod: 300
+  minReplicaCount: 1
+  maxReplicaCount: 5
+  fallback: {failureThreshold: 3, replicas: 2}
+  triggers:
+    - type: nats-jetstream
+      metadata: {natsServerMonitoringEndpoint: nats-monitoring.example.invalid:8222, account: $G, stream: FUNKEY_EVENTS, consumer: funkey-worker-media-vibes, lagThreshold: "50", activationLagThreshold: "5"}
+    - type: nats-jetstream
+      metadata: {natsServerMonitoringEndpoint: nats-monitoring.example.invalid:8222, account: $G, stream: FUNKEY_EVENTS, consumer: funkey-worker-media-uploaded, lagThreshold: "25", activationLagThreshold: "3"}
+    - type: nats-jetstream
+      metadata: {natsServerMonitoringEndpoint: nats-monitoring.example.invalid:8222, account: $G, stream: FUNKEY_EVENTS, consumer: funkey-worker-media-moderation, lagThreshold: "50", activationLagThreshold: "5"}
+    - type: nats-jetstream
+      metadata: {natsServerMonitoringEndpoint: nats-monitoring.example.invalid:8222, account: $G, stream: FUNKEY_EVENTS, consumer: funkey-worker-media-delete, lagThreshold: "50", activationLagThreshold: "5"}
+---
+apiVersion: keda.sh/v1alpha1
+kind: ScaledObject
+metadata: {name: funkey-worker-maintenance}
+spec:
+  scaleTargetRef: {name: funkey-worker-maintenance}
+  pollingInterval: 30
+  cooldownPeriod: 600
+  minReplicaCount: 1
+  maxReplicaCount: 5
+  fallback: {failureThreshold: 3, replicas: 1}
+  triggers:
+    - type: nats-jetstream
+      metadata: {natsServerMonitoringEndpoint: nats-monitoring.example.invalid:8222, account: $G, stream: FUNKEY_EVENTS, consumer: funkey-worker-maintenance-backup, lagThreshold: "20", activationLagThreshold: "2"}
+    - type: nats-jetstream
+      metadata: {natsServerMonitoringEndpoint: nats-monitoring.example.invalid:8222, account: $G, stream: FUNKEY_EVENTS, consumer: funkey-worker-maintenance-restore, lagThreshold: "20", activationLagThreshold: "2"}
+    - type: nats-jetstream
+      metadata: {natsServerMonitoringEndpoint: nats-monitoring.example.invalid:8222, account: $G, stream: FUNKEY_EVENTS, consumer: funkey-worker-maintenance-media-cleanup, lagThreshold: "20", activationLagThreshold: "2"}
+---
+---
+apiVersion: autoscaling/v2
+kind: HorizontalPodAutoscaler
+metadata:
+  name: funkey-inbox
+spec:
+  scaleTargetRef: {apiVersion: apps/v1, kind: Deployment, name: funkey-inbox}
+  minReplicas: 3
+  maxReplicas: 20
+  behavior:
+    scaleDown:
+      stabilizationWindowSeconds: 300
+  metrics:
+    - type: Resource
+      resource:
+        name: cpu
+        target: {type: Utilization, averageUtilization: 65}
+
+---
+apiVersion: autoscaling/v2
+kind: HorizontalPodAutoscaler
+metadata:
+  name: funkey-vibes
+spec:
+  scaleTargetRef: {apiVersion: apps/v1, kind: Deployment, name: funkey-vibes}
+  minReplicas: 3
+  maxReplicas: 20
+  behavior:
+    scaleDown:
+      stabilizationWindowSeconds: 300
+  metrics:
+    - type: Resource
+      resource:
+        name: cpu
+        target: {type: Utilization, averageUtilization: 65}
+
+---
+apiVersion: autoscaling/v2
+kind: HorizontalPodAutoscaler
+metadata:
+  name: funkey-room-control
+spec:
+  scaleTargetRef: {apiVersion: apps/v1, kind: Deployment, name: funkey-room-control}
+  minReplicas: 3
+  maxReplicas: 20
+  behavior:
+    scaleDown:
+      stabilizationWindowSeconds: 300
+  metrics:
+    - type: Resource
+      resource:
+        name: cpu
+        target: {type: Utilization, averageUtilization: 60}
+    - type: Pods
+      pods:
+        metric: {name: funkey_http_inflight_requests}
+        target: {type: AverageValue, averageValue: "40"}
+
+---
+apiVersion: autoscaling/v2
+kind: HorizontalPodAutoscaler
+metadata:
+  name: funkey-identity
+spec:
+  scaleTargetRef: {apiVersion: apps/v1, kind: Deployment, name: funkey-identity}
+  minReplicas: 3
+  maxReplicas: 20
+  behavior: {scaleDown: {stabilizationWindowSeconds: 300}}
+  metrics:
+    - type: Resource
+      resource: {name: cpu, target: {type: Utilization, averageUtilization: 60}}
+    - type: Pods
+      pods: {metric: {name: funkey_http_inflight_requests}, target: {type: AverageValue, averageValue: "40"}}
+---
+apiVersion: autoscaling/v2
+kind: HorizontalPodAutoscaler
+metadata:
+  name: funkey-profile-social
+spec:
+  scaleTargetRef: {apiVersion: apps/v1, kind: Deployment, name: funkey-profile-social}
+  minReplicas: 3
+  maxReplicas: 20
+  behavior: {scaleDown: {stabilizationWindowSeconds: 300}}
+  metrics:
+    - type: Resource
+      resource: {name: cpu, target: {type: Utilization, averageUtilization: 65}}
+    - type: Pods
+      pods: {metric: {name: funkey_http_inflight_requests}, target: {type: AverageValue, averageValue: "45"}}
+
+---
+apiVersion: autoscaling/v2
+kind: HorizontalPodAutoscaler
+metadata:
+  name: funkey-economy
+spec:
+  scaleTargetRef:
+    apiVersion: apps/v1
+    kind: Deployment
+    name: funkey-economy
+  minReplicas: 3
+  maxReplicas: 20
+  behavior:
+    scaleDown:
+      stabilizationWindowSeconds: 300
+  metrics:
+    - type: Resource
+      resource:
+        name: cpu
+        target:
+          type: Utilization
+          averageUtilization: 60
+    - type: Pods
+      pods:
+        metric:
+          name: funkey_http_inflight_requests
+        target:
+          type: AverageValue
+          averageValue: "35"
+
+---
+apiVersion: autoscaling/v2
+kind: HorizontalPodAutoscaler
+metadata:
+  name: funkey-economy-bulk-worker
+spec:
+  scaleTargetRef:
+    apiVersion: apps/v1
+    kind: Deployment
+    name: funkey-economy-bulk-worker
+  minReplicas: 2
+  maxReplicas: 4
+  behavior:
+    scaleDown:
+      stabilizationWindowSeconds: 300
+  metrics:
+    - type: Resource
+      resource:
+        name: cpu
+        target:
+          type: Utilization
+          averageUtilization: 65
+---
+apiVersion: autoscaling/v2
+kind: HorizontalPodAutoscaler
+metadata:
+  name: funkey-notification
+spec:
+  scaleTargetRef: {apiVersion: apps/v1, kind: Deployment, name: funkey-notification}
+  minReplicas: 3
+  maxReplicas: 20
+  behavior:
+    scaleDown:
+      stabilizationWindowSeconds: 300
+  metrics:
+    - type: Resource
+      resource:
+        name: cpu
+        target: {type: Utilization, averageUtilization: 60}
+    - type: Pods
+      pods:
+        metric: {name: funkey_http_inflight_requests}
+        target: {type: AverageValue, averageValue: "40"}
+---
+apiVersion: autoscaling/v2
+kind: HorizontalPodAutoscaler
+metadata:
+  name: funkey-notification-provider
+spec:
+  scaleTargetRef: {apiVersion: apps/v1, kind: Deployment, name: funkey-notification-provider}
+  minReplicas: 2
+  maxReplicas: 4
+  behavior:
+    scaleDown:
+      stabilizationWindowSeconds: 300
+  metrics:
+    - type: Resource
+      resource:
+        name: cpu
+        target: {type: Utilization, averageUtilization: 65}
+
+---
+apiVersion: autoscaling/v2
+kind: HorizontalPodAutoscaler
+metadata:
+  name: funkey-graphql-bff
+spec:
+  scaleTargetRef: {apiVersion: apps/v1, kind: Deployment, name: funkey-graphql-bff}
+  minReplicas: 3
+  maxReplicas: 20
+  behavior:
+    scaleDown: {stabilizationWindowSeconds: 300}
+  metrics:
+    - type: Resource
+      resource:
+        name: cpu
+        target: {type: Utilization, averageUtilization: 60}

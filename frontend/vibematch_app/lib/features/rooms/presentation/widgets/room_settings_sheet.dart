@@ -34,10 +34,12 @@ class RoomSettingsSheet extends StatelessWidget {
     required this.onVibeSyncTap,
     required this.onWatchPartyTap,
     required this.onCricketModeTap,
+    required this.onPkModeTap,
     required this.onClearChatTap,
     required this.canCloseRoom,
     this.showSeatLayoutOption = true,
     this.cricketModeActive = false,
+    this.pkModeEngaged = false,
   });
 
   final RoomPrivacyMode privacyMode;
@@ -64,10 +66,12 @@ class RoomSettingsSheet extends StatelessWidget {
   final VoidCallback onVibeSyncTap;
   final VoidCallback onWatchPartyTap;
   final VoidCallback onCricketModeTap;
+  final VoidCallback onPkModeTap;
   final VoidCallback onClearChatTap;
   final bool canCloseRoom;
   final bool showSeatLayoutOption;
   final bool cricketModeActive;
+  final bool pkModeEngaged;
 
   @override
   Widget build(BuildContext context) {
@@ -96,6 +100,8 @@ class RoomSettingsSheet extends StatelessWidget {
                     onVibeSyncTap: onVibeSyncTap,
                     onWatchPartyTap: onWatchPartyTap,
                     onCricketModeTap: onCricketModeTap,
+                    onPkModeTap: onPkModeTap,
+                    pkModeEngaged: pkModeEngaged,
                   ),
                   const SizedBox(height: 11),
                   RoomSettingsMainSection(

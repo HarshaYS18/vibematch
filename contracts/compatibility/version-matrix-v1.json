@@ -1,0 +1,21 @@
+{
+  "schema_version": 1,
+  "server_contracts": {
+    "rest": {"current": "v1", "supported": ["v1"]},
+    "realtime_envelope": {"current": 1, "supported": [1]},
+    "domain_events": {"current": 1, "minimum_supported": 1},
+    "graphql_persisted_operations": {"current": 1, "minimum_supported": 1},
+    "game_bridge": {"current": 1, "supported": [1]},
+    "asset_manifest": {"current": 1, "supported": [1]}
+  },
+  "mobile": {
+    "minimum_supported": "1.0.0",
+    "recommended": "1.0.0",
+    "server_skew_policy": "server must tolerate at least current and previous supported mobile contract generation"
+  },
+  "deprecation": {
+    "minimum_notice_days": 30,
+    "removal_requires_usage_evidence": true,
+    "breaking_change_requires_version_bump": true
+  }
+}

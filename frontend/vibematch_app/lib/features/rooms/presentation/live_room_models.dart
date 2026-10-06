@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 
+import '../../../core/assets/funkey_cdn_assets.dart';
+
 enum RoomPrivacyMode { open, locked, membersOnly, privateVibe }
 
 enum GiftCategory {
@@ -285,6 +287,7 @@ class ChatEntry {
     this.systemEventType = RoomSystemEventType.none,
     this.autoDismissAt,
     this.giftAssetPath,
+    this.giftAssetUrl,
     this.imageUrl,
     this.imageContentType,
   });
@@ -307,6 +310,7 @@ class ChatEntry {
   final RoomSystemEventType systemEventType;
   final DateTime? autoDismissAt;
   final String? giftAssetPath;
+  final String? giftAssetUrl;
   final String? imageUrl;
   final String? imageContentType;
   bool get isSystemMessage =>
@@ -331,6 +335,7 @@ class ChatEntry {
     bool? applicationExpired,
     RoomSystemEventType? systemEventType,
     DateTime? autoDismissAt,
+    String? giftAssetUrl,
     String? imageUrl,
     String? imageContentType,
   }) => ChatEntry(
@@ -356,6 +361,7 @@ class ChatEntry {
     systemEventType: systemEventType ?? this.systemEventType,
     autoDismissAt: autoDismissAt ?? this.autoDismissAt,
     giftAssetPath: giftAssetPath,
+    giftAssetUrl: giftAssetUrl ?? this.giftAssetUrl,
     imageUrl: imageUrl ?? this.imageUrl,
     imageContentType: imageContentType ?? this.imageContentType,
   );
@@ -402,9 +408,7 @@ class GiftItem {
   final bool showGiftSlide;
   final bool showPremiumBroadcast;
   final bool showGiftFlight;
-  bool get isVideoGift =>
-      (videoUrl?.trim().isNotEmpty ?? false) ||
-      (videoAssetPath?.trim().isNotEmpty ?? false);
+  bool get isVideoGift => videoUrl?.trim().isNotEmpty ?? false;
 }
 
 class GiftSlide {
@@ -436,9 +440,7 @@ class GiftSlide {
   final int combo;
   final int baseCombo;
   final int remainingSeconds;
-  bool get isVideoGift =>
-      (videoUrl?.trim().isNotEmpty ?? false) ||
-      (videoAssetPath?.trim().isNotEmpty ?? false);
+  bool get isVideoGift => videoUrl?.trim().isNotEmpty ?? false;
   GiftSlide copyWith({int? combo, int? baseCombo, int? remainingSeconds}) =>
       GiftSlide(
         id: id,
@@ -535,7 +537,7 @@ final List<SeatUser> mockRoomUsers = <SeatUser>[];
 final List<SeatUser> mockInviteUsers = <SeatUser>[];
 final List<ChatEntry> mockChatEntries = <ChatEntry>[];
 
-const List<GiftItem> mockGiftItems = [
+final List<GiftItem> mockGiftItems = [
   GiftItem(
     id: 'rose_bloom',
     name: 'Rose Bloom',
@@ -543,7 +545,7 @@ const List<GiftItem> mockGiftItems = [
     coins: 9,
     icon: Icons.favorite_rounded,
     chatSymbol: '🌹',
-    assetPath: 'assets/gifts/normal/rose_bloom.webp',
+    assetUrl: FunKeyCdnAssets.url('gifts/rose_bloom/v1/icon.webp'),
     colors: [Color(0xFFFF5F7E), Color(0xFFFFB3C1)],
   ),
   GiftItem(
@@ -553,7 +555,7 @@ const List<GiftItem> mockGiftItems = [
     coins: 29,
     icon: Icons.paid_rounded,
     chatSymbol: '🪙',
-    assetPath: 'assets/gifts/normal/gold_coin.webp',
+    assetUrl: FunKeyCdnAssets.url('gifts/gold_coin/v1/icon.webp'),
     colors: [Color(0xFFFFC857), Color(0xFFC99A3B)],
   ),
   GiftItem(
@@ -563,7 +565,7 @@ const List<GiftItem> mockGiftItems = [
     coins: 99,
     icon: Icons.celebration_rounded,
     chatSymbol: '🎉',
-    assetPath: 'assets/gifts/normal/party_pop.webp',
+    assetUrl: FunKeyCdnAssets.url('gifts/party_pop/v1/icon.webp'),
     colors: [Color(0xFF12C7B7), Color(0xFF6D5DF6)],
   ),
   GiftItem(
@@ -573,8 +575,8 @@ const List<GiftItem> mockGiftItems = [
     coins: 999,
     icon: Icons.rocket_launch_rounded,
     chatSymbol: '🚀',
-    assetPath: 'assets/gifts/love_rocket/icon/love_rocket_icon.webp',
-    videoAssetPath: 'assets/videos/gifts/love_rocket.mp4',
+    assetUrl: FunKeyCdnAssets.url('gifts/love_rocket/v1/icon.webp'),
+    videoUrl: FunKeyCdnAssets.giftVideo('love_rocket'),
     colors: [Color(0xFFFF5F7E), Color(0xFFFFC857)],
     showPremiumBroadcast: true,
     showGiftFlight: false,
@@ -586,7 +588,7 @@ const List<GiftItem> mockGiftItems = [
     coins: 99,
     icon: Icons.auto_fix_high_rounded,
     chatSymbol: '🪄',
-    assetPath: 'assets/gifts/lucky/arcane_crystal_wand.png',
+    assetUrl: FunKeyCdnAssets.url('gifts/arcane_crystal_wand/v1/icon.webp'),
     colors: [Color(0xFF8C5CF6), Color(0xFFC99A3B)],
     giftType: 'lucky',
   ),
@@ -597,7 +599,7 @@ const List<GiftItem> mockGiftItems = [
     coins: 199,
     icon: Icons.favorite_border_rounded,
     chatSymbol: '🌹',
-    assetPath: 'assets/gifts/lucky/celestial_rose.png',
+    assetUrl: FunKeyCdnAssets.url('gifts/celestial_rose/v1/icon.webp'),
     colors: [Color(0xFFE84C72), Color(0xFFFFD166)],
     giftType: 'lucky',
   ),
@@ -608,7 +610,7 @@ const List<GiftItem> mockGiftItems = [
     coins: 299,
     icon: Icons.diamond_rounded,
     chatSymbol: '💍',
-    assetPath: 'assets/gifts/lucky/eternal_bond_rings.png',
+    assetUrl: FunKeyCdnAssets.url('gifts/eternal_bond_rings/v1/icon.webp'),
     colors: [Color(0xFFC99A3B), Color(0xFFEDE3D7)],
     giftType: 'lucky',
   ),
@@ -619,7 +621,7 @@ const List<GiftItem> mockGiftItems = [
     coins: 99,
     icon: Icons.pets_rounded,
     chatSymbol: '🐘',
-    assetPath: 'assets/gifts/lucky/bubble_elephant.png',
+    assetUrl: FunKeyCdnAssets.url('gifts/bubble_elephant/v1/icon.webp'),
     colors: [Color(0xFFFF9CCB), Color(0xFFEDE3D7)],
     giftType: 'lucky',
   ),
@@ -630,7 +632,7 @@ const List<GiftItem> mockGiftItems = [
     coins: 499,
     icon: Icons.wb_sunny_rounded,
     chatSymbol: '☀️',
-    assetPath: 'assets/gifts/lucky/sun_fortune_coin.png',
+    assetUrl: FunKeyCdnAssets.url('gifts/sun_fortune_coin/v1/icon.webp'),
     colors: [Color(0xFFFFC857), Color(0xFFC99A3B)],
     giftType: 'lucky',
   ),
@@ -641,7 +643,7 @@ const List<GiftItem> mockGiftItems = [
     coins: 299,
     icon: Icons.waves_rounded,
     chatSymbol: '🐟',
-    assetPath: 'assets/gifts/lucky/moonlit_koi.png',
+    assetUrl: FunKeyCdnAssets.url('gifts/moonlit_koi/v1/icon.webp'),
     colors: [Color(0xFFEDE3D7), Color(0xFF251538)],
     giftType: 'lucky',
   ),
@@ -652,7 +654,7 @@ const List<GiftItem> mockGiftItems = [
     coins: 999,
     icon: Icons.auto_stories_rounded,
     chatSymbol: '📖',
-    assetPath: 'assets/gifts/lucky/spellbound_tome.png',
+    assetUrl: FunKeyCdnAssets.url('gifts/spellbound_tome/v1/icon.webp'),
     colors: [Color(0xFF6D5DF6), Color(0xFF12C7B7)],
     giftType: 'lucky',
   ),

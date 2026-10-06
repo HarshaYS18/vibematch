@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 
+import '../../../../core/presentation/vm_async_state.dart';
+
 import '../../models/vibe_models.dart';
 
 class VibesLoadingStrip extends StatelessWidget {
@@ -27,33 +29,12 @@ class VibesErrorCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Container(
-      margin: const EdgeInsets.fromLTRB(16, 0, 16, 12),
-      padding: const EdgeInsets.all(13),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(18),
-        border: Border.all(color: const Color(0xFFE8C77C)),
-      ),
-      child: Row(
-        children: [
-          const Icon(Icons.wifi_off_rounded, color: Color(0xFFC99A3B), size: 20),
-          const SizedBox(width: 10),
-          Expanded(
-            child: Text(
-              message,
-              maxLines: 2,
-              overflow: TextOverflow.ellipsis,
-              style: const TextStyle(color: Color(0xFF7B6A86), fontSize: 12, fontWeight: FontWeight.w800),
-            ),
-          ),
-          TextButton(onPressed: onRetry, child: const Text('Retry', style: TextStyle(fontWeight: FontWeight.w900))),
-        ],
-      ),
+    return VmInlineFailure(
+      message: message,
+      onRetry: onRetry,
     );
   }
 }
-
 class EmptyVibesState extends StatelessWidget {
   const EmptyVibesState({super.key, required this.selectedTab});
 

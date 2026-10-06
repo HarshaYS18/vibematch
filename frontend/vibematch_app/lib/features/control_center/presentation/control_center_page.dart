@@ -1,5 +1,9 @@
 import 'package:flutter/material.dart';
 
+import '../../../core/network/vm_failure.dart';
+import '../../../core/presentation/vm_async_state.dart';
+import '../../../core/ui/vm_motion.dart';
+
 import '../data/control_center_api_service.dart';
 
 class ControlCenterPage extends StatefulWidget {
@@ -86,7 +90,7 @@ class _ControlCenterPageState extends State<ControlCenterPage> {
     } catch (error) {
       if (!mounted) return;
       setState(() {
-        _error = error.toString().replaceFirst('Exception: ', '');
+        _error = VmFailurePresentation.messageFor(error, contentLabel: 'control center');
         _loading = false;
       });
     }
@@ -113,7 +117,7 @@ class _ControlCenterPageState extends State<ControlCenterPage> {
       await _load();
     } catch (error) {
       if (!mounted) return;
-      _toast(error.toString().replaceFirst('Exception: ', ''), danger: true);
+      _toast(VmFailurePresentation.messageFor(error, contentLabel: 'control center'), danger: true);
     } finally {
       if (mounted) setState(() => _busy = false);
     }
@@ -150,6 +154,7 @@ class _ControlCenterPageState extends State<ControlCenterPage> {
     var enabled = true;
     await showModalBottomSheet<void>(
       context: context,
+      sheetAnimationStyle: VmMotion.sheetAnimationStyle,
       isScrollControlled: true,
       backgroundColor: Colors.transparent,
       builder: (context) => StatefulBuilder(
@@ -209,6 +214,7 @@ class _ControlCenterPageState extends State<ControlCenterPage> {
 
     await showModalBottomSheet<void>(
       context: context,
+      sheetAnimationStyle: VmMotion.sheetAnimationStyle,
       isScrollControlled: true,
       backgroundColor: Colors.transparent,
       builder: (context) => StatefulBuilder(
@@ -321,9 +327,9 @@ class _ControlCenterPageState extends State<ControlCenterPage> {
       backgroundColor: const Color(0xFFFAF7F1),
       body: SafeArea(
         child: _loading
-            ? const Center(child: CircularProgressIndicator(color: Color(0xFF12C7B7)))
+            ? const VmLoadingState(message: 'Loading control center…')
             : _error != null
-                ? _ErrorState(message: _error!, onRetry: _load)
+                ? VmFailureState(message: _error!, contentLabel: 'control center', onRetry: _load)
                 : RefreshIndicator(
                     color: const Color(0xFF12C7B7),
                     onRefresh: _load,
@@ -434,4 +440,3 @@ class _PrimaryButton extends StatelessWidget { const _PrimaryButton({required th
 class _Metric extends StatelessWidget { const _Metric({required this.label, required this.value}); final String label; final String value; @override Widget build(BuildContext context) => Container(padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 7), decoration: BoxDecoration(color: Colors.white.withValues(alpha: 0.16), borderRadius: BorderRadius.circular(999), border: Border.all(color: Colors.white24)), child: Column(mainAxisSize: MainAxisSize.min, children: [Text(value, style: const TextStyle(color: Colors.white, fontSize: 12.5, fontWeight: FontWeight.w900)), Text(label, style: const TextStyle(color: Colors.white70, fontSize: 9.5, fontWeight: FontWeight.w700))])); }
 class _StatusPill extends StatelessWidget { const _StatusPill({required this.text, required this.color}); final String text; final Color color; @override Widget build(BuildContext context) => Container(padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 4), decoration: BoxDecoration(color: color.withValues(alpha: 0.14), borderRadius: BorderRadius.circular(999)), child: Text(text, maxLines: 1, overflow: TextOverflow.ellipsis, style: TextStyle(color: color, fontSize: 9.5, fontWeight: FontWeight.w900))); }
 class _EmptyPanel extends StatelessWidget { const _EmptyPanel({required this.icon, required this.title, required this.subtitle}); final IconData icon; final String title; final String subtitle; @override Widget build(BuildContext context) => _Panel(child: Column(children: [Icon(icon, color: const Color(0xFF8C5CF6), size: 34), const SizedBox(height: 10), Text(title, style: const TextStyle(color: Color(0xFF251538), fontSize: 14, fontWeight: FontWeight.w900)), const SizedBox(height: 5), Text(subtitle, textAlign: TextAlign.center, style: const TextStyle(color: Color(0xFF7B6A86), fontSize: 11.5, fontWeight: FontWeight.w700))])); }
-class _ErrorState extends StatelessWidget { const _ErrorState({required this.message, required this.onRetry}); final String message; final VoidCallback onRetry; @override Widget build(BuildContext context) => Center(child: Padding(padding: const EdgeInsets.all(22), child: Column(mainAxisSize: MainAxisSize.min, children: [const Icon(Icons.error_outline_rounded, color: Color(0xFFE84C72), size: 38), const SizedBox(height: 10), Text(message, textAlign: TextAlign.center, style: const TextStyle(color: Color(0xFF251538), fontSize: 13, fontWeight: FontWeight.w800)), const SizedBox(height: 14), _SmallButton(label: 'Retry', icon: Icons.refresh_rounded, onTap: onRetry)]))); }

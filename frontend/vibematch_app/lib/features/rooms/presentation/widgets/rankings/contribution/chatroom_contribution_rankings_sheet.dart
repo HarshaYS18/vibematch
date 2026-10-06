@@ -2,6 +2,8 @@ import 'dart:async';
 
 import 'package:flutter/material.dart';
 
+import '../../../../../../core/network/vm_failure.dart';
+
 import '../../../../../auth/data/auth_api_service.dart';
 import '../../../../../auth/models/current_user.dart';
 import '../../../../data/room_contribution_rankings_api_service.dart';
@@ -98,7 +100,7 @@ class _ChatroomContributionRankingsSheetState
       if (!mounted) return;
       setState(() {
         _loading = false;
-        _error = error.toString().replaceFirst('Exception: ', '');
+        _error = VmFailurePresentation.messageFor(error, contentLabel: 'room contribution rankings');
       });
     }
   }

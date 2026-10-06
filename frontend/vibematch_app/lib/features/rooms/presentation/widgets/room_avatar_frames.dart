@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 
+import '../../../../core/assets/funkey_cdn_assets.dart';
 import '../../../../core/widgets/vm_avatar_frame.dart';
 import 'room_theme.dart';
 
@@ -41,17 +42,15 @@ RoomAvatarFrame? equippedStoreAvatarFrame({
   String? assetPath,
   String? imageUrl,
 }) {
-  final cleanAsset = assetPath?.trim();
+  // assetPath is accepted temporarily for payload/source compatibility only.
+  // Product media is CDN-owned and local frame paths are never rendered.
   final cleanImage = imageUrl?.trim();
-  if ((cleanAsset == null || cleanAsset.isEmpty) && (cleanImage == null || cleanImage.isEmpty)) {
-    return null;
-  }
+  if (cleanImage == null || cleanImage.isEmpty) return null;
   return RoomAvatarFrame(
     id: 'equipped_store_frame_$userId',
     name: 'Equipped Frame',
     type: RoomAvatarFrameType.staticFrame,
     accent: RoomColors.gold,
-    assetPath: cleanAsset,
     imageUrl: cleanImage,
   );
 }
@@ -110,7 +109,7 @@ class RoomWallpaperItem {
     required this.id,
     required this.name,
     required this.type,
-    required this.assetPath,
+    this.assetPath,
     this.remoteUrl,
     this.thumbnailUrl,
   });
@@ -118,7 +117,7 @@ class RoomWallpaperItem {
   final String id;
   final String name;
   final RoomWallpaperType type;
-  final String assetPath;
+  final String? assetPath;
   final String? remoteUrl;
   final String? thumbnailUrl;
 
@@ -126,53 +125,53 @@ class RoomWallpaperItem {
   bool get isCdnReady => remoteUrl != null && remoteUrl!.trim().isNotEmpty;
 }
 
-const List<RoomWallpaperItem> ownedRoomWallpaperItems = [
+final List<RoomWallpaperItem> ownedRoomWallpaperItems = [
   RoomWallpaperItem(
     id: 'celestial_falls',
     name: 'Celestial Falls',
     type: RoomWallpaperType.image,
-    assetPath: '$roomDefaultBackgroundAssetBase/celestial_falls.webp',
+    remoteUrl: FunKeyCdnAssets.url('ui/rooms/chat/backgrounds/v1/celestial_falls.webp'),
   ),
   RoomWallpaperItem(
     id: 'moonlit_biolume_shore',
     name: 'Moonlit Biolume Shore',
     type: RoomWallpaperType.image,
-    assetPath: '$roomDefaultBackgroundAssetBase/moonlit_biolume_shore.webp',
+    remoteUrl: FunKeyCdnAssets.url('ui/rooms/chat/backgrounds/v1/moonlit_biolume_shore.webp'),
   ),
   RoomWallpaperItem(
     id: 'aurora_frost_lake',
     name: 'Aurora Frost Lake',
     type: RoomWallpaperType.image,
-    assetPath: '$roomDefaultBackgroundAssetBase/aurora_frost_lake.webp',
+    remoteUrl: FunKeyCdnAssets.url('ui/rooms/chat/backgrounds/v1/aurora_frost_lake.webp'),
   ),
   RoomWallpaperItem(
     id: 'desert_dusk_oasis',
     name: 'Desert Dusk Oasis',
     type: RoomWallpaperType.image,
-    assetPath: '$roomDefaultBackgroundAssetBase/desert_dusk_oasis.webp',
+    remoteUrl: FunKeyCdnAssets.url('ui/rooms/chat/backgrounds/v1/desert_dusk_oasis.webp'),
   ),
   RoomWallpaperItem(
     id: 'alpine_twilight_mirror',
     name: 'Alpine Twilight Mirror',
     type: RoomWallpaperType.image,
-    assetPath: '$roomDefaultBackgroundAssetBase/alpine_twilight_mirror.webp',
+    remoteUrl: FunKeyCdnAssets.url('ui/rooms/chat/backgrounds/v1/alpine_twilight_mirror.webp'),
   ),
   RoomWallpaperItem(
     id: 'crimson_coast_beacon',
     name: 'Crimson Coast Beacon',
     type: RoomWallpaperType.image,
-    assetPath: '$roomDefaultBackgroundAssetBase/crimson_coast_beacon.webp',
+    remoteUrl: FunKeyCdnAssets.url('ui/rooms/chat/backgrounds/v1/crimson_coast_beacon.webp'),
   ),
   RoomWallpaperItem(
     id: 'moonlit_whisper_grove',
     name: 'Moonlit Whisper Grove',
     type: RoomWallpaperType.image,
-    assetPath: '$roomDefaultBackgroundAssetBase/moonlit_whisper_grove.webp',
+    remoteUrl: FunKeyCdnAssets.url('ui/rooms/chat/backgrounds/v1/moonlit_whisper_grove.webp'),
   ),
   RoomWallpaperItem(
     id: 'cosmic_horizon_veil',
     name: 'Cosmic Horizon Veil',
     type: RoomWallpaperType.image,
-    assetPath: '$roomDefaultBackgroundAssetBase/cosmic_horizon_veil.webp',
+    remoteUrl: FunKeyCdnAssets.url('ui/rooms/chat/backgrounds/v1/cosmic_horizon_veil.webp'),
   ),
 ];

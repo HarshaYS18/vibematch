@@ -1,6 +1,6 @@
 apiVersion: apps/v1
 kind: Deployment
-metadata: {name: funkey-api}
+metadata: {name: funkey-api-stable}
 spec:
   replicas: 1
   template:
@@ -36,5 +36,108 @@ spec: {minReplicas: 1, maxReplicas: 1}
 ---
 apiVersion: keda.sh/v1alpha1
 kind: ScaledObject
-metadata: {name: funkey-worker}
+metadata: {name: funkey-worker-notification}
 spec: {minReplicaCount: 1, maxReplicaCount: 1}
+---
+apiVersion: keda.sh/v1alpha1
+kind: ScaledObject
+metadata: {name: funkey-worker-media}
+spec: {minReplicaCount: 1, maxReplicaCount: 1}
+---
+apiVersion: keda.sh/v1alpha1
+kind: ScaledObject
+metadata: {name: funkey-worker-fanout}
+spec: {minReplicaCount: 1, maxReplicaCount: 1}
+---
+apiVersion: keda.sh/v1alpha1
+kind: ScaledObject
+metadata: {name: funkey-worker-maintenance}
+spec: {minReplicaCount: 1, maxReplicaCount: 1}
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata: {name: funkey-notification}
+spec:
+  replicas: 1
+  template:
+    spec:
+      nodeSelector: null
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata: {name: funkey-notification-provider}
+spec:
+  replicas: 1
+  template:
+    spec:
+      nodeSelector: null
+---
+apiVersion: autoscaling/v2
+kind: HorizontalPodAutoscaler
+metadata: {name: funkey-notification}
+spec: {minReplicas: 1, maxReplicas: 1}
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata: {name: funkey-graphql-bff}
+spec:
+  replicas: 1
+  template:
+    spec:
+      nodeSelector: null
+---
+apiVersion: autoscaling/v2
+kind: HorizontalPodAutoscaler
+metadata: {name: funkey-graphql-bff}
+spec: {minReplicas: 1, maxReplicas: 1}
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata: {name: funkey-kafka-event-bridge}
+spec:
+  replicas: 0
+  template:
+    spec:
+      nodeSelector: null
+---
+apiVersion: keda.sh/v1alpha1
+kind: ScaledObject
+metadata: {name: funkey-kafka-event-bridge}
+$patch: delete
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata: {name: funkey-search}
+spec:
+  replicas: 0
+  template:
+    spec:
+      nodeSelector: null
+---
+apiVersion: autoscaling/v2
+kind: HorizontalPodAutoscaler
+metadata: {name: funkey-search}
+$patch: delete
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata: {name: funkey-recommendation}
+spec:
+  replicas: 0
+  template:
+    spec:
+      nodeSelector: null
+---
+apiVersion: autoscaling/v2
+kind: HorizontalPodAutoscaler
+metadata: {name: funkey-recommendation}
+$patch: delete
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata: {name: funkey-analytics-sink}
+spec:
+  replicas: 0
+  template:
+    spec:
+      nodeSelector: null

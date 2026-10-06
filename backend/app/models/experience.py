@@ -36,3 +36,13 @@ class RoomExperienceStatus(Base):
     updated_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow, index=True)
 
     room = relationship("Room")
+
+
+class ExperienceMutationReceipt(Base):
+    __tablename__ = "experience_mutation_receipts"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, index=True)
+    receipt_key: Mapped[str] = mapped_column(String(180), unique=True, nullable=False, index=True)
+    source_type: Mapped[str] = mapped_column(String(80), nullable=False, index=True)
+    source_id: Mapped[str] = mapped_column(String(120), nullable=False, index=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow, nullable=False, index=True)

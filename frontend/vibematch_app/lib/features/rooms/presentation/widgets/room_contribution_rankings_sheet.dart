@@ -1,10 +1,13 @@
 import 'package:flutter/material.dart';
 
-import '../../data/active_room_context.dart';
 import '../live_room_models.dart';
 import 'rankings/contribution/chatroom_contribution_rankings_sheet.dart';
 import 'rankings/room_rankings_models.dart';
 
+/// Contribution rankings for one explicit room identity.
+///
+/// Room identity is injected by the room-scoped controller bundle; this widget
+/// never falls back to process-global active-room state.
 class RoomContributionRankingsSheet extends StatelessWidget {
   const RoomContributionRankingsSheet({
     super.key,
@@ -25,10 +28,10 @@ class RoomContributionRankingsSheet extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final activeRoomPublicId = ActiveRoomContext.roomPublicId?.trim();
-    final effectiveRoomPublicId = roomPublicId != 'unknown_room' && roomPublicId.trim().isNotEmpty
+    final effectiveRoomPublicId =
+        roomPublicId != 'unknown_room' && roomPublicId.trim().isNotEmpty
         ? roomPublicId.trim()
-        : (activeRoomPublicId != null && activeRoomPublicId.isNotEmpty ? activeRoomPublicId : 'unknown_room');
+        : 'unknown_room';
 
     return ChatroomContributionRankingsSheet(
       roomPublicId: effectiveRoomPublicId,

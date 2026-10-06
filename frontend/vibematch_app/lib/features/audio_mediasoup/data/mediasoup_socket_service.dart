@@ -2,6 +2,8 @@ import 'dart:async';
 
 import 'package:socket_io_client/socket_io_client.dart' as io;
 
+import '../../../core/network/trace_context.dart';
+
 import '../models/mediasoup_producer_state.dart';
 import '../models/mediasoup_room_state.dart';
 
@@ -44,7 +46,7 @@ class MediasoupSocketService {
       serverUrl,
       io.OptionBuilder()
           .setTransports(['websocket'])
-          .setAuth({'token': audioToken})
+          .setAuth({'token': audioToken, 'traceparent': TraceContext.newTraceparent()})
           .disableAutoConnect()
           .enableReconnection()
           .setReconnectionAttempts(8)

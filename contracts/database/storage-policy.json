@@ -1,0 +1,30 @@
+{
+  "schema_version": 1,
+  "durable_business_authority": "postgresql",
+  "read_replicas": {
+    "enabled": false,
+    "approved_stale_tolerant_routes": [],
+    "requirements_before_enable": [
+      "measured primary read saturation or latency attributable to read load",
+      "route-level stale-read tolerance documented",
+      "replica lag SLO and fail-closed/fallback behavior documented",
+      "read-after-write paths remain on primary",
+      "query-budget and correctness tests cover replica routing"
+    ]
+  },
+  "partitioning": {
+    "enabled_tables": [],
+    "requirements_before_enable": [
+      "measured table/index size or vacuum pressure demonstrates need",
+      "retention and partition-key semantics are explicit",
+      "migration, rollback and operational ownership are documented",
+      "query plans demonstrate partition pruning benefit"
+    ]
+  },
+  "redis_cache_policy": {
+    "durable_authority": false,
+    "ttl_required_for_business_projection_keys": true,
+    "version_required_for_business_projection_payloads": true,
+    "loss_must_preserve_postgres_correctness": true
+  }
+}

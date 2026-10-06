@@ -24,7 +24,7 @@ from app.schemas.cdn_media import (
     MediaSafetySettingResponse,
     MediaSafetySettingUpdateRequest,
 )
-from app.services import cdn_media_service, inbox_service
+from app.services import cdn_media_service, inbox_service_client
 from app.services.audit_log_service import create_admin_log
 
 
@@ -56,7 +56,13 @@ def _send_media_team_message(db: Session, *, asset: CdnMediaAsset, text: str) ->
     owner = _asset_owner(db, asset)
     if owner is None:
         return
-    inbox_service.send_team_system_message(db, owner, text)
+    try:
+        inbox_service_client.send_team_message(
+            target_user_id=owner.id,
+            text=text,
+        )
+    except (inbox_service_client.InboxServiceUnavailable, ValueError):
+        return
 
 
 @router.get("/dashboard", response_model=CdnMediaDashboardResponse)
@@ -242,4 +248,4 @@ def cleanup_expired_inbox_media(
     current_user: User = Depends(get_current_user),
 ):
     _require_media_safety_access(current_user)
-    return cdn_media_service.expire_due_inbox_media(db, limit=limit, actor_user_id=current_user.id)
+    return cdn_media_service.request_expired_inbox_media_cleanup(db, limit=limit, actor_user_id=current_user.id)

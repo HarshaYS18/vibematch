@@ -1,16 +1,34 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:vibematch_app/features/rooms/data/live_room_system_event_bus.dart';
 import 'package:vibematch_app/features/rooms/modules/gift_slide/presentation/gift_slide_overlay.dart';
 import 'package:vibematch_app/features/rooms/presentation/live_room_models.dart';
+import 'package:vibematch_app/features/rooms/presentation/widgets/gift_flight_bus.dart';
 import 'package:vibematch_app/features/rooms/presentation/widgets/live_room_gift_overlay.dart';
+import 'package:vibematch_app/features/rooms/presentation/widgets/premium_gift_broadcast_overlay.dart';
 
+// Regression coverage for lucky-combo dedupe using the same room-scoped gift
+// presentation queues that production owns in LiveRoomGiftController.
+// Explicit roomPublicId mirrors production's controller-bundle scope and
+// protects against fallback to a process-global active-room identity.
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
 
-  tearDown(() {
-    LiveRoomSystemEventBus.latestEvent.value = null;
-  });
+  ({GiftFlightBus flight, PremiumGiftBroadcastBus premium}) scopedQueues() {
+    final flight = GiftFlightBus();
+    final premium = PremiumGiftBroadcastBus();
+    addTearDown(flight.dispose);
+    addTearDown(premium.dispose);
+    return (flight: flight, premium: premium);
+  }
+
+  StreamController<LiveRoomSystemEvent> eventController() {
+    final controller = StreamController<LiveRoomSystemEvent>.broadcast();
+    addTearDown(controller.close);
+    return controller;
+  }
 
   LiveRoomSystemEvent luckyEvent({
     required String id,
@@ -46,6 +64,8 @@ void main() {
   testWidgets('sender lucky combo backend echo does not create a second slide', (
     tester,
   ) async {
+    final queues = scopedQueues();
+    final events = eventController();
     const localSlide = GiftSlide(
       id: 'local-lucky-slide',
       senderName: 'Sender',
@@ -62,6 +82,8 @@ void main() {
       MaterialApp(
         home: Scaffold(
           body: LiveRoomGiftOverlay(
+            roomPublicId: 'LUCKYROOM',
+            systemEvents: events.stream,
             slides: const <GiftSlide>[localSlide],
             activeComboSlide: localSlide,
             bottomPadding: 0,
@@ -69,6 +91,8 @@ void main() {
             onComboTap: (_) {},
             onComboButtonTap: () {},
             onVideoGiftFinished: (_) {},
+            giftFlightBus: queues.flight,
+            premiumGiftBroadcastBus: queues.premium,
           ),
         ),
       ),
@@ -78,7 +102,7 @@ void main() {
     expect(find.text('Combo x18'), findsOneWidget);
     expect(find.text('WIN x500'), findsOneWidget);
 
-    LiveRoomSystemEventBus.publish(
+    events.add(
       luckyEvent(id: 'gift_combo_2', multiplier: 100),
     );
     await tester.pump(const Duration(milliseconds: 100));
@@ -92,10 +116,14 @@ void main() {
   testWidgets('sender backend echo arriving before local slide never flashes duplicate', (
     tester,
   ) async {
+    final queues = scopedQueues();
+    final events = eventController();
     Widget overlay(List<GiftSlide> slides, GiftSlide? active) {
       return MaterialApp(
         home: Scaffold(
           body: LiveRoomGiftOverlay(
+            roomPublicId: 'LUCKYROOM',
+            systemEvents: events.stream,
             slides: slides,
             activeComboSlide: active,
             bottomPadding: 0,
@@ -103,13 +131,15 @@ void main() {
             onComboTap: (_) {},
             onComboButtonTap: () {},
             onVideoGiftFinished: (_) {},
+            giftFlightBus: queues.flight,
+            premiumGiftBroadcastBus: queues.premium,
           ),
         ),
       );
     }
 
     await tester.pumpWidget(overlay(const <GiftSlide>[], null));
-    LiveRoomSystemEventBus.publish(
+    events.add(
       luckyEvent(id: 'gift_before_http_response', multiplier: 500),
     );
     await tester.pump(const Duration(milliseconds: 100));
@@ -137,10 +167,14 @@ void main() {
   testWidgets('receiver lucky combo stays one slide and accumulates quantity', (
     tester,
   ) async {
+    final queues = scopedQueues();
+    final events = eventController();
     await tester.pumpWidget(
       MaterialApp(
         home: Scaffold(
           body: LiveRoomGiftOverlay(
+            roomPublicId: 'LUCKYROOM',
+            systemEvents: events.stream,
             slides: const <GiftSlide>[],
             activeComboSlide: null,
             bottomPadding: 0,
@@ -148,12 +182,14 @@ void main() {
             onComboTap: (_) {},
             onComboButtonTap: () {},
             onVideoGiftFinished: (_) {},
+            giftFlightBus: queues.flight,
+            premiumGiftBroadcastBus: queues.premium,
           ),
         ),
       ),
     );
 
-    LiveRoomSystemEventBus.publish(
+    events.add(
       luckyEvent(
         id: 'gift_combo_receiver_1',
         multiplier: 500,
@@ -167,7 +203,7 @@ void main() {
     expect(find.text('Combo x9'), findsOneWidget);
     expect(find.text('WIN x500'), findsOneWidget);
 
-    LiveRoomSystemEventBus.publish(
+    events.add(
       luckyEvent(
         id: 'gift_combo_receiver_2',
         multiplier: 100,
@@ -187,10 +223,14 @@ void main() {
   testWidgets('zero multiplier is shown as try again without resetting combo', (
     tester,
   ) async {
+    final queues = scopedQueues();
+    final events = eventController();
     await tester.pumpWidget(
       MaterialApp(
         home: Scaffold(
           body: LiveRoomGiftOverlay(
+            roomPublicId: 'LUCKYROOM',
+            systemEvents: events.stream,
             slides: const <GiftSlide>[],
             activeComboSlide: null,
             bottomPadding: 0,
@@ -198,16 +238,18 @@ void main() {
             onComboTap: (_) {},
             onComboButtonTap: () {},
             onVideoGiftFinished: (_) {},
+            giftFlightBus: queues.flight,
+            premiumGiftBroadcastBus: queues.premium,
           ),
         ),
       ),
     );
 
-    LiveRoomSystemEventBus.publish(
+    events.add(
       luckyEvent(id: 'try_again_1', multiplier: 100),
     );
     await tester.pump(const Duration(milliseconds: 300));
-    LiveRoomSystemEventBus.publish(
+    events.add(
       luckyEvent(id: 'try_again_2', multiplier: 0),
     );
     await tester.pump(const Duration(milliseconds: 100));

@@ -1,8 +1,11 @@
 import 'package:flutter/material.dart';
 
+import '../../../../core/ui/vm_motion.dart';
+
 Future<bool?> showMeSessionSheet(BuildContext context) {
   return showModalBottomSheet<bool>(
     context: context,
+    sheetAnimationStyle: VmMotion.sheetAnimationStyle,
     backgroundColor: Colors.transparent,
     builder: (_) {
       return Container(

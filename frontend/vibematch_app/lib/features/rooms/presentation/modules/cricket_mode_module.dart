@@ -37,6 +37,11 @@ const List<RoomBackgroundTheme> cricketModeBackgroundThemes = [
   cricketRoyalPitchBackgroundTheme,
 ];
 
+/// Cricket scoring/presentation models for scoped room or widget runtimes.
+///
+/// The deterministic models in this file may be shared, but mutable controller
+/// instances must be owned by a mounted room/widget and never by a static
+/// registry or signal.
 enum CricketMatchStatus { setup, live, inningsBreak, completed }
 
 enum CricketExtraType { wide, noBall, bye, legBye, penalty }
@@ -705,6 +710,8 @@ class CricketModeModule {
     required bool canManage,
     required RoomBackgroundTheme previousBackground,
     required ValueChanged<RoomBackgroundTheme> onBackgroundChanged,
+    VoidCallback? onModeStarted,
+    VoidCallback? onModeEnded,
     ValueChanged<String>? onSystemMessage,
   }) {
     return showModalBottomSheet<void>(
@@ -718,6 +725,8 @@ class CricketModeModule {
         canManage: canManage,
         previousBackground: previousBackground,
         onBackgroundChanged: onBackgroundChanged,
+        onModeStarted: onModeStarted,
+        onModeEnded: onModeEnded,
         onSystemMessage: onSystemMessage,
       ),
     );
@@ -732,6 +741,8 @@ class CricketModeSheet extends StatefulWidget {
     required this.canManage,
     required this.previousBackground,
     required this.onBackgroundChanged,
+    this.onModeStarted,
+    this.onModeEnded,
     this.onSystemMessage,
   });
 
@@ -740,6 +751,8 @@ class CricketModeSheet extends StatefulWidget {
   final bool canManage;
   final RoomBackgroundTheme previousBackground;
   final ValueChanged<RoomBackgroundTheme> onBackgroundChanged;
+  final VoidCallback? onModeStarted;
+  final VoidCallback? onModeEnded;
   final ValueChanged<String>? onSystemMessage;
 
   @override
@@ -775,7 +788,7 @@ class _CricketModeSheetState extends State<CricketModeSheet> {
       return;
     }
     widget.onBackgroundChanged(_selectedCricketBackground);
-    CricketRoomModeSignal.activate(widget.roomId);
+    widget.onModeStarted?.call();
     _controller.startMatch();
     widget.onSystemMessage?.call(
       'Cricket Mode started. Room background switched to ${_selectedCricketBackground.name}.',
@@ -784,7 +797,7 @@ class _CricketModeSheetState extends State<CricketModeSheet> {
 
   void _endMode() {
     _controller.complete();
-    CricketRoomModeSignal.deactivate(widget.roomId);
+    widget.onModeEnded?.call();
     widget.onBackgroundChanged(widget.previousBackground);
     widget.onSystemMessage?.call(
       'Cricket Mode ended. Room background restored.',

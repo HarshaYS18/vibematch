@@ -1,0 +1,30 @@
+{
+  "schema_version": 1,
+  "tiers": {
+    "tier0_economy_identity": {
+      "rpo_seconds": 60,
+      "rto_seconds": 900,
+      "restore_test_frequency_days": 30
+    },
+    "tier1_rooms_inbox_vibes": {
+      "rpo_seconds": 300,
+      "rto_seconds": 1800,
+      "restore_test_frequency_days": 30
+    },
+    "tier2_search_recommendation_analytics": {
+      "rpo_seconds": 86400,
+      "rto_seconds": 3600,
+      "restore_strategy": "rebuild_from_authoritative_events"
+    },
+    "media_objects": {
+      "rpo_seconds": 300,
+      "rto_seconds": 3600,
+      "restore_test_frequency_days": 90
+    }
+  },
+  "rules": [
+    "a backup is not valid until restore-tested",
+    "restore evidence must record UTC time, source backup, target environment and verification",
+    "projection stores are rebuilt rather than promoted to authority"
+  ]
+}

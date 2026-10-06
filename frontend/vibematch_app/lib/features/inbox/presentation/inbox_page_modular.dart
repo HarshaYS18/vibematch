@@ -1,6 +1,12 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+
+import '../../../core/network/vm_failure.dart';
+import '../../../core/presentation/vm_async_state.dart';
+import '../../../core/ui/vm_motion.dart';
 
 import '../controllers/inbox_controller.dart';
+import '../controllers/inbox_call_controller.dart';
 import '../data/inbox_ai_api_service.dart';
 import '../data/inbox_stories_api_service.dart';
 import '../models/inbox_models.dart';
@@ -19,7 +25,7 @@ import 'widgets/inbox_passcode_sheet.dart';
 import 'widgets/inbox_v3_locked_pull_reveal.dart';
 import 'widgets/report_conversation_sheet.dart';
 
-class InboxPage extends StatefulWidget {
+class InboxPage extends ConsumerStatefulWidget {
   const InboxPage({
     super.key,
     this.openPagesInOverlay = false,
@@ -36,17 +42,17 @@ class InboxPage extends StatefulWidget {
   final ValueChanged<String?>? onActiveConversationChanged;
 
   @override
-  State<InboxPage> createState() => _InboxPageState();
+  ConsumerState<InboxPage> createState() => _InboxPageState();
 }
 
-class _InboxPageState extends State<InboxPage> {
+class _InboxPageState extends ConsumerState<InboxPage> {
   static const _bg = Color(0xFFFAFAFA);
   static const _ink = Color(0xFF111114);
   static const _muted = Color(0xFF71717A);
   static const _blue = Color(0xFF3797F0);
 
-  late final InboxController _controller;
-  late final bool _ownsController;
+  InboxController get _controller =>
+      widget.controller ?? ref.read(inboxControllerProvider.notifier);
   final InboxAiApiService _inboxAiApi = const InboxAiApiService();
   final InboxStoriesApiService _storiesApi = const InboxStoriesApiService();
   final ScrollController _scrollController = ScrollController();
@@ -60,13 +66,12 @@ class _InboxPageState extends State<InboxPage> {
   @override
   void initState() {
     super.initState();
-    _controller = widget.controller ?? InboxController();
-    _ownsController = widget.controller == null;
-    _controller.addListener(_handleControllerChanged);
     _storiesFuture = _storiesApi.loadStories();
-    if (_ownsController) {
+    if (widget.controller == null) {
       WidgetsBinding.instance.addPostFrameCallback((_) {
-        if (mounted) _controller.loadFromBackend();
+        if (mounted) {
+          ref.read(inboxControllerProvider.notifier).loadFromBackend();
+        }
       });
     }
   }
@@ -80,13 +85,7 @@ class _InboxPageState extends State<InboxPage> {
   @override
   void dispose() {
     _scrollController.dispose();
-    _controller.removeListener(_handleControllerChanged);
-    if (_ownsController) _controller.dispose();
     super.dispose();
-  }
-
-  void _handleControllerChanged() {
-    if (mounted) setState(() {});
   }
 
   void _handleRequestedConversationOpen() {
@@ -209,6 +208,7 @@ class _InboxPageState extends State<InboxPage> {
   Future<void> _openInboxAiHelper() async {
     await showModalBottomSheet<void>(
       context: context,
+      sheetAnimationStyle: VmMotion.sheetAnimationStyle,
       isScrollControlled: true,
       backgroundColor: Colors.transparent,
       builder: (_) => InboxAiHelperSheet(
@@ -280,6 +280,7 @@ class _InboxPageState extends State<InboxPage> {
   void _openLockSetupSheet() {
     showModalBottomSheet<void>(
       context: context,
+      sheetAnimationStyle: VmMotion.sheetAnimationStyle,
       backgroundColor: Colors.transparent,
       isScrollControlled: true,
       builder: (_) => InboxLockSetupSheet(
@@ -296,6 +297,7 @@ class _InboxPageState extends State<InboxPage> {
   void _openLockRecoverySheet() {
     showModalBottomSheet<void>(
       context: context,
+      sheetAnimationStyle: VmMotion.sheetAnimationStyle,
       backgroundColor: Colors.transparent,
       isScrollControlled: true,
       builder: (_) => InboxLockRecoverySheet(
@@ -339,6 +341,7 @@ class _InboxPageState extends State<InboxPage> {
     }
     await showModalBottomSheet<void>(
       context: context,
+      sheetAnimationStyle: VmMotion.sheetAnimationStyle,
       isDismissible: true,
       enableDrag: true,
       backgroundColor: Colors.transparent,
@@ -450,6 +453,7 @@ class _InboxPageState extends State<InboxPage> {
         _controller.conversationById(conversation.id) ?? conversation;
     await showModalBottomSheet<void>(
       context: context,
+      sheetAnimationStyle: VmMotion.sheetAnimationStyle,
       backgroundColor: Colors.transparent,
       isScrollControlled: true,
       builder: (_) => InboxChatThemePickerSheet(
@@ -484,6 +488,7 @@ class _InboxPageState extends State<InboxPage> {
       if (!mounted) return;
       showModalBottomSheet<void>(
         context: context,
+        sheetAnimationStyle: VmMotion.sheetAnimationStyle,
         isScrollControlled: true,
         backgroundColor: Colors.transparent,
         builder: (_) => ReportConversationSheet(
@@ -544,6 +549,7 @@ class _InboxPageState extends State<InboxPage> {
     }
     showModalBottomSheet<void>(
       context: context,
+      sheetAnimationStyle: VmMotion.sheetAnimationStyle,
       isDismissible: true,
       enableDrag: true,
       backgroundColor: Colors.transparent,
@@ -555,6 +561,7 @@ class _InboxPageState extends State<InboxPage> {
   Future<void> _createStory() async {
     final result = await showModalBottomSheet<_StoryDraft>(
       context: context,
+      sheetAnimationStyle: VmMotion.sheetAnimationStyle,
       backgroundColor: Colors.transparent,
       isScrollControlled: true,
       builder: (_) => const _CreateStorySheetV3(),
@@ -569,24 +576,20 @@ class _InboxPageState extends State<InboxPage> {
       );
       _refreshStories();
     } catch (error) {
-      _toast(error.toString());
+      _toast(VmFailurePresentation.messageFor(error, contentLabel: 'Inbox action'));
     }
   }
 
   Future<void> _openStory(List<InboxStoryItem> stories, int index) async {
     final story = stories[index];
     await Navigator.of(context).push(
-      PageRouteBuilder<void>(
-        opaque: true,
-        transitionDuration: const Duration(milliseconds: 180),
-        reverseTransitionDuration: const Duration(milliseconds: 140),
-        pageBuilder: (context, animation, child) => FadeTransition(
-          opacity: animation,
-          child: _StoryViewerPage(
-            stories: stories,
-            initialIndex: index,
-            onViewed: (item) => _storiesApi.markViewed(item.id),
-          ),
+      VmMotion.pageRoute<void>(
+        settings: const RouteSettings(name: '/inbox/story'),
+        beginOffset: Offset.zero,
+        page: _StoryViewerPage(
+          stories: stories,
+          initialIndex: index,
+          onViewed: (item) => _storiesApi.markViewed(item.id),
         ),
       ),
     );
@@ -595,6 +598,12 @@ class _InboxPageState extends State<InboxPage> {
   }
 
   bool _onScrollNotification(ScrollNotification notification) {
+    if (notification.metrics.pixels > 0 &&
+        notification.metrics.extentAfter < 600 &&
+        _controller.hasMoreConversations &&
+        !_controller.isLoadingMoreConversations) {
+      _controller.loadMoreConversations();
+    }
     if (notification.metrics.pixels > 0) return false;
     if (notification is OverscrollNotification && notification.overscroll < 0) {
       setState(() {
@@ -622,6 +631,9 @@ class _InboxPageState extends State<InboxPage> {
 
   @override
   Widget build(BuildContext context) {
+    ref.watch(inboxControllerProvider);
+    ref.watch(inboxCallControllerProvider);
+
     final visibleConversations = _visibleConversations;
     final page = Stack(
       children: [
@@ -685,6 +697,16 @@ class _InboxPageState extends State<InboxPage> {
                     const SliverFillRemaining(
                       hasScrollBody: false,
                       child: _InboxLoadingSkeletonV3(),
+                    )
+                  else if (_controller.errorMessage != null &&
+                      visibleConversations.isEmpty)
+                    SliverFillRemaining(
+                      hasScrollBody: false,
+                      child: VmFailureState(
+                        message: _controller.errorMessage!,
+                        contentLabel: 'messages',
+                        onRetry: _controller.loadFromBackend,
+                      ),
                     )
                   else if (visibleConversations.isEmpty)
                     SliverFillRemaining(

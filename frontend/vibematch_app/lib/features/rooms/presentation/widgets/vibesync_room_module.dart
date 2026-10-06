@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 
+import '../../../../core/ui/vm_motion.dart';
+
 import '../live_room_models.dart';
 import 'room_theme.dart';
 
@@ -185,6 +187,7 @@ class VibeSyncControlSheet extends StatelessWidget {
   void _openPicker(BuildContext context, {required bool firstSlot}) {
     showModalBottomSheet<void>(
       context: context,
+      sheetAnimationStyle: VmMotion.sheetAnimationStyle,
       backgroundColor: Colors.transparent,
       builder: (_) => Container(
         padding: EdgeInsets.fromLTRB(14, 10, 14, MediaQuery.paddingOf(context).bottom + 14),

@@ -1,10 +1,14 @@
+import base64
+import json
 from datetime import datetime, timedelta
 from uuid import uuid4
 
+from sqlalchemy import and_, case, exists, func, or_
 from sqlalchemy.exc import IntegrityError
-from sqlalchemy.orm import Session
+from sqlalchemy.orm import Session, joinedload, selectinload
 
-from app.models.inbox import InboxConversation, InboxConversationType, InboxMessage, InboxMessageStatus, InboxMessageType, InboxParticipant, InboxReport, InboxReportStatus
+from app.models.inbox import InboxConversation, InboxConversationType, InboxMessage, InboxMessageStatus, InboxMessageType, InboxParticipant, InboxReadReceipt, InboxReport, InboxReportStatus
+from app.models.inbox_preferences import InboxMessageUserState
 from app.models.user import User
 from app.websocket.inbox_ws import inbox_ws_manager
 
@@ -13,6 +17,10 @@ TEAM_PUBLIC_ID_PREFIX = "team_official"
 OFFICIAL_TEAM_NAME = "FunKey Team"
 OFFICIAL_TEAM_AVATAR_TEXT = "FK"
 OFFICIAL_TEAM_LOGO_ASSET = "assets/branding/funkey_logo.png"
+ACTIVE_MESSAGE_WINDOW = 50
+MAX_MESSAGE_PAGE_SIZE = 100
+MAX_CONVERSATION_PAGE_SIZE = 100
+READ_RECEIPT_WINDOW = 100
 
 
 def _public_id(prefix: str) -> str:
@@ -229,20 +237,107 @@ def _merge_duplicate_direct_conversations_for_user(db: Session, user: User) -> N
 
 
 
-def list_conversations(db: Session, user: User) -> list[InboxConversation]:
-    ensure_team_conversation(db, user)
-    _merge_duplicate_direct_conversations_for_user(db, user)
-    return (
-        db.query(InboxConversation)
-        .join(InboxParticipant)
+def _encode_cursor(payload: dict) -> str:
+    raw = json.dumps(payload, separators=(",", ":"), sort_keys=True).encode("utf-8")
+    return base64.urlsafe_b64encode(raw).rstrip(b"=").decode("ascii")
+
+
+def _decode_cursor(cursor: str | None) -> dict | None:
+    value = (cursor or "").strip()
+    if not value:
+        return None
+    try:
+        padded = value + "=" * ((4 - len(value) % 4) % 4)
+        decoded = json.loads(base64.urlsafe_b64decode(padded).decode("utf-8"))
+    except Exception as exc:
+        raise ValueError("Invalid Inbox cursor") from exc
+    if not isinstance(decoded, dict):
+        raise ValueError("Invalid Inbox cursor")
+    return decoded
+
+
+def list_conversations_page(
+    db: Session,
+    user: User,
+    *,
+    limit: int = 40,
+    cursor: str | None = None,
+) -> tuple[list[tuple[InboxConversation, InboxParticipant]], str | None]:
+    """Read-only keyset page. No repair/bootstrap mutation is allowed here."""
+
+    page_size = max(1, min(int(limit or 40), MAX_CONVERSATION_PAGE_SIZE))
+    pin_rank = case((InboxParticipant.is_pinned.is_(True), 1), else_=0)
+    query = (
+        db.query(InboxConversation, InboxParticipant)
+        .options(
+            selectinload(InboxConversation.participants)
+            .joinedload(InboxParticipant.user)
+        )
+        .join(
+            InboxParticipant,
+            InboxParticipant.conversation_id == InboxConversation.id,
+        )
         .filter(
             InboxParticipant.user_id == user.id,
             InboxParticipant.is_deleted_for_user.is_(False),
         )
-        .order_by(InboxConversation.is_pinned.desc(), InboxConversation.updated_at.desc())
-        .all()
     )
 
+    decoded = _decode_cursor(cursor)
+    if decoded is not None:
+        try:
+            cursor_pinned = 1 if bool(decoded["pinned"]) else 0
+            cursor_updated_at = datetime.fromisoformat(str(decoded["updated_at"]))
+            cursor_id = int(decoded["id"])
+        except (KeyError, TypeError, ValueError) as exc:
+            raise ValueError("Invalid Inbox cursor") from exc
+        query = query.filter(
+            or_(
+                pin_rank < cursor_pinned,
+                and_(
+                    pin_rank == cursor_pinned,
+                    or_(
+                        InboxConversation.updated_at < cursor_updated_at,
+                        and_(
+                            InboxConversation.updated_at == cursor_updated_at,
+                            InboxConversation.id < cursor_id,
+                        ),
+                    ),
+                ),
+            )
+        )
+
+    rows = (
+        query.order_by(
+            pin_rank.desc(),
+            InboxConversation.updated_at.desc(),
+            InboxConversation.id.desc(),
+        )
+        .limit(page_size + 1)
+        .all()
+    )
+    has_more = len(rows) > page_size
+    rows = rows[:page_size]
+    next_cursor = None
+    if has_more and rows:
+        conversation, participant = rows[-1]
+        next_cursor = _encode_cursor(
+            {
+                "pinned": bool(participant.is_pinned),
+                "updated_at": conversation.updated_at.isoformat(),
+                "id": int(conversation.id),
+            }
+        )
+    return rows, next_cursor
+
+
+def list_conversations(db: Session, user: User) -> list[InboxConversation]:
+    rows, _ = list_conversations_page(
+        db,
+        user,
+        limit=MAX_CONVERSATION_PAGE_SIZE,
+    )
+    return [conversation for conversation, _participant in rows]
 
 def get_conversation_for_user(db: Session, user: User, conversation_public_id: str) -> InboxConversation | None:
     return db.query(InboxConversation).join(InboxParticipant).filter(InboxConversation.public_id == conversation_public_id, InboxParticipant.user_id == user.id).first()
@@ -273,6 +368,253 @@ def _dedupe_conversations_for_user(conversations: list[InboxConversation]) -> li
     return visible
 
 
+
+
+def conversation_message_windows(
+    db: Session,
+    conversations: list[InboxConversation],
+    user: User,
+    *,
+    limit: int = ACTIVE_MESSAGE_WINDOW,
+) -> tuple[
+    dict[int, list[InboxMessage]],
+    dict[int, str | None],
+    dict[int, bool],
+    dict[int, str],
+]:
+    """Batch the active message window for a conversation list page.
+
+    The window function keeps work bounded per conversation while avoiding the
+    historical 2-query-per-conversation message/read-receipt N+1.
+    """
+
+    page_size = max(1, min(int(limit or ACTIVE_MESSAGE_WINDOW), MAX_MESSAGE_PAGE_SIZE))
+    conversation_ids = [conversation.id for conversation in conversations]
+    if not conversation_ids:
+        return {}, {}, {}, {}
+
+    ranked = (
+        db.query(
+            InboxMessage.id.label("message_id"),
+            InboxMessage.conversation_id.label("conversation_id"),
+            func.row_number().over(
+                partition_by=InboxMessage.conversation_id,
+                order_by=(InboxMessage.created_at.desc(), InboxMessage.id.desc()),
+            ).label("row_number"),
+        )
+        .filter(
+            InboxMessage.conversation_id.in_(conversation_ids),
+            ~exists().where(
+                and_(
+                    InboxMessageUserState.message_id == InboxMessage.id,
+                    InboxMessageUserState.user_id == user.id,
+                    InboxMessageUserState.is_deleted_for_user.is_(True),
+                )
+            ),
+        )
+        .subquery()
+    )
+
+    rows = (
+        db.query(InboxMessage, ranked.c.row_number)
+        .options(joinedload(InboxMessage.conversation))
+        .join(ranked, ranked.c.message_id == InboxMessage.id)
+        .filter(ranked.c.row_number <= page_size + 1)
+        .order_by(
+            InboxMessage.conversation_id.asc(),
+            InboxMessage.created_at.desc(),
+            InboxMessage.id.desc(),
+        )
+        .all()
+    )
+
+    newest_first: dict[int, list[InboxMessage]] = {
+        conversation_id: [] for conversation_id in conversation_ids
+    }
+    for message, _row_number in rows:
+        newest_first.setdefault(message.conversation_id, []).append(message)
+
+    windows: dict[int, list[InboxMessage]] = {}
+    cursors: dict[int, str | None] = {}
+    has_more: dict[int, bool] = {}
+    all_visible_messages: list[InboxMessage] = []
+    for conversation_id in conversation_ids:
+        candidates = newest_first.get(conversation_id, [])
+        more = len(candidates) > page_size
+        page = candidates[:page_size]
+        page.reverse()
+        windows[conversation_id] = page
+        has_more[conversation_id] = more
+        cursors[conversation_id] = None
+        if more and page:
+            oldest = page[0]
+            cursors[conversation_id] = _encode_cursor(
+                {
+                    "created_at": oldest.created_at.isoformat(),
+                    "id": int(oldest.id),
+                }
+            )
+        all_visible_messages.extend(page)
+
+    statuses = message_statuses_for_user(db, all_visible_messages, user)
+    return windows, cursors, has_more, statuses
+
+
+def list_messages_page(
+    db: Session,
+    conversation: InboxConversation,
+    user: User,
+    *,
+    limit: int = ACTIVE_MESSAGE_WINDOW,
+    before: str | None = None,
+) -> tuple[list[InboxMessage], str | None, bool]:
+    page_size = max(1, min(int(limit or ACTIVE_MESSAGE_WINDOW), MAX_MESSAGE_PAGE_SIZE))
+    query = db.query(InboxMessage).filter(
+        InboxMessage.conversation_id == conversation.id,
+        ~exists().where(
+            and_(
+                InboxMessageUserState.message_id == InboxMessage.id,
+                InboxMessageUserState.user_id == user.id,
+                InboxMessageUserState.is_deleted_for_user.is_(True),
+            )
+        ),
+    )
+    decoded = _decode_cursor(before)
+    if decoded is not None:
+        try:
+            cursor_created_at = datetime.fromisoformat(str(decoded["created_at"]))
+            cursor_id = int(decoded["id"])
+        except (KeyError, TypeError, ValueError) as exc:
+            raise ValueError("Invalid Inbox message cursor") from exc
+        query = query.filter(
+            or_(
+                InboxMessage.created_at < cursor_created_at,
+                and_(
+                    InboxMessage.created_at == cursor_created_at,
+                    InboxMessage.id < cursor_id,
+                ),
+            )
+        )
+
+    rows = (
+        query.order_by(InboxMessage.created_at.desc(), InboxMessage.id.desc())
+        .limit(page_size + 1)
+        .all()
+    )
+    has_more = len(rows) > page_size
+    rows = rows[:page_size]
+    # API keeps the historical oldest -> newest message order.
+    rows.reverse()
+    next_cursor = None
+    if has_more and rows:
+        oldest = rows[0]
+        next_cursor = _encode_cursor(
+            {
+                "created_at": oldest.created_at.isoformat(),
+                "id": int(oldest.id),
+            }
+        )
+    return rows, next_cursor, has_more
+
+
+def message_statuses_for_user(
+    db: Session,
+    messages: list[InboxMessage],
+    user: User,
+) -> dict[int, str]:
+    if not messages:
+        return {}
+    message_ids = [message.id for message in messages]
+    receipts = (
+        db.query(InboxReadReceipt)
+        .filter(InboxReadReceipt.message_id.in_(message_ids))
+        .all()
+    )
+    receipt_users: dict[int, set[int]] = {}
+    for receipt in receipts:
+        receipt_users.setdefault(receipt.message_id, set()).add(receipt.user_id)
+
+    statuses: dict[int, str] = {}
+    for message in messages:
+        readers = receipt_users.get(message.id, set())
+        if message.sender_user_id == user.id:
+            if any(reader_id != user.id for reader_id in readers):
+                statuses[message.id] = InboxMessageStatus.READ.value
+            else:
+                statuses[message.id] = message.status
+        elif user.id in readers:
+            statuses[message.id] = InboxMessageStatus.READ.value
+        else:
+            statuses[message.id] = message.status
+    return statuses
+
+
+def ensure_family_conversation(
+    db: Session,
+    *,
+    family_id: int,
+    title: str,
+    member_user_ids: list[int],
+) -> InboxConversation:
+    """Synchronize one family chat through the Inbox write authority."""
+
+    public_id = f"family_chat_{int(family_id)}"
+    safe_title = (title or f"Family {family_id}").strip()[:120] or f"Family {family_id}"
+    desired_members = {int(user_id) for user_id in member_user_ids if int(user_id) > 0}
+
+    conversation = (
+        db.query(InboxConversation)
+        .filter(InboxConversation.public_id == public_id)
+        .first()
+    )
+    if conversation is None:
+        conversation = InboxConversation(
+            public_id=public_id,
+            title=safe_title,
+            avatar_text=_avatar_text(safe_title),
+            conversation_type=InboxConversationType.FAMILY.value,
+            is_official=False,
+            metadata_json={"family_id": int(family_id), "colors": DEFAULT_COLORS},
+        )
+        db.add(conversation)
+        db.flush()
+
+    changed = False
+    existing = {item.user_id: item for item in conversation.participants}
+    for user_id in desired_members:
+        participant = existing.get(user_id)
+        if participant is None:
+            db.add(
+                InboxParticipant(
+                    conversation_id=conversation.id,
+                    user_id=user_id,
+                )
+            )
+            changed = True
+        elif participant.is_deleted_for_user:
+            participant.is_deleted_for_user = False
+            db.add(participant)
+            changed = True
+
+    for user_id, participant in existing.items():
+        if user_id not in desired_members and not participant.is_deleted_for_user:
+            participant.is_deleted_for_user = True
+            db.add(participant)
+            changed = True
+
+    if conversation.title != safe_title:
+        conversation.title = safe_title
+        conversation.avatar_text = _avatar_text(safe_title)
+        changed = True
+    if conversation.conversation_type != InboxConversationType.FAMILY.value:
+        conversation.conversation_type = InboxConversationType.FAMILY.value
+        changed = True
+    if changed:
+        conversation.updated_at = datetime.utcnow()
+    db.add(conversation)
+    db.commit()
+    db.refresh(conversation)
+    return conversation
 
 
 def create_direct_conversation(db: Session, current_user: User, target_user: User) -> InboxConversation:
@@ -329,8 +671,20 @@ def send_message(
     invite_room_id: str | None = None,
     attachment_url: str | None = None,
     metadata: dict | None = None,
+    source_dedupe_key: str | None = None,
 ) -> InboxMessage:
     safe_text = text.strip()
+    clean_dedupe_key = (source_dedupe_key or "").strip() or None
+
+    if clean_dedupe_key is not None:
+        existing = (
+            db.query(InboxMessage)
+            .filter(InboxMessage.source_dedupe_key == clean_dedupe_key)
+            .first()
+        )
+        if existing is not None:
+            return existing
+
     message_metadata = dict(metadata or {})
     if message_type == InboxMessageType.ROOM_INVITE.value:
         if invite_room_name:
@@ -341,6 +695,7 @@ def send_message(
 
     message = InboxMessage(
         public_id=_public_id("msg"),
+        source_dedupe_key=clean_dedupe_key,
         conversation_id=conversation.id,
         sender_user_id=sender.id,
         sender_name=_display_name(sender),
@@ -353,7 +708,9 @@ def send_message(
         metadata_json=message_metadata or None,
     )
     if _disappearing_mode_enabled(conversation):
-        expires_at = datetime.utcnow() + timedelta(seconds=_disappearing_ttl_seconds(conversation))
+        expires_at = datetime.utcnow() + timedelta(
+            seconds=_disappearing_ttl_seconds(conversation)
+        )
         message_metadata = dict(message.metadata_json or {})
         message_metadata["disappearing"] = True
         message_metadata["expires_at"] = _utc_iso_z(expires_at)
@@ -367,7 +724,9 @@ def send_message(
 
         conversation_metadata = _conversation_metadata(conversation)
         conversation_metadata["secret_drift_closed_by"] = []
-        conversation_metadata["secret_drift_last_message_at"] = _utc_iso_z(datetime.utcnow())
+        conversation_metadata["secret_drift_last_message_at"] = _utc_iso_z(
+            datetime.utcnow()
+        )
         conversation.metadata_json = conversation_metadata
 
     conversation.updated_at = datetime.utcnow()
@@ -378,7 +737,22 @@ def send_message(
     for participant in conversation.participants:
         if participant.user_id != sender.id:
             participant.unread_count += 1
-    db.commit()
+
+    try:
+        db.commit()
+    except IntegrityError:
+        db.rollback()
+        if clean_dedupe_key is None:
+            raise
+        existing = (
+            db.query(InboxMessage)
+            .filter(InboxMessage.source_dedupe_key == clean_dedupe_key)
+            .first()
+        )
+        if existing is None:
+            raise
+        return existing
+
     db.refresh(message)
     return message
 
@@ -429,19 +803,37 @@ def send_team_system_message(db: Session, user: User, text: str) -> InboxMessage
     return message
 
 
-def update_conversation_state(db: Session, conversation: InboxConversation, is_muted: bool | None = None, is_pinned: bool | None = None, is_locked: bool | None = None, is_blocked: bool | None = None) -> InboxConversation:
+def update_conversation_state(
+    db: Session,
+    conversation: InboxConversation,
+    user: User,
+    is_muted: bool | None = None,
+    is_pinned: bool | None = None,
+    is_archived: bool | None = None,
+    is_locked: bool | None = None,
+    is_blocked: bool | None = None,
+) -> InboxConversation:
+    participant = next(
+        (item for item in conversation.participants if item.user_id == user.id),
+        None,
+    )
+    if participant is None:
+        raise ValueError("Conversation participant not found")
     if is_muted is not None:
-        conversation.is_muted = is_muted
+        participant.is_muted = is_muted
     if is_pinned is not None:
-        conversation.is_pinned = is_pinned
+        participant.is_pinned = is_pinned
+    if is_archived is not None:
+        participant.is_archived = is_archived
     if is_locked is not None and not conversation.is_official:
         conversation.is_locked = is_locked
     if is_blocked is not None and not conversation.is_official:
         conversation.is_blocked = is_blocked
+    db.add(participant)
+    db.add(conversation)
     db.commit()
     db.refresh(conversation)
     return conversation
-
 
 def update_message(db: Session, conversation: InboxConversation, message_public_id: str, reaction: str | None = None, is_starred: bool | None = None) -> InboxMessage | None:
     message = db.query(InboxMessage).filter(InboxMessage.public_id == message_public_id, InboxMessage.conversation_id == conversation.id).first()
@@ -596,31 +988,70 @@ def mark_messages_read_for_user(
     conversation: InboxConversation,
     user: User,
 ) -> list[InboxMessage]:
-    changed: list[InboxMessage] = []
-    latest_message_id: int | None = None
+    participant = next(
+        (item for item in conversation.participants if item.user_id == user.id),
+        None,
+    )
+    if participant is None:
+        return []
 
-    for message in conversation.messages:
-        latest_message_id = message.id
-        if message.sender_user_id is None:
-            continue
-        if message.sender_user_id == user.id:
-            continue
-        if message.status != InboxMessageStatus.READ.value:
-            message.status = InboxMessageStatus.READ.value
-            changed.append(message)
+    latest = (
+        db.query(InboxMessage)
+        .filter(InboxMessage.conversation_id == conversation.id)
+        .order_by(InboxMessage.id.desc())
+        .first()
+    )
+    if latest is None:
+        if participant.unread_count:
+            participant.unread_count = 0
+            db.commit()
+        return []
 
-    participant = next((item for item in conversation.participants if item.user_id == user.id), None)
-    if participant is not None:
-        participant.unread_count = 0
-        participant.last_read_message_id = latest_message_id
+    # The last-read pointer makes historical reads O(1); explicit receipts are
+    # kept for the bounded active window used by sender/read-receipt UI.
+    recent = (
+        db.query(InboxMessage)
+        .filter(
+            InboxMessage.conversation_id == conversation.id,
+            InboxMessage.id <= latest.id,
+            or_(
+                InboxMessage.sender_user_id.is_(None),
+                InboxMessage.sender_user_id != user.id,
+            ),
+        )
+        .order_by(InboxMessage.id.desc())
+        .limit(READ_RECEIPT_WINDOW)
+        .all()
+    )
+    message_ids = [message.id for message in recent]
+    existing = set()
+    if message_ids:
+        existing = {
+            receipt.message_id
+            for receipt in db.query(InboxReadReceipt)
+            .filter(
+                InboxReadReceipt.user_id == user.id,
+                InboxReadReceipt.message_id.in_(message_ids),
+            )
+            .all()
+        }
+    read_at = datetime.utcnow()
+    for message in recent:
+        if message.id not in existing:
+            db.add(
+                InboxReadReceipt(
+                    message_id=message.id,
+                    conversation_id=conversation.id,
+                    user_id=user.id,
+                    read_at=read_at,
+                )
+            )
 
-    if changed or participant is not None:
-        db.commit()
-        for message in changed:
-            db.refresh(message)
-
-    return changed
-
+    participant.unread_count = 0
+    participant.last_read_message_id = latest.id
+    db.add(participant)
+    db.commit()
+    return list(reversed(recent))
 
 
 
@@ -815,13 +1246,13 @@ def mark_secret_drift_closed_and_clear(
     return should_clear
 
 
-def _visible_messages(messages: list[InboxMessage]) -> list[InboxMessage]:
-    return list(messages)
 
-
-
-
-def message_to_dict(message: InboxMessage, current_user: User | None) -> dict:
+def message_to_dict(
+    message: InboxMessage,
+    current_user: User | None,
+    *,
+    status_override: str | None = None,
+) -> dict:
     metadata = message.metadata_json or {}
     invite_room_id = metadata.get("invite_room_id") or metadata.get("room_public_id") or message.conversation.room_public_id
     media_expired = metadata.get("media_expired") is True
@@ -832,7 +1263,7 @@ def message_to_dict(message: InboxMessage, current_user: User | None) -> dict:
         "time": _time_label(message.created_at),
         "is_mine": current_user is not None and message.sender_user_id == current_user.id,
         "type": message.message_type,
-        "status": message.status,
+        "status": status_override or message.status,
         "reaction": message.reaction,
         "reply_to_text": message.reply_to_text,
         "is_starred": message.is_starred,
@@ -858,10 +1289,47 @@ def _utc_iso_z(value: datetime | None) -> str | None:
 
 
 
-def conversation_to_dict(conversation: InboxConversation, current_user: User) -> dict:
-    participant = next((item for item in conversation.participants if item.user_id == current_user.id), None)
-    messages = _visible_messages(list(conversation.messages))
+def conversation_to_dict(
+    conversation: InboxConversation,
+    current_user: User,
+    *,
+    db: Session | None = None,
+    participant: InboxParticipant | None = None,
+    messages: list[InboxMessage] | None = None,
+    messages_next_cursor: str | None = None,
+    has_older_messages: bool | None = None,
+    status_overrides: dict[int, str] | None = None,
+    include_messages: bool = True,
+) -> dict:
+    participant = participant or next(
+        (item for item in conversation.participants if item.user_id == current_user.id),
+        None,
+    )
+    if messages is None:
+        if db is not None:
+            messages, messages_next_cursor, has_older_messages = list_messages_page(
+                db,
+                conversation,
+                current_user,
+                limit=ACTIVE_MESSAGE_WINDOW,
+            )
+        else:
+            # Compatibility-only fallback; all public list/detail routes pass
+            # a DB session and therefore never materialize unbounded history.
+            messages = list(conversation.messages)[-ACTIVE_MESSAGE_WINDOW:]
+            has_older_messages = len(conversation.messages) > len(messages)
+
+    messages = _visible_messages(list(messages))
     last_message = messages[-1] if messages else None
+    statuses = (
+        status_overrides
+        if status_overrides is not None
+        else (
+            message_statuses_for_user(db, messages, current_user)
+            if db is not None
+            else {}
+        )
+    )
     metadata = conversation.metadata_json or {}
     other_user = _other_participant_user(conversation, current_user)
     uses_live_user_profile = not conversation.is_official and other_user is not None
@@ -869,10 +1337,17 @@ def conversation_to_dict(conversation: InboxConversation, current_user: User) ->
     avatar_url = other_user.avatar_url if uses_live_user_profile else metadata.get("avatar_url")
     streak_count = _chat_streak_count(conversation, messages)
     streak_active_today = _chat_streak_active_today(conversation, messages)
-    other_user_online = inbox_ws_manager.is_user_online(other_user.id if other_user is not None else None)
-    last_seen_at = inbox_ws_manager.last_seen_at(other_user.id if other_user is not None else None)
+    other_user_online = inbox_ws_manager.is_user_online(
+        other_user.id if other_user is not None else None
+    )
+    last_seen_at = inbox_ws_manager.last_seen_at(
+        other_user.id if other_user is not None else None
+    )
     if last_seen_at is None and other_user is not None:
-        last_seen_at = getattr(other_user, "last_login_at", None)
+        last_seen_at = (
+            getattr(other_user, "last_seen_at", None)
+            or getattr(other_user, "last_login_at", None)
+        )
     last_seen_text = "online" if other_user_online else "offline"
 
     return {
@@ -888,19 +1363,27 @@ def conversation_to_dict(conversation: InboxConversation, current_user: User) ->
         "last_seen_text": last_seen_text,
         "last_seen_at": _utc_iso_z(last_seen_at),
         "colors": metadata.get("colors") or DEFAULT_COLORS,
-        "messages": [message_to_dict(message, current_user) for message in messages],
+        "messages": [
+            message_to_dict(
+                message,
+                current_user,
+                status_override=statuses.get(message.id),
+            )
+            for message in messages
+        ] if include_messages else [],
+        "messages_next_cursor": messages_next_cursor if include_messages else None,
+        "has_older_messages": bool(has_older_messages) if include_messages else False,
         "current_room_name": conversation.current_room_name,
         "current_room_id": conversation.room_public_id,
         "is_locked_by_backend": conversation.is_locked,
         "is_blocked": conversation.is_blocked,
-        "is_muted": conversation.is_muted,
-        "is_pinned": conversation.is_pinned,
-        "is_archived": conversation.is_archived,
+        "is_muted": participant.is_muted if participant else False,
+        "is_pinned": participant.is_pinned if participant else False,
+        "is_archived": participant.is_archived if participant else False,
         "chat_streak_count": streak_count,
         "chat_streak_active_today": streak_active_today,
         "secret_drift_enabled": _secret_drift_enabled(conversation),
     }
-
 
 def report_to_dict(report: InboxReport) -> dict:
     return {"id": report.public_id, "reported_conversation_id": report.conversation.public_id, "reported_user_name": report.reported_user_name, "reporter_name": _display_name(report.reporter), "reason": report.reason, "snapshot": report.snapshot_json, "created_at_label": _time_label(report.created_at), "status": report.status, "cs_note": report.cs_note, "monitor_action": report.monitor_action}

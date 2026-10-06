@@ -1,16 +1,23 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:video_player/video_player.dart';
 
+import '../../../../../foundation/runtime/media_resource_lifecycle.dart';
 import '../../../presentation/live_room_models.dart';
+import '../runtime/gift_video_resource_participant.dart';
 import '../../../presentation/widgets/gift_modules/gift_panel_constants.dart';
 
 class CleanVideoGiftOverlay extends StatelessWidget {
   const CleanVideoGiftOverlay({
     super.key,
+    required this.roomPublicId,
     required this.slides,
     required this.onVideoFinished,
   });
 
+  final String roomPublicId;
   final List<GiftSlide> slides;
   final ValueChanged<GiftSlide> onVideoFinished;
 
@@ -23,6 +30,7 @@ class CleanVideoGiftOverlay extends StatelessWidget {
       child: IgnorePointer(
         child: _CleanVideoGiftCard(
           key: ValueKey(activeSlide.id),
+          roomPublicId: roomPublicId,
           slide: activeSlide,
           onVideoFinished: onVideoFinished,
         ),
@@ -31,24 +39,30 @@ class CleanVideoGiftOverlay extends StatelessWidget {
   }
 }
 
-class _CleanVideoGiftCard extends StatefulWidget {
+class _CleanVideoGiftCard extends ConsumerStatefulWidget {
   const _CleanVideoGiftCard({
     super.key,
+    required this.roomPublicId,
     required this.slide,
     required this.onVideoFinished,
   });
 
+  final String roomPublicId;
   final GiftSlide slide;
   final ValueChanged<GiftSlide> onVideoFinished;
 
   @override
-  State<_CleanVideoGiftCard> createState() => _CleanVideoGiftCardState();
+  ConsumerState<_CleanVideoGiftCard> createState() =>
+      _CleanVideoGiftCardState();
 }
 
-class _CleanVideoGiftCardState extends State<_CleanVideoGiftCard> {
+class _CleanVideoGiftCardState extends ConsumerState<_CleanVideoGiftCard> {
   VideoPlayerController? _controller;
   bool _ready = false;
   bool _finished = false;
+  bool _controllerDisposed = false;
+  MediaResourceRegistry? _resourceRegistry;
+  GiftVideoResourceParticipant? _resourceParticipant;
 
   @override
   void initState() {
@@ -58,24 +72,26 @@ class _CleanVideoGiftCardState extends State<_CleanVideoGiftCard> {
 
   Future<void> _load() async {
     final networkUrl = widget.slide.videoUrl?.trim();
-    final localPath = widget.slide.videoAssetPath?.trim();
-    if ((networkUrl == null || networkUrl.isEmpty) &&
-        (localPath == null || localPath.isEmpty)) {
+    if (networkUrl == null || networkUrl.isEmpty) {
       return;
     }
     try {
-      final controller = networkUrl != null && networkUrl.isNotEmpty
-          ? VideoPlayerController.networkUrl(Uri.parse(networkUrl))
-          : VideoPlayerController.asset(localPath!);
+      final controller = VideoPlayerController.networkUrl(Uri.parse(networkUrl));
       _controller = controller;
       controller.addListener(_onTick);
       await controller.initialize();
       await controller.setLooping(false);
       await controller.setVolume(1.0);
       await controller.play();
-      if (mounted) setState(() => _ready = true);
+      if (!mounted) {
+        await _disposeController();
+        return;
+      }
+      setState(() => _ready = true);
+      await _attachResource();
     } catch (_) {
-      _finish();
+      await _disposeController();
+      if (mounted) _finish();
     }
   }
 
@@ -95,14 +111,87 @@ class _CleanVideoGiftCardState extends State<_CleanVideoGiftCard> {
     widget.onVideoFinished(widget.slide);
   }
 
+  Future<void> _attachResource() async {
+    if (!mounted || _resourceParticipant != null) return;
+    final registry = ref.read(mediaResourceRegistryProvider);
+    if (registry == null) return;
+
+    final participant = GiftVideoResourceParticipant(
+      resourceId: 'gift-video:${widget.roomPublicId}:${widget.slide.id}',
+      pause: _pauseForLifecycle,
+      resume: _resumeForLifecycle,
+      releaseResource: _releaseForLifecycle,
+    );
+    try {
+      if (!registry.register(participant)) return;
+      _resourceRegistry = registry;
+      _resourceParticipant = participant;
+      await participant.onForegroundChanged(registry.isForeground);
+    } catch (_) {
+      registry.unregister(
+        participant.resourceId,
+        expectedParticipant: participant,
+      );
+    }
+  }
+
+  Future<bool> _pauseForLifecycle() async {
+    final controller = _controller;
+    if (_controllerDisposed ||
+        controller == null ||
+        !controller.value.isInitialized) {
+      return false;
+    }
+    final wasPlaying = controller.value.isPlaying;
+    if (wasPlaying) await controller.pause();
+    return wasPlaying;
+  }
+
+  Future<void> _resumeForLifecycle() async {
+    final controller = _controller;
+    if (_finished ||
+        _controllerDisposed ||
+        controller == null ||
+        !controller.value.isInitialized) {
+      return;
+    }
+    await controller.play();
+  }
+
+  Future<void> _releaseForLifecycle() async {
+    await _disposeController();
+    _finish();
+  }
+
+  void _detachResource() {
+    final registry = _resourceRegistry;
+    final participant = _resourceParticipant;
+    _resourceRegistry = null;
+    _resourceParticipant = null;
+    if (registry == null || participant == null) return;
+    registry.unregister(
+      participant.resourceId,
+      expectedParticipant: participant,
+    );
+  }
+
+  Future<void> _disposeController() async {
+    if (_controllerDisposed) return;
+    _controllerDisposed = true;
+    final controller = _controller;
+    _controller = null;
+    if (controller == null) return;
+    controller.removeListener(_onTick);
+    try {
+      await controller.pause();
+    } catch (_) {}
+    await controller.dispose();
+  }
+
   @override
   void dispose() {
-    final controller = _controller;
-    if (controller != null) {
-      controller.removeListener(_onTick);
-      controller.pause();
-      controller.dispose();
-    }
+    _detachResource();
+    unawaited(_disposeController());
     super.dispose();
   }
 
@@ -145,7 +234,6 @@ class _CleanVideoGiftCardState extends State<_CleanVideoGiftCard> {
                     )
                   : _GiftFallback(
                       assetUrl: widget.slide.giftAssetUrl,
-                      assetPath: widget.slide.giftAssetPath,
                       colors: widget.slide.colors,
                       icon: widget.slide.giftIcon,
                       fit: fit,
@@ -161,14 +249,12 @@ class _CleanVideoGiftCardState extends State<_CleanVideoGiftCard> {
 class _GiftFallback extends StatelessWidget {
   const _GiftFallback({
     required this.assetUrl,
-    required this.assetPath,
     required this.colors,
     required this.icon,
     required this.fit,
   });
 
   final String? assetUrl;
-  final String? assetPath;
   final List<Color> colors;
   final IconData icon;
   final BoxFit fit;
@@ -181,45 +267,27 @@ class _GiftFallback extends StatelessWidget {
         networkUrl,
         fit: fit,
         gaplessPlayback: true,
-        errorBuilder: (context, error, stackTrace) => _LocalOrIconFallback(
-          assetPath: assetPath,
+        errorBuilder: (context, error, stackTrace) => _GiftIconFallback(
           colors: colors,
           icon: icon,
-          fit: fit,
         ),
       );
     }
-    return _LocalOrIconFallback(
-      assetPath: assetPath,
-      colors: colors,
-      icon: icon,
-      fit: fit,
-    );
+    return _GiftIconFallback(colors: colors, icon: icon);
   }
 }
 
-class _LocalOrIconFallback extends StatelessWidget {
-  const _LocalOrIconFallback({
-    required this.assetPath,
+class _GiftIconFallback extends StatelessWidget {
+  const _GiftIconFallback({
     required this.colors,
     required this.icon,
-    required this.fit,
   });
 
-  final String? assetPath;
   final List<Color> colors;
   final IconData icon;
-  final BoxFit fit;
 
   @override
   Widget build(BuildContext context) {
-    final path = assetPath?.toLowerCase().trim() ?? '';
-    if (path.endsWith('.webp') ||
-        path.endsWith('.gif') ||
-        path.endsWith('.png') ||
-        path.endsWith('.apng')) {
-      return Image.asset(assetPath!, fit: fit, gaplessPlayback: true);
-    }
     return Center(
       child: Container(
         width: 180,

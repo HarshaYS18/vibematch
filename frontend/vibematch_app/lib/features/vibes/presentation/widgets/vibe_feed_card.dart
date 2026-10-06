@@ -3,12 +3,20 @@ import 'package:flutter/material.dart';
 import '../../../auth/data/auth_api_service.dart';
 import '../../models/vibe_models.dart';
 import 'vibe_avatar.dart';
+import 'vibe_media_playback_gate.dart';
 import 'vibe_media_player.dart';
 
+/// Feed card presentation for one Vibe.
+///
+/// The open action-pill key is supplied by the owning feed page so cards can
+/// coordinate a single visible pill without process-global mutable state. The
+/// notifier is presentation-only and must be disposed by the page that owns it.
 class VibeCardModular extends StatefulWidget {
   const VibeCardModular({
     super.key,
     required this.vibe,
+    required this.playbackGate,
+    required this.actionPillKey,
     required this.onProfileTap,
     required this.onLikeTap,
     required this.onCommentTap,
@@ -18,6 +26,8 @@ class VibeCardModular extends StatefulWidget {
   });
 
   final VibeItem vibe;
+  final VibeMediaPlaybackGate playbackGate;
+  final ValueNotifier<String?> actionPillKey;
   final VoidCallback onProfileTap;
   final VoidCallback onLikeTap;
   final VoidCallback onCommentTap;
@@ -30,8 +40,6 @@ class VibeCardModular extends StatefulWidget {
 }
 
 class _VibeCardModularState extends State<VibeCardModular> {
-  static final ValueNotifier<String?> _openActionPillKey = ValueNotifier<String?>(null);
-
   String get _pillKey => widget.vibe.id.trim().isNotEmpty ? widget.vibe.id : '${widget.vibe.authorId}-${widget.vibe.caption.hashCode}';
 
   bool get _isSelfVibe {
@@ -53,11 +61,11 @@ class _VibeCardModularState extends State<VibeCardModular> {
   }
 
   void _toggleActionPill() {
-    _openActionPillKey.value = _openActionPillKey.value == _pillKey ? null : _pillKey;
+    widget.actionPillKey.value = widget.actionPillKey.value == _pillKey ? null : _pillKey;
   }
 
   void _hideActionPill() {
-    if (_openActionPillKey.value == _pillKey) _openActionPillKey.value = null;
+    if (widget.actionPillKey.value == _pillKey) widget.actionPillKey.value = null;
   }
 
   void _runAction() {
@@ -77,7 +85,7 @@ class _VibeCardModularState extends State<VibeCardModular> {
     final isTextVibe = widget.vibe.mediaType == VibeMediaType.text;
 
     return ValueListenableBuilder<String?>(
-      valueListenable: _openActionPillKey,
+      valueListenable: widget.actionPillKey,
       builder: (context, openKey, _) {
         final showActionPill = openKey == _pillKey;
         return Stack(
@@ -98,7 +106,7 @@ class _VibeCardModularState extends State<VibeCardModular> {
                       SizedBox(
                         width: width,
                         height: mediaHeight,
-                        child: ClipRect(child: VibeMediaPlayer(vibe: widget.vibe, onDoubleTap: _handleDoubleTap)),
+                        child: RepaintBoundary(child: ClipRect(child: VibeMediaPlayer(vibe: widget.vibe, onDoubleTap: _handleDoubleTap, playbackGate: widget.playbackGate))),
                       ),
                     _MetaPanel(
                       vibe: widget.vibe,
