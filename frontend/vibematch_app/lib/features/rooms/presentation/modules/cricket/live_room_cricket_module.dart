@@ -39,6 +39,10 @@ class LiveRoomCricketModule {
   }
 
   static void startNewMatch(LiveRoomControllerBundle bundle) {
+    if (bundle.pkController.pending || bundle.pkController.active) {
+      RoomToast.show(bundle.context, 'End Room PK before starting Cricket Mode');
+      return;
+    }
     if (!bundle.cricketModeController.active) return;
     LiveRoomLifecycleModule.clearFocus(bundle);
     CricketStumpsFlowModule.open(
@@ -96,6 +100,10 @@ class LiveRoomCricketModule {
     required LiveRoomControllerBundle bundle,
     required BuildContext sheetContext,
   }) {
+    if (bundle.pkController.pending || bundle.pkController.active) {
+      RoomToast.show(bundle.context, 'End Room PK before starting Cricket Mode');
+      return;
+    }
     Navigator.pop(sheetContext);
     capturePreCricketRoomState(bundle);
     Future<void>.delayed(const Duration(milliseconds: 80), () {
