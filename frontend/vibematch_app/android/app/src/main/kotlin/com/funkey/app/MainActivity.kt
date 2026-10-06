@@ -16,14 +16,58 @@ import io.flutter.plugin.common.MethodChannel
 
 class MainActivity : FlutterActivity() {
     private var screenshotBlocked = false
+    private var growthChannel: MethodChannel? = null
+    private var pendingGrowthLink: String? = null
 
     override fun onCreate(savedInstanceState: Bundle?) {
+        pendingGrowthLink = intent?.dataString
         super.onCreate(savedInstanceState)
         applyScreenshotPolicy()
     }
 
+    override fun onNewIntent(intent: Intent) {
+        super.onNewIntent(intent)
+        setIntent(intent)
+        val link = intent.dataString ?: return
+        val channel = growthChannel
+        if (channel == null) {
+            pendingGrowthLink = link
+        } else {
+            channel.invokeMethod("link", link)
+        }
+    }
+
     override fun configureFlutterEngine(flutterEngine: FlutterEngine) {
         super.configureFlutterEngine(flutterEngine)
+
+        growthChannel = MethodChannel(
+            flutterEngine.dartExecutor.binaryMessenger,
+            GROWTH_CHANNEL
+        ).also { channel ->
+            channel.setMethodCallHandler { call, result ->
+                when (call.method) {
+                    "getInitialLink" -> {
+                        val link = pendingGrowthLink
+                        pendingGrowthLink = null
+                        result.success(link)
+                    }
+                    "shareText" -> {
+                        val text = call.argument<String>("text")?.trim().orEmpty()
+                        if (text.isEmpty()) {
+                            result.error("invalid_share", "Share text is empty.", null)
+                        } else {
+                            val sendIntent = Intent(Intent.ACTION_SEND).apply {
+                                type = "text/plain"
+                                putExtra(Intent.EXTRA_TEXT, text)
+                            }
+                            startActivity(Intent.createChooser(sendIntent, null))
+                            result.success(true)
+                        }
+                    }
+                    else -> result.notImplemented()
+                }
+            }
+        }
 
         MethodChannel(flutterEngine.dartExecutor.binaryMessenger, LIVE_ROOM_SERVICE_CHANNEL).setMethodCallHandler { call, result ->
             when (call.method) {
@@ -118,5 +162,6 @@ class MainActivity : FlutterActivity() {
         private const val LIVE_ROOM_SERVICE_CHANNEL = "vibematch/live_room_service"
         private const val SCREENSHOT_GUARD_CHANNEL = "vibematch/screenshot_guard"
         private const val POWER_STATE_CHANNEL = "funkey/power_state"
+        private const val GROWTH_CHANNEL = "funkey/growth"
     }
 }
