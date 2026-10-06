@@ -2,6 +2,8 @@ import 'dart:async';
 
 import 'package:flutter/foundation.dart';
 
+import '../../../../core/network/vm_failure.dart';
+
 import '../../../../foundation/realtime/realtime_event_envelope.dart';
 import '../../../../realtime/app_realtime_hub.dart';
 import '../../data/room_pk_api_service.dart';
@@ -94,8 +96,11 @@ class RoomPkController extends ChangeNotifier {
       final value = await _api.current(roomId);
       _applySnapshot(value, eventType: 'snapshot');
     } catch (error) {
-      _error = error.toString();
-      if (showLoading) notifyListeners();
+      _error = VmFailurePresentation.messageFor(
+        error,
+        contentLabel: 'PK battle',
+      );
+      notifyListeners();
     } finally {
       if (showLoading) {
         _loading = false;
@@ -119,6 +124,11 @@ class RoomPkController extends ChangeNotifier {
         durationSeconds: durationSeconds,
       );
       _applySnapshot(value, eventType: 'challenge_created');
+    } catch (error) {
+      _error = VmFailurePresentation.messageFor(
+        error,
+        contentLabel: 'PK challenge',
+      );
     } finally {
       _actionPending = false;
       notifyListeners();
@@ -144,6 +154,11 @@ class RoomPkController extends ChangeNotifier {
         next,
         eventType: accept ? 'challenge_accepted' : 'challenge_declined',
       );
+    } catch (error) {
+      _error = VmFailurePresentation.messageFor(
+        error,
+        contentLabel: 'PK challenge',
+      );
     } finally {
       _actionPending = false;
       notifyListeners();
@@ -160,6 +175,11 @@ class RoomPkController extends ChangeNotifier {
           ? await _api.finish(roomId: roomId, matchId: value.matchId)
           : await _api.cancel(roomId: roomId, matchId: value.matchId);
       _applySnapshot(next, eventType: value.isActive ? 'finished' : 'cancelled');
+    } catch (error) {
+      _error = VmFailurePresentation.messageFor(
+        error,
+        contentLabel: 'PK battle',
+      );
     } finally {
       _actionPending = false;
       notifyListeners();
