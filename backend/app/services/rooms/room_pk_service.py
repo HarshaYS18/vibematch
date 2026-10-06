@@ -8,7 +8,9 @@ from sqlalchemy import or_
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
+from app.models.cricket import CricketMatch, CricketMatchStatus
 from app.models.room import Room
+from app.models.room_realtime_state import RoomRealtimeEvent
 from app.models.room_pk import RoomPkMatch, RoomPkScoreReceipt
 from app.models.user import User
 from app.services.rooms import room_permission_service
@@ -113,6 +115,71 @@ def _ensure_not_busy(db: Session, room: Room) -> None:
             raise HTTPException(status_code=409, detail="Room is already in a PK challenge or battle")
 
 
+def has_open_match(db: Session, room_public_id: str) -> bool:
+    room = _room(db, room_public_id)
+    match = _match_for_room(db, room, statuses=OPEN_MATCH_STATUSES)
+    if match is None:
+        return False
+    _expire_if_needed(db, match)
+    return match.status in OPEN_MATCH_STATUSES
+
+
+def _latest_activity_payload(
+    db: Session,
+    room: Room,
+    event_pattern: str,
+) -> dict:
+    event = (
+        db.query(RoomRealtimeEvent)
+        .filter(
+            RoomRealtimeEvent.room_id == room.id,
+            RoomRealtimeEvent.event_type.like(event_pattern),
+        )
+        .order_by(RoomRealtimeEvent.id.desc())
+        .first()
+    )
+    if event is None or not isinstance(event.payload, dict):
+        return {}
+    return dict(event.payload)
+
+
+def _require_pk_compatible_room(db: Session, room: Room) -> None:
+    room_activity = _latest_activity_payload(
+        db,
+        room,
+        "room_activity.state.%",
+    )
+    if room_activity.get("active") is True:
+        raise HTTPException(
+            status_code=409,
+            detail="End the current room activity before starting PK",
+        )
+
+    watch_party = _latest_activity_payload(db, room, "watch_party.%")
+    if watch_party.get("active") is True:
+        raise HTTPException(
+            status_code=409,
+            detail="End Watch Party before starting PK",
+        )
+
+    cricket = (
+        db.query(CricketMatch)
+        .filter(
+            CricketMatch.room_public_id == room.room_public_id,
+            CricketMatch.status.notin_(
+                (CricketMatchStatus.COMPLETED, CricketMatchStatus.DELETED)
+            ),
+        )
+        .order_by(CricketMatch.id.desc())
+        .first()
+    )
+    if cricket is not None:
+        raise HTTPException(
+            status_code=409,
+            detail="End Cricket Mode before starting PK",
+        )
+
+
 def list_candidates(
     db: Session,
     room_public_id: str,
@@ -185,6 +252,8 @@ def create_challenge(
     if target.is_secret or target.is_locked or target.is_members_only:
         raise HTTPException(status_code=409, detail="This room is not available for public PK")
 
+    _require_pk_compatible_room(db, source)
+    _require_pk_compatible_room(db, target)
     _ensure_not_busy(db, source)
     _ensure_not_busy(db, target)
 
