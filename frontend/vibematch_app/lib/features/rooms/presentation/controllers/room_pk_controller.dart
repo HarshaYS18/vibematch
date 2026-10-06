@@ -33,6 +33,7 @@ class RoomPkController extends ChangeNotifier {
   final RoomPkApiService _api;
 
   StreamSubscription<RealtimeEventEnvelope>? _subscription;
+  StreamSubscription<RealtimeResyncRequest>? _resyncSubscription;
   Timer? _phaseTimer;
   Timer? _finishTimer;
   RoomPkMatchSnapshot? _match;
@@ -78,6 +79,8 @@ class RoomPkController extends ChangeNotifier {
 
   Future<void> initialize() async {
     _subscription ??= _realtimeHub.events.listen(_handleRealtime);
+    _resyncSubscription ??=
+        _realtimeHub.resyncRequests.listen(_handleRealtimeResync);
     await _realtimeHub.start();
     await refresh(showLoading: false);
   }
@@ -186,6 +189,21 @@ class RoomPkController extends ChangeNotifier {
     }
   }
 
+  void _handleRealtimeResync(RealtimeResyncRequest request) {
+    final requestedRoom = request.roomId?.trim();
+    if (requestedRoom != null &&
+        requestedRoom.isNotEmpty &&
+        requestedRoom != roomId) {
+      return;
+    }
+    if (request.stream != '*' &&
+        request.stream.isNotEmpty &&
+        !request.stream.startsWith('room:$roomId:')) {
+      return;
+    }
+    unawaited(refresh(showLoading: false));
+  }
+
   void _handleRealtime(RealtimeEventEnvelope envelope) {
     final decoded = envelope.toLegacyEvent();
     if (decoded['type']?.toString() != 'room_pk/state') return;
@@ -282,6 +300,7 @@ class RoomPkController extends ChangeNotifier {
     _phaseTimer?.cancel();
     _finishTimer?.cancel();
     unawaited(_subscription?.cancel());
+    unawaited(_resyncSubscription?.cancel());
     super.dispose();
   }
 }
