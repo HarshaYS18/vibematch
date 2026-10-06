@@ -6,12 +6,14 @@ import 'package:flutter/material.dart';
 import '../../data/lucky_packet_realtime_service.dart';
 import '../../data/room_music_controller.dart';
 import '../controllers/live_room_gift_controller.dart';
+import '../controllers/room_pk_controller.dart';
 import '../live_room_models.dart';
 import '../modules/room_music_overlay.dart';
 import 'live_room_gift_overlay.dart';
 import 'live_room_remote_audio_renderers.dart';
 import 'live_room_seat_invite_notification.dart';
 import 'lucky_win_celebration_overlay.dart';
+import 'pk/live_room_pk_overlay.dart';
 import 'vibesync_room_module.dart';
 
 /// Hosts overlays for a single mounted room controller bundle.
@@ -35,6 +37,8 @@ class LiveRoomOverlayHost extends StatelessWidget {
     required this.pendingSeatInviteIndex,
     required this.onRejectSeatInvite,
     required this.onAcceptSeatInvite,
+    required this.pkController,
+    required this.canManagePk,
   });
 
   final String roomPublicId;
@@ -50,6 +54,8 @@ class LiveRoomOverlayHost extends StatelessWidget {
   final int? pendingSeatInviteIndex;
   final VoidCallback onRejectSeatInvite;
   final VoidCallback onAcceptSeatInvite;
+  final RoomPkController pkController;
+  final bool canManagePk;
 
   bool get _hasPendingSeatInvite {
     return pendingSeatInviteInviterName != null &&
@@ -104,6 +110,10 @@ class LiveRoomOverlayHost extends StatelessWidget {
             onReject: onRejectSeatInvite,
             onAccept: onAcceptSeatInvite,
           ),
+        LiveRoomPkOverlay(
+          controller: pkController,
+          canManage: canManagePk,
+        ),
       ],
     );
   }
