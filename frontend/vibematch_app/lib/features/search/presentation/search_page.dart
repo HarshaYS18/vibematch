@@ -2,7 +2,11 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../core/navigation/vm_navigator.dart';
+import '../../../core/network/vm_failure.dart';
 import '../../../core/presentation/vm_async_state.dart';
+import '../../../core/ui/vm_motion.dart';
+import '../../vibes/data/vibes_api_service.dart';
+import '../../vibes/presentation/pages/vibe_detail_backend_page.dart';
 import '../application/search_controller.dart';
 import '../models/search_result_item.dart';
 import '../models/search_result_type.dart';
@@ -21,6 +25,7 @@ class SearchPage extends ConsumerStatefulWidget {
 class _SearchPageState extends ConsumerState<SearchPage> {
   final TextEditingController _textController = TextEditingController();
   final FocusNode _focusNode = FocusNode();
+  bool _openingResult = false;
 
   @override
   void initState() {
@@ -52,9 +57,12 @@ class _SearchPageState extends ConsumerState<SearchPage> {
     _focusNode.requestFocus();
   }
 
-  void _openResult(SearchResultItem item) {
+  Future<void> _openResult(SearchResultItem item) async {
+    if (_openingResult) return;
     final searchState = ref.read(vibeSearchControllerProvider);
-    ref.read(vibeSearchControllerProvider.notifier).submitSearch(searchState.query);
+    ref
+        .read(vibeSearchControllerProvider.notifier)
+        .submitSearch(searchState.query);
     FocusManager.instance.primaryFocus?.unfocus();
 
     switch (item.type) {
@@ -65,8 +73,39 @@ class _SearchPageState extends ConsumerState<SearchPage> {
         _openRoomResult(item);
         return;
       case SearchResultType.vibe:
-        _toast('Vibe search will appear after backend Vibe search endpoint is added.');
+        await _openVibeResult(item);
         return;
+    }
+  }
+
+  Future<void> _openVibeResult(SearchResultItem item) async {
+    final vibeId = item.vibeId?.trim();
+    if (vibeId == null || vibeId.isEmpty) {
+      _toast('This Vibe is unavailable. Refresh search and try again.');
+      return;
+    }
+
+    setState(() => _openingResult = true);
+    try {
+      final vibe = await const VibesApiService().getVibe(vibeId);
+      if (!mounted) return;
+      await Navigator.of(context).push<void>(
+        VmMotion.pageRoute<void>(
+          settings: RouteSettings(name: 'search-vibe:$vibeId'),
+          page: VibeDetailBackendPage(vibe: vibe),
+        ),
+      );
+    } catch (error) {
+      if (mounted) {
+        _toast(
+          VmFailurePresentation.messageFor(
+            error,
+            contentLabel: 'Vibe',
+          ),
+        );
+      }
+    } finally {
+      if (mounted) setState(() => _openingResult = false);
     }
   }
 
@@ -122,6 +161,12 @@ class _SearchPageState extends ConsumerState<SearchPage> {
               onChanged: controller.setQuery,
               onSubmitted: controller.submitSearch,
             ),
+            if (_openingResult)
+              const LinearProgressIndicator(
+                minHeight: 2,
+                color: Color(0xFF12C7B7),
+                backgroundColor: Color(0xFFECE2D8),
+              ),
             if (hasQuery)
               SearchCategoryTabs(
                 selectedCategory: search.selectedCategory,

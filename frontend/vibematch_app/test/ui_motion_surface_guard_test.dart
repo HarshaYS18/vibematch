@@ -39,6 +39,11 @@ void main() {
     final lib = Directory('lib/features');
     final offenders = <String>[];
 
+    final rawErrorTextInterpolation = RegExp(
+      r'''Text\s*\(\s*['\"][^'\"]*\$(?:\{)?(?:error|exception)''',
+      multiLine: true,
+    );
+
     const forbidden = <String>[
       "error.toString().replaceFirst('Exception: ', '')",
       'error.toString().replaceFirst("Exception: ", "")',
@@ -59,7 +64,8 @@ void main() {
       if (!isUserFacing) continue;
 
       final source = entity.readAsStringSync();
-      if (forbidden.any(source.contains)) {
+      if (forbidden.any(source.contains) ||
+          rawErrorTextInterpolation.hasMatch(source)) {
         offenders.add(entity.path);
       }
     }

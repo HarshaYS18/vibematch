@@ -9,7 +9,6 @@ import '../../../control_center/presentation/control_center_hub_page.dart';
 import '../../../economy/presentation/merchant_seller_panel_page.dart';
 import '../../../family/models/family_ui_models.dart';
 import '../../../family/presentation/family_modular_page.dart';
-import '../../../games/presentation/game_test_page.dart';
 import '../../../presence/data/presence_api_service.dart';
 import '../../../store/presentation/store_page.dart';
 import '../../../vip/presentation/vip_program_page.dart';
@@ -307,19 +306,6 @@ class _MePageContentState extends State<MePageContent> {
         .then((_) => _refreshAll());
   }
 
-  void _openGameTest(BuildContext context) {
-    if (!_isOwnerToolsUser) {
-      _showAction(
-        context,
-        'Game backend test is available only for Owner/Super Owner.',
-      );
-      return;
-    }
-    Navigator.of(
-      context,
-    ).push(MaterialPageRoute(builder: (_) => const GameTestPage()));
-  }
-
   void _openMerchantSellerPanel(BuildContext context) {
     if (!_isMerchantPanelUser) {
       _showAction(
@@ -423,9 +409,9 @@ class _MePageContentState extends State<MePageContent> {
   }
 
   bool _shouldShowItem(MeActionItem item) {
+    if (item.action == 'game_test') return false;
     if (item.action == 'vip_svip_admin' ||
-        item.action == 'coin_supply_grant' ||
-        item.action == 'game_test')
+        item.action == 'coin_supply_grant')
       return _isOwnerToolsUser;
     if (item.title == 'Control Center') return _isOfficialOrPanelUser;
     if (item.title == 'Merchant & Seller Panel') return _isMerchantPanelUser;
@@ -524,8 +510,6 @@ class _MePageContentState extends State<MePageContent> {
                         _openVipSvipAdmin(context);
                       } else if (item.action == 'coin_supply_grant') {
                         _openCoinSupplyGrant(context);
-                      } else if (item.action == 'game_test') {
-                        _openGameTest(context);
                       } else if (item.action == 'family' ||
                           item.title == 'Family') {
                         _openFamily(context);
