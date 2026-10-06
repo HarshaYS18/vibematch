@@ -137,6 +137,7 @@ def list_candidates(
             Room.is_secret.is_(False),
             Room.is_locked.is_(False),
             Room.is_members_only.is_(False),
+            Room.online_count > 0,
         )
         .order_by(Room.online_count.desc(), Room.trending_score.desc(), Room.id.asc())
         .limit(max(1, min(limit * 2, 100)))
@@ -303,8 +304,15 @@ def _expire_if_needed(db: Session, match: RoomPkMatch) -> RoomPkMatch:
     return match
 
 
-def current_match(db: Session, room_public_id: str) -> RoomPkMatch | None:
+def current_match(
+    db: Session,
+    room_public_id: str,
+    *,
+    actor: User | None = None,
+) -> RoomPkMatch | None:
     room = _room(db, room_public_id)
+    if actor is not None:
+        room_permission_service.require_join(db, room, actor)
     match = _match_for_room(db, room)
     if match is None:
         return None
