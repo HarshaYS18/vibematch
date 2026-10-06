@@ -6,7 +6,10 @@ import '../../../core/network/vm_failure.dart';
 import '../../../core/presentation/vm_async_state.dart';
 import '../../../core/ui/vm_motion.dart';
 import '../../../game_platform/presentation/remote_game_player_page.dart';
+import '../../discovery/data/recommendation_repository.dart';
+import '../application/game_discovery_ranker.dart';
 import '../data/game_api_service.dart';
+import '../data/recent_games_store.dart';
 
 /// Consumer-facing entry point for the existing remote Game Platform.
 ///
@@ -21,6 +24,8 @@ class GamesPage extends StatefulWidget {
 
 class _GamesPageState extends State<GamesPage> {
   final GameApiService _api = const GameApiService();
+  final RecommendationRepository _recommendations = RecommendationRepository();
+  final RecentGamesStore _recentGames = RecentGamesStore();
 
   List<GameDefinition> _games = const <GameDefinition>[];
   bool _loading = true;
@@ -41,18 +46,28 @@ class _GamesPageState extends State<GamesPage> {
 
     try {
       final catalog = await _api.loadCatalog();
-      final games = catalog
-          .where(
-            (game) =>
-                game.isEnabled &&
-                (game.assetManifestUrl?.trim().isNotEmpty ?? false),
-          )
-          .toList(growable: false)
-        ..sort(
-          (a, b) => a.displayName.toLowerCase().compareTo(
-                b.displayName.toLowerCase(),
-              ),
-        );
+      final discovery = await Future.wait<Object?>([
+        _recommendations.tryFetchCandidateIds(
+          candidateKind: 'game',
+          limit: 80,
+        ),
+        _recentGames.load(),
+      ]);
+      final recommendedGameIds =
+          discovery[0] as List<String>? ?? const <String>[];
+      final recentGameIds = discovery[1] as List<String>;
+
+      final games = rankGameCatalog(
+        catalog
+            .where(
+              (game) =>
+                  game.isEnabled &&
+                  (game.assetManifestUrl?.trim().isNotEmpty ?? false),
+            )
+            .toList(growable: false),
+        recentGameIds: recentGameIds,
+        recommendedGameIds: recommendedGameIds,
+      );
 
       if (!mounted) return;
       setState(() {
@@ -89,6 +104,7 @@ class _GamesPageState extends State<GamesPage> {
   }
 
   void _openGame(GameDefinition game) {
+    unawaited(_recentGames.record(game.gameKey));
     Navigator.of(context).push<void>(
       VmMotion.pageRoute<void>(
         settings: RouteSettings(name: 'game:${game.gameKey}'),

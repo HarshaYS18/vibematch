@@ -2,6 +2,7 @@ import '../../../foundation/graphql/composite_read_repository.dart';
 import '../../../foundation/networking/app_network_client.dart';
 import '../../../core/network/api_endpoints.dart';
 import '../../auth/data/auth_api_service.dart';
+import '../../discovery/data/recommendation_repository.dart';
 import '../models/home_banner.dart';
 import '../models/home_room.dart';
 import 'models/home_banner_dto.dart';
@@ -12,6 +13,7 @@ class HomeRepository {
     AppNetworkClient? apiClient,
     AuthApiService? authApiService,
     CompositeReadRepository? compositeReadRepository,
+    RecommendationRepository? recommendationRepository,
   }) : _apiClient = apiClient ?? AppNetworkRuntime.shared,
        _authApiService = authApiService ?? const AuthApiService(),
        _compositeReads =
@@ -19,11 +21,18 @@ class HomeRepository {
            CompositeReadRepository(
              apiClient: apiClient ?? AppNetworkRuntime.shared,
              authApiService: authApiService ?? const AuthApiService(),
+           ),
+       _recommendations =
+           recommendationRepository ??
+           RecommendationRepository(
+             apiClient: apiClient ?? AppNetworkRuntime.shared,
+             authApiService: authApiService ?? const AuthApiService(),
            );
 
   final AppNetworkClient _apiClient;
   final AuthApiService _authApiService;
   final CompositeReadRepository _compositeReads;
+  final RecommendationRepository _recommendations;
 
   Map<String, String> _authHeaders() {
     final token = _authApiService.cachedAccessToken;
@@ -106,6 +115,13 @@ class HomeRepository {
         .map(HomeRoomDto.fromJson)
         .map((dto) => dto.toDomain())
         .toList(growable: false);
+  }
+
+  Future<List<String>?> fetchRecommendedRoomIds() {
+    return _recommendations.tryFetchCandidateIds(
+      candidateKind: 'room',
+      limit: 80,
+    );
   }
 
   Future<HomeRoom?> fetchQuickMatch({

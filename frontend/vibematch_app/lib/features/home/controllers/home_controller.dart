@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
@@ -25,6 +27,7 @@ class HomeState {
     this.backendRooms = const <HomeRoom>[],
     this.eventBanners = const <HomeBanner>[],
     this.policyBanners = const <HomeBanner>[],
+    this.recommendedRoomIds = const <String>[],
   });
 
   final int selectedBannerIndex;
@@ -41,11 +44,11 @@ class HomeState {
   final List<HomeRoom> backendRooms;
   final List<HomeBanner> eventBanners;
   final List<HomeBanner> policyBanners;
+  final List<String> recommendedRoomIds;
 
   bool get hasNetworkError => loadErrorMessage != null;
 
   List<HomeRoom> get filteredRooms {
-    if (hasNetworkError) return const <HomeRoom>[];
     final filtered = backendRooms.where((room) {
       final languageMatch =
           selectedLanguage == 'All' || room.language == selectedLanguage;
@@ -56,6 +59,20 @@ class HomeState {
       return true;
     }).toList(growable: false)
       ..sort((a, b) {
+        if (selectedCategory == 'Trending' && recommendedRoomIds.isNotEmpty) {
+          final rank = <String, int>{
+            for (var index = 0; index < recommendedRoomIds.length; index++)
+              recommendedRoomIds[index]: index,
+          };
+          final aRank = rank[a.id];
+          final bRank = rank[b.id];
+          if (aRank != null || bRank != null) {
+            if (aRank == null) return 1;
+            if (bRank == null) return -1;
+            final recommendationCompare = aRank.compareTo(bRank);
+            if (recommendationCompare != 0) return recommendationCompare;
+          }
+        }
         final onlineCompare = b.onlineCount.compareTo(a.onlineCount);
         if (onlineCompare != 0) return onlineCompare;
         return b.trendingScore.compareTo(a.trendingScore);
@@ -84,6 +101,7 @@ class HomeState {
     List<HomeRoom>? backendRooms,
     List<HomeBanner>? eventBanners,
     List<HomeBanner>? policyBanners,
+    List<String>? recommendedRoomIds,
   }) {
     return HomeState(
       selectedBannerIndex: selectedBannerIndex ?? this.selectedBannerIndex,
@@ -107,12 +125,14 @@ class HomeState {
       backendRooms: backendRooms ?? this.backendRooms,
       eventBanners: eventBanners ?? this.eventBanners,
       policyBanners: policyBanners ?? this.policyBanners,
+      recommendedRoomIds: recommendedRoomIds ?? this.recommendedRoomIds,
     );
   }
 }
 
 class HomeController extends AutoDisposeNotifier<HomeState> {
   late final HomeRepository _repository;
+  int _quickMatchCursor = 0;
 
   @override
   HomeState build() {
@@ -222,6 +242,9 @@ class HomeController extends AutoDisposeNotifier<HomeState> {
         backendRooms: fetchedRooms,
         loadErrorMessage: null,
       );
+      if (state.selectedCategory == 'Trending') {
+        unawaited(_refreshRoomRecommendations());
+      }
     } catch (error) {
       state = state.copyWith(
         // Keep the last-known-good room list visible when refresh fails.
@@ -238,6 +261,13 @@ class HomeController extends AutoDisposeNotifier<HomeState> {
 
   Future<void> refreshAll() async {
     await Future.wait<void>([loadHomeChrome(), loadRooms()]);
+  }
+
+  Future<void> _refreshRoomRecommendations() async {
+    final recommended = await _repository.fetchRecommendedRoomIds();
+    if (recommended == null || state.selectedCategory != 'Trending') return;
+    _quickMatchCursor = 0;
+    state = state.copyWith(recommendedRoomIds: recommended);
   }
 
   void onScrollNearBottom(ScrollController scrollController) {
@@ -268,6 +298,7 @@ class HomeController extends AutoDisposeNotifier<HomeState> {
 
   void selectCategory(String category) {
     if (!categories.contains(category)) return;
+    _quickMatchCursor = 0;
     state = state.copyWith(
       selectedCategory: category,
       visibleRoomCount: 8,
@@ -277,6 +308,7 @@ class HomeController extends AutoDisposeNotifier<HomeState> {
 
   void selectLanguage(String language) {
     if (!languages.contains(language)) return;
+    _quickMatchCursor = 0;
     state = state.copyWith(
       selectedLanguage: language,
       visibleRoomCount: 8,
@@ -292,6 +324,8 @@ class HomeController extends AutoDisposeNotifier<HomeState> {
     if (state.isQuickMatching) return null;
     state = state.copyWith(isQuickMatching: true);
     try {
+      final personalized = _nextRecommendedQuickMatch();
+      if (personalized != null) return personalized;
       return await _repository.fetchQuickMatch(
         language:
             state.selectedLanguage == 'All' ? null : state.selectedLanguage,
@@ -299,6 +333,26 @@ class HomeController extends AutoDisposeNotifier<HomeState> {
     } finally {
       state = state.copyWith(isQuickMatching: false);
     }
+  }
+
+  HomeRoom? _nextRecommendedQuickMatch() {
+    if (state.selectedCategory != 'Trending' ||
+        state.recommendedRoomIds.isEmpty) {
+      return null;
+    }
+    final rank = state.recommendedRoomIds.toSet();
+    final candidates = state.filteredRooms
+        .where(
+          (room) =>
+              rank.contains(room.id) &&
+              room.isPublicOpen &&
+              room.onlineCount > 0,
+        )
+        .toList(growable: false);
+    if (candidates.isEmpty) return null;
+    final room = candidates[_quickMatchCursor % candidates.length];
+    _quickMatchCursor = (_quickMatchCursor + 1) % candidates.length;
+    return room;
   }
 
   Future<void> retryLoadingRooms() => loadRooms();
