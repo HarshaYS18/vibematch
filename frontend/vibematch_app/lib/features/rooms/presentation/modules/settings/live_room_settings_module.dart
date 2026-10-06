@@ -365,6 +365,10 @@ class LiveRoomSettingsModule {
     LiveRoomControllerBundle bundle,
     BuildContext sheetContext,
   ) {
+    if (bundle.pkController.pending || bundle.pkController.active) {
+      RoomToast.show(bundle.context, 'End Room PK before starting VibeSync');
+      return;
+    }
     Navigator.pop(sheetContext);
     Future<void>.delayed(const Duration(milliseconds: 80), () {
       if (bundle.mounted) openVibeSyncSheet(bundle);
