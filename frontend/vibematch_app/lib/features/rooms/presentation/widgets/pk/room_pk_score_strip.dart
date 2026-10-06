@@ -103,9 +103,6 @@ class _RoomPkScoreStripState extends State<RoomPkScoreStrip> {
                       color: Colors.white,
                       fontWeight: FontWeight.w900,
                       fontSize: 11,
-                      fontFeatures: <FontFeature>[
-                        FontFeature.tabularFigures(),
-                      ],
                     ),
                   ),
                 ),
