@@ -24,6 +24,7 @@ from app.schemas.rooms.cricket import (
     CricketTournamentUpdateRequest,
 )
 from app.services.permissions import room_permission_service
+from app.services.rooms import room_pk_service
 from app.services.rooms.room_service import get_room_model_by_public_id
 
 
@@ -290,6 +291,11 @@ def create_match(
     payload: CricketMatchCreateRequest,
 ) -> dict:
     _require_room(db, room_public_id, current_user, admin=True)
+    if room_pk_service.has_open_match(db, room_public_id):
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="End Room PK before starting Cricket Mode",
+        )
     if payload.tournament_id is not None:
         _tournament_entity(
             db=db,
