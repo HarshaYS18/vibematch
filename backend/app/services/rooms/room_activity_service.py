@@ -13,7 +13,7 @@ from app.models.room import Room
 from app.models.room_participant import RoomParticipant
 from app.models.room_realtime_state import RoomRealtimeEvent
 from app.models.user import User
-from app.services.rooms import room_permission_service
+from app.services.rooms import room_permission_service, room_pk_service
 
 
 ROOM_ACTIVITY_ACTIONS = frozenset({"START", "UPDATE", "END"})
@@ -163,6 +163,11 @@ def apply_activity_command(
 
     if command == "START":
         room_permission_service.require_room_admin(db, room, actor)
+        if room_pk_service.has_open_match(db, room.room_public_id):
+            raise HTTPException(
+                status_code=409,
+                detail="End Room PK before starting another room activity",
+            )
         current = room_activity_snapshot(db, room)
         if current.get("active") is True:
             raise HTTPException(status_code=409, detail="End the current room activity before starting another")
