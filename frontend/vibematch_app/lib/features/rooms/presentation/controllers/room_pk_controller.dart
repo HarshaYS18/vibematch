@@ -41,6 +41,7 @@ class RoomPkController extends ChangeNotifier {
   bool _loading = false;
   bool _actionPending = false;
   String? _error;
+  String? _presentedResultMatchId;
 
   RoomPkMatchSnapshot? get match => _match;
   RoomPkPresentationPhase get phase => _phase;
@@ -266,6 +267,17 @@ class RoomPkController extends ChangeNotifier {
     }
 
     if (snapshot.status == 'finished') {
+      if (_presentedResultMatchId == snapshot.matchId) {
+        if (_phase != RoomPkPresentationPhase.victory &&
+            _phase != RoomPkPresentationPhase.defeat &&
+            _phase != RoomPkPresentationPhase.draw) {
+          _phase = RoomPkPresentationPhase.settled;
+          notifyListeners();
+        }
+        return;
+      }
+
+      _presentedResultMatchId = snapshot.matchId;
       if (snapshot.winnerRoomId == null) {
         _phase = RoomPkPresentationPhase.draw;
       } else if (snapshot.winnerRoomId == roomId) {
