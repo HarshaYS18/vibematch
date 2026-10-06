@@ -52,7 +52,9 @@ receives a subdued finished state.
 - PostgreSQL / Room Control: PK challenge, state, scores, final result, winner.
 - Economy: gift/wallet settlement remains sole financial authority.
 - Core Economy integration: after settlement commits, an idempotent score
-  receipt is sent to Room Control.
+  receipt is sent to Room Control for low-latency live scoring.
+- Finalization: Room Control rebuilds both scores from Economy's settled
+  `gift_transactions` in the exact PK time window before choosing the winner.
 - Redis / Go gateway: replay/fanout only.
 - Flutter: presentation only.
 
@@ -60,8 +62,10 @@ The unique score receipt source ID prevents a successful gift from counting
 twice after retries.
 
 If Room Control is temporarily unavailable after a gift commits, the gift
-settlement remains valid. PK scoring may need resynchronization but money is
-never rolled back by a presentation/game-mode failure.
+settlement remains valid. A live score may temporarily lag, but finalization
+reconciles against the settled Economy ledger, so a missed realtime receipt
+cannot change the durable winner. Money is never rolled back by a
+presentation/game-mode failure.
 
 ## Mode compatibility
 
@@ -73,8 +77,12 @@ activity modes from fighting over the same interaction surface.
 
 Each connected room client schedules an authoritative refresh at the server
 `ends_at` timestamp. Room Control finalizes an overdue active match when
-authoritative state is requested. Final score/winner remains durable even if a
-client reconnects after the visual animation window.
+authoritative state is requested. PK also listens to the existing realtime
+resync stream and reloads its authoritative snapshot after reconnect/sequence
+gaps. Finished matches remain eligible for current-state recovery only for a
+short bounded window, and each match result animation is presented at most once
+per client controller. Final score/winner remains durable independently of the
+visual animation window.
 
 ## Non-goals
 

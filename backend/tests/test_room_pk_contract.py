@@ -29,6 +29,8 @@ class RoomPkContractTests(unittest.TestCase):
         self.assertIn("match.winner_room_id", service)
         self.assertIn("RoomPkScoreReceipt(", service)
         self.assertIn("source_event_id", service)
+        self.assertIn("_reconcile_scores_from_economy", service)
+        self.assertIn("GiftTransaction.total_coin_value", service)
 
     def test_economy_scores_pk_only_after_settlement_path(self):
         route = (
