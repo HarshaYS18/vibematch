@@ -397,10 +397,34 @@ def current_match(
     room = _room(db, room_public_id)
     if actor is not None:
         room_permission_service.require_join(db, room, actor)
-    match = _match_for_room(db, room)
-    if match is None:
-        return None
-    return _expire_if_needed(db, match)
+
+    match = _match_for_room(db, room, statuses=OPEN_MATCH_STATUSES)
+    if match is not None:
+        match = _expire_if_needed(db, match)
+        if match.status in OPEN_MATCH_STATUSES:
+            return match
+        if (
+            match.status == "finished"
+            and match.finished_at is not None
+            and datetime.utcnow() - match.finished_at <= timedelta(seconds=20)
+        ):
+            return match
+
+    recent_result = (
+        db.query(RoomPkMatch)
+        .filter(
+            or_(
+                RoomPkMatch.challenger_room_id == room.id,
+                RoomPkMatch.opponent_room_id == room.id,
+            ),
+            RoomPkMatch.status == "finished",
+            RoomPkMatch.finished_at.isnot(None),
+            RoomPkMatch.finished_at >= datetime.utcnow() - timedelta(seconds=20),
+        )
+        .order_by(RoomPkMatch.finished_at.desc(), RoomPkMatch.id.desc())
+        .first()
+    )
+    return recent_result
 
 
 def apply_gift_score(
