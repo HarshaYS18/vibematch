@@ -2,6 +2,7 @@ import 'dart:math' as math;
 
 import 'package:flutter/material.dart';
 
+import '../../../data/room_pk_api_service.dart';
 import '../../controllers/room_pk_controller.dart';
 import '../room_theme.dart';
 
@@ -256,7 +257,7 @@ class _VsRoomCard extends StatelessWidget {
     required this.accent,
   });
 
-  final dynamic room;
+  final RoomPkRoomSummary room;
   final TextAlign alignment;
   final Color accent;
 
@@ -279,12 +280,12 @@ class _VsRoomCard extends StatelessWidget {
                 backgroundColor: accent,
                 backgroundImage: room.coverPhotoUrl == null
                     ? null
-                    : NetworkImage(room.coverPhotoUrl as String),
+                    : NetworkImage(room.coverPhotoUrl!),
                 child: room.coverPhotoUrl == null
                     ? Text(
-                        (room.roomName as String).isEmpty
+                        room.roomName.isEmpty
                             ? '?'
-                            : (room.roomName as String)
+                            : room.roomName
                                 .characters
                                 .first
                                 .toUpperCase(),
@@ -298,7 +299,7 @@ class _VsRoomCard extends StatelessWidget {
               ),
               const SizedBox(height: 9),
               Text(
-                room.roomName as String,
+                room.roomName,
                 maxLines: 2,
                 overflow: TextOverflow.ellipsis,
                 textAlign: alignment,
