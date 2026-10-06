@@ -40,7 +40,7 @@ void main() {
     final offenders = <String>[];
 
     final rawErrorTextInterpolation = RegExp(
-      r'''Text\s*\(\s*['\"][^'\"]*\$(?:\{)?(?:error|exception)''',
+      r'''Text\s*\(\s*['"][^'"]*\$(?:\{)?(?:error|exception)''',
       multiLine: true,
     );
 

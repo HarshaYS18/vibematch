@@ -50,11 +50,7 @@ class AppRouteFactory {
         }
         return _buildRoute(
           settings,
-          const VmSkeletonPage(
-            title: 'Room Locked',
-            subtitle: 'Open rooms from Home after access check.',
-            icon: Icons.lock_rounded,
-          ),
+          UnknownRoutePage(routeName: settings.name ?? VmRoutes.liveRoom),
         );
       case VmRoutes.roomLevel:
         return _buildRoute(settings, const RoomLevelPage());

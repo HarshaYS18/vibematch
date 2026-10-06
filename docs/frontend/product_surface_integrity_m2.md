@@ -18,8 +18,8 @@ It does not add a new backend authority or redesign the application.
 - Vibe Search results now fetch the canonical backend Vibe and open the real
   detail surface;
 - raw invite exceptions are normalized through `VmFailurePresentation`;
-- the owner profile no longer exposes the engineering-only
-  `GameTestPage`;
+- the engineering-only `GameTestPage` was removed after the hygiene guard
+  correctly identified it as an unreachable production orphan;
 - the canonical `/games` named route now opens a consumer-facing, backend
   catalog-driven remote-games surface;
 - `AppRouteFactory` no longer maps named routes to `VmSkeletonPage`.
