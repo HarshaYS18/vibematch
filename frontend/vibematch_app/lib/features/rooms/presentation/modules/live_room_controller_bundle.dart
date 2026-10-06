@@ -23,6 +23,7 @@ import '../controllers/live_room_settings_controller.dart';
 import '../controllers/live_room_state_controller.dart';
 import '../controllers/live_room_users_controller.dart';
 import '../controllers/live_room_vibesync_controller.dart';
+import '../controllers/room_pk_controller.dart';
 import '../live_room_models.dart';
 import '../live_room_restore_state.dart';
 import '../widgets/room_theme.dart';
@@ -118,6 +119,7 @@ class LiveRoomControllerBundle {
   late final LiveRoomPresenceController presenceController;
   late final RoomMusicController roomMusicController;
   late final CricketRoomModeController cricketModeController;
+  late final RoomPkController pkController;
   late final LuckyPacketRealtimeService luckyPacketRealtimeService;
 
   final LiveRoomUsersController usersController =
@@ -308,6 +310,11 @@ class LiveRoomControllerBundle {
       roomId: config.roomId,
       roomName: config.roomName,
     );
+    pkController = RoomPkController(
+      roomId: config.roomId,
+      realtimeHub: _realtimeHub,
+    )..addListener(notifyRoomChanged);
+    unawaited(pkController.initialize());
     _cricketEventSubscription =
         _realtimeHub.events.listen(_handleCricketRealtimeEvent);
     unawaited(_realtimeHub.start());
@@ -410,6 +417,7 @@ class LiveRoomControllerBundle {
     presenceController.dispose();
     unawaited(roomMusicController.dispose());
     cricketModeController.dispose();
+    pkController.dispose();
     roomStateController.dispose();
     roomRevision.dispose();
     giftRevision.dispose();
