@@ -49,8 +49,9 @@ class _RoomPkScoreStripState extends State<RoomPkScoreStrip> {
     return AnimatedBuilder(
       animation: widget.controller,
       builder: (context, _) {
+        final local = widget.controller.localRoom;
         final opponent = widget.controller.opponentRoom;
-        if (!widget.controller.active || opponent == null) {
+        if (!widget.controller.active || local == null || opponent == null) {
           return const SizedBox.shrink();
         }
 
@@ -79,7 +80,7 @@ class _RoomPkScoreStripState extends State<RoomPkScoreStrip> {
                 const SizedBox(width: 6),
                 Expanded(
                   child: Text(
-                    'FunKey  ${widget.controller.localScore}',
+                    '${local.roomName}  ${widget.controller.localScore}',
                     overflow: TextOverflow.ellipsis,
                     style: const TextStyle(
                       color: Colors.white,
