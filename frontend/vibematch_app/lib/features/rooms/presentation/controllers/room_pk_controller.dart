@@ -35,6 +35,7 @@ class RoomPkController extends ChangeNotifier {
   StreamSubscription<RealtimeEventEnvelope>? _subscription;
   StreamSubscription<RealtimeResyncRequest>? _resyncSubscription;
   Timer? _phaseTimer;
+  Timer? _challengeTimer;
   Timer? _finishTimer;
   RoomPkMatchSnapshot? _match;
   RoomPkPresentationPhase _phase = RoomPkPresentationPhase.idle;
@@ -228,6 +229,7 @@ class RoomPkController extends ChangeNotifier {
     required String eventType,
   }) {
     _phaseTimer?.cancel();
+    _challengeTimer?.cancel();
     _finishTimer?.cancel();
     _match = snapshot;
     _error = null;
@@ -242,6 +244,7 @@ class RoomPkController extends ChangeNotifier {
       _phase = snapshot.opponent.roomId == roomId
           ? RoomPkPresentationPhase.incomingChallenge
           : RoomPkPresentationPhase.outgoingChallenge;
+      _scheduleChallengeExpiryRefresh(snapshot);
       notifyListeners();
       return;
     }
@@ -297,6 +300,14 @@ class RoomPkController extends ChangeNotifier {
     notifyListeners();
   }
 
+  void _scheduleChallengeExpiryRefresh(RoomPkMatchSnapshot snapshot) {
+    var delay = snapshot.challengeExpiresAt.difference(DateTime.now().toUtc());
+    if (delay.isNegative) delay = Duration.zero;
+    _challengeTimer = Timer(delay + const Duration(milliseconds: 250), () {
+      unawaited(refresh(showLoading: false));
+    });
+  }
+
   void _scheduleFinishRefresh(RoomPkMatchSnapshot snapshot) {
     final endsAt = snapshot.endsAt;
     if (endsAt == null) return;
@@ -310,6 +321,7 @@ class RoomPkController extends ChangeNotifier {
   @override
   void dispose() {
     _phaseTimer?.cancel();
+    _challengeTimer?.cancel();
     _finishTimer?.cancel();
     unawaited(_subscription?.cancel());
     unawaited(_resyncSubscription?.cancel());
