@@ -47,6 +47,7 @@ class LiveRoomBody extends StatelessWidget {
     required this.imagesEnabled,
     required this.cricketModeController,
     this.watchPartyModule,
+    this.pkScoreModule,
     required this.onBack,
     required this.onJoinTap,
     required this.onShare,
@@ -109,6 +110,7 @@ class LiveRoomBody extends StatelessWidget {
   final bool imagesEnabled;
   final CricketRoomModeController cricketModeController;
   final Widget? watchPartyModule;
+  final Widget? pkScoreModule;
   final VoidCallback onBack;
   final VoidCallback onJoinTap;
   final VoidCallback onShare;
@@ -251,6 +253,13 @@ class LiveRoomBody extends StatelessWidget {
                     Padding(
                       padding: const EdgeInsets.symmetric(horizontal: 12),
                       child: watchPartyModule!,
+                    ),
+                  ],
+                  if (pkScoreModule != null) ...[
+                    const SizedBox(height: 6),
+                    Padding(
+                      padding: const EdgeInsets.symmetric(horizontal: 12),
+                      child: pkScoreModule!,
                     ),
                   ],
                   const SizedBox(height: 3),
