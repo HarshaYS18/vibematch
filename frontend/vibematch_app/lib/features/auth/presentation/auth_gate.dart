@@ -4,6 +4,10 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../app/app_shell.dart';
+import '../../../app/growth/vm_growth_router.dart';
+import '../../../core/growth/vm_growth_coordinator.dart';
+import '../../../core/growth/vm_growth_link.dart';
+import '../../../core/localization/vm_locale_controller.dart';
 import '../../../core/network/vm_failure.dart';
 import '../../../identity/data/identity_repository.dart';
 import '../../../session/data/session_repository.dart';
@@ -36,6 +40,7 @@ class _AuthGateState extends ConsumerState<AuthGate> {
   String? _error;
   CurrentUser? _currentUser;
   StreamSubscription<void>? _signedOutSubscription;
+  StreamSubscription<VmGrowthLink>? _growthLinkSubscription;
 
   @override
   void initState() {
@@ -43,12 +48,16 @@ class _AuthGateState extends ConsumerState<AuthGate> {
     _signedOutSubscription = AuthUserRealtimeService.instance.signedOut.listen(
       (_) => _handleSessionSignedOut(),
     );
+    _growthLinkSubscription =
+        VmGrowthCoordinator.instance.links.listen(_handleGrowthLink);
+    unawaited(VmGrowthCoordinator.instance.initialize());
     _checkSavedLogin();
   }
 
   @override
   void dispose() {
     _signedOutSubscription?.cancel();
+    _growthLinkSubscription?.cancel();
     super.dispose();
   }
 
@@ -78,6 +87,7 @@ class _AuthGateState extends ConsumerState<AuthGate> {
           _currentUser = user;
           _needsProfileSetup = needsSetup;
         });
+        _activateAuthenticatedUser(user, needsSetup: needsSetup);
       }
     } catch (_) {
       if (mounted) {
@@ -136,6 +146,7 @@ class _AuthGateState extends ConsumerState<AuthGate> {
           _currentUser = user;
           _needsProfileSetup = needsSetup;
         });
+        _activateAuthenticatedUser(user, needsSetup: needsSetup);
       }
     } catch (error) {
       if (mounted) {
@@ -180,6 +191,7 @@ class _AuthGateState extends ConsumerState<AuthGate> {
           _currentUser = user;
           _needsProfileSetup = needsSetup;
         });
+        _activateAuthenticatedUser(user, needsSetup: needsSetup);
       }
     } catch (error) {
       final raw = error.toString().toLowerCase();
@@ -219,6 +231,57 @@ class _AuthGateState extends ConsumerState<AuthGate> {
       _currentUser = user;
       _needsProfileSetup = false;
     });
+    _activateAuthenticatedUser(user, needsSetup: false);
+  }
+
+  void _activateAuthenticatedUser(
+    CurrentUser user, {
+    required bool needsSetup,
+  }) {
+    unawaited(VmLocaleController.instance.syncFromBackend());
+    if (needsSetup) return;
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted) unawaited(_drainPendingGrowthLink(user));
+    });
+  }
+
+  void _handleGrowthLink(VmGrowthLink link) {
+    final user = _currentUser;
+    if (user == null || _needsProfileSetup) return;
+    VmGrowthCoordinator.instance.markConsumed(link);
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted) unawaited(_openGrowthLink(link, user));
+    });
+  }
+
+  Future<void> _drainPendingGrowthLink(CurrentUser user) async {
+    final link = VmGrowthCoordinator.instance.takePending();
+    if (link == null) return;
+    await _openGrowthLink(link, user);
+  }
+
+  Future<void> _openGrowthLink(
+    VmGrowthLink link,
+    CurrentUser user,
+  ) async {
+    try {
+      await VmGrowthRouter.open(context, link: link, currentUser: user);
+    } catch (error) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context)
+        ..clearSnackBars()
+        ..showSnackBar(
+          SnackBar(
+            behavior: SnackBarBehavior.floating,
+            content: Text(
+              VmFailurePresentation.messageFor(
+                error,
+                contentLabel: 'shared link',
+              ),
+            ),
+          ),
+        );
+    }
   }
 
   @override

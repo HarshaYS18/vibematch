@@ -9,6 +9,7 @@ import 'package:sentry_flutter/sentry_flutter.dart';
 
 import 'app/app_route_factory.dart';
 import 'app/app_routes.dart';
+import 'core/growth/vm_growth_coordinator.dart';
 import 'core/localization/funkey_localizations.dart';
 import 'core/localization/vm_locale_controller.dart';
 import 'core/notifications/vm_push_notification_service.dart';
@@ -47,6 +48,7 @@ void main() {
       WidgetsFlutterBinding.ensureInitialized();
       _installGlobalErrorHandling();
       unawaited(VmLocaleController.instance.restore());
+      unawaited(VmGrowthCoordinator.instance.initialize());
 
       // Render FunKey immediately. Optional services such as Firebase/push must
       // never be able to block the first frame or leave the app on a white page.

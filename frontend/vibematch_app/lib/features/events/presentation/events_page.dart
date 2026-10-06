@@ -9,7 +9,9 @@ import '../data/events_repository.dart';
 import '../models/event_item.dart';
 
 class EventsPage extends StatefulWidget {
-  const EventsPage({super.key});
+  const EventsPage({super.key, this.initialEventId});
+
+  final String? initialEventId;
 
   @override
   State<EventsPage> createState() => _EventsPageState();
@@ -47,9 +49,16 @@ class _EventsPageState extends State<EventsPage> {
     try {
       final data = await _repository.fetch(force: force);
       if (!mounted) return;
+      final active = data.events.where((event) => event.isActive).toList()
+        ..sort((a, b) => a.endsAt.compareTo(b.endsAt));
+      final requestedId = widget.initialEventId?.trim();
+      final requestedIndex = requestedId == null || requestedId.isEmpty
+          ? -1
+          : active.indexWhere((event) => event.id == requestedId);
       setState(() {
         _events = data.events;
         _missions = data.missions;
+        if (requestedIndex >= 0) _selectedIndex = requestedIndex;
         _loading = false;
       });
     } catch (error) {
