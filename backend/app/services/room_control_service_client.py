@@ -154,3 +154,21 @@ def execute_cricket_operation(
         },
     )
     return response.get("result")
+
+
+
+def apply_pk_gift_score(
+    *,
+    room_public_id: str,
+    source_event_id: str,
+    coin_value: int,
+) -> dict[str, Any]:
+    return _request(
+        "POST",
+        "pk/gift-score",
+        json_body={
+            "room_public_id": room_public_id,
+            "source_event_id": source_event_id,
+            "coin_value": max(1, int(coin_value)),
+        },
+    )
