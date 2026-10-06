@@ -161,12 +161,27 @@ def create_challenge(
     duration_seconds: int,
     actor: User,
 ) -> RoomPkMatch:
-    source = _room(db, room_public_id, lock=True)
-    target = _room(db, opponent_room_public_id, lock=True)
-    room_permission_service.require_room_admin(db, source, actor)
+    source = _room(db, room_public_id)
+    target = _room(db, opponent_room_public_id)
 
     if source.id == target.id:
         raise HTTPException(status_code=400, detail="Choose a different room for PK")
+
+    # Lock both room rows in deterministic primary-key order. Opposite
+    # simultaneous challenges (A->B and B->A) therefore serialize instead of
+    # deadlocking while checking the one-open-PK-per-room invariant.
+    locked_rooms = (
+        db.query(Room)
+        .filter(Room.id.in_(sorted((source.id, target.id))))
+        .order_by(Room.id.asc())
+        .with_for_update()
+        .all()
+    )
+    locked_by_id = {int(room.id): room for room in locked_rooms}
+    source = locked_by_id[source.id]
+    target = locked_by_id[target.id]
+
+    room_permission_service.require_room_admin(db, source, actor)
     if target.is_secret or target.is_locked or target.is_members_only:
         raise HTTPException(status_code=409, detail="This room is not available for public PK")
 
