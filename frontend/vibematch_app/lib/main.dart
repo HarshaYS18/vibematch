@@ -3,11 +3,14 @@ import 'dart:async';
 import 'package:firebase_core/firebase_core.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:sentry_flutter/sentry_flutter.dart';
 
 import 'app/app_route_factory.dart';
 import 'app/app_routes.dart';
+import 'core/localization/funkey_localizations.dart';
+import 'core/localization/vm_locale_controller.dart';
 import 'core/notifications/vm_push_notification_service.dart';
 import 'core/ui/vm_motion.dart';
 import 'features/auth/presentation/auth_gate.dart';
@@ -43,6 +46,7 @@ void main() {
     () {
       WidgetsFlutterBinding.ensureInitialized();
       _installGlobalErrorHandling();
+      unawaited(VmLocaleController.instance.restore());
 
       // Render FunKey immediately. Optional services such as Firebase/push must
       // never be able to block the first frame or leave the app on a white page.
@@ -381,18 +385,33 @@ class VibeMatchApp extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return MaterialApp(
-      title: 'FunKey',
-      debugShowCheckedModeBanner: false,
-      navigatorKey: rootNavigatorKey,
-      navigatorObservers: <NavigatorObserver>[SentryNavigatorObserver()],
-      scaffoldMessengerKey: rootScaffoldMessengerKey,
-      initialRoute: VmRoutes.auth,
-      onGenerateRoute: AppRouteFactory.onGenerateRoute,
-      theme: _theme(),
-      // Respect the user's platform text-scale preference. Individual screens
-      // must adapt instead of globally shrinking accessibility text.
-      builder: (context, child) => child ?? const AuthGate(),
+    final localeController = VmLocaleController.instance;
+    return AnimatedBuilder(
+      animation: localeController,
+      builder: (context, _) {
+        return MaterialApp(
+          onGenerateTitle: (context) =>
+              FunKeyLocalizations.of(context).appTitle,
+          debugShowCheckedModeBanner: false,
+          navigatorKey: rootNavigatorKey,
+          navigatorObservers: <NavigatorObserver>[SentryNavigatorObserver()],
+          scaffoldMessengerKey: rootScaffoldMessengerKey,
+          initialRoute: VmRoutes.auth,
+          onGenerateRoute: AppRouteFactory.onGenerateRoute,
+          theme: _theme(),
+          locale: localeController.locale,
+          supportedLocales: FunKeyLocalizations.supportedLocales,
+          localizationsDelegates: const <LocalizationsDelegate<dynamic>>[
+            FunKeyLocalizations.delegate,
+            GlobalMaterialLocalizations.delegate,
+            GlobalWidgetsLocalizations.delegate,
+            GlobalCupertinoLocalizations.delegate,
+          ],
+          // Respect the user's platform text-scale preference. Individual
+          // screens adapt instead of globally shrinking accessibility text.
+          builder: (context, child) => child ?? const AuthGate(),
+        );
+      },
     );
   }
 }

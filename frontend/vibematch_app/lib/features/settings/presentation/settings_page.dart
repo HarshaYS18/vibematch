@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 
+import '../../../core/localization/funkey_localizations.dart';
+import '../../../core/localization/vm_locale_controller.dart';
 import '../../../core/network/vm_failure.dart';
 import '../../../core/presentation/vm_async_state.dart';
 import '../../../core/ui/vm_motion.dart';
@@ -44,6 +46,9 @@ class _SettingsPageState extends State<SettingsPage> {
     setState(() => _state = state);
     try {
       await AccountSettingsStore.save(state);
+      if (previous?.language != state.language) {
+        await VmLocaleController.instance.setLanguage(state.language);
+      }
       if (mounted) _toast(message);
     } catch (error) {
       if (!mounted) return;
@@ -74,8 +79,9 @@ class _SettingsPageState extends State<SettingsPage> {
   Future<void> _chooseLanguage() async {
     final state = _state;
     if (state == null) return;
+    final strings = FunKeyLocalizations.of(context);
     final language = await _choiceSheet(
-      title: 'Language',
+      title: strings.language,
       selected: state.language,
       choices: const <String>[
         'English',
@@ -87,7 +93,7 @@ class _SettingsPageState extends State<SettingsPage> {
       ],
     );
     if (language != null)
-      await _save(state.copyWith(language: language), 'Language saved.');
+      await _save(state.copyWith(language: language), strings.languageSaved);
   }
 
   Future<void> _chooseAppearance() async {
@@ -155,6 +161,7 @@ class _SettingsPageState extends State<SettingsPage> {
   @override
   Widget build(BuildContext context) {
     final state = _state;
+    final strings = FunKeyLocalizations.of(context);
     return Scaffold(
       backgroundColor: const Color(0xFFFAFAFA),
       body: SafeArea(
@@ -231,8 +238,8 @@ class _SettingsPageState extends State<SettingsPage> {
                     children: [
                       _SettingsRow(
                         icon: Icons.language_rounded,
-                        title: 'Language',
-                        subtitle: state.language,
+                        title: strings.language,
+                        subtitle: strings.languageName(state.language),
                         onTap: _chooseLanguage,
                       ),
                       _SettingsRow(
@@ -293,9 +300,9 @@ class _Header extends StatelessWidget {
             color: Color(0xFF111114),
           ),
         ),
-        const Expanded(
+        Expanded(
           child: Text(
-            'Settings',
+            FunKeyLocalizations.of(context).settingsTitle,
             style: TextStyle(
               color: Color(0xFF111114),
               fontSize: 25,

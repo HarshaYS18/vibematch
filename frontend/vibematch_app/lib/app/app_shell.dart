@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../core/icons/vm_icons.dart';
+import '../core/localization/funkey_localizations.dart';
 import '../core/permissions/vm_android_permission_service.dart';
 import '../core/ui/vm_motion.dart';
 import '../core/ui/vm_toast.dart';
@@ -501,6 +502,16 @@ class _VibeBottomNav extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final strings = FunKeyLocalizations.of(context);
+    String labelFor(VmMainTab tab) {
+      return switch (tab) {
+        VmMainTab.home => strings.navHome,
+        VmMainTab.vibes => strings.navVibes,
+        VmMainTab.inbox => strings.navInbox,
+        VmMainTab.me => strings.navMe,
+      };
+    }
+
     return SafeArea(
       top: false,
       child: Container(
@@ -523,26 +534,26 @@ class _VibeBottomNav extends StatelessWidget {
           children: [
             _NavItem(
               icon: VMIcons.home,
-              label: VmMainTab.home.label,
+              label: labelFor(VmMainTab.home),
               active: selectedTab == VmMainTab.home,
               onTap: () => onTabSelected(VmMainTab.home),
             ),
             _NavItem(
               icon: VMIcons.vibes,
-              label: VmMainTab.vibes.label,
+              label: labelFor(VmMainTab.vibes),
               active: selectedTab == VmMainTab.vibes,
               onTap: () => onTabSelected(VmMainTab.vibes),
             ),
             _NavItem(
               icon: VMIcons.inbox,
-              label: VmMainTab.inbox.label,
+              label: labelFor(VmMainTab.inbox),
               active: selectedTab == VmMainTab.inbox,
               badgeCount: inboxUnreadCount,
               onTap: () => onTabSelected(VmMainTab.inbox),
             ),
             _NavItem(
               icon: showOwnerControls ? VMIcons.admin : VMIcons.profile,
-              label: VmMainTab.me.label,
+              label: labelFor(VmMainTab.me),
               active: selectedTab == VmMainTab.me,
               onTap: () => onTabSelected(VmMainTab.me),
             ),
