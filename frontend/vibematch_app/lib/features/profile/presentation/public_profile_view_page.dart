@@ -3,6 +3,9 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../../core/growth/vm_growth_coordinator.dart';
+import '../../../core/growth/vm_growth_link.dart';
+import '../../../core/localization/funkey_localizations.dart';
 import '../../../core/network/vm_failure.dart';
 import '../../../core/presentation/vm_async_state.dart';
 
@@ -122,6 +125,27 @@ class _PublicProfileViewPageState
 
   void _setProfileState(VoidCallback update) => setState(update);
 
+  Future<void> _shareProfile(String displayName) async {
+    final targetId = _targetPublicUserId();
+    if (targetId <= 0) return;
+    final viewerId = (_viewer ?? _authApi.cachedUser)?.publicUserId;
+    final link = VmGrowthLinks.profile(
+      targetId.toString(),
+      referrerId: viewerId?.toString(),
+    );
+    final strings = FunKeyLocalizations.of(context);
+    final result = await VmGrowthCoordinator.instance.shareText(
+      strings.profileShareText(displayName, link.toString()),
+    );
+    if (!mounted) return;
+    _showAction(
+      context,
+      result == VmGrowthShareResult.shared
+          ? strings.shareOpened
+          : strings.linkCopied,
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final displayName = _displayName();
@@ -189,8 +213,7 @@ class _PublicProfileViewPageState
                 onCoverChanged: (index) => setState(() => _coverIndex = index),
                 onBackTap: () => Navigator.pop(context),
                 onQrTap: _openProfileQrActions,
-                onShareTap: () =>
-                    _showAction(context, 'Profile share sheet will open.'),
+                onShareTap: () => unawaited(_shareProfile(displayName)),
                 onAddCoverTap: () => _showAction(
                   context,
                   'Add cover photos flow will open. Users can upload multiple covers.',
