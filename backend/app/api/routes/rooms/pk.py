@@ -83,8 +83,6 @@ async def get_current_pk(
     )
     if match is None:
         return None
-    if match.status == "finished" and match.finished_reason == "timer_elapsed":
-        await _broadcast(db, match, "finished")
     return _response(db, match)
 
 
