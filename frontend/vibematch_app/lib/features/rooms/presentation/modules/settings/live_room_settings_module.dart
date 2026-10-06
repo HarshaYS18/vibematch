@@ -22,6 +22,7 @@ import '../chat/live_room_chat_module.dart';
 import '../cricket/live_room_cricket_module.dart';
 import '../games/live_room_games_entry_module.dart';
 import '../lifecycle/live_room_lifecycle_module.dart';
+import '../pk/live_room_pk_module.dart';
 import '../live_room_controller_bundle.dart';
 import '../seats/live_room_seats_module.dart';
 import '../watch_party/live_room_watch_party_entry_module.dart';
@@ -48,6 +49,8 @@ class LiveRoomSettingsModule {
         applyOnlyModeEnabled: bundle.applyOnlyModeEnabled,
         joinRequestCount: bundle.pendingRoomMemberRequests.length,
         cricketModeActive: bundle.cricketModeController.active,
+        pkModeEngaged:
+            bundle.pkController.pending || bundle.pkController.active,
         onBackgroundTap: () =>
             openBackgroundPickerFromSettings(bundle, sheetContext),
         onCoverPhotoTap: () =>
@@ -67,6 +70,10 @@ class LiveRoomSettingsModule {
           sheetContext: sheetContext,
         ),
         onCricketModeTap: () => LiveRoomCricketModule.openFromSettings(
+          bundle: bundle,
+          sheetContext: sheetContext,
+        ),
+        onPkModeTap: () => LiveRoomPkModule.openFromSettings(
           bundle: bundle,
           sheetContext: sheetContext,
         ),
