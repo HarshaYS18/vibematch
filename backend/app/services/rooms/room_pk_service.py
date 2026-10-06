@@ -4,11 +4,12 @@ from datetime import datetime, timedelta
 from uuid import uuid4
 
 from fastapi import HTTPException
-from sqlalchemy import or_
+from sqlalchemy import func, or_
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
 from app.models.cricket import CricketMatch, CricketMatchStatus
+from app.models.economy import GiftTransaction
 from app.models.room import Room
 from app.models.room_realtime_state import RoomRealtimeEvent
 from app.models.room_pk import RoomPkMatch, RoomPkScoreReceipt
@@ -353,12 +354,48 @@ def finish_match(
     return _finish(db, match, reason="timer_elapsed" if match.ends_at and datetime.utcnow() >= match.ends_at else "ended_by_host")
 
 
+def _reconcile_scores_from_economy(
+    db: Session,
+    match: RoomPkMatch,
+    *,
+    finished_at: datetime,
+) -> None:
+    if match.started_at is None:
+        return
+    cutoff = finished_at
+    if match.ends_at is not None and match.ends_at < cutoff:
+        cutoff = match.ends_at
+
+    rows = (
+        db.query(
+            GiftTransaction.room_id,
+            func.coalesce(func.sum(GiftTransaction.total_coin_value), 0),
+        )
+        .filter(
+            GiftTransaction.room_id.in_(
+                (match.challenger_room_id, match.opponent_room_id)
+            ),
+            GiftTransaction.created_at >= match.started_at,
+            GiftTransaction.created_at <= cutoff,
+        )
+        .group_by(GiftTransaction.room_id)
+        .all()
+    )
+    scores = {int(room_id): int(total or 0) for room_id, total in rows}
+    match.challenger_score = scores.get(int(match.challenger_room_id), 0)
+    match.opponent_score = scores.get(int(match.opponent_room_id), 0)
+
+
 def _finish(db: Session, match: RoomPkMatch, *, reason: str) -> RoomPkMatch:
     now = datetime.utcnow()
     if match.status == "challenged":
         match.status = "cancelled"
         match.winner_room_id = None
     else:
+        # Rebuild the final PK score from Economy's settled gift ledger before
+        # selecting a winner. Realtime score receipts are a low-latency
+        # projection only and cannot decide the durable result.
+        _reconcile_scores_from_economy(db, match, finished_at=now)
         match.status = "finished"
         if int(match.challenger_score or 0) > int(match.opponent_score or 0):
             match.winner_room_id = match.challenger_room_id
