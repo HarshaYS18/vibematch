@@ -76,8 +76,11 @@ async def get_current_pk(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
-    del current_user
-    match = room_pk_service.current_match(db, room_public_id)
+    match = room_pk_service.current_match(
+        db,
+        room_public_id,
+        actor=current_user,
+    )
     if match is None:
         return None
     if match.status == "finished" and match.finished_reason == "timer_elapsed":
