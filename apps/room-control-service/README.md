@@ -6,8 +6,8 @@ Chunk 26 extracts durable room correctness from the core API.
 
 Room creation/configuration, membership/admin flags, kickouts, durable seats,
 member/seat requests, room chat state, Room State Engine event/version state,
-room activities, Watch Party durable state, room themes/reviews/inventory and
-room moderation actions.
+room activities, Watch Party durable state, Room-vs-Room PK challenge/result
+state, room themes/reviews/inventory and room moderation actions.
 
 The Go realtime gateway remains transport. Redis remains rebuildable
 presence/fanout/replay state. mediasoup remains media transport.
@@ -38,3 +38,16 @@ room through the authenticated internal API.
 media permission context. `POST /internal/room-control/command` executes the
 allowlisted room command engine inside this deployable. Core realtime and media
 code must use these endpoints instead of reading Room Control tables directly.
+
+
+## Room PK
+
+Room Control owns durable PK challenge, live-score and winner state. The
+Economy domain remains authoritative for gifts and wallets; after a gift
+settlement commits, core forwards an idempotent score receipt to Room Control.
+A scoring projection failure cannot roll back or alter financial settlement.
+
+Public PK operations remain under `/api/v1/rooms/{room}/pk/**`. The internal
+`/internal/room-control/pk/gift-score` endpoint is token-protected and exists
+only for settled Economy receipts. Realtime `room_pk/state` messages are
+transport mirrors of PostgreSQL state, not a second authority.
