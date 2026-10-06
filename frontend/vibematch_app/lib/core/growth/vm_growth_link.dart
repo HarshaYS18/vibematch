@@ -141,7 +141,7 @@ class VmGrowthLinks {
     }
 
     final destination =
-        VmGrowthDestination.fromSegment(destinationSegment ?? '');
+        VmGrowthDestination.fromSegment(destinationSegment);
     if (destination == null || remainingSegments.isEmpty) return null;
 
     final id = remainingSegments.first.trim();
