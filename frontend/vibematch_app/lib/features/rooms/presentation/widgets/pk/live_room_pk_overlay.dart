@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:math' as math;
 
 import 'package:flutter/material.dart';
@@ -113,7 +114,7 @@ class _IncomingPkChallengeOverlay extends StatelessWidget {
               TextButton(
                 onPressed: controller.actionPending
                     ? null
-                    : () => controller.decline(),
+                    : () => unawaited(controller.decline()),
                 child: const Text(
                   'No',
                   style: TextStyle(color: Colors.white70),
@@ -122,7 +123,7 @@ class _IncomingPkChallengeOverlay extends StatelessWidget {
               FilledButton(
                 onPressed: controller.actionPending
                     ? null
-                    : () => controller.accept(),
+                    : () => unawaited(controller.accept()),
                 style: FilledButton.styleFrom(
                   backgroundColor: RoomColors.coral,
                   foregroundColor: Colors.white,
