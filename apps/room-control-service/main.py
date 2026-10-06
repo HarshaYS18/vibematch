@@ -5,7 +5,7 @@ from fastapi.responses import PlainTextResponse
 from sqlalchemy import text
 
 from app.api.routes import room_realtime_commands
-from app.api.routes.rooms import rooms
+from app.api.routes.rooms import pk, rooms
 from app.core.config import settings
 from app.core.operational import install_query_counter, operational_middleware, render_metrics
 from app.core.telemetry import configure_telemetry
@@ -29,6 +29,7 @@ app.dependency_overrides[get_db] = get_room_control_db
 
 api = APIRouter(prefix="/api/v1")
 api.include_router(rooms.router)
+api.include_router(pk.router)
 api.include_router(room_realtime_commands.router)
 api.include_router(rooms.admin_router)
 app.include_router(api)
