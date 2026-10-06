@@ -87,9 +87,6 @@ class _SettingsPageState extends State<SettingsPage> {
         'English',
         'Hindi',
         'Telugu',
-        'Tamil',
-        'Kannada',
-        'Malayalam',
       ],
     );
     if (language != null)
