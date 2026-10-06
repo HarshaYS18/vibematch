@@ -8,6 +8,7 @@ import '../../../../../watch_party/data/watch_party_repository.dart';
 import '../../widgets/live_room_body.dart';
 import '../../widgets/live_room_minimized_bubble.dart';
 import '../../widgets/live_room_shell.dart';
+import '../../widgets/pk/room_pk_score_strip.dart';
 import '../chat/live_room_chat_module.dart';
 import '../cricket/live_room_cricket_module.dart';
 import '../games/live_room_games_entry_module.dart';
@@ -148,6 +149,9 @@ class LiveRoomLayoutModule extends ConsumerWidget {
           imagesEnabled: bundle.roomImagesEnabled,
           cricketModeController: bundle.cricketModeController,
           watchPartyModule: watchPartyModule,
+          pkScoreModule: RoomPkScoreStrip(
+            controller: bundle.pkController,
+          ),
           onBack: () => LiveRoomLifecycleModule.openLeaveSheet(bundle),
           onJoinTap: () => LiveRoomSeatsModule.handleJoinRoom(bundle),
           onShare: () => LiveRoomChatModule.openRoomShareSheet(bundle),
