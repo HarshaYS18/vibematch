@@ -90,6 +90,7 @@ class _RoomPkChallengeSheetState extends State<RoomPkChallengeSheet> {
   Widget build(BuildContext context) {
     final controller = widget.controller;
     final opponent = controller.opponentRoom;
+    final surfacedError = _error ?? controller.error;
 
     return Container(
       constraints: BoxConstraints(
@@ -229,13 +230,13 @@ class _RoomPkChallengeSheetState extends State<RoomPkChallengeSheet> {
                 ),
               ),
           ],
-          if (_error != null &&
+          if (surfacedError != null &&
               !((_candidates ?? const <RoomPkRoomSummary>[]).isEmpty &&
                   !controller.pending &&
                   !controller.active)) ...[
             const SizedBox(height: 10),
             Text(
-              _error!,
+              surfacedError,
               style: const TextStyle(
                 color: RoomColors.coral,
                 fontSize: 11.5,
