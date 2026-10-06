@@ -12,7 +12,7 @@ from app.models.room import Room
 from app.models.room_participant import RoomParticipant
 from app.models.room_realtime_state import RoomRealtimeEvent
 from app.models.user import User
-from app.services.rooms import room_permission_service
+from app.services.rooms import room_permission_service, room_pk_service
 
 
 WATCH_PARTY_ACTIONS = {
@@ -256,6 +256,11 @@ def apply_watch_party_command(
 
     if command == "LOAD":
         room_permission_service.require_room_admin(db, room, actor)
+        if room_pk_service.has_open_match(db, room.room_public_id):
+            raise HTTPException(
+                status_code=409,
+                detail="End Room PK before starting Watch Party",
+            )
         content = _content_fields(payload)
         _require_private_ott_room(room, content["provider"])
         state = {
