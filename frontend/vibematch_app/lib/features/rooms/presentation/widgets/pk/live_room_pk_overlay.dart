@@ -164,7 +164,7 @@ class _PkVsIntroOverlay extends StatelessWidget {
               duration: duration,
               curve: Curves.easeOutBack,
               builder: (context, value, _) {
-                final clamped = value.clamp(0.0, 1.0);
+                final clamped = value.clamp(0.0, 1.0).toDouble();
                 return Stack(
                   alignment: Alignment.center,
                   children: [
@@ -353,7 +353,7 @@ class _PkResultOverlay extends StatelessWidget {
                 : const Duration(milliseconds: 800),
             curve: Curves.easeOutCubic,
             builder: (context, value, child) {
-              final progress = value.clamp(0.0, 1.0);
+              final progress = value.clamp(0.0, 1.0).toDouble();
               return Stack(
                 fit: StackFit.expand,
                 children: [
@@ -469,7 +469,9 @@ class _PkConfettiPainter extends CustomPainter {
       final xSeed = ((index * 37) % 101) / 100;
       final ySeed = ((index * 19) % 67) / 67;
       final drift = math.sin(index * 1.7 + progress * math.pi * 2) * 22;
-      final x = (xSeed * size.width + drift).clamp(0.0, size.width);
+      final x = (xSeed * size.width + drift)
+          .clamp(0.0, size.width)
+          .toDouble();
       final y = -20 + ((size.height + 80) * ((progress + ySeed) % 1));
       final paint = Paint()
         ..color = _colors[index % _colors.length].withValues(
