@@ -208,7 +208,8 @@ class _RoomPkChallengeSheetState extends State<RoomPkChallengeSheet> {
                 action: _error == null ? null : _loadCandidates,
               )
             else
-              Flexible(
+              ConstrainedBox(
+                constraints: const BoxConstraints(maxHeight: 320),
                 child: ListView.separated(
                   shrinkWrap: true,
                   physics: const BouncingScrollPhysics(),
